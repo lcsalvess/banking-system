@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.service;
 
+import com.lucas.sistemabancario.dto.ContaResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaCorrente;
@@ -28,8 +29,11 @@ public class ContaService {
         this.clienteService = clienteService;
     }
 
-    public List<Conta> listar() {
-        return contaRepository.findAll();
+    public List<ContaResponseDTO> listar() {
+        return contaRepository.findAll()
+                .stream()
+                .map(ContaResponseDTO::fromEntity)
+                .toList();
     }
 
     public Conta buscarPorId(Long id){

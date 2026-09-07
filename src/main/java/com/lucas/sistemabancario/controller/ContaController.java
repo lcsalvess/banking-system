@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.controller;
 
+import com.lucas.sistemabancario.dto.ContaResponseDTO;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaCorrente;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
@@ -19,7 +20,7 @@ public class ContaController {
     }
 
     @GetMapping
-    public List<Conta> listar() {
+    public List<ContaResponseDTO> listar() {
         return contaService.listar();
     }
 

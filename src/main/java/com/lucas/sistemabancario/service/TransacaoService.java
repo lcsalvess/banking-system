@@ -32,8 +32,7 @@ public class TransacaoService {
         validarContaAtiva(conta);
         validarValor(valor);
         conta.creditar(valor);
-        Transacao transacao = new Transacao(TipoTransacao.DEPOSITO, valor, LocalDateTime.now(), conta);
-        transacaoRepository.save(transacao);
+        registrarTransacao(TipoTransacao.DEPOSITO, valor, conta);
     }
 
     public List<Transacao> listarPorConta(Long contaId) {
@@ -48,8 +47,7 @@ public class TransacaoService {
         validarValor(valor);
         validarSaldo(conta, valor);
         conta.debitar(valor);
-        Transacao transacao = new Transacao(TipoTransacao.SAQUE, valor, LocalDateTime.now(), conta);
-        transacaoRepository.save(transacao);
+        registrarTransacao(TipoTransacao.SAQUE, valor, conta);
     }
 
     @Transactional
@@ -63,10 +61,8 @@ public class TransacaoService {
         validarSaldo(contaOrigem, valor);
         contaOrigem.debitar(valor);
         contaDestino.creditar(valor);
-        Transacao transacaoContaOrigem = new Transacao(TipoTransacao.TRANSFERENCIA_ENVIADA, valor, LocalDateTime.now(), contaOrigem);
-        Transacao transacaoContaDestino = new Transacao(TipoTransacao.TRANSFERENCIA_RECEBIDA, valor, LocalDateTime.now(), contaDestino);
-        transacaoRepository.save(transacaoContaOrigem);
-        transacaoRepository.save(transacaoContaDestino);
+        registrarTransacao(TipoTransacao.TRANSFERENCIA_ENVIADA, valor, contaOrigem);
+        registrarTransacao(TipoTransacao.TRANSFERENCIA_RECEBIDA, valor, contaDestino);
     }
 
     private void validarContaAtiva(Conta conta) {
@@ -91,5 +87,10 @@ public class TransacaoService {
         if (contaIdOrigem.equals(contaIdDestino)) {
             throw new ContasIguaisException("A conta de origem não pode ser igual à conta de destino.");
         }
+    }
+
+    private void registrarTransacao(TipoTransacao tipoTransacao, BigDecimal valor, Conta conta) {
+        Transacao transacao = new Transacao(tipoTransacao, valor, LocalDateTime.now(), conta);
+        transacaoRepository.save(transacao);
     }
 }

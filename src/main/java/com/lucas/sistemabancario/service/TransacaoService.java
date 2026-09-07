@@ -5,7 +5,6 @@ import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.Transacao;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
-import com.lucas.sistemabancario.entity.enums.TipoConta;
 import com.lucas.sistemabancario.entity.enums.TipoTransacao;
 import com.lucas.sistemabancario.exception.*;
 import com.lucas.sistemabancario.repository.TransacaoRepository;
@@ -13,7 +12,9 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Service
@@ -28,7 +29,7 @@ public class TransacaoService {
 
     @Transactional
     public void depositar(Long contaId, BigDecimal valor) {
-        Conta conta = contaService.buscarPorId(contaId);
+        Conta conta = contaService.buscarContaPorId(contaId);
         validarContaAtiva(conta);
         validarValor(valor);
         conta.creditar(valor);
@@ -36,7 +37,7 @@ public class TransacaoService {
     }
 
     public List<TransacaoResponseDTO> listarPorConta(Long contaId) {
-        contaService.buscarPorId(contaId);
+        contaService.buscarContaPorId(contaId);
         return transacaoRepository.findByContaId(contaId)
                 .stream()
                 .map(transacao -> new TransacaoResponseDTO(
@@ -48,7 +49,7 @@ public class TransacaoService {
 
     @Transactional
     public void sacar(Long contaId, BigDecimal valor) {
-        Conta conta = contaService.buscarPorId(contaId);
+        Conta conta = contaService.buscarContaPorId(contaId);
         validarContaAtiva(conta);
         validarValor(valor);
         validarSaldo(conta, valor);
@@ -59,8 +60,8 @@ public class TransacaoService {
     @Transactional
     public void transferir(Long contaIdOrigem, Long contaIdDestino, BigDecimal valor) {
         validarContasDiferentes(contaIdOrigem, contaIdDestino);
-        Conta contaOrigem = contaService.buscarPorId(contaIdOrigem);
-        Conta contaDestino = contaService.buscarPorId(contaIdDestino);
+        Conta contaOrigem = contaService.buscarContaPorId(contaIdOrigem);
+        Conta contaDestino = contaService.buscarContaPorId(contaIdDestino);
         validarContaAtiva(contaOrigem);
         validarContaAtiva(contaDestino);
         validarValor(valor);
@@ -73,9 +74,10 @@ public class TransacaoService {
 
     @Transactional
     public void aplicarRendimento(Long contaId) {
-        Conta conta = contaService.buscarPorId(contaId);
+        Conta conta = contaService.buscarContaPorId(contaId);
         ContaPoupanca contaPoupanca = validarEObterContaPoupanca(conta);
         validarContaAtiva(contaPoupanca);
+        validarRendimentoJaAplicado(contaPoupanca.getId());
         validarRendimentoDisponivel(contaPoupanca);
         BigDecimal rendimento = contaPoupanca.calcularRendimento();
         contaPoupanca.creditar(rendimento);
@@ -116,6 +118,15 @@ public class TransacaoService {
     private void validarRendimentoDisponivel(ContaPoupanca contaPoupanca) {
         if (!contaPoupanca.podeReceberRendimento()){
             throw new RendimentoNaoDisponivelException("A conta ainda não está disponível para receber rendimento");
+        }
+    }
+
+    private void validarRendimentoJaAplicado(Long contaId) {
+        LocalDateTime inicioDoDia = LocalDate.now().atStartOfDay();
+        LocalDateTime fimDoDia = LocalDate.now().atTime(LocalTime.MAX);
+        boolean rendimentoJaAplicado = transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(contaId, TipoTransacao.RENDIMENTO, inicioDoDia, fimDoDia);
+        if (rendimentoJaAplicado) {
+            throw new RendimentoJaAplicadoException("O rendimento já foi aplicado para a conta hoje.");
         }
     }
 

@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.service;
 
+import com.lucas.sistemabancario.dto.ClienteResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.entity.Endereco;
 import com.lucas.sistemabancario.exception.ClienteNotFoundException;
@@ -27,18 +28,26 @@ public class ClienteService {
         return clienteRepository.save(cliente);
     }
 
-    public List<Cliente> listar() {
-        return clienteRepository.findAll();
+    public List<ClienteResponseDTO> listar() {
+        return clienteRepository.findAll()
+                .stream()
+                .map(ClienteResponseDTO::fromEntity)
+                .toList();
     }
 
-    public Cliente buscarPorId(Long id) {
+    public Cliente buscarClientePorId(Long id) {
         return clienteRepository.findById(id)
                 .orElseThrow(() -> new ClienteNotFoundException("Cliente não encontrado"));
     }
 
+    public ClienteResponseDTO buscarPorId(Long id) {
+        Cliente cliente = buscarClientePorId(id);
+        return ClienteResponseDTO.fromEntity(cliente);
+    }
+
     @Transactional
     public Cliente atualizar(Long id, Cliente cliente) {
-        Cliente clienteExistente = buscarPorId(id);
+        Cliente clienteExistente = buscarClientePorId(id);
         atualizarCliente(clienteExistente, cliente);
         atualizarEndereco(clienteExistente.getEndereco(), cliente.getEndereco());
         return clienteRepository.save(clienteExistente);
@@ -46,7 +55,7 @@ public class ClienteService {
 
     @Transactional
     public void deletarPorId(Long id) {
-        Cliente cliente = buscarPorId(id);
+        Cliente cliente = buscarClientePorId(id);
         clienteRepository.delete(cliente);
     }
 

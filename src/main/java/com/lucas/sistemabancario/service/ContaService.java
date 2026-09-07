@@ -36,9 +36,14 @@ public class ContaService {
                 .toList();
     }
 
-    public Conta buscarPorId(Long id){
+    public Conta buscarContaPorId(Long id){
         return contaRepository.findById(id)
                 .orElseThrow(() -> new ContaNotFoundException("Conta não encontrada"));
+    }
+
+    public ContaResponseDTO buscarPorId(Long id) {
+        Conta conta = buscarContaPorId(id);
+        return ContaResponseDTO.fromEntity(conta);
     }
 
     private String gerarNumeroConta() {
@@ -59,7 +64,7 @@ public class ContaService {
     }
 
     public ContaCorrente criarContaCorrente(Long clienteId){
-        Cliente cliente = clienteService.buscarPorId(clienteId);
+        Cliente cliente = clienteService.buscarClientePorId(clienteId);
         if (contaCorrenteRepository.existsByTitularId(clienteId)) {
             throw new ContaAlreadyExistsException("O cliente já possui uma conta corrente.");
         }
@@ -69,7 +74,7 @@ public class ContaService {
     }
 
     public ContaPoupanca criarContaPoupanca(Long clienteId){
-        Cliente cliente = clienteService.buscarPorId(clienteId);
+        Cliente cliente = clienteService.buscarClientePorId(clienteId);
         if (contaPoupancaRepository.existsByTitularId(clienteId)) {
             throw new ContaAlreadyExistsException("O cliente já possui uma conta poupança.");
         }

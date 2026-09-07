@@ -1,7 +1,7 @@
 package com.lucas.sistemabancario.controller;
 
+import com.lucas.sistemabancario.dto.ClienteResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
-import com.lucas.sistemabancario.repository.ClienteRepository;
 import com.lucas.sistemabancario.service.ClienteService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -13,7 +13,7 @@ import java.util.List;
 public class ClienteController {
     private final ClienteService clienteService;
 
-    public ClienteController(ClienteService clienteService, ClienteRepository clienteRepository) {
+    public ClienteController(ClienteService clienteService) {
         this.clienteService = clienteService;
     }
 
@@ -25,12 +25,12 @@ public class ClienteController {
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<Cliente> listar() {
+    public List<ClienteResponseDTO> listar() {
         return clienteService.listar();
     }
 
     @GetMapping("/{id}")
-    public Cliente buscarPorId(@PathVariable Long id){
+    public ClienteResponseDTO buscarPorId(@PathVariable Long id){
         return clienteService.buscarPorId(id);
     }
 

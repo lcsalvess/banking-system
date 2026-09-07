@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -59,5 +60,20 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String tratarRendimentoNaoDisponivel(RendimentoNaoDisponivelException exception) {
         return exception.getMessage();
+    }
+
+    @ExceptionHandler(RendimentoJaAplicadoException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String tratarRendimentoJaAplicado(RendimentoJaAplicadoException exception) {
+        return exception.getMessage();
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String tratarDataIntegrityViolation(DataIntegrityViolationException exception) {
+        if (exception.getMessage() != null && exception.getMessage().contains("idx_unico_rendimento_diario")) {
+            return "O rendimento já foi aplicado para esta conta hoje.";
+        }
+        return "Erro de integridade de dados no banco";
     }
 }

@@ -25,7 +25,7 @@ public class ContaController {
     }
 
     @GetMapping("/{id}")
-    public Conta buscarPorId(@PathVariable Long id) {
+    public ContaResponseDTO buscarPorId(@PathVariable Long id) {
         return contaService.buscarPorId(id);
     }
 

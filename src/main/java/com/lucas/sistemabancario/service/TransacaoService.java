@@ -2,13 +2,12 @@ package com.lucas.sistemabancario.service;
 
 import com.lucas.sistemabancario.dto.TransacaoResponseDTO;
 import com.lucas.sistemabancario.entity.Conta;
+import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.Transacao;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
+import com.lucas.sistemabancario.entity.enums.TipoConta;
 import com.lucas.sistemabancario.entity.enums.TipoTransacao;
-import com.lucas.sistemabancario.exception.ContaIsNotActiveException;
-import com.lucas.sistemabancario.exception.ContasIguaisException;
-import com.lucas.sistemabancario.exception.SaldoIsNotEnoughException;
-import com.lucas.sistemabancario.exception.ValorInvalidoException;
+import com.lucas.sistemabancario.exception.*;
 import com.lucas.sistemabancario.repository.TransacaoRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -72,6 +71,17 @@ public class TransacaoService {
         registrarTransacao(TipoTransacao.TRANSFERENCIA_RECEBIDA, valor, contaDestino);
     }
 
+    @Transactional
+    public void aplicarRendimento(Long contaId) {
+        Conta conta = contaService.buscarPorId(contaId);
+        ContaPoupanca contaPoupanca = validarEObterContaPoupanca(conta);
+        validarContaAtiva(contaPoupanca);
+        validarRendimentoDisponivel(contaPoupanca);
+        BigDecimal rendimento = contaPoupanca.calcularRendimento();
+        contaPoupanca.creditar(rendimento);
+        registrarTransacao(TipoTransacao.RENDIMENTO, rendimento, contaPoupanca);
+    }
+
     private void validarContaAtiva(Conta conta) {
         if (conta.getSituacaoConta() != SituacaoConta.ATIVA) {
             throw new ContaIsNotActiveException("A conta informada não está ativa.");
@@ -93,6 +103,19 @@ public class TransacaoService {
     private void validarContasDiferentes(Long contaIdOrigem, Long contaIdDestino) {
         if (contaIdOrigem.equals(contaIdDestino)) {
             throw new ContasIguaisException("A conta de origem não pode ser igual à conta de destino.");
+        }
+    }
+
+    private ContaPoupanca validarEObterContaPoupanca(Conta conta) {
+        if (!(conta instanceof ContaPoupanca contaPoupanca)) {
+            throw new ContaIsNotPoupancaException("A conta informada não é poupança.");
+        }
+        return contaPoupanca;
+    }
+
+    private void validarRendimentoDisponivel(ContaPoupanca contaPoupanca) {
+        if (!contaPoupanca.podeReceberRendimento()){
+            throw new RendimentoNaoDisponivelException("A conta ainda não está disponível para receber rendimento");
         }
     }
 

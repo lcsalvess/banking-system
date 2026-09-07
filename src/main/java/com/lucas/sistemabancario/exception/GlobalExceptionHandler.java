@@ -48,4 +48,16 @@ public class GlobalExceptionHandler {
     public String tratarContasIguais(ContasIguaisException exception) {
         return exception.getMessage();
     }
+
+    @ExceptionHandler(ContaIsNotPoupancaException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public String tratarContaIsNotPoupanca(ContaIsNotPoupancaException exception) {
+        return exception.getMessage();
+    }
+
+    @ExceptionHandler(RendimentoNaoDisponivelException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String tratarRendimentoNaoDisponivel(RendimentoNaoDisponivelException exception) {
+        return exception.getMessage();
+    }
 }

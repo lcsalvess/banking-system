@@ -41,4 +41,10 @@ public class TransacaoController {
                            @RequestParam BigDecimal valor) {
         transacaoService.transferir(contaIdOrigem, contaIdDestino, valor);
     }
+
+    @PostMapping("/rendimento/{contaId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void aplicarRendimento(@PathVariable Long contaId) {
+        transacaoService.aplicarRendimento(contaId);
+    }
 }

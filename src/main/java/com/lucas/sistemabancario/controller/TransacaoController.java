@@ -1,6 +1,6 @@
 package com.lucas.sistemabancario.controller;
 
-import com.lucas.sistemabancario.entity.Transacao;
+import com.lucas.sistemabancario.dto.TransacaoResponseDTO;
 import com.lucas.sistemabancario.service.TransacaoService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +24,7 @@ public class TransacaoController {
     }
 
     @GetMapping("/conta/{contaId}")
-    public List<Transacao> listarPorConta(@PathVariable Long contaId) {
+    public List<TransacaoResponseDTO> listarPorConta(@PathVariable Long contaId) {
         return transacaoService.listarPorConta(contaId);
     }
 

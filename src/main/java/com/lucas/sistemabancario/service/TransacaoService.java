@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.service;
 
+import com.lucas.sistemabancario.dto.TransacaoResponseDTO;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.Transacao;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
@@ -35,9 +36,15 @@ public class TransacaoService {
         registrarTransacao(TipoTransacao.DEPOSITO, valor, conta);
     }
 
-    public List<Transacao> listarPorConta(Long contaId) {
+    public List<TransacaoResponseDTO> listarPorConta(Long contaId) {
         contaService.buscarPorId(contaId);
-        return transacaoRepository.findByContaId(contaId);
+        return transacaoRepository.findByContaId(contaId)
+                .stream()
+                .map(transacao -> new TransacaoResponseDTO(
+                        transacao.getId(), transacao.getTipoTransacao(),
+                        transacao.getValor(), transacao.getDataHora()
+                ))
+                .toList();
     }
 
     @Transactional

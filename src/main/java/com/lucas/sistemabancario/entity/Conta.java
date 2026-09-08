@@ -70,6 +70,10 @@ public abstract class Conta {
         this.saldo = this.saldo.subtract(valor);
     }
 
+    public void cancelarConta() {
+        this.situacaoConta = SituacaoConta.CANCELADA;
+    }
+
     public SituacaoConta getSituacaoConta() {
         return situacaoConta;
     }

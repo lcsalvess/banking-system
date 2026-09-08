@@ -5,13 +5,18 @@ import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaCorrente;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
+import com.lucas.sistemabancario.entity.enums.SituacaoConta;
 import com.lucas.sistemabancario.exception.ContaAlreadyExistsException;
+import com.lucas.sistemabancario.exception.ContaHasBalanceException;
+import com.lucas.sistemabancario.exception.ContaIsNotActiveException;
 import com.lucas.sistemabancario.exception.ContaNotFoundException;
 import com.lucas.sistemabancario.repository.ContaCorrenteRepository;
 import com.lucas.sistemabancario.repository.ContaPoupancaRepository;
 import com.lucas.sistemabancario.repository.ContaRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -82,5 +87,26 @@ public class ContaService {
         LocalDate dataUltimoRendimento = LocalDate.now();
         ContaPoupanca contaPoupanca = new ContaPoupanca(cliente, numeroConta, dataUltimoRendimento);
         return contaRepository.save(contaPoupanca);
+    }
+
+    @Transactional
+    public void cancelarConta(Long contaId) {
+        Conta conta = contaRepository.findById(contaId)
+                .orElseThrow(() -> new ContaNotFoundException("Conta não encontrada."));
+        validarContaAtiva(conta);
+        validarSeContaTemSaldo(conta);
+        conta.cancelarConta();
+    }
+
+    private void validarSeContaTemSaldo(Conta conta) {
+        if (conta.getSaldo().compareTo(BigDecimal.ZERO) != 0) {
+            throw new ContaHasBalanceException("Não é possível cancelar uma conta com saldo.");
+        }
+    }
+
+    private void validarContaAtiva(Conta conta) {
+        if (conta.getSituacaoConta() != SituacaoConta.ATIVA) {
+            throw new ContaIsNotActiveException("Não é possível cancelar uma conta que não está ativa.");
+        }
     }
 }

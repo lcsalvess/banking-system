@@ -32,6 +32,12 @@ public class GlobalExceptionHandler {
         return exception.getMessage();
     }
 
+    @ExceptionHandler(ContaHasBalanceException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public String tratarContaHasBalance(ContaHasBalanceException exception) {
+        return exception.getMessage();
+    }
+
     @ExceptionHandler(ValorInvalidoException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String tratarValorInvalido(ValorInvalidoException exception) {

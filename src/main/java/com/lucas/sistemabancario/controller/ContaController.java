@@ -40,4 +40,10 @@ public class ContaController {
     public ContaPoupanca criarContaPoupanca(@PathVariable Long clienteId) {
         return contaService.criarContaPoupanca(clienteId);
     }
+
+    @PatchMapping("/cancelar/{contaId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelarConta(@PathVariable Long contaId) {
+        contaService.cancelarConta(contaId);
+    }
 }

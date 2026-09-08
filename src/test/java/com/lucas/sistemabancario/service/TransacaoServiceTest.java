@@ -1,8 +1,11 @@
 package com.lucas.sistemabancario.service;
 
+import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
+import com.lucas.sistemabancario.exception.ContaIsNotActiveException;
 import com.lucas.sistemabancario.exception.RendimentoJaAplicadoException;
+import com.lucas.sistemabancario.repository.ContaRepository;
 import com.lucas.sistemabancario.repository.TransacaoRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,8 +27,11 @@ public class TransacaoServiceTest {
     private TransacaoRepository transacaoRepository;
     @Mock
     private ContaService contaService;
+    @Mock
+    private ContaRepository contaRepository;
     @InjectMocks
     private TransacaoService transacaoService;
+
 
     @Test
     @DisplayName("Deve lançar exceção ao tentar aplicar rendimento já aplicado no dia")

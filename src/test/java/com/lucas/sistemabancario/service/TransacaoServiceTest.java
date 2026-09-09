@@ -4,6 +4,7 @@ import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.Transacao;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
+import com.lucas.sistemabancario.entity.enums.TipoTransacao;
 import com.lucas.sistemabancario.exception.ContaIsNotActiveException;
 import com.lucas.sistemabancario.exception.RendimentoJaAplicadoException;
 import com.lucas.sistemabancario.exception.ValorInvalidoException;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -23,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -59,14 +62,6 @@ public class TransacaoServiceTest {
             verify(transacaoRepository, never()).save(any());
         }
 
-        @Test
-        @DisplayName("Deve realizar depósito em uma conta ATIVA e valor VÁLIDO.")
-        void deveRealizarDepositoQuandoContaEstaAtivaEValorValido() {
-            when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
-            transacaoService.depositar(contaId, BigDecimal.TEN);
-            verify(transacaoRepository).save(any(Transacao.class));
-        }
-
         @ParameterizedTest
         @DisplayName("Deve lançar exceção ao tentar depositar com valores inválidos (null, zero ou negativo).")
         @NullSource
@@ -75,6 +70,20 @@ public class TransacaoServiceTest {
             when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
             assertThrows(ValorInvalidoException.class, () -> transacaoService.depositar(contaId, valorInvalido));
             verify(transacaoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve realizar depósito em uma conta ATIVA e valor VÁLIDO.")
+        void deveRealizarDepositoQuandoContaEstaAtivaEValorValido() {
+            ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
+            when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
+            transacaoService.depositar(contaId, BigDecimal.TEN);
+            assertEquals(BigDecimal.TEN, conta.getSaldo());
+            verify(transacaoRepository).save(transacaoCaptor.capture());
+            Transacao transacao = transacaoCaptor.getValue();
+            assertEquals(TipoTransacao.DEPOSITO, transacao.getTipoTransacao());
+            assertEquals(BigDecimal.TEN, transacao.getValor());
+            assertEquals(conta, transacao.getConta());
         }
     }
 

@@ -254,7 +254,6 @@ public class TransacaoServiceTest {
         void setUp() {
             contaPoupanca = spy(new ContaPoupanca());
             ReflectionTestUtils.setField(contaPoupanca, "id", contaId);
-            lenient().when(contaService.buscarContaPorId(contaId)).thenReturn(contaPoupanca);
         }
 
         @Test
@@ -271,14 +270,34 @@ public class TransacaoServiceTest {
         @Test
         @DisplayName("Deve lançar exceção ao tentar aplicar rendimento já aplicado no dia")
         void deveLancarExcecaoQuandoRendimentoJaAplicadoNoDia() {
+            mockarBuscaContaPoupanca();
             when(transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(eq(contaId), any(), any(), any())).thenReturn(true);
             assertThrows(RendimentoJaAplicadoException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
 
         @Test
+        @DisplayName("Deve lançar exceção quando conta poupança estiver cancelada.")
+        void deveLancarExcecaoQuandoContaPoupancaEstiverCancelada() {
+            ReflectionTestUtils.setField(contaPoupanca, "situacaoConta", SituacaoConta.CANCELADA);
+            mockarBuscaContaPoupanca();
+            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.aplicarRendimento(contaId));
+            verify(transacaoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção quando a conta poupança não puder receber rendimento.")
+        void deveLancarExcecaoQuandoContaNaoPuderReceberRendimento() {
+            mockarBuscaContaPoupanca();
+            doReturn(false).when(contaPoupanca).podeReceberRendimento();
+            assertThrows(RendimentoNaoDisponivelException.class, () -> transacaoService.aplicarRendimento(contaId));
+            verify(transacaoRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("Deve aplicar rendimento com sucesso quando ainda não foi aplicado hoje.")
         void deveAplicarRendimentoComSucesso() {
+            mockarBuscaContaPoupanca();
             ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
             BigDecimal valorRendimento = new BigDecimal("15.50");
             doReturn(true).when(contaPoupanca).podeReceberRendimento();
@@ -292,6 +311,10 @@ public class TransacaoServiceTest {
             assertEquals(contaPoupanca, transacao.getConta());
             assertEquals(TipoTransacao.RENDIMENTO, transacao.getTipoTransacao());
             assertEquals(valorRendimento, transacao.getValor());
+        }
+
+        private void mockarBuscaContaPoupanca() {
+            when(contaService.buscarContaPorId(contaId)).thenReturn(contaPoupanca);
         }
     }
 }

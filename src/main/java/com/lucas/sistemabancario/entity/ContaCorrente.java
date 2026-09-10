@@ -1,10 +1,7 @@
 package com.lucas.sistemabancario.entity;
 
-import com.lucas.sistemabancario.entity.enums.SituacaoConta;
 import com.lucas.sistemabancario.entity.enums.TipoConta;
 import jakarta.persistence.Entity;
-
-import java.math.BigDecimal;
 
 @Entity
 public class ContaCorrente extends Conta{

@@ -50,13 +50,12 @@ public class ClienteService {
     }
 
     @Transactional
-    public Cliente atualizar(Long id, Cliente cliente) {
+    public Cliente atualizar(Long id, ClienteRequestDTO dto) {
         Cliente clienteExistente = buscarClientePorId(id);
-        if (clienteRepository.existsByCpfAndIdNot(cliente.getCpf(), id)) {
-            throw new ClienteCpfAlreadyExistsException("CPF já cadastrado: " + cliente.getCpf());
+        if (clienteRepository.existsByCpfAndIdNot(dto.getCpf(), id)) {
+            throw new ClienteCpfAlreadyExistsException("CPF já cadastrado: " + dto.getCpf());
         }
-        atualizarCliente(clienteExistente, cliente);
-        atualizarEndereco(clienteExistente.getEndereco(), cliente.getEndereco());
+        clienteExistente.atualizarInformacoes(dto);
         return clienteRepository.save(clienteExistente);
     }
 
@@ -64,23 +63,5 @@ public class ClienteService {
     public void deletarPorId(Long id) {
         Cliente cliente = buscarClientePorId(id);
         clienteRepository.delete(cliente);
-    }
-
-    private void atualizarEndereco(Endereco enderecoExistente, Endereco enderecoNovo) {
-        enderecoExistente.setTipoLogradouro(enderecoNovo.getTipoLogradouro());
-        enderecoExistente.setLogradouro(enderecoNovo.getLogradouro());
-        enderecoExistente.setNumero(enderecoNovo.getNumero());
-        enderecoExistente.setComplemento(enderecoNovo.getComplemento());
-        enderecoExistente.setBairro(enderecoNovo.getBairro());
-        enderecoExistente.setCidade(enderecoNovo.getCidade());
-        enderecoExistente.setEstado(enderecoNovo.getEstado());
-        enderecoExistente.setCep(enderecoNovo.getCep());
-    }
-
-    private void atualizarCliente(Cliente clienteExistente, Cliente clienteNovo) {
-        clienteExistente.setNome(clienteNovo.getNome());
-        clienteExistente.setCpf(clienteNovo.getCpf());
-        clienteExistente.setEmail(clienteNovo.getEmail());
-        clienteExistente.setTelefone(clienteNovo.getTelefone());
     }
 }

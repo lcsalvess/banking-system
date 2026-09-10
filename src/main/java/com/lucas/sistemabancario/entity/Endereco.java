@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.entity;
 
+import com.lucas.sistemabancario.dto.request.EnderecoRequestDTO;
 import com.lucas.sistemabancario.entity.enums.Estado;
 import com.lucas.sistemabancario.entity.enums.TipoLogradouro;
 import jakarta.persistence.*;
@@ -40,6 +41,17 @@ public class Endereco {
         this.cidade = cidade;
         this.estado = estado;
         this.cep = cep;
+    }
+
+    public void atualizarInformacoes(EnderecoRequestDTO dto) {
+        this.tipoLogradouro = dto.getTipoLogradouro();
+        this.logradouro = dto.getLogradouro();
+        this.numero = dto.getNumero();
+        this.complemento = dto.getComplemento();
+        this.bairro = dto.getBairro();
+        this.cidade = dto.getCidade();
+        this.estado = dto.getEstado();
+        this.cep = dto.getCep();
     }
 
     public Long getId() {

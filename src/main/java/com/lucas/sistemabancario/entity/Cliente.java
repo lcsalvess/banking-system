@@ -49,6 +49,14 @@ public class Cliente {
         );
     }
 
+    public void atualizarInformacoes(ClienteRequestDTO dto) {
+        this.nome = dto.getNome();
+        this.cpf = dto.getCpf();
+        this.email = dto.getEmail();
+        this.telefone = dto.getTelefone();
+        this.endereco.atualizarInformacoes(dto.getEndereco());
+    }
+
     public Long getId() {
         return id;
     }

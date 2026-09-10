@@ -21,7 +21,7 @@ public class ClienteController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ClienteResponseDTO salvar(@Valid @RequestBody ClienteRequestDTO dto){
+    public ClienteResponseDTO salvar(@Valid @RequestBody ClienteRequestDTO dto) {
         Cliente clienteSalvo = clienteService.salvar(dto);
         return ClienteResponseDTO.fromEntity(clienteSalvo);
     }
@@ -33,13 +33,14 @@ public class ClienteController {
     }
 
     @GetMapping("/{id}")
-    public ClienteResponseDTO buscarPorId(@PathVariable Long id){
+    public ClienteResponseDTO buscarPorId(@PathVariable Long id) {
         return clienteService.buscarPorId(id);
     }
 
     @PutMapping("/{id}")
-    public Cliente atualizarPorId(@PathVariable Long id, @RequestBody Cliente cliente){
-        return clienteService.atualizar(id, cliente);
+    public ClienteResponseDTO atualizarPorId(@PathVariable Long id, @Valid @RequestBody ClienteRequestDTO dto) {
+        Cliente clienteAtualizado = clienteService.atualizar(id, dto);
+        return ClienteResponseDTO.fromEntity(clienteAtualizado);
     }
 
     @DeleteMapping("/{id}")

@@ -1,7 +1,6 @@
 package com.lucas.sistemabancario.controller;
 
-import com.lucas.sistemabancario.dto.ContaResponseDTO;
-import com.lucas.sistemabancario.entity.Conta;
+import com.lucas.sistemabancario.dto.response.ContaResponseDTO;
 import com.lucas.sistemabancario.entity.ContaCorrente;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.service.ContaService;

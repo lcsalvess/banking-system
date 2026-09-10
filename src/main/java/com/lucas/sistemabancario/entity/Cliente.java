@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.entity;
 
+import com.lucas.sistemabancario.dto.request.ClienteRequestDTO;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 
@@ -9,25 +10,14 @@ public class Cliente {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(nullable = false, length = 125)
-    @NotBlank
-    @Size(max = 125)
     private String nome;
     @Column(unique = true, nullable = false, length = 11)
-    @Size(min = 11, max = 11)
-    @NotBlank
     private String cpf;
     @Column(nullable = false, length = 150)
-    @NotBlank
-    @Email
-    @Size(max = 150)
     private String email;
     @Column(nullable = false, length = 11)
-    @NotBlank
-    @Pattern(regexp = "^[0-9]{10,11}$")
-    @Size(min = 10, max = 11)
     private String telefone;
-    @NotNull
-    @ManyToOne(optional = false)
+    @ManyToOne(cascade = CascadeType.PERSIST, optional = false)
     @JoinColumn(name = "endereco_id", nullable = false)
     private Endereco endereco;
 
@@ -39,6 +29,24 @@ public class Cliente {
         this.email = email;
         this.telefone = telefone;
         this.endereco = endereco;
+    }
+
+    public Cliente(ClienteRequestDTO dto) {
+        this.nome = dto.getNome();
+        this.cpf = dto.getCpf();
+        this.email = dto.getEmail();
+        this.telefone = dto.getTelefone();
+
+        this.endereco = new Endereco(
+                dto.getEndereco().getTipoLogradouro(),
+                dto.getEndereco().getLogradouro(),
+                dto.getEndereco().getNumero(),
+                dto.getEndereco().getComplemento(),
+                dto.getEndereco().getBairro(),
+                dto.getEndereco().getCidade(),
+                dto.getEndereco().getEstado(),
+                dto.getEndereco().getCep()
+        );
     }
 
     public Long getId() {

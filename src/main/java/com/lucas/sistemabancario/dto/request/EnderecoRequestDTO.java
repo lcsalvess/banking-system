@@ -1,50 +1,41 @@
-package com.lucas.sistemabancario.entity;
+package com.lucas.sistemabancario.dto.request;
 
 import com.lucas.sistemabancario.entity.enums.Estado;
 import com.lucas.sistemabancario.entity.enums.TipoLogradouro;
-import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
-@Entity
-public class Endereco {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+public class EnderecoRequestDTO {
+    @NotNull(message = "O tipo do logradouro é obrigatório.")
     private TipoLogradouro tipoLogradouro;
-    @Column(nullable = false, length = 150)
+
+    @NotBlank(message = "O logradouro não pode ser vazio.")
+    @Size(max = 150, message = "O logradouro deve ter no máximo 150 caracteres.")
     private String logradouro;
-    @Column(nullable = false, length = 10)
+
+    @NotBlank(message = "O número não pode ser vazio.")
+    @Size(max = 10, message = "O número deve ter no máximo 10 caracteres.")
     private String numero;
-    @Column(length = 100)
+
+    @Size(max = 100, message = "O complemento deve ter no máximo 100 caracteres.")
     private String complemento;
-    @Column(nullable = false, length = 100)
+
+    @NotBlank(message = "O bairro não pode ser vazio.")
+    @Size(max = 100, message = "O bairro deve ter no máximo 100 caracteres.")
     private String bairro;
-    @Column(nullable = false, length = 100)
+
+    @NotBlank(message = "A cidade não pode ser vazia.")
+    @Size(max = 100, message = "A cidade deve ter no máximo 100 caracteres.")
     private String cidade;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 2)
+
+    @NotNull(message = "O estado é obrigatório.")
     private Estado estado;
-    @Column(nullable = false, length = 8)
+
+    @NotBlank(message = "O CEP é obrigatório.")
+    @Pattern(regexp = "^[0-9]{8}$", message = "O CEP deve conter exatamente 8 números, sem traços ou espaços.")
     private String cep;
-
-    public Endereco() {
-    }
-
-    public Endereco(TipoLogradouro tipoLogradouro, String logradouro, String numero, String complemento, String bairro, String cidade, Estado estado, String cep) {
-        this.tipoLogradouro = tipoLogradouro;
-        this.logradouro = logradouro;
-        this.numero = numero;
-        this.complemento = complemento;
-        this.bairro = bairro;
-        this.cidade = cidade;
-        this.estado = estado;
-        this.cep = cep;
-    }
-
-    public Long getId() {
-        return id;
-    }
 
     public TipoLogradouro getTipoLogradouro() {
         return tipoLogradouro;

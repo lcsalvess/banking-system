@@ -1,4 +1,4 @@
-package com.lucas.sistemabancario.dto;
+package com.lucas.sistemabancario.dto.response;
 
 import com.lucas.sistemabancario.entity.Cliente;
 

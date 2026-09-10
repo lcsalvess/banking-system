@@ -1,8 +1,10 @@
 package com.lucas.sistemabancario.service;
 
-import com.lucas.sistemabancario.dto.ClienteResponseDTO;
+import com.lucas.sistemabancario.dto.response.ClienteResponseDTO;
+import com.lucas.sistemabancario.dto.request.ClienteRequestDTO;
 import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.entity.Endereco;
+import com.lucas.sistemabancario.exception.cliente.ClienteCpfAlreadyExistsException;
 import com.lucas.sistemabancario.exception.cliente.ClienteNotFoundException;
 import com.lucas.sistemabancario.repository.ClienteRepository;
 import com.lucas.sistemabancario.repository.EnderecoRepository;
@@ -22,9 +24,11 @@ public class ClienteService {
     }
 
     @Transactional
-    public Cliente salvar(Cliente cliente) {
-        Endereco endereco = enderecoRepository.save(cliente.getEndereco());
-        cliente.setEndereco(endereco);
+    public Cliente salvar(ClienteRequestDTO dto) {
+        if (clienteRepository.existsByCpf(dto.getCpf())) {
+            throw new ClienteCpfAlreadyExistsException("CPF já cadastrado: " + dto.getCpf());
+        }
+        Cliente cliente = new Cliente(dto);
         return clienteRepository.save(cliente);
     }
 
@@ -48,6 +52,9 @@ public class ClienteService {
     @Transactional
     public Cliente atualizar(Long id, Cliente cliente) {
         Cliente clienteExistente = buscarClientePorId(id);
+        if (clienteRepository.existsByCpfAndIdNot(cliente.getCpf(), id)) {
+            throw new ClienteCpfAlreadyExistsException("CPF já cadastrado: " + cliente.getCpf());
+        }
         atualizarCliente(clienteExistente, cliente);
         atualizarEndereco(clienteExistente.getEndereco(), cliente.getEndereco());
         return clienteRepository.save(clienteExistente);
@@ -70,7 +77,7 @@ public class ClienteService {
         enderecoExistente.setCep(enderecoNovo.getCep());
     }
 
-    private void atualizarCliente (Cliente clienteExistente, Cliente clienteNovo) {
+    private void atualizarCliente(Cliente clienteExistente, Cliente clienteNovo) {
         clienteExistente.setNome(clienteNovo.getNome());
         clienteExistente.setCpf(clienteNovo.getCpf());
         clienteExistente.setEmail(clienteNovo.getEmail());

@@ -1,6 +1,6 @@
 package com.lucas.sistemabancario.service;
 
-import com.lucas.sistemabancario.dto.TransacaoResponseDTO;
+import com.lucas.sistemabancario.dto.response.TransacaoResponseDTO;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.Transacao;

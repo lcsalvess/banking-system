@@ -1,6 +1,6 @@
 package com.lucas.sistemabancario.controller;
 
-import com.lucas.sistemabancario.dto.TransacaoResponseDTO;
+import com.lucas.sistemabancario.dto.response.TransacaoResponseDTO;
 import com.lucas.sistemabancario.service.TransacaoService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;

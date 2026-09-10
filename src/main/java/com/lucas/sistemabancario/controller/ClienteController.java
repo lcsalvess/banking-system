@@ -1,8 +1,10 @@
 package com.lucas.sistemabancario.controller;
 
-import com.lucas.sistemabancario.dto.ClienteResponseDTO;
+import com.lucas.sistemabancario.dto.response.ClienteResponseDTO;
+import com.lucas.sistemabancario.dto.request.ClienteRequestDTO;
 import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.service.ClienteService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,8 +21,9 @@ public class ClienteController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Cliente salvar(@RequestBody Cliente cliente){
-        return clienteService.salvar(cliente);
+    public ClienteResponseDTO salvar(@Valid @RequestBody ClienteRequestDTO dto){
+        Cliente clienteSalvo = clienteService.salvar(dto);
+        return ClienteResponseDTO.fromEntity(clienteSalvo);
     }
 
     @GetMapping

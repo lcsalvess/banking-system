@@ -5,10 +5,7 @@ import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.Transacao;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
 import com.lucas.sistemabancario.entity.enums.TipoTransacao;
-import com.lucas.sistemabancario.exception.ContaIsNotActiveException;
-import com.lucas.sistemabancario.exception.RendimentoJaAplicadoException;
-import com.lucas.sistemabancario.exception.SaldoIsNotEnoughException;
-import com.lucas.sistemabancario.exception.ValorInvalidoException;
+import com.lucas.sistemabancario.exception.*;
 import com.lucas.sistemabancario.repository.TransacaoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -152,6 +150,98 @@ public class TransacaoServiceTest {
             assertEquals(new BigDecimal("30.00"), transacao.getValor());
             assertEquals(conta, transacao.getConta());
         }
+    }
+
+    @Nested
+    @DisplayName("Testes de transferências")
+    class TransferenciaTests {
+        private final Long contaIdOrigem = 1L;
+        private final Long contaIdDestino = 2L;
+        private Conta contaOrigem;
+        private Conta contaDestino;
+
+        @BeforeEach
+        void setUp() {
+            contaOrigem = new Conta() {
+            };
+            contaDestino = new Conta() {
+            };
+            ReflectionTestUtils.setField(contaOrigem, "id", contaIdOrigem);
+            ReflectionTestUtils.setField(contaOrigem, "saldo", new BigDecimal("100.00"));
+            ReflectionTestUtils.setField(contaDestino, "id", contaIdDestino);
+            ReflectionTestUtils.setField(contaDestino, "saldo", new BigDecimal("50.00"));
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção se a transferência for entre a mesma conta")
+        void deveLancarExcecaoTransferenciaEntreMesmaConta() {
+            assertThrows(ContasIguaisException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdOrigem, BigDecimal.TEN));
+            verify(contaService, never()).buscarContaPorId(any());
+            verify(transacaoRepository, never()).save(any());
+        }
+
+        @ParameterizedTest
+        @DisplayName("Deve lançar exceção ao tentar transferir com valores INVÁLIDOS (null, zero ou negativo).")
+        @NullSource
+        @ValueSource(strings = {"0.00", "-0.01", "-10.00"})
+        void deveLancarExcecaoTransferenciaValorInvalido(BigDecimal valorInvalido) {
+            mockarBuscaDeContas();
+            assertThrows(ValorInvalidoException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdDestino, valorInvalido));
+            verify(transacaoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção se a conta ORIGEM está cancelada.")
+        void deveLancarExcecaoCasoContaOrigemEstaCancelada() {
+            mockarBuscaDeContas();
+            ReflectionTestUtils.setField(contaOrigem, "situacaoConta", SituacaoConta.CANCELADA);
+            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdDestino, BigDecimal.TEN));
+            verify(transacaoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção se a conta DESTINO está cancelada.")
+        void deveLancarExcecaoCasoContaDestinoEstaCancelada() {
+            mockarBuscaDeContas();
+            ReflectionTestUtils.setField(contaDestino, "situacaoConta", SituacaoConta.CANCELADA);
+            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdDestino, BigDecimal.TEN));
+            verify(transacaoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção ao tentar transferir valor maior que o saldo da conta origem")
+        void deveLancarExcecaoQuandoTransferenciaEhMaiorQueSaldo() {
+            mockarBuscaDeContas();
+            assertThrows(SaldoIsNotEnoughException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdDestino, new BigDecimal("200.00")));
+            verify(transacaoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve realizar transferência com sucesso, alterar dados e salvar duas transações.")
+        void deveRealizarTransferenciaComSucesso() {
+            mockarBuscaDeContas();
+            ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
+            BigDecimal valorTransferencia = new BigDecimal("30.00");
+            transacaoService.transferir(contaIdOrigem, contaIdDestino, valorTransferencia);
+            assertEquals(new BigDecimal("70.00"), contaOrigem.getSaldo());
+            assertEquals(new BigDecimal("80.00"), contaDestino.getSaldo());
+            verify(transacaoRepository, times(2)).save(transacaoCaptor.capture());
+            List<Transacao> transacoesSalvas = transacaoCaptor.getAllValues();
+            Transacao transacaoSaida = transacoesSalvas.get(0);
+            assertEquals(contaOrigem, transacaoSaida.getConta());
+            assertEquals(valorTransferencia, transacaoSaida.getValor());
+            assertEquals(TipoTransacao.TRANSFERENCIA_ENVIADA, transacaoSaida.getTipoTransacao());
+            Transacao transacaoEntrada = transacoesSalvas.get(1);
+            assertEquals(contaDestino, transacaoEntrada.getConta());
+            assertEquals(valorTransferencia, transacaoEntrada.getValor());
+            assertEquals(TipoTransacao.TRANSFERENCIA_RECEBIDA, transacaoEntrada.getTipoTransacao());
+        }
+
+        private void mockarBuscaDeContas() {
+            when(contaService.buscarContaPorId(contaIdOrigem)).thenReturn(contaOrigem);
+            when(contaService.buscarContaPorId(contaIdDestino)).thenReturn(contaDestino);
+        }
+
     }
 
     @Nested

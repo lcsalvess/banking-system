@@ -1,26 +1,33 @@
 package com.lucas.sistemabancario.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.*;
 
 @Entity
 public class Cliente {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false)
+    @Column(nullable = false, length = 125)
     @NotBlank
+    @Size(max = 125)
     private String nome;
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 11)
+    @Size(min = 11, max = 11)
     @NotBlank
     private String cpf;
-    @Column(nullable = false)
+    @Column(nullable = false, length = 150)
     @NotBlank
+    @Email
+    @Size(max = 150)
     private String email;
-    @Column(nullable = false)
+    @Column(nullable = false, length = 11)
     @NotBlank
+    @Pattern(regexp = "^[0-9]{10,11}$")
+    @Size(min = 10, max = 11)
     private String telefone;
-    @ManyToOne
+    @NotNull
+    @ManyToOne(optional = false)
     @JoinColumn(name = "endereco_id", nullable = false)
     private Endereco endereco;
 

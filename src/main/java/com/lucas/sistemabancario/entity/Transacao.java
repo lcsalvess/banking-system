@@ -2,7 +2,8 @@ package com.lucas.sistemabancario.entity;
 
 import com.lucas.sistemabancario.entity.enums.TipoTransacao;
 import jakarta.persistence.*;
-import jakarta.transaction.Transactional;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -12,15 +13,20 @@ public class Transacao {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TipoTransacao tipoTransacao;
+    @NotNull
+    @Positive
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal valor;
+    @NotNull
     @Column(nullable = false)
     private LocalDateTime dataHora;
-    @ManyToOne
-    @JoinColumn(nullable = false)
+    @NotNull
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "conta_id", nullable = false)
     private Conta conta;
 
     public Transacao() {}

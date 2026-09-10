@@ -3,6 +3,7 @@ package com.lucas.sistemabancario.entity;
 import com.lucas.sistemabancario.entity.enums.TipoConta;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,6 +11,7 @@ import java.time.LocalDate;
 @Entity
 public class ContaPoupanca extends Conta {
     private static final BigDecimal TAXA_RENDIMENTO = new BigDecimal("0.005");
+    @NotNull
     @Column(nullable = false)
     private LocalDate dataUltimoRendimento;
 

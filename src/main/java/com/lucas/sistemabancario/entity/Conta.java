@@ -3,6 +3,10 @@ package com.lucas.sistemabancario.entity;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
 import com.lucas.sistemabancario.entity.enums.TipoConta;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -12,18 +16,24 @@ public abstract class Conta {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @ManyToOne
-    @JoinColumn(nullable = false)
+    @NotNull
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "titular_id", nullable = false)
     private Cliente titular;
-    @Column(nullable = false, unique = true)
+    @NotBlank
+    @Column(nullable = false, unique = true, length = 6)
+    @Pattern(regexp = "^[0-9]{6}$")
+    @Size(min = 6, max = 6)
     private String numeroConta;
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal saldo = BigDecimal.ZERO;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @NotNull
     private SituacaoConta situacaoConta = SituacaoConta.ATIVA;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @NotNull
     private TipoConta tipoConta;
 
     public Conta () {}

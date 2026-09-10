@@ -247,33 +247,51 @@ public class TransacaoServiceTest {
     @Nested
     @DisplayName("Testes de rendimento")
     class RendimentoTests {
+        private final Long contaId = 1L;
+        private ContaPoupanca contaPoupanca;
+
+        @BeforeEach
+        void setUp() {
+            contaPoupanca = spy(new ContaPoupanca());
+            ReflectionTestUtils.setField(contaPoupanca, "id", contaId);
+            lenient().when(contaService.buscarContaPorId(contaId)).thenReturn(contaPoupanca);
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção ao tentar aplicar rendimento em uma conta que não é poupança.")
+        void deveLancarExcecaoQuandoContaNaoEhPoupanca() {
+            Conta contaInvalida = new Conta() {
+            };
+            ReflectionTestUtils.setField(contaInvalida, "id", contaId);
+            when(contaService.buscarContaPorId(contaId)).thenReturn(contaInvalida);
+            assertThrows(ContaIsNotPoupancaException.class, () -> transacaoService.aplicarRendimento(contaId));
+            verify(transacaoRepository, never()).save(any());
+        }
+
         @Test
         @DisplayName("Deve lançar exceção ao tentar aplicar rendimento já aplicado no dia")
         void deveLancarExcecaoQuandoRendimentoJaAplicadoNoDia() {
-            Long contaId = 1L;
-            ContaPoupanca contaPoupanca = mock(ContaPoupanca.class);
-            when(contaPoupanca.getId()).thenReturn(contaId);
-            when(contaPoupanca.getSituacaoConta()).thenReturn(SituacaoConta.ATIVA);
-            when(contaService.buscarContaPorId(contaId)).thenReturn(contaPoupanca);
             when(transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(eq(contaId), any(), any(), any())).thenReturn(true);
             assertThrows(RendimentoJaAplicadoException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("Deve aplicar rendimento com sucesso quando ainda não foi aplicado hoje")
+        @DisplayName("Deve aplicar rendimento com sucesso quando ainda não foi aplicado hoje.")
         void deveAplicarRendimentoComSucesso() {
-            Long contaId = 1L;
-            ContaPoupanca contaPoupanca = mock(ContaPoupanca.class);
-            when(contaPoupanca.getId()).thenReturn(contaId);
-            when(contaPoupanca.getSituacaoConta()).thenReturn(SituacaoConta.ATIVA);
-            when(contaPoupanca.podeReceberRendimento()).thenReturn(true);
-            when(contaPoupanca.calcularRendimento()).thenReturn(new BigDecimal("15.50"));
-            when(contaService.buscarContaPorId(contaId)).thenReturn(contaPoupanca);
-            when(transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(eq(contaId), any(), any(), any())).thenReturn(false);
+            ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
+            BigDecimal valorRendimento = new BigDecimal("15.50");
+            doReturn(true).when(contaPoupanca).podeReceberRendimento();
+            doReturn(valorRendimento).when(contaPoupanca).calcularRendimento();
+            when(transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(eq(contaId), any(), any(), any()))
+                    .thenReturn(false);
             transacaoService.aplicarRendimento(contaId);
-            verify(contaPoupanca).creditar(new BigDecimal("15.50"));
-            verify(transacaoRepository, times(1)).save(any());
+            assertEquals(valorRendimento, contaPoupanca.getSaldo());
+            verify(transacaoRepository).save(transacaoCaptor.capture());
+            Transacao transacao = transacaoCaptor.getValue();
+            assertEquals(contaPoupanca, transacao.getConta());
+            assertEquals(TipoTransacao.RENDIMENTO, transacao.getTipoTransacao());
+            assertEquals(valorRendimento, transacao.getValor());
         }
     }
 }

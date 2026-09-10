@@ -1,5 +1,11 @@
-package com.lucas.sistemabancario.exception;
+package com.lucas.sistemabancario.exception.handler;
 
+import com.lucas.sistemabancario.exception.cliente.ClienteNotFoundException;
+import com.lucas.sistemabancario.exception.conta.*;
+import com.lucas.sistemabancario.exception.transacao.RendimentoJaAplicadoException;
+import com.lucas.sistemabancario.exception.transacao.RendimentoNaoDisponivelException;
+import com.lucas.sistemabancario.exception.transacao.SaldoIsNotEnoughException;
+import com.lucas.sistemabancario.exception.transacao.ValorInvalidoException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;

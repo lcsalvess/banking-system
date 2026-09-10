@@ -3,7 +3,7 @@ package com.lucas.sistemabancario.service;
 import com.lucas.sistemabancario.dto.ClienteResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.entity.Endereco;
-import com.lucas.sistemabancario.exception.ClienteNotFoundException;
+import com.lucas.sistemabancario.exception.cliente.ClienteNotFoundException;
 import com.lucas.sistemabancario.repository.ClienteRepository;
 import com.lucas.sistemabancario.repository.EnderecoRepository;
 import jakarta.transaction.Transactional;

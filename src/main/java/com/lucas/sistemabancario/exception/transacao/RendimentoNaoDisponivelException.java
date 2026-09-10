@@ -1,4 +1,4 @@
-package com.lucas.sistemabancario.exception;
+package com.lucas.sistemabancario.exception.transacao;
 
 public class RendimentoNaoDisponivelException extends RuntimeException {
     public RendimentoNaoDisponivelException(String message) {

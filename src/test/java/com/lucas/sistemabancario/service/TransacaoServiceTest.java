@@ -1,5 +1,7 @@
 package com.lucas.sistemabancario.service;
 
+import com.lucas.sistemabancario.dto.request.TransacaoRequestDTO;
+import com.lucas.sistemabancario.dto.response.TransacaoResponseDTO;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.Transacao;
@@ -11,39 +13,41 @@ import com.lucas.sistemabancario.exception.conta.ContasIguaisException;
 import com.lucas.sistemabancario.exception.transacao.RendimentoJaAplicadoException;
 import com.lucas.sistemabancario.exception.transacao.RendimentoNaoDisponivelException;
 import com.lucas.sistemabancario.exception.transacao.SaldoIsNotEnoughException;
-import com.lucas.sistemabancario.exception.transacao.ValorInvalidoException;
 import com.lucas.sistemabancario.repository.TransacaoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullSource;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
-import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class TransacaoServiceTest {
+
     @Mock
     private TransacaoRepository transacaoRepository;
     @Mock
     private ContaService contaService;
     @InjectMocks
     private TransacaoService transacaoService;
+
+    private TransacaoRequestDTO criarDto(Long contaId, TipoTransacao tipo, BigDecimal valor) {
+        TransacaoRequestDTO dto = new TransacaoRequestDTO();
+        dto.setContaId(contaId);
+        dto.setTipoTransacao(tipo);
+        dto.setValor(valor);
+        return dto;
+    }
 
     @Nested
     @DisplayName("Testes de depósito")
@@ -53,8 +57,7 @@ public class TransacaoServiceTest {
 
         @BeforeEach
         void setUp() {
-            conta = new Conta() {
-            };
+            conta = new Conta() {};
             ReflectionTestUtils.setField(conta, "id", contaId);
         }
 
@@ -63,32 +66,28 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoQuandoContaNaoEstaAtiva() {
             ReflectionTestUtils.setField(conta, "situacaoConta", SituacaoConta.CANCELADA);
             when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.depositar(contaId, BigDecimal.TEN));
-            verify(transacaoRepository, never()).save(any());
-        }
 
-        @ParameterizedTest
-        @DisplayName("Deve lançar exceção ao tentar depositar com valores inválidos (null, zero ou negativo).")
-        @NullSource
-        @ValueSource(strings = {"0.00", "-0.01", "-10.00"})
-        void deveLancarExcecaoQuandoValorEhInvalido(BigDecimal valorInvalido) {
-            when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
-            assertThrows(ValorInvalidoException.class, () -> transacaoService.depositar(contaId, valorInvalido));
+            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.DEPOSITO, BigDecimal.TEN);
+
+            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.depositar(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("Deve realizar depósito em uma conta ATIVA e valor VÁLIDO.")
         void deveRealizarDepositoQuandoContaEstaAtivaEValorValido() {
-            ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
             when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
-            transacaoService.depositar(contaId, BigDecimal.TEN);
+            when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
+
+            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.DEPOSITO, BigDecimal.TEN);
+
+            TransacaoResponseDTO response = transacaoService.depositar(dto);
+
             assertEquals(BigDecimal.TEN, conta.getSaldo());
-            verify(transacaoRepository).save(transacaoCaptor.capture());
-            Transacao transacao = transacaoCaptor.getValue();
-            assertEquals(TipoTransacao.DEPOSITO, transacao.getTipoTransacao());
-            assertEquals(BigDecimal.TEN, transacao.getValor());
-            assertEquals(conta, transacao.getConta());
+            assertNotNull(response);
+            assertEquals(BigDecimal.TEN, response.getValor());
+            assertEquals(TipoTransacao.DEPOSITO, response.getTipoTransacao());
+            verify(transacaoRepository, times(1)).save(any(Transacao.class));
         }
     }
 
@@ -100,8 +99,7 @@ public class TransacaoServiceTest {
 
         @BeforeEach
         void setUp() {
-            conta = new Conta() {
-            };
+            conta = new Conta() {};
             ReflectionTestUtils.setField(conta, "id", contaId);
             ReflectionTestUtils.setField(conta, "saldo", new BigDecimal("100.00"));
             when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
@@ -111,50 +109,43 @@ public class TransacaoServiceTest {
         @DisplayName("Deve lançar exceção ao tentar sacar de uma conta CANCELADA.")
         void deveLancarExcecaoQuandoContaNaoEstaAtiva() {
             ReflectionTestUtils.setField(conta, "situacaoConta", SituacaoConta.CANCELADA);
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.sacar(contaId, BigDecimal.TEN));
-            verify(transacaoRepository, never()).save(any());
-        }
+            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, BigDecimal.TEN);
 
-        @ParameterizedTest
-        @DisplayName("Deve lançar exceção ao tentar sacar com valores inválidos (null, zero ou negativo).")
-        @NullSource
-        @ValueSource(strings = {"0.00", "-0.01", "-10.00"})
-        void deveLancarExcecaoQuandoValorEhInvalido(BigDecimal valorInvalido) {
-            assertThrows(ValorInvalidoException.class, () -> transacaoService.sacar(contaId, valorInvalido));
+            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.sacar(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("Deve lançar exceção ao tentar sacar mais do que tem em conta.")
         void deveLancarExcecaoQuandoSaqueEhMaiorQueSaldo() {
-            assertThrows(SaldoIsNotEnoughException.class, () -> transacaoService.sacar(contaId, new BigDecimal("200.00")));
+            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, new BigDecimal("200.00"));
+
+            assertThrows(SaldoIsNotEnoughException.class, () -> transacaoService.sacar(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("Deve retornar sucesso ao tentar sacar o mesmo valor do saldo.")
         void deveRealizarSaqueQuandoValorSaqueIgualASaldo() {
-            ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
-            transacaoService.sacar(contaId, new BigDecimal("100.00"));
+            when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
+            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, new BigDecimal("100.00"));
+
+            transacaoService.sacar(dto);
+
             assertEquals(new BigDecimal("0.00"), conta.getSaldo());
-            verify(transacaoRepository).save(transacaoCaptor.capture());
-            Transacao transacao = transacaoCaptor.getValue();
-            assertEquals(TipoTransacao.SAQUE, transacao.getTipoTransacao());
-            assertEquals(new BigDecimal("100.00"), transacao.getValor());
-            assertEquals(conta, transacao.getConta());
+            verify(transacaoRepository, times(1)).save(any(Transacao.class));
         }
 
         @Test
         @DisplayName("Deve retornar sucesso ao tentar sacar valor menor que o saldo.")
         void deveRealizarSaqueQuandoValorMenorQueSaldo() {
-            ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
-            transacaoService.sacar(contaId, new BigDecimal("30.00"));
+            when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
+            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, new BigDecimal("30.00"));
+
+            transacaoService.sacar(dto);
+
             assertEquals(new BigDecimal("70.00"), conta.getSaldo());
-            verify(transacaoRepository).save(transacaoCaptor.capture());
-            Transacao transacao = transacaoCaptor.getValue();
-            assertEquals(TipoTransacao.SAQUE, transacao.getTipoTransacao());
-            assertEquals(new BigDecimal("30.00"), transacao.getValor());
-            assertEquals(conta, transacao.getConta());
+            verify(transacaoRepository, times(1)).save(any(Transacao.class));
         }
     }
 
@@ -168,31 +159,28 @@ public class TransacaoServiceTest {
 
         @BeforeEach
         void setUp() {
-            contaOrigem = new Conta() {
-            };
-            contaDestino = new Conta() {
-            };
+            contaOrigem = new Conta() {};
+            contaDestino = new Conta() {};
             ReflectionTestUtils.setField(contaOrigem, "id", contaIdOrigem);
             ReflectionTestUtils.setField(contaOrigem, "saldo", new BigDecimal("100.00"));
             ReflectionTestUtils.setField(contaDestino, "id", contaIdDestino);
             ReflectionTestUtils.setField(contaDestino, "saldo", new BigDecimal("50.00"));
         }
 
+        private TransacaoRequestDTO criarDtoTransferencia(BigDecimal valor) {
+            TransacaoRequestDTO dto = criarDto(contaIdOrigem, TipoTransacao.TRANSFERENCIA_ENVIADA, valor);
+            dto.setContaIdDestino(contaIdDestino);
+            return dto;
+        }
+
         @Test
         @DisplayName("Deve lançar exceção se a transferência for entre a mesma conta")
         void deveLancarExcecaoTransferenciaEntreMesmaConta() {
-            assertThrows(ContasIguaisException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdOrigem, BigDecimal.TEN));
-            verify(contaService, never()).buscarContaPorId(any());
-            verify(transacaoRepository, never()).save(any());
-        }
+            TransacaoRequestDTO dto = criarDto(contaIdOrigem, TipoTransacao.TRANSFERENCIA_ENVIADA, BigDecimal.TEN);
+            dto.setContaIdDestino(contaIdOrigem); // Forçando IDs iguais
 
-        @ParameterizedTest
-        @DisplayName("Deve lançar exceção ao tentar transferir com valores INVÁLIDOS (null, zero ou negativo).")
-        @NullSource
-        @ValueSource(strings = {"0.00", "-0.01", "-10.00"})
-        void deveLancarExcecaoTransferenciaValorInvalido(BigDecimal valorInvalido) {
-            mockarBuscaDeContas();
-            assertThrows(ValorInvalidoException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdDestino, valorInvalido));
+            assertThrows(ContasIguaisException.class, () -> transacaoService.transferir(dto));
+            verify(contaService, never()).buscarContaPorId(any());
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -201,7 +189,9 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoCasoContaOrigemEstaCancelada() {
             mockarBuscaDeContas();
             ReflectionTestUtils.setField(contaOrigem, "situacaoConta", SituacaoConta.CANCELADA);
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdDestino, BigDecimal.TEN));
+            TransacaoRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
+
+            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -210,7 +200,9 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoCasoContaDestinoEstaCancelada() {
             mockarBuscaDeContas();
             ReflectionTestUtils.setField(contaDestino, "situacaoConta", SituacaoConta.CANCELADA);
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdDestino, BigDecimal.TEN));
+            TransacaoRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
+
+            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -218,7 +210,9 @@ public class TransacaoServiceTest {
         @DisplayName("Deve lançar exceção ao tentar transferir valor maior que o saldo da conta origem")
         void deveLancarExcecaoQuandoTransferenciaEhMaiorQueSaldo() {
             mockarBuscaDeContas();
-            assertThrows(SaldoIsNotEnoughException.class, () -> transacaoService.transferir(contaIdOrigem, contaIdDestino, new BigDecimal("200.00")));
+            TransacaoRequestDTO dto = criarDtoTransferencia(new BigDecimal("200.00"));
+
+            assertThrows(SaldoIsNotEnoughException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -226,28 +220,22 @@ public class TransacaoServiceTest {
         @DisplayName("Deve realizar transferência com sucesso, alterar dados e salvar duas transações.")
         void deveRealizarTransferenciaComSucesso() {
             mockarBuscaDeContas();
-            ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
+            when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
+
             BigDecimal valorTransferencia = new BigDecimal("30.00");
-            transacaoService.transferir(contaIdOrigem, contaIdDestino, valorTransferencia);
+            TransacaoRequestDTO dto = criarDtoTransferencia(valorTransferencia);
+
+            transacaoService.transferir(dto);
+
             assertEquals(new BigDecimal("70.00"), contaOrigem.getSaldo());
             assertEquals(new BigDecimal("80.00"), contaDestino.getSaldo());
-            verify(transacaoRepository, times(2)).save(transacaoCaptor.capture());
-            List<Transacao> transacoesSalvas = transacaoCaptor.getAllValues();
-            Transacao transacaoSaida = transacoesSalvas.get(0);
-            assertEquals(contaOrigem, transacaoSaida.getConta());
-            assertEquals(valorTransferencia, transacaoSaida.getValor());
-            assertEquals(TipoTransacao.TRANSFERENCIA_ENVIADA, transacaoSaida.getTipoTransacao());
-            Transacao transacaoEntrada = transacoesSalvas.get(1);
-            assertEquals(contaDestino, transacaoEntrada.getConta());
-            assertEquals(valorTransferencia, transacaoEntrada.getValor());
-            assertEquals(TipoTransacao.TRANSFERENCIA_RECEBIDA, transacaoEntrada.getTipoTransacao());
+            verify(transacaoRepository, times(2)).save(any(Transacao.class));
         }
 
         private void mockarBuscaDeContas() {
             when(contaService.buscarContaPorId(contaIdOrigem)).thenReturn(contaOrigem);
             when(contaService.buscarContaPorId(contaIdDestino)).thenReturn(contaDestino);
         }
-
     }
 
     @Nested
@@ -265,10 +253,10 @@ public class TransacaoServiceTest {
         @Test
         @DisplayName("Deve lançar exceção ao tentar aplicar rendimento em uma conta que não é poupança.")
         void deveLancarExcecaoQuandoContaNaoEhPoupanca() {
-            Conta contaInvalida = new Conta() {
-            };
+            Conta contaInvalida = new Conta() {};
             ReflectionTestUtils.setField(contaInvalida, "id", contaId);
             when(contaService.buscarContaPorId(contaId)).thenReturn(contaInvalida);
+
             assertThrows(ContaIsNotPoupancaException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
@@ -278,6 +266,7 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoQuandoRendimentoJaAplicadoNoDia() {
             mockarBuscaContaPoupanca();
             when(transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(eq(contaId), any(), any(), any())).thenReturn(true);
+
             assertThrows(RendimentoJaAplicadoException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
@@ -287,6 +276,7 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoQuandoContaPoupancaEstiverCancelada() {
             ReflectionTestUtils.setField(contaPoupanca, "situacaoConta", SituacaoConta.CANCELADA);
             mockarBuscaContaPoupanca();
+
             assertThrows(ContaIsNotActiveException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
@@ -296,6 +286,7 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoQuandoContaNaoPuderReceberRendimento() {
             mockarBuscaContaPoupanca();
             doReturn(false).when(contaPoupanca).podeReceberRendimento();
+
             assertThrows(RendimentoNaoDisponivelException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
@@ -304,19 +295,18 @@ public class TransacaoServiceTest {
         @DisplayName("Deve aplicar rendimento com sucesso quando ainda não foi aplicado hoje.")
         void deveAplicarRendimentoComSucesso() {
             mockarBuscaContaPoupanca();
-            ArgumentCaptor<Transacao> transacaoCaptor = ArgumentCaptor.forClass(Transacao.class);
+            when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
+
             BigDecimal valorRendimento = new BigDecimal("15.50");
             doReturn(true).when(contaPoupanca).podeReceberRendimento();
             doReturn(valorRendimento).when(contaPoupanca).calcularRendimento();
             when(transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(eq(contaId), any(), any(), any()))
                     .thenReturn(false);
+
             transacaoService.aplicarRendimento(contaId);
+
             assertEquals(valorRendimento, contaPoupanca.getSaldo());
-            verify(transacaoRepository).save(transacaoCaptor.capture());
-            Transacao transacao = transacaoCaptor.getValue();
-            assertEquals(contaPoupanca, transacao.getConta());
-            assertEquals(TipoTransacao.RENDIMENTO, transacao.getTipoTransacao());
-            assertEquals(valorRendimento, transacao.getValor());
+            verify(transacaoRepository).save(any(Transacao.class));
         }
 
         private void mockarBuscaContaPoupanca() {

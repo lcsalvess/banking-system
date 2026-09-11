@@ -1,13 +1,11 @@
 package com.lucas.sistemabancario.service;
 
-import com.lucas.sistemabancario.dto.response.ClienteResponseDTO;
 import com.lucas.sistemabancario.dto.request.ClienteRequestDTO;
+import com.lucas.sistemabancario.dto.response.ClienteResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
-import com.lucas.sistemabancario.entity.Endereco;
 import com.lucas.sistemabancario.exception.cliente.ClienteCpfAlreadyExistsException;
 import com.lucas.sistemabancario.exception.cliente.ClienteNotFoundException;
 import com.lucas.sistemabancario.repository.ClienteRepository;
-import com.lucas.sistemabancario.repository.EnderecoRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -16,11 +14,9 @@ import java.util.List;
 @Service
 public class ClienteService {
     private final ClienteRepository clienteRepository;
-    private final EnderecoRepository enderecoRepository;
 
-    public ClienteService(ClienteRepository clienteRepository, EnderecoRepository enderecoRepository) {
+    public ClienteService(ClienteRepository clienteRepository) {
         this.clienteRepository = clienteRepository;
-        this.enderecoRepository = enderecoRepository;
     }
 
     @Transactional

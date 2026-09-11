@@ -1,6 +1,7 @@
 package com.lucas.sistemabancario.service;
 
 import com.lucas.sistemabancario.dto.request.ClienteRequestDTO;
+import com.lucas.sistemabancario.dto.request.ClienteUpdateRequestDTO;
 import com.lucas.sistemabancario.dto.response.ClienteResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.exception.cliente.ClienteCpfAlreadyExistsException;
@@ -46,11 +47,8 @@ public class ClienteService {
     }
 
     @Transactional
-    public Cliente atualizar(Long id, ClienteRequestDTO dto) {
+    public Cliente atualizar(Long id, ClienteUpdateRequestDTO dto) {
         Cliente clienteExistente = buscarClientePorId(id);
-        if (clienteRepository.existsByCpfAndIdNot(dto.getCpf(), id)) {
-            throw new ClienteCpfAlreadyExistsException("CPF já cadastrado: " + dto.getCpf());
-        }
         clienteExistente.atualizarInformacoes(dto);
         return clienteRepository.save(clienteExistente);
     }

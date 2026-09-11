@@ -1,6 +1,7 @@
 package com.lucas.sistemabancario.entity;
 
 import com.lucas.sistemabancario.dto.request.ClienteRequestDTO;
+import com.lucas.sistemabancario.dto.request.ClienteUpdateRequestDTO;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 
@@ -17,7 +18,7 @@ public class Cliente {
     private String email;
     @Column(nullable = false, length = 11)
     private String telefone;
-    @ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+    @OneToOne(cascade = CascadeType.ALL, optional = false)
     @JoinColumn(name = "endereco_id", nullable = false)
     private Endereco endereco;
 
@@ -49,9 +50,8 @@ public class Cliente {
         );
     }
 
-    public void atualizarInformacoes(ClienteRequestDTO dto) {
+    public void atualizarInformacoes(ClienteUpdateRequestDTO dto) {
         this.nome = dto.getNome();
-        this.cpf = dto.getCpf();
         this.email = dto.getEmail();
         this.telefone = dto.getTelefone();
         this.endereco.atualizarInformacoes(dto.getEndereco());

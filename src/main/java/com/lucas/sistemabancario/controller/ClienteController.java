@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.controller;
 
+import com.lucas.sistemabancario.dto.request.ClienteUpdateRequestDTO;
 import com.lucas.sistemabancario.dto.response.ClienteResponseDTO;
 import com.lucas.sistemabancario.dto.request.ClienteRequestDTO;
 import com.lucas.sistemabancario.entity.Cliente;
@@ -38,7 +39,7 @@ public class ClienteController {
     }
 
     @PutMapping("/{id}")
-    public ClienteResponseDTO atualizarPorId(@PathVariable Long id, @Valid @RequestBody ClienteRequestDTO dto) {
+    public ClienteResponseDTO atualizarPorId(@PathVariable Long id, @Valid @RequestBody ClienteUpdateRequestDTO dto) {
         Cliente clienteAtualizado = clienteService.atualizar(id, dto);
         return ClienteResponseDTO.fromEntity(clienteAtualizado);
     }

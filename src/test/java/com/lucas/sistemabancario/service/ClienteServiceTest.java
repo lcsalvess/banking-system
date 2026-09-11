@@ -173,7 +173,7 @@ public class ClienteServiceTest {
 
     @Nested
     @DisplayName("Testes de atualizar cliente")
-    class AtualizarTests{
+    class AtualizarTests {
         private ClienteUpdateRequestDTO criarDtoAtualizado() {
             EnderecoRequestDTO endereco = new EnderecoRequestDTO();
             endereco.setTipoLogradouro(TipoLogradouro.AVENIDA);
@@ -223,6 +223,31 @@ public class ClienteServiceTest {
             verify(clienteRepository).findById(idInexistente);
             verify(clienteRepository, never()).save(any(Cliente.class));
         }
+    }
 
+    @Nested
+    @DisplayName("Testes de deletar cliente")
+    class DeletarTests {
+        @Test
+        @DisplayName("Deve deletar cliente quando cliente existe")
+        void deveDeletarClienteQuandoClienteExiste() {
+            Cliente cliente = new Cliente(criarDto());
+            Long idCliente = 1L;
+            ReflectionTestUtils.setField(cliente, "id", idCliente);
+            when(clienteRepository.findById(idCliente)).thenReturn(Optional.of(cliente));
+            clienteService.deletarPorId(idCliente);
+            verify(clienteRepository).findById(idCliente);
+            verify(clienteRepository).delete(cliente);
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção quando tentar deletar um cliente inexistente")
+        void deveLancarExcecaoAoTentarDeletarClienteInexistente() {
+            Long idInexistente = 1L;
+            when(clienteRepository.findById(idInexistente)).thenReturn(Optional.empty());
+            assertThrows(ClienteNotFoundException.class, () -> clienteService.deletarPorId(idInexistente));
+            verify(clienteRepository).findById(idInexistente);
+            verify(clienteRepository, never()).delete(any(Cliente.class));
+        }
     }
 }

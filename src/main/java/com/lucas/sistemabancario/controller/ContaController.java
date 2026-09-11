@@ -1,9 +1,11 @@
 package com.lucas.sistemabancario.controller;
 
+import com.lucas.sistemabancario.dto.request.ContaRequestDTO;
 import com.lucas.sistemabancario.dto.response.ContaResponseDTO;
 import com.lucas.sistemabancario.entity.ContaCorrente;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.service.ContaService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,16 +30,10 @@ public class ContaController {
         return contaService.buscarPorId(id);
     }
 
-    @PostMapping("/corrente/{clienteId}")
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ContaCorrente criarContaCorrente(@PathVariable Long clienteId) {
-        return contaService.criarContaCorrente(clienteId);
-    }
-
-    @PostMapping("/poupanca/{clienteId}")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ContaPoupanca criarContaPoupanca(@PathVariable Long clienteId) {
-        return contaService.criarContaPoupanca(clienteId);
+    public ContaResponseDTO criar (@Valid @RequestBody ContaRequestDTO dto) {
+        return contaService.criar(dto);
     }
 
     @PatchMapping("/cancelar/{contaId}")

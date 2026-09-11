@@ -16,24 +16,18 @@ public abstract class Conta {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @NotNull
     @ManyToOne(optional = false)
     @JoinColumn(name = "titular_id", nullable = false)
     private Cliente titular;
-    @NotBlank
     @Column(nullable = false, unique = true, length = 6)
-    @Pattern(regexp = "^[0-9]{6}$")
-    @Size(min = 6, max = 6)
     private String numeroConta;
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal saldo = BigDecimal.ZERO;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    @NotNull
     private SituacaoConta situacaoConta = SituacaoConta.ATIVA;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    @NotNull
     private TipoConta tipoConta;
 
     public Conta () {}

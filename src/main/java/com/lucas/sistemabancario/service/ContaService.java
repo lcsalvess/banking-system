@@ -1,11 +1,13 @@
 package com.lucas.sistemabancario.service;
 
+import com.lucas.sistemabancario.dto.request.ContaRequestDTO;
 import com.lucas.sistemabancario.dto.response.ContaResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaCorrente;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
+import com.lucas.sistemabancario.entity.enums.TipoConta;
 import com.lucas.sistemabancario.exception.conta.ContaAlreadyExistsException;
 import com.lucas.sistemabancario.exception.conta.ContaHasBalanceException;
 import com.lucas.sistemabancario.exception.conta.ContaIsNotActiveException;
@@ -41,7 +43,7 @@ public class ContaService {
                 .toList();
     }
 
-    public Conta buscarContaPorId(Long id){
+    public Conta buscarContaPorId(Long id) {
         return contaRepository.findById(id)
                 .orElseThrow(() -> new ContaNotFoundException("Conta não encontrada"));
     }
@@ -61,33 +63,36 @@ public class ContaService {
     private int calcularDigitoVerificador(String numeroBase) {
         int soma = 0;
         int[] pesos = {5, 4, 3, 2, 1};
-        for (int i = 0; i <numeroBase.length(); i++) {
+        for (int i = 0; i < numeroBase.length(); i++) {
             int digito = Character.getNumericValue(numeroBase.charAt(i));
             soma += digito * pesos[i];
         }
         return soma % 10;
     }
 
-    public ContaCorrente criarContaCorrente(Long clienteId){
-        Cliente cliente = clienteService.buscarClientePorId(clienteId);
-        if (contaCorrenteRepository.existsByTitularId(clienteId)) {
-            throw new ContaAlreadyExistsException("O cliente já possui uma conta corrente.");
-        }
+    @Transactional
+    public ContaResponseDTO criar(ContaRequestDTO dto) {
+        Cliente cliente = clienteService.buscarClientePorId(dto.getTitularId());
         String numeroConta = gerarNumeroConta();
-        ContaCorrente contaCorrente = new ContaCorrente(cliente, numeroConta);
-        return contaRepository.save(contaCorrente);
+        Conta conta;
+        if (dto.getTipoConta() == TipoConta.CORRENTE) {
+            if (contaCorrenteRepository.existsByTitularId(dto.getTitularId())) {
+                throw new ContaAlreadyExistsException("O cliente já possui uma conta corrente");
+            }
+            conta = new ContaCorrente(cliente, numeroConta);
+        } else if (dto.getTipoConta() == TipoConta.POUPANCA) {
+            if (contaPoupancaRepository.existsByTitularId(dto.getTitularId())) {
+                throw new ContaAlreadyExistsException("O cliente já possui uma conta poupança");
+            }
+            LocalDate dataUltimoRendimento = LocalDate.now();
+            conta = new ContaPoupanca(cliente, numeroConta, dataUltimoRendimento);
+        } else {
+            throw new IllegalArgumentException("Tipo de conta inválido.");
+        }
+        Conta contaSalva = contaRepository.save(conta);
+        return ContaResponseDTO.fromEntity(contaSalva);
     }
 
-    public ContaPoupanca criarContaPoupanca(Long clienteId){
-        Cliente cliente = clienteService.buscarClientePorId(clienteId);
-        if (contaPoupancaRepository.existsByTitularId(clienteId)) {
-            throw new ContaAlreadyExistsException("O cliente já possui uma conta poupança.");
-        }
-        String numeroConta = gerarNumeroConta();
-        LocalDate dataUltimoRendimento = LocalDate.now();
-        ContaPoupanca contaPoupanca = new ContaPoupanca(cliente, numeroConta, dataUltimoRendimento);
-        return contaRepository.save(contaPoupanca);
-    }
 
     @Transactional
     public void cancelarConta(Long contaId) {

@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.service;
 
+import com.lucas.sistemabancario.dto.request.TransacaoRequestDTO;
 import com.lucas.sistemabancario.dto.response.TransacaoResponseDTO;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
@@ -34,52 +35,52 @@ public class TransacaoService {
     }
 
     @Transactional
-    public void depositar(Long contaId, BigDecimal valor) {
-        Conta conta = contaService.buscarContaPorId(contaId);
+    public TransacaoResponseDTO depositar(TransacaoRequestDTO dto) {
+        Conta conta = contaService.buscarContaPorId(dto.getContaId());
         validarContaAtiva(conta);
-        validarValor(valor);
-        conta.creditar(valor);
-        registrarTransacao(TipoTransacao.DEPOSITO, valor, conta);
+        validarValor(dto.getValor());
+        conta.creditar(dto.getValor());
+        Transacao transacao = registrarTransacao(TipoTransacao.DEPOSITO, dto.getValor(), conta);
+        return TransacaoResponseDTO.fromEntity(transacao);
     }
 
     public List<TransacaoResponseDTO> listarPorConta(Long contaId) {
         contaService.buscarContaPorId(contaId);
         return transacaoRepository.findByContaId(contaId)
                 .stream()
-                .map(transacao -> new TransacaoResponseDTO(
-                        transacao.getId(), transacao.getTipoTransacao(),
-                        transacao.getValor(), transacao.getDataHora()
-                ))
+                .map(TransacaoResponseDTO::fromEntity)
                 .toList();
     }
 
     @Transactional
-    public void sacar(Long contaId, BigDecimal valor) {
-        Conta conta = contaService.buscarContaPorId(contaId);
+    public TransacaoResponseDTO sacar(TransacaoRequestDTO dto) {
+        Conta conta = contaService.buscarContaPorId(dto.getContaId());
         validarContaAtiva(conta);
-        validarValor(valor);
-        validarSaldo(conta, valor);
-        conta.debitar(valor);
-        registrarTransacao(TipoTransacao.SAQUE, valor, conta);
+        validarValor(dto.getValor());
+        validarSaldo(conta, dto.getValor());
+        conta.debitar(dto.getValor());
+        Transacao transacao = registrarTransacao(TipoTransacao.SAQUE, dto.getValor(), conta);
+        return TransacaoResponseDTO.fromEntity(transacao);
     }
 
     @Transactional
-    public void transferir(Long contaIdOrigem, Long contaIdDestino, BigDecimal valor) {
-        validarContasDiferentes(contaIdOrigem, contaIdDestino);
-        Conta contaOrigem = contaService.buscarContaPorId(contaIdOrigem);
-        Conta contaDestino = contaService.buscarContaPorId(contaIdDestino);
+    public TransacaoResponseDTO transferir(TransacaoRequestDTO dto) {
+        validarContasDiferentes(dto.getContaId(), dto.getContaIdDestino());
+        Conta contaOrigem = contaService.buscarContaPorId(dto.getContaId());
+        Conta contaDestino = contaService.buscarContaPorId(dto.getContaIdDestino());
         validarContaAtiva(contaOrigem);
         validarContaAtiva(contaDestino);
-        validarValor(valor);
-        validarSaldo(contaOrigem, valor);
-        contaOrigem.debitar(valor);
-        contaDestino.creditar(valor);
-        registrarTransacao(TipoTransacao.TRANSFERENCIA_ENVIADA, valor, contaOrigem);
-        registrarTransacao(TipoTransacao.TRANSFERENCIA_RECEBIDA, valor, contaDestino);
+        validarValor(dto.getValor());
+        validarSaldo(contaOrigem, dto.getValor());
+        contaOrigem.debitar(dto.getValor());
+        contaDestino.creditar(dto.getValor());
+        Transacao enviada = registrarTransacao(TipoTransacao.TRANSFERENCIA_ENVIADA, dto.getValor(), contaOrigem);
+        registrarTransacao(TipoTransacao.TRANSFERENCIA_RECEBIDA, dto.getValor(), contaDestino);
+        return TransacaoResponseDTO.fromEntity(enviada);
     }
 
     @Transactional
-    public void aplicarRendimento(Long contaId) {
+    public TransacaoResponseDTO aplicarRendimento(Long contaId) {
         Conta conta = contaService.buscarContaPorId(contaId);
         ContaPoupanca contaPoupanca = validarEObterContaPoupanca(conta);
         validarContaAtiva(contaPoupanca);
@@ -87,7 +88,8 @@ public class TransacaoService {
         validarRendimentoDisponivel(contaPoupanca);
         BigDecimal rendimento = contaPoupanca.calcularRendimento();
         contaPoupanca.creditar(rendimento);
-        registrarTransacao(TipoTransacao.RENDIMENTO, rendimento, contaPoupanca);
+        Transacao transacao = registrarTransacao(TipoTransacao.RENDIMENTO, rendimento, contaPoupanca);
+        return TransacaoResponseDTO.fromEntity(transacao);
     }
 
     private void validarContaAtiva(Conta conta) {
@@ -122,7 +124,7 @@ public class TransacaoService {
     }
 
     private void validarRendimentoDisponivel(ContaPoupanca contaPoupanca) {
-        if (!contaPoupanca.podeReceberRendimento()){
+        if (!contaPoupanca.podeReceberRendimento()) {
             throw new RendimentoNaoDisponivelException("A conta ainda não está disponível para receber rendimento");
         }
     }
@@ -136,8 +138,8 @@ public class TransacaoService {
         }
     }
 
-    private void registrarTransacao(TipoTransacao tipoTransacao, BigDecimal valor, Conta conta) {
+    private Transacao registrarTransacao(TipoTransacao tipoTransacao, BigDecimal valor, Conta conta) {
         Transacao transacao = new Transacao(tipoTransacao, valor, LocalDateTime.now(), conta);
-        transacaoRepository.save(transacao);
+        return transacaoRepository.save(transacao);
     }
 }

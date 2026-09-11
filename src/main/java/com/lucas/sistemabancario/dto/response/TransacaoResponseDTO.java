@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.dto.response;
 
+import com.lucas.sistemabancario.entity.Transacao;
 import com.lucas.sistemabancario.entity.enums.TipoTransacao;
 
 import java.math.BigDecimal;
@@ -33,5 +34,14 @@ public class TransacaoResponseDTO {
 
     public LocalDateTime getDataHora() {
         return dataHora;
+    }
+
+    public static TransacaoResponseDTO fromEntity(Transacao transacao) {
+        return new TransacaoResponseDTO(
+                transacao.getId(),
+                transacao.getTipoTransacao(),
+                transacao.getValor(),
+                transacao.getDataHora()
+        );
     }
 }

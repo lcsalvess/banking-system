@@ -93,7 +93,6 @@ public class ContaService {
         return ContaResponseDTO.fromEntity(contaSalva);
     }
 
-
     @Transactional
     public void cancelarConta(Long contaId) {
         Conta conta = contaRepository.findById(contaId)

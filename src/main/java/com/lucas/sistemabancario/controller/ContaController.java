@@ -2,8 +2,6 @@ package com.lucas.sistemabancario.controller;
 
 import com.lucas.sistemabancario.dto.request.ContaRequestDTO;
 import com.lucas.sistemabancario.dto.response.ContaResponseDTO;
-import com.lucas.sistemabancario.entity.ContaCorrente;
-import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.service.ContaService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

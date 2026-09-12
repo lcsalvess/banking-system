@@ -7,8 +7,8 @@ import com.lucas.sistemabancario.dto.response.ClienteResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
 import com.lucas.sistemabancario.entity.enums.Estado;
 import com.lucas.sistemabancario.entity.enums.TipoLogradouro;
-import com.lucas.sistemabancario.exception.cliente.ClienteCpfAlreadyExistsException;
-import com.lucas.sistemabancario.exception.cliente.ClienteNotFoundException;
+import com.lucas.sistemabancario.exception.cliente.ClientCpfAlreadyExistsException;
+import com.lucas.sistemabancario.exception.cliente.ClientNotFoundException;
 import com.lucas.sistemabancario.repository.ClienteRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -60,7 +60,7 @@ public class ClienteServiceTest {
         void deveLancarExcecaoQuandoCpfJaExiste() {
             ClienteRequestDTO dto = criarDto();
             when(clienteRepository.existsByCpf(dto.getCpf())).thenReturn(true);
-            assertThrows(ClienteCpfAlreadyExistsException.class, () -> clienteService.salvar(dto));
+            assertThrows(ClientCpfAlreadyExistsException.class, () -> clienteService.salvar(dto));
             verify(clienteRepository, never()).save(any(Cliente.class));
         }
 
@@ -139,7 +139,7 @@ public class ClienteServiceTest {
         void deveLancarExcecaoQuandoClienteNaoExistir() {
             Long idInexistente = 1L;
             when(clienteRepository.findById(idInexistente)).thenReturn(Optional.empty());
-            assertThrows(ClienteNotFoundException.class, () -> clienteService.buscarClientePorId(idInexistente));
+            assertThrows(ClientNotFoundException.class, () -> clienteService.buscarClientePorId(idInexistente));
             verify(clienteRepository).findById(idInexistente);
         }
     }
@@ -166,7 +166,7 @@ public class ClienteServiceTest {
         void deveLancarExcecaoQuandoIdNaoExistir() {
             Long idInexistente = 1L;
             when(clienteRepository.findById(idInexistente)).thenReturn(Optional.empty());
-            assertThrows(ClienteNotFoundException.class, () -> clienteService.buscarPorId(idInexistente));
+            assertThrows(ClientNotFoundException.class, () -> clienteService.buscarPorId(idInexistente));
             verify(clienteRepository).findById(idInexistente);
         }
     }
@@ -219,7 +219,7 @@ public class ClienteServiceTest {
             Long idInexistente = 1L;
             ClienteUpdateRequestDTO dto = criarDtoAtualizado();
             when(clienteRepository.findById(idInexistente)).thenReturn(Optional.empty());
-            assertThrows(ClienteNotFoundException.class, () -> clienteService.atualizar(idInexistente, dto));
+            assertThrows(ClientNotFoundException.class, () -> clienteService.atualizar(idInexistente, dto));
             verify(clienteRepository).findById(idInexistente);
             verify(clienteRepository, never()).save(any(Cliente.class));
         }
@@ -245,7 +245,7 @@ public class ClienteServiceTest {
         void deveLancarExcecaoAoTentarDeletarClienteInexistente() {
             Long idInexistente = 1L;
             when(clienteRepository.findById(idInexistente)).thenReturn(Optional.empty());
-            assertThrows(ClienteNotFoundException.class, () -> clienteService.deletarPorId(idInexistente));
+            assertThrows(ClientNotFoundException.class, () -> clienteService.deletarPorId(idInexistente));
             verify(clienteRepository).findById(idInexistente);
             verify(clienteRepository, never()).delete(any(Cliente.class));
         }

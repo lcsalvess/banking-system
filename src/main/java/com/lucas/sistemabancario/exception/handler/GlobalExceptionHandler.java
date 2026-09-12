@@ -1,14 +1,12 @@
 package com.lucas.sistemabancario.exception.handler;
 
-import com.lucas.sistemabancario.exception.cliente.ClienteCpfAlreadyExistsException;
-import com.lucas.sistemabancario.exception.cliente.ClienteNotFoundException;
+import com.lucas.sistemabancario.exception.cliente.ClientCpfAlreadyExistsException;
+import com.lucas.sistemabancario.exception.cliente.ClientNotFoundException;
 import com.lucas.sistemabancario.exception.conta.*;
-import com.lucas.sistemabancario.exception.transacao.RendimentoJaAplicadoException;
-import com.lucas.sistemabancario.exception.transacao.RendimentoNaoDisponivelException;
-import com.lucas.sistemabancario.exception.transacao.SaldoIsNotEnoughException;
-import com.lucas.sistemabancario.exception.transacao.ValorInvalidoException;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
+import com.lucas.sistemabancario.exception.transacao.InterestAlreadyAppliedException;
+import com.lucas.sistemabancario.exception.transacao.InterestNotAvailableException;
+import com.lucas.sistemabancario.exception.transacao.InsufficientBalanceException;
+import com.lucas.sistemabancario.exception.transacao.InvalidAmountException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -21,75 +19,75 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(ClienteNotFoundException.class)
+    @ExceptionHandler(ClientNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public String tratarClientNotFound(ClienteNotFoundException exception) {
+    public String tratarClientNotFound(ClientNotFoundException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(ContaNotFoundException.class)
+    @ExceptionHandler(AccountNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public String tratarContaNotFound(ContaNotFoundException exception) {
+    public String tratarContaNotFound(AccountNotFoundException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(ContaAlreadyExistsException.class)
+    @ExceptionHandler(AccountAlreadyExistsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String tratarContaAlreadyExists(ContaAlreadyExistsException exception) {
+    public String tratarContaAlreadyExists(AccountAlreadyExistsException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(ContaIsNotActiveException.class)
+    @ExceptionHandler(AccountIsNotActiveException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String tratarContaIsNotActive(ContaIsNotActiveException exception) {
+    public String tratarContaIsNotActive(AccountIsNotActiveException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(ContaHasBalanceException.class)
+    @ExceptionHandler(AccountHasBalanceException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String tratarContaHasBalance(ContaHasBalanceException exception) {
+    public String tratarContaHasBalance(AccountHasBalanceException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(ValorInvalidoException.class)
+    @ExceptionHandler(InvalidAmountException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String tratarValorInvalido(ValorInvalidoException exception) {
+    public String tratarValorInvalido(InvalidAmountException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(SaldoIsNotEnoughException.class)
+    @ExceptionHandler(InsufficientBalanceException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String tratarSaldoIsNotEnough(SaldoIsNotEnoughException exception) {
+    public String tratarSaldoIsNotEnough(InsufficientBalanceException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(ContasIguaisException.class)
+    @ExceptionHandler(AccountsAreSameException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String tratarContasIguais(ContasIguaisException exception) {
+    public String tratarContasIguais(AccountsAreSameException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(ContaIsNotPoupancaException.class)
+    @ExceptionHandler(AccountIsNotSavingsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String tratarContaIsNotPoupanca(ContaIsNotPoupancaException exception) {
+    public String tratarContaIsNotPoupanca(AccountIsNotSavingsException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(RendimentoNaoDisponivelException.class)
+    @ExceptionHandler(InterestNotAvailableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String tratarRendimentoNaoDisponivel(RendimentoNaoDisponivelException exception) {
+    public String tratarRendimentoNaoDisponivel(InterestNotAvailableException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(RendimentoJaAplicadoException.class)
+    @ExceptionHandler(InterestAlreadyAppliedException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String tratarRendimentoJaAplicado(RendimentoJaAplicadoException exception) {
+    public String tratarRendimentoJaAplicado(InterestAlreadyAppliedException exception) {
         return exception.getMessage();
     }
 
-    @ExceptionHandler(ClienteCpfAlreadyExistsException.class)
+    @ExceptionHandler(ClientCpfAlreadyExistsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String tratarCpfAlreadyExists(ClienteCpfAlreadyExistsException exception) {return exception.getMessage();}
+    public String tratarCpfAlreadyExists(ClientCpfAlreadyExistsException exception) {return exception.getMessage();}
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -101,6 +99,12 @@ public class GlobalExceptionHandler {
             erros.put(fieldName, errorMessage);
         });
         return erros;
+    }
+
+    @ExceptionHandler(InvalidAccountTypeException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String handleInvalidAccountType(InvalidAccountTypeException exception) {
+        return exception.getMessage();
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

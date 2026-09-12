@@ -4,8 +4,8 @@ import com.lucas.sistemabancario.dto.request.ClienteRequestDTO;
 import com.lucas.sistemabancario.dto.request.ClienteUpdateRequestDTO;
 import com.lucas.sistemabancario.dto.response.ClienteResponseDTO;
 import com.lucas.sistemabancario.entity.Cliente;
-import com.lucas.sistemabancario.exception.cliente.ClienteCpfAlreadyExistsException;
-import com.lucas.sistemabancario.exception.cliente.ClienteNotFoundException;
+import com.lucas.sistemabancario.exception.cliente.ClientCpfAlreadyExistsException;
+import com.lucas.sistemabancario.exception.cliente.ClientNotFoundException;
 import com.lucas.sistemabancario.repository.ClienteRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -23,7 +23,7 @@ public class ClienteService {
     @Transactional
     public Cliente salvar(ClienteRequestDTO dto) {
         if (clienteRepository.existsByCpf(dto.getCpf())) {
-            throw new ClienteCpfAlreadyExistsException("CPF já cadastrado: " + dto.getCpf());
+            throw new ClientCpfAlreadyExistsException("CPF já cadastrado: " + dto.getCpf());
         }
         Cliente cliente = new Cliente(dto);
         return clienteRepository.save(cliente);
@@ -38,7 +38,7 @@ public class ClienteService {
 
     public Cliente buscarClientePorId(Long id) {
         return clienteRepository.findById(id)
-                .orElseThrow(() -> new ClienteNotFoundException("Cliente não encontrado"));
+                .orElseThrow(() -> new ClientNotFoundException("Cliente não encontrado"));
     }
 
     public ClienteResponseDTO buscarPorId(Long id) {

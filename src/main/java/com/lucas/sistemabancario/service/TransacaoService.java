@@ -7,13 +7,13 @@ import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.Transacao;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
 import com.lucas.sistemabancario.entity.enums.TipoTransacao;
-import com.lucas.sistemabancario.exception.conta.ContaIsNotActiveException;
-import com.lucas.sistemabancario.exception.conta.ContaIsNotPoupancaException;
-import com.lucas.sistemabancario.exception.conta.ContasIguaisException;
-import com.lucas.sistemabancario.exception.transacao.RendimentoJaAplicadoException;
-import com.lucas.sistemabancario.exception.transacao.RendimentoNaoDisponivelException;
-import com.lucas.sistemabancario.exception.transacao.SaldoIsNotEnoughException;
-import com.lucas.sistemabancario.exception.transacao.ValorInvalidoException;
+import com.lucas.sistemabancario.exception.conta.AccountIsNotActiveException;
+import com.lucas.sistemabancario.exception.conta.AccountIsNotSavingsException;
+import com.lucas.sistemabancario.exception.conta.AccountsAreSameException;
+import com.lucas.sistemabancario.exception.transacao.InterestAlreadyAppliedException;
+import com.lucas.sistemabancario.exception.transacao.InterestNotAvailableException;
+import com.lucas.sistemabancario.exception.transacao.InsufficientBalanceException;
+import com.lucas.sistemabancario.exception.transacao.InvalidAmountException;
 import com.lucas.sistemabancario.repository.TransacaoRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -94,38 +94,38 @@ public class TransacaoService {
 
     private void validarContaAtiva(Conta conta) {
         if (conta.getSituacaoConta() != SituacaoConta.ATIVA) {
-            throw new ContaIsNotActiveException("A conta informada não está ativa.");
+            throw new AccountIsNotActiveException("A conta informada não está ativa.");
         }
     }
 
     private void validarValor(BigDecimal valor) {
         if (valor == null || valor.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ValorInvalidoException("O valor deve ser maior que zero.");
+            throw new InvalidAmountException("O valor deve ser maior que zero.");
         }
     }
 
     private void validarSaldo(Conta conta, BigDecimal valor) {
         if (conta.getSaldo().compareTo(valor) < 0) {
-            throw new SaldoIsNotEnoughException("O valor informado é maior do que o saldo.");
+            throw new InsufficientBalanceException("O valor informado é maior do que o saldo.");
         }
     }
 
     private void validarContasDiferentes(Long contaIdOrigem, Long contaIdDestino) {
         if (contaIdOrigem.equals(contaIdDestino)) {
-            throw new ContasIguaisException("A conta de origem não pode ser igual à conta de destino.");
+            throw new AccountsAreSameException("A conta de origem não pode ser igual à conta de destino.");
         }
     }
 
     private ContaPoupanca validarEObterContaPoupanca(Conta conta) {
         if (!(conta instanceof ContaPoupanca contaPoupanca)) {
-            throw new ContaIsNotPoupancaException("A conta informada não é poupança.");
+            throw new AccountIsNotSavingsException("A conta informada não é poupança.");
         }
         return contaPoupanca;
     }
 
     private void validarRendimentoDisponivel(ContaPoupanca contaPoupanca) {
         if (!contaPoupanca.podeReceberRendimento()) {
-            throw new RendimentoNaoDisponivelException("A conta ainda não está disponível para receber rendimento");
+            throw new InterestNotAvailableException("A conta ainda não está disponível para receber rendimento");
         }
     }
 
@@ -134,7 +134,7 @@ public class TransacaoService {
         LocalDateTime fimDoDia = LocalDate.now().atTime(LocalTime.MAX);
         boolean rendimentoJaAplicado = transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(contaId, TipoTransacao.RENDIMENTO, inicioDoDia, fimDoDia);
         if (rendimentoJaAplicado) {
-            throw new RendimentoJaAplicadoException("O rendimento já foi aplicado para a conta hoje.");
+            throw new InterestAlreadyAppliedException("O rendimento já foi aplicado para a conta hoje.");
         }
     }
 

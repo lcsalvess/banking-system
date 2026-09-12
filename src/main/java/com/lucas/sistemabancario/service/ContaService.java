@@ -8,10 +8,7 @@ import com.lucas.sistemabancario.entity.ContaCorrente;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
 import com.lucas.sistemabancario.entity.enums.TipoConta;
-import com.lucas.sistemabancario.exception.conta.ContaAlreadyExistsException;
-import com.lucas.sistemabancario.exception.conta.ContaHasBalanceException;
-import com.lucas.sistemabancario.exception.conta.ContaIsNotActiveException;
-import com.lucas.sistemabancario.exception.conta.ContaNotFoundException;
+import com.lucas.sistemabancario.exception.conta.*;
 import com.lucas.sistemabancario.repository.ContaCorrenteRepository;
 import com.lucas.sistemabancario.repository.ContaPoupancaRepository;
 import com.lucas.sistemabancario.repository.ContaRepository;
@@ -45,7 +42,7 @@ public class ContaService {
 
     public Conta buscarContaPorId(Long id) {
         return contaRepository.findById(id)
-                .orElseThrow(() -> new ContaNotFoundException("Conta não encontrada"));
+                .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada"));
     }
 
     public ContaResponseDTO buscarPorId(Long id) {
@@ -73,30 +70,32 @@ public class ContaService {
     @Transactional
     public ContaResponseDTO criar(ContaRequestDTO dto) {
         Cliente cliente = clienteService.buscarClientePorId(dto.getTitularId());
-        String numeroConta = gerarNumeroConta();
         Conta conta;
         if (dto.getTipoConta() == TipoConta.CORRENTE) {
             if (contaCorrenteRepository.existsByTitularId(dto.getTitularId())) {
-                throw new ContaAlreadyExistsException("O cliente já possui uma conta corrente");
+                throw new AccountAlreadyExistsException("O cliente já possui uma conta corrente");
             }
+            String numeroConta = gerarNumeroConta();
             conta = new ContaCorrente(cliente, numeroConta);
         } else if (dto.getTipoConta() == TipoConta.POUPANCA) {
             if (contaPoupancaRepository.existsByTitularId(dto.getTitularId())) {
-                throw new ContaAlreadyExistsException("O cliente já possui uma conta poupança");
+                throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança");
             }
+            String numeroConta = gerarNumeroConta();
             LocalDate dataUltimoRendimento = LocalDate.now();
             conta = new ContaPoupanca(cliente, numeroConta, dataUltimoRendimento);
         } else {
-            throw new IllegalArgumentException("Tipo de conta inválido.");
+            throw new InvalidAccountTypeException("Tipo de conta inválido.");
         }
         Conta contaSalva = contaRepository.save(conta);
+
         return ContaResponseDTO.fromEntity(contaSalva);
     }
 
     @Transactional
     public void cancelarConta(Long contaId) {
         Conta conta = contaRepository.findById(contaId)
-                .orElseThrow(() -> new ContaNotFoundException("Conta não encontrada."));
+                .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
         validarContaAtiva(conta);
         validarSeContaTemSaldo(conta);
         conta.cancelarConta();
@@ -104,13 +103,13 @@ public class ContaService {
 
     private void validarSeContaTemSaldo(Conta conta) {
         if (conta.getSaldo().compareTo(BigDecimal.ZERO) != 0) {
-            throw new ContaHasBalanceException("Não é possível cancelar uma conta com saldo.");
+            throw new AccountHasBalanceException("Não é possível cancelar uma conta com saldo.");
         }
     }
 
     private void validarContaAtiva(Conta conta) {
         if (conta.getSituacaoConta() != SituacaoConta.ATIVA) {
-            throw new ContaIsNotActiveException("Não é possível cancelar uma conta que não está ativa.");
+            throw new AccountIsNotActiveException("Não é possível cancelar uma conta que não está ativa.");
         }
     }
 }

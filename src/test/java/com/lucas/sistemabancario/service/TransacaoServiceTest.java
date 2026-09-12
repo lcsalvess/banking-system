@@ -7,12 +7,12 @@ import com.lucas.sistemabancario.entity.ContaPoupanca;
 import com.lucas.sistemabancario.entity.Transacao;
 import com.lucas.sistemabancario.entity.enums.SituacaoConta;
 import com.lucas.sistemabancario.entity.enums.TipoTransacao;
-import com.lucas.sistemabancario.exception.conta.ContaIsNotActiveException;
-import com.lucas.sistemabancario.exception.conta.ContaIsNotPoupancaException;
-import com.lucas.sistemabancario.exception.conta.ContasIguaisException;
-import com.lucas.sistemabancario.exception.transacao.RendimentoJaAplicadoException;
-import com.lucas.sistemabancario.exception.transacao.RendimentoNaoDisponivelException;
-import com.lucas.sistemabancario.exception.transacao.SaldoIsNotEnoughException;
+import com.lucas.sistemabancario.exception.conta.AccountIsNotActiveException;
+import com.lucas.sistemabancario.exception.conta.AccountIsNotSavingsException;
+import com.lucas.sistemabancario.exception.conta.AccountsAreSameException;
+import com.lucas.sistemabancario.exception.transacao.InterestAlreadyAppliedException;
+import com.lucas.sistemabancario.exception.transacao.InterestNotAvailableException;
+import com.lucas.sistemabancario.exception.transacao.InsufficientBalanceException;
 import com.lucas.sistemabancario.repository.TransacaoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -69,7 +69,7 @@ public class TransacaoServiceTest {
 
             TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.DEPOSITO, BigDecimal.TEN);
 
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.depositar(dto));
+            assertThrows(AccountIsNotActiveException.class, () -> transacaoService.depositar(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -111,7 +111,7 @@ public class TransacaoServiceTest {
             ReflectionTestUtils.setField(conta, "situacaoConta", SituacaoConta.CANCELADA);
             TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, BigDecimal.TEN);
 
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.sacar(dto));
+            assertThrows(AccountIsNotActiveException.class, () -> transacaoService.sacar(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -120,7 +120,7 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoQuandoSaqueEhMaiorQueSaldo() {
             TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, new BigDecimal("200.00"));
 
-            assertThrows(SaldoIsNotEnoughException.class, () -> transacaoService.sacar(dto));
+            assertThrows(InsufficientBalanceException.class, () -> transacaoService.sacar(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -179,7 +179,7 @@ public class TransacaoServiceTest {
             TransacaoRequestDTO dto = criarDto(contaIdOrigem, TipoTransacao.TRANSFERENCIA_ENVIADA, BigDecimal.TEN);
             dto.setContaIdDestino(contaIdOrigem); // Forçando IDs iguais
 
-            assertThrows(ContasIguaisException.class, () -> transacaoService.transferir(dto));
+            assertThrows(AccountsAreSameException.class, () -> transacaoService.transferir(dto));
             verify(contaService, never()).buscarContaPorId(any());
             verify(transacaoRepository, never()).save(any());
         }
@@ -191,7 +191,7 @@ public class TransacaoServiceTest {
             ReflectionTestUtils.setField(contaOrigem, "situacaoConta", SituacaoConta.CANCELADA);
             TransacaoRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
 
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.transferir(dto));
+            assertThrows(AccountIsNotActiveException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -202,7 +202,7 @@ public class TransacaoServiceTest {
             ReflectionTestUtils.setField(contaDestino, "situacaoConta", SituacaoConta.CANCELADA);
             TransacaoRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
 
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.transferir(dto));
+            assertThrows(AccountIsNotActiveException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -212,7 +212,7 @@ public class TransacaoServiceTest {
             mockarBuscaDeContas();
             TransacaoRequestDTO dto = criarDtoTransferencia(new BigDecimal("200.00"));
 
-            assertThrows(SaldoIsNotEnoughException.class, () -> transacaoService.transferir(dto));
+            assertThrows(InsufficientBalanceException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -257,7 +257,7 @@ public class TransacaoServiceTest {
             ReflectionTestUtils.setField(contaInvalida, "id", contaId);
             when(contaService.buscarContaPorId(contaId)).thenReturn(contaInvalida);
 
-            assertThrows(ContaIsNotPoupancaException.class, () -> transacaoService.aplicarRendimento(contaId));
+            assertThrows(AccountIsNotSavingsException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -267,7 +267,7 @@ public class TransacaoServiceTest {
             mockarBuscaContaPoupanca();
             when(transacaoRepository.existsByContaIdAndTipoTransacaoAndDataHoraBetween(eq(contaId), any(), any(), any())).thenReturn(true);
 
-            assertThrows(RendimentoJaAplicadoException.class, () -> transacaoService.aplicarRendimento(contaId));
+            assertThrows(InterestAlreadyAppliedException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -277,7 +277,7 @@ public class TransacaoServiceTest {
             ReflectionTestUtils.setField(contaPoupanca, "situacaoConta", SituacaoConta.CANCELADA);
             mockarBuscaContaPoupanca();
 
-            assertThrows(ContaIsNotActiveException.class, () -> transacaoService.aplicarRendimento(contaId));
+            assertThrows(AccountIsNotActiveException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
 
@@ -287,7 +287,7 @@ public class TransacaoServiceTest {
             mockarBuscaContaPoupanca();
             doReturn(false).when(contaPoupanca).podeReceberRendimento();
 
-            assertThrows(RendimentoNaoDisponivelException.class, () -> transacaoService.aplicarRendimento(contaId));
+            assertThrows(InterestNotAvailableException.class, () -> transacaoService.aplicarRendimento(contaId));
             verify(transacaoRepository, never()).save(any());
         }
 

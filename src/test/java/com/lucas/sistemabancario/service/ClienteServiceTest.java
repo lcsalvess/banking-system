@@ -196,21 +196,21 @@ public class ClienteServiceTest {
         @Test
         @DisplayName("Deve atualizar cliente com sucesso quando cliente existir")
         void deveAtualizarClienteQuandoExistir() {
-            Long id = 1L;
+            Long clienteId = 1L;
             Cliente cliente = new Cliente(criarDto());
-            ReflectionTestUtils.setField(cliente, "id", id);
+            ReflectionTestUtils.setField(cliente, "id", clienteId);
             String cpfOriginal = cliente.getCpf();
-            when(clienteRepository.findById(id)).thenReturn(Optional.of(cliente));
+            when(clienteRepository.findById(clienteId)).thenReturn(Optional.of(cliente));
             ClienteUpdateRequestDTO dtoAtualizado = criarDtoAtualizado();
             when(clienteRepository.save(any(Cliente.class))).thenReturn(cliente);
-            Cliente resultado = clienteService.atualizar(id, dtoAtualizado);
-            assertEquals(id, resultado.getId());
+            Cliente resultado = clienteService.atualizar(clienteId, dtoAtualizado);
+            assertEquals(clienteId, resultado.getId());
             assertEquals(dtoAtualizado.getNome(), resultado.getNome());
             assertEquals(cpfOriginal, resultado.getCpf());
             assertEquals(dtoAtualizado.getEmail(), resultado.getEmail());
             assertEquals(dtoAtualizado.getTelefone(), resultado.getTelefone());
-            verify(clienteRepository).findById(id);
-            verify(clienteRepository).save(resultado);
+            verify(clienteRepository).findById(clienteId);
+            verify(clienteRepository).save(cliente);
         }
 
         @Test

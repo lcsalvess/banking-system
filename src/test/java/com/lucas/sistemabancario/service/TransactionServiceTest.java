@@ -12,8 +12,8 @@ import com.lucas.sistemabancario.exception.account.AccountIsNotActiveException;
 import com.lucas.sistemabancario.exception.account.AccountIsNotSavingsException;
 import com.lucas.sistemabancario.exception.account.AccountsAreSameException;
 import com.lucas.sistemabancario.exception.transaction.InsufficientBalanceException;
-import com.lucas.sistemabancario.exception.transaction.InterestAlreadyAppliedException;
-import com.lucas.sistemabancario.exception.transaction.InterestNotAvailableException;
+import com.lucas.sistemabancario.exception.transaction.YieldAlreadyAppliedException;
+import com.lucas.sistemabancario.exception.transaction.YieldNotAvailableException;
 import com.lucas.sistemabancario.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -269,7 +269,7 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
             when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(eq(accountId), any(), any(), any())).thenReturn(true);
 
-            assertThrows(InterestAlreadyAppliedException.class, () -> transactionService.applyYield(accountNumber));
+            assertThrows(YieldAlreadyAppliedException.class, () -> transactionService.applyYield(accountNumber));
             verify(transactionRepository, never()).save(any());
         }
 
@@ -289,7 +289,7 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
             doReturn(false).when(savingsAccount).isEligibleForYield();
 
-            assertThrows(InterestNotAvailableException.class, () -> transactionService.applyYield(accountNumber));
+            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber));
             verify(transactionRepository, never()).save(any());
         }
 

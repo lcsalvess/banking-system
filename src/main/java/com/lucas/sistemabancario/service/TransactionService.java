@@ -11,8 +11,8 @@ import com.lucas.sistemabancario.entity.enums.TransactionType;
 import com.lucas.sistemabancario.exception.account.AccountIsNotActiveException;
 import com.lucas.sistemabancario.exception.account.AccountIsNotSavingsException;
 import com.lucas.sistemabancario.exception.account.AccountsAreSameException;
-import com.lucas.sistemabancario.exception.transaction.InterestAlreadyAppliedException;
-import com.lucas.sistemabancario.exception.transaction.InterestNotAvailableException;
+import com.lucas.sistemabancario.exception.transaction.YieldAlreadyAppliedException;
+import com.lucas.sistemabancario.exception.transaction.YieldNotAvailableException;
 import com.lucas.sistemabancario.exception.transaction.InsufficientBalanceException;
 import com.lucas.sistemabancario.exception.transaction.InvalidAmountException;
 import com.lucas.sistemabancario.repository.TransactionRepository;
@@ -127,7 +127,7 @@ public class TransactionService {
 
     private void validateYieldAvailable(SavingsAccount savingsAccount) {
         if (!savingsAccount.isEligibleForYield()) {
-            throw new InterestNotAvailableException("A conta ainda não está disponível para receber rendimento");
+            throw new YieldNotAvailableException("A conta ainda não está disponível para receber rendimento");
         }
     }
 
@@ -136,7 +136,7 @@ public class TransactionService {
         LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
         boolean alreadyApplied = transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(accountId, TransactionType.YIELD, startOfDay, endOfDay);
         if (alreadyApplied) {
-            throw new InterestAlreadyAppliedException("O rendimento já foi aplicado para a conta hoje.");
+            throw new YieldAlreadyAppliedException("O rendimento já foi aplicado para a conta hoje.");
         }
     }
 

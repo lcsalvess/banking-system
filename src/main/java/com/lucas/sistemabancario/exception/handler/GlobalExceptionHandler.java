@@ -1,12 +1,12 @@
 package com.lucas.sistemabancario.exception.handler;
 
-import com.lucas.sistemabancario.exception.cliente.ClientCpfAlreadyExistsException;
-import com.lucas.sistemabancario.exception.cliente.ClientNotFoundException;
-import com.lucas.sistemabancario.exception.conta.*;
-import com.lucas.sistemabancario.exception.transacao.InterestAlreadyAppliedException;
-import com.lucas.sistemabancario.exception.transacao.InterestNotAvailableException;
-import com.lucas.sistemabancario.exception.transacao.InsufficientBalanceException;
-import com.lucas.sistemabancario.exception.transacao.InvalidAmountException;
+import com.lucas.sistemabancario.exception.client.ClientCpfAlreadyExistsException;
+import com.lucas.sistemabancario.exception.client.ClientNotFoundException;
+import com.lucas.sistemabancario.exception.account.*;
+import com.lucas.sistemabancario.exception.transaction.InterestAlreadyAppliedException;
+import com.lucas.sistemabancario.exception.transaction.InterestNotAvailableException;
+import com.lucas.sistemabancario.exception.transaction.InsufficientBalanceException;
+import com.lucas.sistemabancario.exception.transaction.InvalidAmountException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;

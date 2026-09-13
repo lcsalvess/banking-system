@@ -9,6 +9,7 @@ import com.lucas.sistemabancario.exception.transaction.YieldAlreadyAppliedExcept
 import com.lucas.sistemabancario.exception.transaction.YieldNotAvailableException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -107,6 +108,12 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
         return errors;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String handleHttpMessageNotReadable(){
+        return "Dados da requisição inválidos.";
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

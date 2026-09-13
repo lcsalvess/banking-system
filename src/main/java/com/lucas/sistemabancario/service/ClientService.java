@@ -53,9 +53,4 @@ public class ClientService {
         return clientRepository.save(existingClient);
     }
 
-    @Transactional
-    public void deleteById(Long id) {
-        Client client = findEntityById(id);
-        clientRepository.delete(client);
-    }
 }

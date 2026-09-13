@@ -224,30 +224,4 @@ public class ClientServiceTest {
             verify(clientRepository, never()).save(any(Client.class));
         }
     }
-
-    @Nested
-    @DisplayName("Ao deletar um cliente")
-    class DeleteTests {
-        @Test
-        @DisplayName("Deve deletar cliente quando cliente existe")
-        void shouldDeleteClientWhenClientExists() {
-            Client client = new Client(createClientRequestDTO());
-            Long clientId = 1L;
-            ReflectionTestUtils.setField(client, "id", clientId);
-            when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
-            clientService.deleteById(clientId);
-            verify(clientRepository).findById(clientId);
-            verify(clientRepository).delete(client);
-        }
-
-        @Test
-        @DisplayName("Deve lançar exceção quando tentar deletar um cliente inexistente")
-        void shouldThrowExceptionWhenDeletingNonExistentClient() {
-            Long nonExistentId = 1L;
-            when(clientRepository.findById(nonExistentId)).thenReturn(Optional.empty());
-            assertThrows(ClientNotFoundException.class, () -> clientService.deleteById(nonExistentId));
-            verify(clientRepository).findById(nonExistentId);
-            verify(clientRepository, never()).delete(any(Client.class));
-        }
-    }
 }

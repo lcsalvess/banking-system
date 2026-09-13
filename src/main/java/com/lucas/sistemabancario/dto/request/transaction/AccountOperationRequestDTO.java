@@ -6,11 +6,11 @@ import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 
 public record AccountOperationRequestDTO(
-        @NotNull(message = "O ID da conta é obrigatório.")
-        Long accountId,
+        @NotNull(message = "O número da conta é obrigatório.")
+        String accountNumber,
 
-        @NotNull(message = "O amount da operação é obrigatório.")
-        @Positive(message = "O amount da operação deve ser maior que zero.")
+        @NotNull(message = "O valor da operação é obrigatório.")
+        @Positive(message = "O valor da operação deve ser maior que zero.")
         BigDecimal amount) {
 
 }

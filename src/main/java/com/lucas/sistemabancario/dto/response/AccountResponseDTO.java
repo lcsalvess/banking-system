@@ -7,15 +7,13 @@ import com.lucas.sistemabancario.entity.enums.AccountType;
 import java.math.BigDecimal;
 
 public record AccountResponseDTO(
-        Long id,
         String accountNumber,
         String clientName,
         BigDecimal balance,
-        AccountType accountType,
-        AccountStatus accountStatus) {
+        AccountType type,
+        AccountStatus status) {
     public static AccountResponseDTO fromEntity(Account account) {
         return new AccountResponseDTO(
-                account.getId(),
                 account.getAccountNumber(),
                 account.getClient().getName(),
                 account.getBalance(),

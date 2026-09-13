@@ -37,7 +37,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO deposit(AccountOperationRequestDTO dto) {
-        Account account = accountService.findEntityById(dto.accountId());
+        Account account = accountService.findEntityByAccountNumber(dto.accountNumber());
         validateActiveAccount(account);
         validateAmount(dto.amount());
         account.credit(dto.amount());
@@ -45,9 +45,9 @@ public class TransactionService {
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
-    public List<TransactionResponseDTO> findByAccountId(Long accountId) {
-        accountService.findEntityById(accountId);
-        return transactionRepository.findByAccountId(accountId)
+    public List<TransactionResponseDTO> findByAccountNumber(String accountNumber) {
+        Account account = accountService.findEntityByAccountNumber(accountNumber);
+        return transactionRepository.findByAccountId(account.getId())
                 .stream()
                 .map(TransactionResponseDTO::fromEntity)
                 .toList();
@@ -55,7 +55,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO withdraw(AccountOperationRequestDTO dto) {
-        Account account = accountService.findEntityById(dto.accountId());
+        Account account = accountService.findEntityByAccountNumber(dto.accountNumber());
         validateActiveAccount(account);
         validateAmount(dto.amount());
         validateBalance(account, dto.amount());
@@ -66,9 +66,9 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO transfer(TransferRequestDTO dto) {
-        validateDistinctAccounts(dto.fromAccountId(), dto.toAccountId());
-        Account fromAccount = accountService.findEntityById(dto.fromAccountId());
-        Account toAccount = accountService.findEntityById(dto.toAccountId());
+        validateDistinctAccounts(dto.fromAccountNumber(), dto.toAccountNumber());
+        Account fromAccount = accountService.findEntityByAccountNumber(dto.fromAccountNumber());
+        Account toAccount = accountService.findEntityByAccountNumber(dto.toAccountNumber());
         validateActiveAccount(fromAccount);
         validateActiveAccount(toAccount);
         validateAmount(dto.amount());
@@ -81,8 +81,8 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponseDTO applyYield(Long accountId) {
-        Account account = accountService.findEntityById(accountId);
+    public TransactionResponseDTO applyYield(String accountNumber) {
+        Account account = accountService.findEntityByAccountNumber(accountNumber);
         SavingsAccount savingsAccount = validateAndGetSavingsAccount(account);
         validateActiveAccount(savingsAccount);
         validateYieldAlreadyApplied(savingsAccount.getId());
@@ -112,8 +112,8 @@ public class TransactionService {
         }
     }
 
-    private void validateDistinctAccounts(Long fromAccountId, Long toAccountId) {
-        if (fromAccountId.equals(toAccountId)) {
+    private void validateDistinctAccounts(String fromAccountNumber, String toAccountNumber) {
+        if (fromAccountNumber.equals(toAccountNumber)) {
             throw new AccountsAreSameException("A conta de origem não pode ser igual à conta de destino.");
         }
     }

@@ -1,24 +1,24 @@
 package com.lucas.sistemabancario.service;
 
-import com.lucas.sistemabancario.dto.request.ClientRequestDTO;
 import com.lucas.sistemabancario.dto.request.AccountRequestDTO;
 import com.lucas.sistemabancario.dto.request.AddressRequestDTO;
+import com.lucas.sistemabancario.dto.request.ClientRequestDTO;
 import com.lucas.sistemabancario.dto.response.AccountResponseDTO;
-import com.lucas.sistemabancario.entity.Client;
 import com.lucas.sistemabancario.entity.Account;
 import com.lucas.sistemabancario.entity.CheckingAccount;
+import com.lucas.sistemabancario.entity.Client;
 import com.lucas.sistemabancario.entity.SavingsAccount;
-import com.lucas.sistemabancario.entity.enums.State;
 import com.lucas.sistemabancario.entity.enums.AccountStatus;
 import com.lucas.sistemabancario.entity.enums.AccountType;
+import com.lucas.sistemabancario.entity.enums.State;
 import com.lucas.sistemabancario.entity.enums.StreetType;
 import com.lucas.sistemabancario.exception.account.AccountAlreadyExistsException;
 import com.lucas.sistemabancario.exception.account.AccountHasBalanceException;
 import com.lucas.sistemabancario.exception.account.AccountIsNotActiveException;
 import com.lucas.sistemabancario.exception.account.AccountNotFoundException;
+import com.lucas.sistemabancario.repository.AccountRepository;
 import com.lucas.sistemabancario.repository.CheckingAccountRepository;
 import com.lucas.sistemabancario.repository.SavingsAccountRepository;
-import com.lucas.sistemabancario.repository.AccountRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -104,16 +104,16 @@ public class AccountServiceTest {
         @DisplayName("Deve retornar lista de contas quando existirem registros.")
         void shouldReturnListOfAccountsWhenRecordsExist() {
             //Arrange
-            CheckingAccount ca = createCheckingAccount();
-            SavingsAccount sa = createSavingsAccount();
-            when(accountRepository.findAll()).thenReturn(List.of(ca, sa));
+            CheckingAccount checkingAccount = createCheckingAccount();
+            SavingsAccount savingsAccount = createSavingsAccount();
+            when(accountRepository.findAll()).thenReturn(List.of(checkingAccount, savingsAccount));
             //Act
             List<AccountResponseDTO> result = accountService.findAll();
             //Assert
             assertNotNull(result);
             assertEquals(2, result.size());
-            assertEquals(ca.getId(), result.getFirst().id());
-            assertEquals(sa.getId(), result.getLast().id());
+            assertEquals(checkingAccount.getAccountNumber(), result.getFirst().accountNumber());
+            assertEquals(savingsAccount.getAccountNumber(), result.getLast().accountNumber());
             //Verify
             verify(accountRepository).findAll();
         }
@@ -134,71 +134,71 @@ public class AccountServiceTest {
     }
 
     @Nested
-    @DisplayName("Ao buscar entidade conta por ID")
-    class FindEntityByIdTests {
+    @DisplayName("Ao buscar entidade conta pelo número da conta")
+    class FindEntityByAccountNumberTests {
         @Test
-        @DisplayName("Deve retornar Conta quando ID existir")
-        void shouldReturnAccountEntityWhenIdExists() {
+        @DisplayName("Deve retornar conta quando número da conta existir")
+        void shouldReturnAccountEntityWhenAccountNumberExists() {
             //Arrange
-            CheckingAccount ca = createCheckingAccount();
-            when(accountRepository.findById(ca.getId())).thenReturn(Optional.of(ca));
+            CheckingAccount checkingAccount = createCheckingAccount();
+            when(accountRepository
+                    .findByAccountNumber(checkingAccount.getAccountNumber()))
+                    .thenReturn(Optional.of(checkingAccount));
             //Act
-            Account result = accountService.findEntityById(ca.getId());
+            Account result = accountService.findEntityByAccountNumber(checkingAccount.getAccountNumber());
             //Assert
             assertNotNull(result);
-            assertEquals(ca.getId(), result.getId());
-            assertEquals(ca.getAccountNumber(), result.getAccountNumber());
-            assertEquals(ca.getClient(), result.getClient());
-            assertEquals(ca.getType(), result.getType());
-            assertEquals(ca.getBalance(), result.getBalance());
+            assertEquals(checkingAccount.getAccountNumber(), result.getAccountNumber());
+            assertEquals(checkingAccount.getClient(), result.getClient());
+            assertEquals(checkingAccount.getType(), result.getType());
+            assertEquals(checkingAccount.getBalance(), result.getBalance());
             //Verify
-            verify(accountRepository).findById(ca.getId());
+            verify(accountRepository).findByAccountNumber(checkingAccount.getAccountNumber());
         }
 
         @Test
-        @DisplayName("Deve lançar exceção quando ID da conta não existir")
+        @DisplayName("Deve lançar exceção quando número da conta não existir")
         void shouldThrowExceptionWhenAccountDoesNotExist() {
             //Arrange
-            Long nonExistentId = 99L;
-            when(accountRepository.findById(nonExistentId)).thenReturn(Optional.empty());
+            String nonExistentAccountNumber = "999999";
+            when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
             //Act + Assert
-            assertThrows(AccountNotFoundException.class, () -> accountService.findEntityById(nonExistentId));
+            assertThrows(AccountNotFoundException.class, () -> accountService.findEntityByAccountNumber(nonExistentAccountNumber));
             //Verify
-            verify(accountRepository).findById(nonExistentId);
+            verify(accountRepository).findByAccountNumber(nonExistentAccountNumber);
         }
     }
 
     @Nested
-    @DisplayName("Ao buscar conta por ID")
-    class FindByIdTests {
+    @DisplayName("Ao buscar conta pelo número da conta")
+    class FindByAccountNumberTests {
         @Test
-        @DisplayName("Deve retornar ContaResponseDTO quando ID existir")
-        void shouldReturnAccountResponseDTOWhenIdExists() {
+        @DisplayName("Deve retornar AccountResponseDTO quando número da conta existir")
+        void shouldReturnAccountResponseDTOWhenAccountNumberExists() {
             // Arrange
-            SavingsAccount sa = createSavingsAccount();
-            when(accountRepository.findById(sa.getId())).thenReturn(Optional.of(sa));
+            SavingsAccount savingsAccount = createSavingsAccount();
+            when(accountRepository.findByAccountNumber(savingsAccount.getAccountNumber())).thenReturn(Optional.of(savingsAccount));
             // Act
-            AccountResponseDTO result = accountService.findById(sa.getId());
+            AccountResponseDTO result = accountService.findByAccountNumber(savingsAccount.getAccountNumber());
             // Assert
             assertNotNull(result);
-            assertEquals(sa.getId(), result.id());
-            assertEquals(sa.getAccountNumber(), result.accountNumber());
-            assertEquals(sa.getType(), result.accountType());
-            assertEquals(sa.getClient().getName(), result.clientName());
+            assertEquals(savingsAccount.getAccountNumber(), result.accountNumber());
+            assertEquals(savingsAccount.getType(), result.type());
+            assertEquals(savingsAccount.getClient().getName(), result.clientName());
             // Verify
-            verify(accountRepository).findById(sa.getId());
+            verify(accountRepository).findByAccountNumber(savingsAccount.getAccountNumber());
         }
 
         @Test
-        @DisplayName("Deve lançar exceção quando ID da conta não existir")
+        @DisplayName("Deve lançar exceção quando número da conta não existir")
         void shouldThrowExceptionWhenAccountDoesNotExist() {
             //Arrange
-            Long nonExistentId = 99L;
-            when(accountRepository.findById(nonExistentId)).thenReturn(Optional.empty());
+            String nonExistentAccountNumber  = "999999";
+            when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
             //Act + Assert
-            assertThrows(AccountNotFoundException.class, () -> accountService.findById(nonExistentId));
+            assertThrows(AccountNotFoundException.class, () -> accountService.findByAccountNumber(nonExistentAccountNumber ));
             //Verify
-            verify(accountRepository).findById(nonExistentId);
+            verify(accountRepository).findByAccountNumber(nonExistentAccountNumber );
         }
     }
 
@@ -223,9 +223,8 @@ public class AccountServiceTest {
             AccountResponseDTO result = accountService.create(dto);
             // Assert
             assertNotNull(result);
-            assertEquals(1L, result.id());
             assertEquals("000011", result.accountNumber());
-            assertEquals(AccountType.CHECKING, result.accountType());
+            assertEquals(AccountType.CHECKING, result.type());
             assertEquals(client.getName(), result.clientName());
             //Verify
             verify(clientService).findEntityById(dto.clientId());
@@ -249,9 +248,8 @@ public class AccountServiceTest {
             });
             AccountResponseDTO result = accountService.create(dto);
             assertNotNull(result);
-            assertEquals(2L, result.id());
             assertEquals("000022", result.accountNumber());
-            assertEquals(AccountType.SAVINGS, result.accountType());
+            assertEquals(AccountType.SAVINGS, result.type());
             assertEquals(client.getName(), result.clientName());
             verify(clientService).findEntityById(dto.clientId());
             verify(savingsAccountRepository).existsByClientId(dto.clientId());
@@ -294,40 +292,40 @@ public class AccountServiceTest {
         @Test
         @DisplayName("Deve cancelar conta com sucesso quando ela está ativa e saldo zerado")
         void shouldCancelAccountSuccessfullyWhenActiveAndBalanceIsZero() {
-            CheckingAccount ca = createCheckingAccount();
-            when(accountRepository.findById(ca.getId())).thenReturn(Optional.of(ca));
-            accountService.cancel(ca.getId());
-            assertEquals(AccountStatus.CANCELLED, ca.getStatus());
-            verify(accountRepository).findById(ca.getId());
+            CheckingAccount checkingAccount = createCheckingAccount();
+            when(accountRepository.findByAccountNumber(checkingAccount.getAccountNumber())).thenReturn(Optional.of(checkingAccount));
+            accountService.cancel(checkingAccount.getAccountNumber());
+            assertEquals(AccountStatus.CANCELLED, checkingAccount.getStatus());
+            verify(accountRepository).findByAccountNumber(checkingAccount.getAccountNumber());
         }
 
         @Test
         @DisplayName("Deve lançar exceção quando tentar cancelar conta inexistente")
         void shouldThrowExceptionWhenCancellingNonExistentAccount() {
-            Long nonExistentId = 99L;
-            when(accountRepository.findById(nonExistentId)).thenReturn(Optional.empty());
-            assertThrows(AccountNotFoundException.class, () -> accountService.cancel(nonExistentId));
-            verify(accountRepository).findById(nonExistentId);
+            String nonExistentAccountNumber  = "999999";
+            when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
+            assertThrows(AccountNotFoundException.class, () -> accountService.cancel(nonExistentAccountNumber ));
+            verify(accountRepository).findByAccountNumber(nonExistentAccountNumber);
         }
 
         @Test
         @DisplayName("Deve lançar exceção quando tentar cancelar conta inativa")
         void shouldThrowExceptionWhenCancellingInactiveAccount() {
-            SavingsAccount sa = createSavingsAccount();
-            ReflectionTestUtils.setField(sa, "status", AccountStatus.CANCELLED);
-            when(accountRepository.findById(sa.getId())).thenReturn(Optional.of(sa));
-            assertThrows(AccountIsNotActiveException.class, () -> accountService.cancel(sa.getId()));
-            verify(accountRepository).findById(sa.getId());
+            SavingsAccount savingsAccount = createSavingsAccount();
+            ReflectionTestUtils.setField(savingsAccount, "status", AccountStatus.CANCELLED);
+            when(accountRepository.findByAccountNumber(savingsAccount.getAccountNumber())).thenReturn(Optional.of(savingsAccount));
+            assertThrows(AccountIsNotActiveException.class, () -> accountService.cancel(savingsAccount.getAccountNumber()));
+            verify(accountRepository).findByAccountNumber(savingsAccount.getAccountNumber());
         }
 
         @Test
         @DisplayName("Deve lançar exceção quando tentar cancelar conta com saldo")
         void shouldThrowExceptionWhenCancellingAccountWithBalance() {
-            CheckingAccount ca = createCheckingAccount();
-            ReflectionTestUtils.setField(ca, "balance", BigDecimal.TEN);
-            when(accountRepository.findById(ca.getId())).thenReturn(Optional.of(ca));
-            assertThrows(AccountHasBalanceException.class, () -> accountService.cancel(ca.getId()));
-            verify(accountRepository).findById(ca.getId());
+            CheckingAccount checkingAccount = createCheckingAccount();
+            ReflectionTestUtils.setField(checkingAccount, "balance", BigDecimal.TEN);
+            when(accountRepository.findByAccountNumber(checkingAccount.getAccountNumber())).thenReturn(Optional.of(checkingAccount));
+            assertThrows(AccountHasBalanceException.class, () -> accountService.cancel(checkingAccount.getAccountNumber()));
+            verify(accountRepository).findByAccountNumber(checkingAccount.getAccountNumber());
         }
     }
 }

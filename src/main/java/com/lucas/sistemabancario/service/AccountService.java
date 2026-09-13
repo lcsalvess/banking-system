@@ -37,12 +37,12 @@ public class AccountService {
         return accountRepository.findAll().stream().map(AccountResponseDTO::fromEntity).toList();
     }
 
-    public Account findEntityById(Long id) {
-        return accountRepository.findById(id).orElseThrow(() -> new AccountNotFoundException("Conta não encontrada"));
+    public Account findEntityByAccountNumber(String accountNumber) {
+        return accountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new AccountNotFoundException("Conta não encontrada"));
     }
 
-    public AccountResponseDTO findById(Long id) {
-        Account account = findEntityById(id);
+    public AccountResponseDTO findByAccountNumber(String accountNumber) {
+        Account account = findEntityByAccountNumber(accountNumber);
         return AccountResponseDTO.fromEntity(account);
     }
 
@@ -50,13 +50,13 @@ public class AccountService {
     public AccountResponseDTO create(AccountRequestDTO dto) {
         Client client = clientService.findEntityById(dto.clientId());
         Account account;
-        if (dto.accountType() == AccountType.CHECKING) {
+        if (dto.type() == AccountType.CHECKING) {
             if (checkingAccountRepository.existsByClientId(dto.clientId())) {
                 throw new AccountAlreadyExistsException("O cliente já possui uma conta corrente");
             }
             String accountNumber = generateAccountNumber();
             account = new CheckingAccount(client, accountNumber);
-        } else if (dto.accountType() == AccountType.SAVINGS) {
+        } else if (dto.type() == AccountType.SAVINGS) {
             if (savingsAccountRepository.existsByClientId(dto.clientId())) {
                 throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança");
             }
@@ -72,8 +72,8 @@ public class AccountService {
     }
 
     @Transactional
-    public void cancel(Long accountId) {
-        Account account = findEntityById(accountId);
+    public void cancel(String accountNumber) {
+        Account account = findEntityByAccountNumber(accountNumber);
         validateActiveAccount(account);
         validateAccountHasNoBalance(account);
         account.cancel();

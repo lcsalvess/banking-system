@@ -25,9 +25,9 @@ public class TransactionController {
         return transactionService.deposit(dto);
     }
 
-    @GetMapping("/account/{accountId}")
-    public List<TransactionResponseDTO> listByAccountId(@PathVariable Long accountId) {
-        return transactionService.findByAccountId(accountId);
+    @GetMapping("/account/{accountNumber}")
+    public List<TransactionResponseDTO> listByAccountNumber(@PathVariable String accountNumber) {
+        return transactionService.findByAccountNumber(accountNumber);
     }
 
     @PostMapping("/withdraw")
@@ -42,9 +42,9 @@ public class TransactionController {
         return transactionService.transfer(dto);
     }
 
-    @PostMapping("/yield/{accountId}")
+    @PostMapping("/yield/{accountNumber}")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO applyYield(@PathVariable Long accountId) {
-        return transactionService.applyYield(accountId);
+    public TransactionResponseDTO applyYield(@PathVariable String accountNumber) {
+        return transactionService.applyYield(accountNumber);
     }
 }

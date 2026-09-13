@@ -8,6 +8,6 @@ public record AccountRequestDTO(
         Long clientId,
 
         @NotNull(message = "O tipo de conta é obrigatório.")
-        AccountType accountType
+        AccountType type
 ) {
 }

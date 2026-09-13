@@ -1,12 +1,18 @@
 package com.lucas.sistemabancario.dto.request.transaction;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 
 public record AccountOperationRequestDTO(
-        @NotNull(message = "O número da conta é obrigatório.")
+        @NotBlank(message = "O número da conta é obrigatório.")
+        @Pattern(
+                regexp = "^\\d{6}$",
+                message = "O número da conta deve conter exatamente 6 dígitos."
+        )
         String accountNumber,
 
         @NotNull(message = "O valor da operação é obrigatório.")

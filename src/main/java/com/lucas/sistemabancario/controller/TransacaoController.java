@@ -42,7 +42,7 @@ public class TransacaoController {
     }
 
     @PostMapping("/rendimento/{contaId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ResponseStatus(HttpStatus.CREATED)
     public TransacaoResponseDTO aplicarRendimento(@PathVariable Long contaId) {
         return transacaoService.aplicarRendimento(contaId);
     }

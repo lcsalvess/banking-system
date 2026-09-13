@@ -1,6 +1,7 @@
 package com.lucas.sistemabancario.service;
 
-import com.lucas.sistemabancario.dto.request.TransacaoRequestDTO;
+import com.lucas.sistemabancario.dto.request.transacao.OperacaoContaRequestDTO;
+import com.lucas.sistemabancario.dto.request.transacao.TransferenciaRequestDTO;
 import com.lucas.sistemabancario.dto.response.TransacaoResponseDTO;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
@@ -35,7 +36,7 @@ public class TransacaoService {
     }
 
     @Transactional
-    public TransacaoResponseDTO depositar(TransacaoRequestDTO dto) {
+    public TransacaoResponseDTO depositar(OperacaoContaRequestDTO dto) {
         Conta conta = contaService.buscarContaPorId(dto.getContaId());
         validarContaAtiva(conta);
         validarValor(dto.getValor());
@@ -53,7 +54,7 @@ public class TransacaoService {
     }
 
     @Transactional
-    public TransacaoResponseDTO sacar(TransacaoRequestDTO dto) {
+    public TransacaoResponseDTO sacar(OperacaoContaRequestDTO dto) {
         Conta conta = contaService.buscarContaPorId(dto.getContaId());
         validarContaAtiva(conta);
         validarValor(dto.getValor());
@@ -64,9 +65,9 @@ public class TransacaoService {
     }
 
     @Transactional
-    public TransacaoResponseDTO transferir(TransacaoRequestDTO dto) {
-        validarContasDiferentes(dto.getContaId(), dto.getContaIdDestino());
-        Conta contaOrigem = contaService.buscarContaPorId(dto.getContaId());
+    public TransacaoResponseDTO transferir(TransferenciaRequestDTO dto) {
+        validarContasDiferentes(dto.getContaIdOrigem(), dto.getContaIdDestino());
+        Conta contaOrigem = contaService.buscarContaPorId(dto.getContaIdOrigem());
         Conta contaDestino = contaService.buscarContaPorId(dto.getContaIdDestino());
         validarContaAtiva(contaOrigem);
         validarContaAtiva(contaDestino);

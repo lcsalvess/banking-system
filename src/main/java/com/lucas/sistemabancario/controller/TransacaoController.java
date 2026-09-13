@@ -1,6 +1,7 @@
 package com.lucas.sistemabancario.controller;
 
-import com.lucas.sistemabancario.dto.request.TransacaoRequestDTO;
+import com.lucas.sistemabancario.dto.request.transacao.OperacaoContaRequestDTO;
+import com.lucas.sistemabancario.dto.request.transacao.TransferenciaRequestDTO;
 import com.lucas.sistemabancario.dto.response.TransacaoResponseDTO;
 import com.lucas.sistemabancario.service.TransacaoService;
 import jakarta.validation.Valid;
@@ -20,7 +21,7 @@ public class TransacaoController {
 
     @PostMapping("/deposito")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransacaoResponseDTO depositar(@Valid @RequestBody TransacaoRequestDTO dto) {
+    public TransacaoResponseDTO depositar(@Valid @RequestBody OperacaoContaRequestDTO dto) {
         return transacaoService.depositar(dto);
     }
 
@@ -31,13 +32,13 @@ public class TransacaoController {
 
     @PostMapping("/saque")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransacaoResponseDTO sacar(@Valid @RequestBody TransacaoRequestDTO dto) {
+    public TransacaoResponseDTO sacar(@Valid @RequestBody OperacaoContaRequestDTO dto) {
         return transacaoService.sacar(dto);
     }
 
     @PostMapping("/transferencia")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransacaoResponseDTO transferir(@Valid @RequestBody TransacaoRequestDTO dto) {
+    public TransacaoResponseDTO transferir(@Valid @RequestBody TransferenciaRequestDTO dto) {
         return transacaoService.transferir(dto);
     }
 

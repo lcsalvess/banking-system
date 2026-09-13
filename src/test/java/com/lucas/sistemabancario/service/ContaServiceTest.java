@@ -287,7 +287,7 @@ public class ContaServiceTest {
 
     @Nested
     @DisplayName("Testes de cancelamento de contas")
-    class CancelarContaTest {
+    class CancelarContaTests {
         @Test
         @DisplayName("Deve cancelar conta com sucesso quando ela está ativa e saldo zerado")
         void deveCancelarContaComSucessoQuandoEstaAtivaESaldoZerado() {

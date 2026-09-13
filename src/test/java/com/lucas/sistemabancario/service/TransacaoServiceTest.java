@@ -1,6 +1,7 @@
 package com.lucas.sistemabancario.service;
 
-import com.lucas.sistemabancario.dto.request.TransacaoRequestDTO;
+import com.lucas.sistemabancario.dto.request.transacao.OperacaoContaRequestDTO;
+import com.lucas.sistemabancario.dto.request.transacao.TransferenciaRequestDTO;
 import com.lucas.sistemabancario.dto.response.TransacaoResponseDTO;
 import com.lucas.sistemabancario.entity.Conta;
 import com.lucas.sistemabancario.entity.ContaPoupanca;
@@ -10,9 +11,9 @@ import com.lucas.sistemabancario.entity.enums.TipoTransacao;
 import com.lucas.sistemabancario.exception.conta.AccountIsNotActiveException;
 import com.lucas.sistemabancario.exception.conta.AccountIsNotSavingsException;
 import com.lucas.sistemabancario.exception.conta.AccountsAreSameException;
+import com.lucas.sistemabancario.exception.transacao.InsufficientBalanceException;
 import com.lucas.sistemabancario.exception.transacao.InterestAlreadyAppliedException;
 import com.lucas.sistemabancario.exception.transacao.InterestNotAvailableException;
-import com.lucas.sistemabancario.exception.transacao.InsufficientBalanceException;
 import com.lucas.sistemabancario.repository.TransacaoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,10 +42,9 @@ public class TransacaoServiceTest {
     @InjectMocks
     private TransacaoService transacaoService;
 
-    private TransacaoRequestDTO criarDto(Long contaId, TipoTransacao tipo, BigDecimal valor) {
-        TransacaoRequestDTO dto = new TransacaoRequestDTO();
+    private OperacaoContaRequestDTO criarDtoOperacao(Long contaId, BigDecimal valor) {
+        OperacaoContaRequestDTO dto = new OperacaoContaRequestDTO();
         dto.setContaId(contaId);
-        dto.setTipoTransacao(tipo);
         dto.setValor(valor);
         return dto;
     }
@@ -67,7 +67,7 @@ public class TransacaoServiceTest {
             ReflectionTestUtils.setField(conta, "situacaoConta", SituacaoConta.CANCELADA);
             when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
 
-            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.DEPOSITO, BigDecimal.TEN);
+            OperacaoContaRequestDTO dto = criarDtoOperacao(contaId, BigDecimal.TEN);
 
             assertThrows(AccountIsNotActiveException.class, () -> transacaoService.depositar(dto));
             verify(transacaoRepository, never()).save(any());
@@ -79,7 +79,7 @@ public class TransacaoServiceTest {
             when(contaService.buscarContaPorId(contaId)).thenReturn(conta);
             when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
 
-            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.DEPOSITO, BigDecimal.TEN);
+            OperacaoContaRequestDTO dto = criarDtoOperacao(contaId, BigDecimal.TEN);
 
             TransacaoResponseDTO response = transacaoService.depositar(dto);
 
@@ -109,7 +109,7 @@ public class TransacaoServiceTest {
         @DisplayName("Deve lançar exceção ao tentar sacar de uma conta CANCELADA.")
         void deveLancarExcecaoQuandoContaNaoEstaAtiva() {
             ReflectionTestUtils.setField(conta, "situacaoConta", SituacaoConta.CANCELADA);
-            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, BigDecimal.TEN);
+            OperacaoContaRequestDTO dto = criarDtoOperacao(contaId, BigDecimal.TEN);
 
             assertThrows(AccountIsNotActiveException.class, () -> transacaoService.sacar(dto));
             verify(transacaoRepository, never()).save(any());
@@ -118,7 +118,7 @@ public class TransacaoServiceTest {
         @Test
         @DisplayName("Deve lançar exceção ao tentar sacar mais do que tem em conta.")
         void deveLancarExcecaoQuandoSaqueEhMaiorQueSaldo() {
-            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, new BigDecimal("200.00"));
+            OperacaoContaRequestDTO dto = criarDtoOperacao(contaId, new BigDecimal("200.00"));
 
             assertThrows(InsufficientBalanceException.class, () -> transacaoService.sacar(dto));
             verify(transacaoRepository, never()).save(any());
@@ -128,7 +128,7 @@ public class TransacaoServiceTest {
         @DisplayName("Deve retornar sucesso ao tentar sacar o mesmo valor do saldo.")
         void deveRealizarSaqueQuandoValorSaqueIgualASaldo() {
             when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
-            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, new BigDecimal("100.00"));
+            OperacaoContaRequestDTO dto = criarDtoOperacao(contaId, new BigDecimal("100.00"));
 
             transacaoService.sacar(dto);
 
@@ -140,7 +140,7 @@ public class TransacaoServiceTest {
         @DisplayName("Deve retornar sucesso ao tentar sacar valor menor que o saldo.")
         void deveRealizarSaqueQuandoValorMenorQueSaldo() {
             when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
-            TransacaoRequestDTO dto = criarDto(contaId, TipoTransacao.SAQUE, new BigDecimal("30.00"));
+            OperacaoContaRequestDTO dto = criarDtoOperacao(contaId, new BigDecimal("30.00"));
 
             transacaoService.sacar(dto);
 
@@ -167,18 +167,19 @@ public class TransacaoServiceTest {
             ReflectionTestUtils.setField(contaDestino, "saldo", new BigDecimal("50.00"));
         }
 
-        private TransacaoRequestDTO criarDtoTransferencia(BigDecimal valor) {
-            TransacaoRequestDTO dto = criarDto(contaIdOrigem, TipoTransacao.TRANSFERENCIA_ENVIADA, valor);
+        private TransferenciaRequestDTO criarDtoTransferencia(BigDecimal valor) {
+            TransferenciaRequestDTO dto = new TransferenciaRequestDTO();
+            dto.setContaIdOrigem(contaIdOrigem);
             dto.setContaIdDestino(contaIdDestino);
+            dto.setValor(valor);
             return dto;
         }
 
         @Test
         @DisplayName("Deve lançar exceção se a transferência for entre a mesma conta")
         void deveLancarExcecaoTransferenciaEntreMesmaConta() {
-            TransacaoRequestDTO dto = criarDto(contaIdOrigem, TipoTransacao.TRANSFERENCIA_ENVIADA, BigDecimal.TEN);
+            TransferenciaRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
             dto.setContaIdDestino(contaIdOrigem); // Forçando IDs iguais
-
             assertThrows(AccountsAreSameException.class, () -> transacaoService.transferir(dto));
             verify(contaService, never()).buscarContaPorId(any());
             verify(transacaoRepository, never()).save(any());
@@ -189,7 +190,7 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoCasoContaOrigemEstaCancelada() {
             mockarBuscaDeContas();
             ReflectionTestUtils.setField(contaOrigem, "situacaoConta", SituacaoConta.CANCELADA);
-            TransacaoRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
+            TransferenciaRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
 
             assertThrows(AccountIsNotActiveException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
@@ -200,7 +201,7 @@ public class TransacaoServiceTest {
         void deveLancarExcecaoCasoContaDestinoEstaCancelada() {
             mockarBuscaDeContas();
             ReflectionTestUtils.setField(contaDestino, "situacaoConta", SituacaoConta.CANCELADA);
-            TransacaoRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
+            TransferenciaRequestDTO dto = criarDtoTransferencia(BigDecimal.TEN);
 
             assertThrows(AccountIsNotActiveException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
@@ -210,7 +211,7 @@ public class TransacaoServiceTest {
         @DisplayName("Deve lançar exceção ao tentar transferir valor maior que o saldo da conta origem")
         void deveLancarExcecaoQuandoTransferenciaEhMaiorQueSaldo() {
             mockarBuscaDeContas();
-            TransacaoRequestDTO dto = criarDtoTransferencia(new BigDecimal("200.00"));
+            TransferenciaRequestDTO dto = criarDtoTransferencia(new BigDecimal("200.00"));
 
             assertThrows(InsufficientBalanceException.class, () -> transacaoService.transferir(dto));
             verify(transacaoRepository, never()).save(any());
@@ -223,7 +224,7 @@ public class TransacaoServiceTest {
             when(transacaoRepository.save(any(Transacao.class))).thenAnswer(i -> i.getArgument(0));
 
             BigDecimal valorTransferencia = new BigDecimal("30.00");
-            TransacaoRequestDTO dto = criarDtoTransferencia(valorTransferencia);
+            TransferenciaRequestDTO dto = criarDtoTransferencia(valorTransferencia);
 
             transacaoService.transferir(dto);
 

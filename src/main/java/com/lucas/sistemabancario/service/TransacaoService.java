@@ -88,6 +88,7 @@ public class TransacaoService {
         validarRendimentoDisponivel(contaPoupanca);
         BigDecimal rendimento = contaPoupanca.calcularRendimento();
         contaPoupanca.creditar(rendimento);
+        contaPoupanca.atualizarDataUltimoRendimento();
         Transacao transacao = registrarTransacao(TipoTransacao.RENDIMENTO, rendimento, contaPoupanca);
         return TransacaoResponseDTO.fromEntity(transacao);
     }

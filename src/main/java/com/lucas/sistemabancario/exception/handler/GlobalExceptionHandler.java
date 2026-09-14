@@ -1,5 +1,6 @@
 package com.lucas.sistemabancario.exception.handler;
 
+import com.lucas.sistemabancario.dto.response.ErrorResponse;
 import com.lucas.sistemabancario.exception.account.*;
 import com.lucas.sistemabancario.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.sistemabancario.exception.client.ClientNotFoundException;
@@ -25,98 +26,98 @@ import java.util.Map;
 public class GlobalExceptionHandler {
     @ExceptionHandler(ClientNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public String handleClientNotFound(ClientNotFoundException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleClientNotFound(ClientNotFoundException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(ClientCpfAlreadyExistsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleClientCpfAlreadyExists(ClientCpfAlreadyExistsException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleClientCpfAlreadyExists(ClientCpfAlreadyExistsException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(AccountNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public String handleAccountNotFound(AccountNotFoundException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleAccountNotFound(AccountNotFoundException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(AccountAlreadyExistsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleAccountAlreadyExists(AccountAlreadyExistsException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleAccountAlreadyExists(AccountAlreadyExistsException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(AccountIsNotActiveException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleAccountIsNotActive(AccountIsNotActiveException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleAccountIsNotActive(AccountIsNotActiveException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(AccountHasBalanceException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleAccountHasBalance(AccountHasBalanceException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleAccountHasBalance(AccountHasBalanceException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(AccountsAreSameException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleAccountsAreSame(AccountsAreSameException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleAccountsAreSame(AccountsAreSameException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(AccountIsNotSavingsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleAccountIsNotSavings(AccountIsNotSavingsException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleAccountIsNotSavings(AccountIsNotSavingsException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(InvalidAccountTypeException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String handleInvalidAccountType(InvalidAccountTypeException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleInvalidAccountType(InvalidAccountTypeException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(InvalidAmountException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String handleInvalidAmount(InvalidAmountException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleInvalidAmount(InvalidAmountException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(InsufficientBalanceException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleInsufficientBalance(InsufficientBalanceException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleInsufficientBalance(InsufficientBalanceException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(YieldNotAvailableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String handleYieldNotAvailable(YieldNotAvailableException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleYieldNotAvailable(YieldNotAvailableException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(YieldAlreadyAppliedException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String handleYieldAlreadyApplied(YieldAlreadyAppliedException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleYieldAlreadyApplied(YieldAlreadyAppliedException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(UsernameAlreadyExistsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleUsernameAlreadyExists(UsernameAlreadyExistsException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleUsernameAlreadyExists(UsernameAlreadyExistsException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(UserEmailAlreadyExistsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleUserEmailAlreadyExists(UserEmailAlreadyExistsException exception) {
-        return exception.getMessage();
+    public ErrorResponse handleUserEmailAlreadyExists(UserEmailAlreadyExistsException exception) {
+        return new ErrorResponse(exception.getMessage());
     }
 
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public String handleBadCredentials() {
-        return "Usuário ou senha inválidos.";
+    public ErrorResponse handleBadCredentials() {
+        return new ErrorResponse("Usuário ou senha inválidos.");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -133,16 +134,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String handleHttpMessageNotReadable(){
-        return "Dados da requisição inválidos.";
+    public ErrorResponse handleHttpMessageNotReadable() {
+        return new ErrorResponse("Dados da requisição inválidos.");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+    public ErrorResponse handleDataIntegrityViolation(DataIntegrityViolationException exception) {
         if (exception.getMessage() != null && exception.getMessage().contains("uk_transaction_daily_yield")) {
-            return "O rendimento já foi aplicado para esta conta hoje.";
+            return new ErrorResponse("O rendimento já foi aplicado para esta conta hoje.");
         }
-        return "Erro de integridade de dados no banco";
+        return new ErrorResponse("Erro de integridade de dados no banco.");
     }
 }

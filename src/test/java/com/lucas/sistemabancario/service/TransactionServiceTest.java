@@ -270,6 +270,8 @@ public class TransactionServiceTest {
             when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(eq(accountId), any(), any(), any())).thenReturn(true);
 
             assertThrows(YieldAlreadyAppliedException.class, () -> transactionService.applyYield(accountNumber));
+            verify(savingsAccount, never()).credit(any());
+            verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
         }
 
@@ -280,6 +282,8 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
 
             assertThrows(AccountIsNotActiveException.class, () -> transactionService.applyYield(accountNumber));
+            verify(savingsAccount, never()).credit(any());
+            verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
         }
 
@@ -290,6 +294,20 @@ public class TransactionServiceTest {
             doReturn(false).when(savingsAccount).isEligibleForYield();
 
             assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber));
+            verify(savingsAccount, never()).credit(any());
+            verify(savingsAccount, never()).updateLastYieldDate();
+            verify(transactionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção quando o rendimento da conta poupança for zero.")
+        void shouldThrowExceptionWhenYieldIsZero() {
+            mockSavingsAccountLookup();
+            doReturn(true).when(savingsAccount).isEligibleForYield();
+            doReturn(BigDecimal.ZERO).when(savingsAccount).calculateYield();
+            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber));
+            verify(savingsAccount, never()).credit(any());
+            verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
         }
 
@@ -304,10 +322,13 @@ public class TransactionServiceTest {
             doReturn(yieldAmount).when(savingsAccount).calculateYield();
             when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(eq(accountId), any(), any(), any()))
                     .thenReturn(false);
+            BigDecimal initialBalance = savingsAccount.getBalance();
 
             transactionService.applyYield(accountNumber);
 
-            assertEquals(yieldAmount, savingsAccount.getBalance());
+            assertEquals(initialBalance.add(yieldAmount), savingsAccount.getBalance());
+            verify(savingsAccount).credit(any());
+            verify(savingsAccount).updateLastYieldDate();
             verify(transactionRepository).save(any(Transaction.class));
         }
 

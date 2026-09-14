@@ -86,8 +86,8 @@ public class TransactionService {
         SavingsAccount savingsAccount = validateAndGetSavingsAccount(account);
         validateActiveAccount(savingsAccount);
         validateYieldAlreadyApplied(savingsAccount.getId());
-        validateYieldAvailable(savingsAccount);
         BigDecimal yieldAmount = savingsAccount.calculateYield();
+        validateYieldAvailable(savingsAccount, yieldAmount);
         savingsAccount.credit(yieldAmount);
         savingsAccount.updateLastYieldDate();
         Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount);
@@ -125,9 +125,13 @@ public class TransactionService {
         return savingsAccount;
     }
 
-    private void validateYieldAvailable(SavingsAccount savingsAccount) {
+    private void validateYieldAvailable(SavingsAccount savingsAccount,
+                                        BigDecimal yieldAmount) {
         if (!savingsAccount.isEligibleForYield()) {
             throw new YieldNotAvailableException("A conta ainda não está disponível para receber rendimento");
+        }
+        if (yieldAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new YieldNotAvailableException("Não há rendimento disponível para esta conta.");
         }
     }
 

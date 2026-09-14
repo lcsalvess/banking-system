@@ -1,4 +1,4 @@
-package com.lucas.sistemabancario.service;
+package com.lucas.sistemabancario.service.security;
 
 import com.lucas.sistemabancario.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;

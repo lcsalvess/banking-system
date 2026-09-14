@@ -12,6 +12,7 @@ import com.lucas.sistemabancario.exception.user.UsernameAlreadyExistsException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -110,6 +111,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public String handleUserEmailAlreadyExists(UserEmailAlreadyExistsException exception) {
         return exception.getMessage();
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public String handleBadCredentials() {
+        return "Usuário ou senha inválidos.";
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

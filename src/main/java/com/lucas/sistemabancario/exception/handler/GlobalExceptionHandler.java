@@ -7,6 +7,8 @@ import com.lucas.sistemabancario.exception.transaction.InsufficientBalanceExcept
 import com.lucas.sistemabancario.exception.transaction.InvalidAmountException;
 import com.lucas.sistemabancario.exception.transaction.YieldAlreadyAppliedException;
 import com.lucas.sistemabancario.exception.transaction.YieldNotAvailableException;
+import com.lucas.sistemabancario.exception.user.UserEmailAlreadyExistsException;
+import com.lucas.sistemabancario.exception.user.UsernameAlreadyExistsException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -95,6 +97,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(YieldAlreadyAppliedException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String handleYieldAlreadyApplied(YieldAlreadyAppliedException exception) {
+        return exception.getMessage();
+    }
+
+    @ExceptionHandler(UsernameAlreadyExistsException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public String handleUsernameAlreadyExists(UsernameAlreadyExistsException exception) {
+        return exception.getMessage();
+    }
+
+    @ExceptionHandler(UserEmailAlreadyExistsException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public String handleUserEmailAlreadyExists(UserEmailAlreadyExistsException exception) {
         return exception.getMessage();
     }
 

@@ -52,13 +52,13 @@ public class AccountService {
         Account account;
         if (dto.type() == AccountType.CHECKING) {
             if (checkingAccountRepository.existsByClientId(dto.clientId())) {
-                throw new AccountAlreadyExistsException("O cliente já possui uma conta corrente");
+                throw new AccountAlreadyExistsException("O cliente já possui uma conta corrente.");
             }
             String accountNumber = generateAccountNumber();
             account = new CheckingAccount(client, accountNumber);
         } else if (dto.type() == AccountType.SAVINGS) {
             if (savingsAccountRepository.existsByClientId(dto.clientId())) {
-                throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança");
+                throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança.");
             }
             String accountNumber = generateAccountNumber();
             LocalDate lastYieldDate = LocalDate.now();

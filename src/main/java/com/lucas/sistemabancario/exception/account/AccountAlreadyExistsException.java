@@ -1,7 +1,10 @@
 package com.lucas.sistemabancario.exception.account;
 
-public class AccountAlreadyExistsException extends RuntimeException {
+import com.lucas.sistemabancario.exception.BusinessException;
+import org.springframework.http.HttpStatus;
+
+public class AccountAlreadyExistsException extends BusinessException {
     public AccountAlreadyExistsException(String message) {
-        super(message);
+        super(message, HttpStatus.CONFLICT);
     }
 }

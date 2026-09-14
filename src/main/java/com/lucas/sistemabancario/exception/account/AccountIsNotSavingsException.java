@@ -1,7 +1,10 @@
 package com.lucas.sistemabancario.exception.account;
 
-public class AccountIsNotSavingsException extends RuntimeException {
+import com.lucas.sistemabancario.exception.BusinessException;
+import org.springframework.http.HttpStatus;
+
+public class AccountIsNotSavingsException extends BusinessException {
     public AccountIsNotSavingsException(String message) {
-        super(message);
+        super(message, HttpStatus.CONFLICT);
     }
 }

@@ -38,7 +38,7 @@ public class ClientService {
 
     public Client findEntityById(Long id) {
         return clientRepository.findById(id)
-                .orElseThrow(() -> new ClientNotFoundException("Cliente não encontrado"));
+                .orElseThrow(() -> new ClientNotFoundException("Cliente não encontrado."));
     }
 
     public ClientResponseDTO findById(Long id) {

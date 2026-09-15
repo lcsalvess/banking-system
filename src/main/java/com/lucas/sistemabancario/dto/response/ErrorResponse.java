@@ -1,7 +1,13 @@
 package com.lucas.sistemabancario.dto.response;
 
+import java.time.Instant;
+
 public record ErrorResponse(
         int status,
-        String message
+        String message,
+        Instant timestamp
 ) {
+    public ErrorResponse(int status, String message) {
+        this(status, message, Instant.now());
+    }
 }

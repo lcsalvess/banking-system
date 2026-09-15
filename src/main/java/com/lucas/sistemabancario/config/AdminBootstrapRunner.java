@@ -22,7 +22,7 @@ public class AdminBootstrapRunner implements CommandLineRunner {
     @Value("${app.admin.email:}")
     private String adminEmail;
 
-    @Value("${app.admin.passowrd:}")
+    @Value("${app.admin.password:}")
     private String adminPassword;
 
     public AdminBootstrapRunner(UserRepository userRepository, PasswordEncoder passwordEncoder) {

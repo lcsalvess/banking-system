@@ -23,8 +23,12 @@ public class SavingsAccount extends Account {
     public SavingsAccount() {
     }
 
-    public SavingsAccount(Client client, String accountNumber, LocalDate lastYieldDate) {
-        super(client, accountNumber, AccountType.SAVINGS);
+    public SavingsAccount(
+            Client client,
+            String accountNumber,
+            String accountDigit
+    ) {
+        super(client, accountNumber, accountDigit, AccountType.SAVINGS);
         this.lastYieldDate = lastYieldDate;
     }
 

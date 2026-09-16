@@ -16,7 +16,6 @@ public class CheckingAccount extends Account {
     public CheckingAccount() {
     }
 
-    public CheckingAccount(Client client, String accountNumber) {
-        super(client, accountNumber, AccountType.CHECKING);
-    }
-}
+    public CheckingAccount(Client client, String accountNumber, String accountDigit) {
+        super(client, accountNumber, accountDigit, AccountType.CHECKING);
+    }}

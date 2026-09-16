@@ -19,6 +19,8 @@ import com.lucas.sistemabancario.exception.account.AccountNotFoundException;
 import com.lucas.sistemabancario.repository.AccountRepository;
 import com.lucas.sistemabancario.repository.CheckingAccountRepository;
 import com.lucas.sistemabancario.repository.SavingsAccountRepository;
+import com.lucas.sistemabancario.service.account.AccountNumberGenerator;
+import com.lucas.sistemabancario.service.account.GeneratedAccountNumber;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,7 +31,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +48,8 @@ public class AccountServiceTest {
     private SavingsAccountRepository savingsAccountRepository;
     @Mock
     private ClientService clientService;
+    @Mock
+    private AccountNumberGenerator accountNumberGenerator;
     @InjectMocks
     private AccountService accountService;
 
@@ -77,14 +80,14 @@ public class AccountServiceTest {
 
     private CheckingAccount createCheckingAccount() {
         Client client = createClient();
-        CheckingAccount ca = new CheckingAccount(client, "000011");
+        CheckingAccount ca = new CheckingAccount(client, "00001", "5");
         ReflectionTestUtils.setField(ca, "id", 1L);
         return ca;
     }
 
     private SavingsAccount createSavingsAccount() {
         Client client = createClient();
-        SavingsAccount sa = new SavingsAccount(client, "000022", LocalDate.now());
+        SavingsAccount sa = new SavingsAccount(client, "00002", "0");
         ReflectionTestUtils.setField(sa, "id", 2L);
         return sa;
     }
@@ -160,7 +163,7 @@ public class AccountServiceTest {
         @DisplayName("Deve lançar exceção quando número da conta não existir")
         void shouldThrowExceptionWhenAccountDoesNotExist() {
             //Arrange
-            String nonExistentAccountNumber = "999999";
+            String nonExistentAccountNumber = "99999";
             when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
             //Act + Assert
             assertThrows(AccountNotFoundException.class, () -> accountService.findEntityByAccountNumber(nonExistentAccountNumber));
@@ -193,12 +196,12 @@ public class AccountServiceTest {
         @DisplayName("Deve lançar exceção quando número da conta não existir")
         void shouldThrowExceptionWhenAccountDoesNotExist() {
             //Arrange
-            String nonExistentAccountNumber  = "999999";
+            String nonExistentAccountNumber = "99999";
             when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
             //Act + Assert
-            assertThrows(AccountNotFoundException.class, () -> accountService.findByAccountNumber(nonExistentAccountNumber ));
+            assertThrows(AccountNotFoundException.class, () -> accountService.findByAccountNumber(nonExistentAccountNumber));
             //Verify
-            verify(accountRepository).findByAccountNumber(nonExistentAccountNumber );
+            verify(accountRepository).findByAccountNumber(nonExistentAccountNumber);
         }
     }
 
@@ -213,7 +216,7 @@ public class AccountServiceTest {
             Client client = createClient();
             when(clientService.findEntityById(dto.clientId())).thenReturn(client);
             when(checkingAccountRepository.existsByClientId(dto.clientId())).thenReturn(false);
-            when(accountRepository.getNextAccountNumber()).thenReturn(1L);
+            when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber("00001", "5"));
             when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
                 Account savedAccount = invocation.getArgument(0);
                 ReflectionTestUtils.setField(savedAccount, "id", 1L);
@@ -223,13 +226,13 @@ public class AccountServiceTest {
             AccountResponseDTO result = accountService.create(dto);
             // Assert
             assertNotNull(result);
-            assertEquals("000011", result.accountNumber());
-            assertEquals(AccountType.CHECKING, result.type());
+            assertEquals("00001", result.accountNumber());
+            assertEquals("5", result.accountDigit());
             assertEquals(client.getName(), result.clientName());
             //Verify
             verify(clientService).findEntityById(dto.clientId());
             verify(checkingAccountRepository).existsByClientId(dto.clientId());
-            verify(accountRepository).getNextAccountNumber();
+            verify(accountNumberGenerator).generate();
             verify(accountRepository).save(any(Account.class));
         }
 
@@ -240,7 +243,7 @@ public class AccountServiceTest {
             Client client = createClient();
             when(clientService.findEntityById(dto.clientId())).thenReturn(client);
             when(savingsAccountRepository.existsByClientId(dto.clientId())).thenReturn(false);
-            when(accountRepository.getNextAccountNumber()).thenReturn(2L);
+            when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber("00002", "0"));
             when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
                 Account savedAccount = invocation.getArgument(0);
                 ReflectionTestUtils.setField(savedAccount, "id", 2L);
@@ -248,12 +251,13 @@ public class AccountServiceTest {
             });
             AccountResponseDTO result = accountService.create(dto);
             assertNotNull(result);
-            assertEquals("000022", result.accountNumber());
+            assertEquals("00002", result.accountNumber());
+            assertEquals("0", result.accountDigit());
             assertEquals(AccountType.SAVINGS, result.type());
             assertEquals(client.getName(), result.clientName());
             verify(clientService).findEntityById(dto.clientId());
             verify(savingsAccountRepository).existsByClientId(dto.clientId());
-            verify(accountRepository).getNextAccountNumber();
+            verify(accountNumberGenerator).generate();
             verify(accountRepository).save(any(Account.class));
         }
 
@@ -267,7 +271,7 @@ public class AccountServiceTest {
             assertThrows(AccountAlreadyExistsException.class, () -> accountService.create(dto));
             verify(clientService).findEntityById(dto.clientId());
             verify(checkingAccountRepository).existsByClientId(dto.clientId());
-            verify(accountRepository, never()).getNextAccountNumber();
+            verify(accountNumberGenerator, never()).generate();
             verify(accountRepository, never()).save(any(Account.class));
         }
 
@@ -281,7 +285,7 @@ public class AccountServiceTest {
             assertThrows(AccountAlreadyExistsException.class, () -> accountService.create(dto));
             verify(clientService).findEntityById(dto.clientId());
             verify(savingsAccountRepository).existsByClientId(dto.clientId());
-            verify(accountRepository, never()).getNextAccountNumber();
+            verify(accountNumberGenerator, never()).generate();
             verify(accountRepository, never()).save(any(Account.class));
         }
     }
@@ -302,9 +306,9 @@ public class AccountServiceTest {
         @Test
         @DisplayName("Deve lançar exceção quando tentar cancelar conta inexistente")
         void shouldThrowExceptionWhenCancellingNonExistentAccount() {
-            String nonExistentAccountNumber  = "999999";
+            String nonExistentAccountNumber = "99999";
             when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
-            assertThrows(AccountNotFoundException.class, () -> accountService.cancel(nonExistentAccountNumber ));
+            assertThrows(AccountNotFoundException.class, () -> accountService.cancel(nonExistentAccountNumber));
             verify(accountRepository).findByAccountNumber(nonExistentAccountNumber);
         }
 

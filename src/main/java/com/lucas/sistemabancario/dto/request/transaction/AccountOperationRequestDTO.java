@@ -10,8 +10,8 @@ import java.math.BigDecimal;
 public record AccountOperationRequestDTO(
         @NotBlank(message = "O número da conta é obrigatório.")
         @Pattern(
-                regexp = "^\\d{6}$",
-                message = "O número da conta deve conter exatamente 6 dígitos."
+                regexp = "^\\d{5}$",
+                message = "O número da conta deve conter exatamente 5 dígitos."
         )
         String accountNumber,
 

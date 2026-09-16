@@ -10,14 +10,14 @@ import java.math.BigDecimal;
 public record TransferRequestDTO(
         @NotBlank(message = "O número da conta de origem é obrigatório.")
         @Pattern(
-                regexp = "^\\d{6}$",
+                regexp = "^\\d{5}$",
                 message = "O número da conta de origem deve conter exatamente 6 dígitos."
         )
         String fromAccountNumber,
 
         @NotBlank(message = "O número da conta de destino é obrigatório.")
         @Pattern(
-                regexp = "^\\d{6}$",
+                regexp = "^\\d{5}$",
                 message = "O número da conta de destino deve conter exatamente 6 dígitos."
         )
         String toAccountNumber,

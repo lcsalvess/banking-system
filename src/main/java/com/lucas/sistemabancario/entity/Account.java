@@ -20,10 +20,12 @@ public abstract class Account {
     private Long id;
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false,
-    foreignKey = @ForeignKey(name = "fk_account_client"))
+            foreignKey = @ForeignKey(name = "fk_account_client"))
     private Client client;
-    @Column(name = "account_number", nullable = false, length = 6)
+    @Column(name = "account_number", nullable = false, length = 5)
     private String accountNumber;
+    @Column(name = "account_digit", nullable = false, length = 1)
+    private String accountDigit;
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal balance = BigDecimal.ZERO;
     @Enumerated(EnumType.STRING)
@@ -33,11 +35,13 @@ public abstract class Account {
     @Column(name = "account_type", nullable = false, length = 20)
     private AccountType type;
 
-    public Account() {}
+    public Account() {
+    }
 
-    public Account(Client client, String accountNumber, AccountType type) {
+    public Account(Client client, String accountNumber, String accountDigit, AccountType type) {
         this.client = client;
         this.accountNumber = accountNumber;
+        this.accountDigit = accountDigit;
         this.type = type;
     }
 
@@ -48,7 +52,7 @@ public abstract class Account {
     public AccountType getType() {
         return type;
     }
-    
+
     public Client getClient() {
         return client;
     }
@@ -63,6 +67,14 @@ public abstract class Account {
 
     public void setAccountNumber(String accountNumber) {
         this.accountNumber = accountNumber;
+    }
+
+    public String getAccountDigit() {
+        return accountDigit;
+    }
+
+    public void setAccountDigit(String accountDigit) {
+        this.accountDigit = accountDigit;
     }
 
     public BigDecimal getBalance() {

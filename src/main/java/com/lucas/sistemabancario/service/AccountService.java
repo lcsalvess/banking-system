@@ -12,11 +12,12 @@ import com.lucas.sistemabancario.exception.account.*;
 import com.lucas.sistemabancario.repository.AccountRepository;
 import com.lucas.sistemabancario.repository.CheckingAccountRepository;
 import com.lucas.sistemabancario.repository.SavingsAccountRepository;
+import com.lucas.sistemabancario.service.account.AccountNumberGenerator;
+import com.lucas.sistemabancario.service.account.GeneratedAccountNumber;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -24,12 +25,14 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final CheckingAccountRepository checkingAccountRepository;
     private final SavingsAccountRepository savingsAccountRepository;
+    private final AccountNumberGenerator accountNumberGenerator;
     private final ClientService clientService;
 
-    public AccountService(AccountRepository accountRepository, CheckingAccountRepository checkingAccountRepository, SavingsAccountRepository savingsAccountRepository, ClientService clientService) {
+    public AccountService(AccountRepository accountRepository, CheckingAccountRepository checkingAccountRepository, SavingsAccountRepository savingsAccountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService) {
         this.accountRepository = accountRepository;
         this.checkingAccountRepository = checkingAccountRepository;
         this.savingsAccountRepository = savingsAccountRepository;
+        this.accountNumberGenerator = accountNumberGenerator;
         this.clientService = clientService;
     }
 
@@ -49,25 +52,10 @@ public class AccountService {
     @Transactional
     public AccountResponseDTO create(AccountRequestDTO dto) {
         Client client = clientService.findEntityById(dto.clientId());
-        Account account;
-        if (dto.type() == AccountType.CHECKING) {
-            if (checkingAccountRepository.existsByClientId(dto.clientId())) {
-                throw new AccountAlreadyExistsException("O cliente já possui uma conta corrente.");
-            }
-            String accountNumber = generateAccountNumber();
-            account = new CheckingAccount(client, accountNumber);
-        } else if (dto.type() == AccountType.SAVINGS) {
-            if (savingsAccountRepository.existsByClientId(dto.clientId())) {
-                throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança.");
-            }
-            String accountNumber = generateAccountNumber();
-            LocalDate lastYieldDate = LocalDate.now();
-            account = new SavingsAccount(client, accountNumber, lastYieldDate);
-        } else {
-            throw new InvalidAccountTypeException("Tipo de conta inválido.");
-        }
+        validateAccountTypeAndAvailability(dto);
+        GeneratedAccountNumber accountNumber = accountNumberGenerator.generate();
+        Account account = createAccount(dto, client, accountNumber);
         Account savedAccount = accountRepository.save(account);
-
         return AccountResponseDTO.fromEntity(savedAccount);
     }
 
@@ -79,21 +67,36 @@ public class AccountService {
         account.cancel();
     }
 
-    private String generateAccountNumber() {
-        Long nextNumber = accountRepository.getNextAccountNumber();
-        String baseNumber = String.format("%05d", nextNumber);
-        int checkDigit = calculateCheckDigit(baseNumber);
-        return baseNumber + checkDigit;
+    private void validateAccountTypeAndAvailability(AccountRequestDTO dto) {
+        if (dto.type() == AccountType.CHECKING &&
+                checkingAccountRepository.existsByClientId(dto.clientId())) {
+            throw new AccountAlreadyExistsException("O cliente já possui uma conta corrente.");
+        }
+
+        if (dto.type() == AccountType.SAVINGS &&
+                savingsAccountRepository.existsByClientId(dto.clientId())) {
+            throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança.");
+        }
+
+        if (dto.type() != AccountType.CHECKING &&
+                dto.type() != AccountType.SAVINGS) {
+            throw new InvalidAccountTypeException("Tipo de conta inválido.");
+        }
     }
 
-    private int calculateCheckDigit(String baseNumber) {
-        int sum = 0;
-        int[] weights = {5, 4, 3, 2, 1};
-        for (int i = 0; i < baseNumber.length(); i++) {
-            int digit = Character.getNumericValue(baseNumber.charAt(i));
-            sum += digit * weights[i];
+    private Account createAccount(AccountRequestDTO dto, Client client, GeneratedAccountNumber accountNumber) {
+        if (dto.type() == AccountType.CHECKING) {
+            return new CheckingAccount(
+                    client,
+                    accountNumber.number(),
+                    accountNumber.digit()
+            );
         }
-        return sum % 10;
+        return new SavingsAccount(
+                client,
+                accountNumber.number(),
+                accountNumber.digit()
+        );
     }
 
     private void validateAccountHasNoBalance(Account account) {

@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 
 public record AccountResponseDTO(
         String accountNumber,
+        String accountDigit,
         String clientName,
         BigDecimal balance,
         AccountType type,
@@ -15,6 +16,7 @@ public record AccountResponseDTO(
     public static AccountResponseDTO fromEntity(Account account) {
         return new AccountResponseDTO(
                 account.getAccountNumber(),
+                account.getAccountDigit(),
                 account.getClient().getName(),
                 account.getBalance(),
                 account.getType(),

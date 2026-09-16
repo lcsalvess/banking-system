@@ -26,8 +26,8 @@ public class TransactionController {
     }
 
     @GetMapping("/account/{accountNumber}")
-    public List<TransactionResponseDTO> listByAccountNumber(@PathVariable String accountNumber) {
-        return transactionService.findByAccountNumber(accountNumber);
+    public List<TransactionResponseDTO> listByAccountNumber(@PathVariable String accountNumber, @RequestParam String accountDigit) {
+        return transactionService.findByAccountNumber(accountNumber, accountDigit);
     }
 
     @PostMapping("/withdraw")
@@ -44,7 +44,7 @@ public class TransactionController {
 
     @PostMapping("/yield/{accountNumber}")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO applyYield(@PathVariable String accountNumber) {
-        return transactionService.applyYield(accountNumber);
+    public TransactionResponseDTO applyYield(@PathVariable String accountNumber, @RequestParam String accountDigit) {
+        return transactionService.applyYield(accountNumber, accountDigit);
     }
 }

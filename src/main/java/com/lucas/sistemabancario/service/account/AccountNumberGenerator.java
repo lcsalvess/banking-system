@@ -20,6 +20,10 @@ public class AccountNumberGenerator {
         return new GeneratedAccountNumber(number, digit);
     }
 
+    public boolean isValid(String number, String digit) {
+        return calculateCheckDigit(number).equals(digit);
+    }
+
     private String calculateCheckDigit(String number) {
         int sum = 0;
         int weight = 2;

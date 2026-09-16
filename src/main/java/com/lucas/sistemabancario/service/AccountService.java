@@ -40,12 +40,13 @@ public class AccountService {
         return accountRepository.findAll().stream().map(AccountResponseDTO::fromEntity).toList();
     }
 
-    public Account findEntityByAccountNumber(String accountNumber) {
+    public Account findEntityByAccountNumber(String accountNumber, String accountDigit) {
+        validateDigit(accountNumber, accountDigit);
         return accountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new AccountNotFoundException("Conta não encontrada"));
     }
 
-    public AccountResponseDTO findByAccountNumber(String accountNumber) {
-        Account account = findEntityByAccountNumber(accountNumber);
+    public AccountResponseDTO findByAccountNumber(String accountNumber, String accountDigit) {
+        Account account = findEntityByAccountNumber(accountNumber, accountDigit);
         return AccountResponseDTO.fromEntity(account);
     }
 
@@ -60,11 +61,17 @@ public class AccountService {
     }
 
     @Transactional
-    public void cancel(String accountNumber) {
-        Account account = findEntityByAccountNumber(accountNumber);
+    public void cancel(String accountNumber, String accountDigit) {
+        Account account = findEntityByAccountNumber(accountNumber, accountDigit);
         validateActiveAccount(account);
         validateAccountHasNoBalance(account);
         account.cancel();
+    }
+
+    private void validateDigit(String accountNumber, String accountDigit) {
+        if (!accountNumberGenerator.isValid(accountNumber, accountDigit)) {
+            throw new InvalidAccountDigitException("Número de conta inválido.");
+        }
     }
 
     private void validateAccountTypeAndAvailability(AccountRequestDTO dto) {

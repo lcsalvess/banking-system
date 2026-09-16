@@ -15,6 +15,10 @@ public record AccountOperationRequestDTO(
         )
         String accountNumber,
 
+        @NotBlank(message = "O dígito da conta é obrigatório.")
+        @Pattern(regexp = "^\\d{1}$", message = "O dígito da conta deve conter exatamente 1 dígito.")
+        String accountDigit,
+
         @NotNull(message = "O valor da operação é obrigatório.")
         @Positive(message = "O valor da operação deve ser maior que zero.")
         BigDecimal amount) {

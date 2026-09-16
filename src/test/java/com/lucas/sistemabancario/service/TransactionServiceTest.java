@@ -42,14 +42,15 @@ public class TransactionServiceTest {
     @InjectMocks
     private TransactionService transactionService;
 
-    private AccountOperationRequestDTO createOperationDTO(String accountNumber, BigDecimal amount) {
-        return new AccountOperationRequestDTO(accountNumber, amount);
+    private AccountOperationRequestDTO createOperationDTO(String accountNumber, String accountDigit, BigDecimal amount) {
+        return new AccountOperationRequestDTO(accountNumber, accountDigit, amount);
     }
 
     @Nested
     @DisplayName("Ao realizar um depósito")
     class DepositTests {
-        private final String accountNumber = "000011";
+        private final String accountNumber = "00001";
+        private final String accountDigit = "1";
         private Account account;
 
         @BeforeEach
@@ -57,15 +58,16 @@ public class TransactionServiceTest {
             account = new Account() {
             };
             ReflectionTestUtils.setField(account, "accountNumber", accountNumber);
+            ReflectionTestUtils.setField(account, "accountDigit", accountDigit);
         }
 
         @Test
-        @DisplayName("Deve lançar exceção ao tentar depositar em uma conta CANCELADA.")
+        @DisplayName("Deve lançar exceção ao tentar depositar em uma conta cancelada.")
         void shouldThrowExceptionWhenDepositingToInactiveAccount() {
             ReflectionTestUtils.setField(account, "status", AccountStatus.CANCELLED);
-            when(accountService.findEntityByAccountNumber(accountNumber)).thenReturn(account);
+            when(accountService.findEntityByAccountNumber(accountNumber, accountDigit)).thenReturn(account);
 
-            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, BigDecimal.TEN);
+            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, accountDigit, BigDecimal.TEN);
 
             assertThrows(AccountIsNotActiveException.class, () -> transactionService.deposit(dto));
             verify(transactionRepository, never()).save(any());
@@ -74,10 +76,10 @@ public class TransactionServiceTest {
         @Test
         @DisplayName("Deve realizar depósito em uma conta ativa e valor válido.")
         void shouldDepositSuccessfullyWhenAccountIsActiveAndAmountIsValid() {
-            when(accountService.findEntityByAccountNumber(accountNumber)).thenReturn(account);
+            when(accountService.findEntityByAccountNumber(accountNumber, accountDigit)).thenReturn(account);
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
 
-            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, BigDecimal.TEN);
+            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, accountDigit, BigDecimal.TEN);
 
             TransactionResponseDTO result = transactionService.deposit(dto);
 
@@ -85,7 +87,7 @@ public class TransactionServiceTest {
             assertNotNull(result);
             assertEquals(BigDecimal.TEN, result.amount());
             assertEquals(TransactionType.DEPOSIT, result.transactionType());
-            verify(accountService).findEntityByAccountNumber(accountNumber);
+            verify(accountService).findEntityByAccountNumber(accountNumber, accountDigit);
             verify(transactionRepository, times(1)).save(any(Transaction.class));
         }
     }
@@ -93,7 +95,8 @@ public class TransactionServiceTest {
     @Nested
     @DisplayName("Ao realizar um saque")
     class WithdrawTests {
-        private final String accountNumber = "000011";
+        private final String accountNumber = "00001";
+        private final String accountDigit = "1";
         private final Long accountId = 1L;
         private Account account;
 
@@ -104,14 +107,14 @@ public class TransactionServiceTest {
             ReflectionTestUtils.setField(account, "id", accountId);
             ReflectionTestUtils.setField(account, "accountNumber", accountNumber);
             ReflectionTestUtils.setField(account, "balance", new BigDecimal("100.00"));
-            when(accountService.findEntityByAccountNumber(accountNumber)).thenReturn(account);
+            when(accountService.findEntityByAccountNumber(accountNumber, accountDigit)).thenReturn(account);
         }
 
         @Test
         @DisplayName("Deve lançar exceção ao tentar sacar de uma conta cancelada")
         void shouldThrowExceptionWhenWithdrawingFromInactiveAccount() {
             ReflectionTestUtils.setField(account, "status", AccountStatus.CANCELLED);
-            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, BigDecimal.TEN);
+            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, accountDigit, BigDecimal.TEN);
 
             assertThrows(AccountIsNotActiveException.class, () -> transactionService.withdraw(dto));
             verify(transactionRepository, never()).save(any());
@@ -120,7 +123,7 @@ public class TransactionServiceTest {
         @Test
         @DisplayName("Deve lançar exceção ao tentar sacar mais do que tem em conta")
         void shouldThrowExceptionWhenWithdrawalAmountExceedsBalance() {
-            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, new BigDecimal("200.00"));
+            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, accountDigit, new BigDecimal("200.00"));
 
             assertThrows(InsufficientBalanceException.class, () -> transactionService.withdraw(dto));
             verify(transactionRepository, never()).save(any());
@@ -130,7 +133,7 @@ public class TransactionServiceTest {
         @DisplayName("Deve realizar saque com sucesso quando o valor for igual ao saldo")
         void shouldWithdrawSuccessfullyWhenAmountEqualsBalance() {
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
-            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, new BigDecimal("100.00"));
+            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, accountDigit, new BigDecimal("100.00"));
 
             transactionService.withdraw(dto);
 
@@ -142,7 +145,7 @@ public class TransactionServiceTest {
         @DisplayName("Deve realizar saque com sucesso quando o valor for menor que o saldo")
         void shouldWithdrawSuccessfullyWhenAmountIsLessThanBalance() {
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
-            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, new BigDecimal("30.00"));
+            AccountOperationRequestDTO dto = createOperationDTO(accountNumber, accountDigit, new BigDecimal("30.00"));
 
             transactionService.withdraw(dto);
 
@@ -154,8 +157,10 @@ public class TransactionServiceTest {
     @Nested
     @DisplayName("Ao realizar uma transferência")
     class TransferTests {
-        private final String fromAccountNumber = "000011";
-        private final String toAccountNumber = "000022";
+        private final String fromAccountNumber = "00001";
+        private final String fromAccountDigit = "1";
+        private final String toAccountNumber = "00002";
+        private final String toAccountDigit = "2";
         private Account fromAccount;
         private Account toAccount;
 
@@ -172,15 +177,15 @@ public class TransactionServiceTest {
         }
 
         private TransferRequestDTO createTransferRequestDTO(BigDecimal amount) {
-            return new TransferRequestDTO(fromAccountNumber, toAccountNumber, amount);
+            return new TransferRequestDTO(fromAccountNumber, fromAccountDigit, toAccountNumber, toAccountDigit, amount);
         }
 
         @Test
         @DisplayName("Deve lançar exceção se a transferência for entre a mesma conta")
         void shouldThrowExceptionWhenTransferringBetweenSameAccounts() {
-            TransferRequestDTO dto = new TransferRequestDTO(fromAccountNumber, fromAccountNumber, BigDecimal.TEN);
+            TransferRequestDTO dto = new TransferRequestDTO(fromAccountNumber, fromAccountDigit, fromAccountNumber, fromAccountDigit, BigDecimal.TEN);
             assertThrows(AccountsAreSameException.class, () -> transactionService.transfer(dto));
-            verify(accountService, never()).findEntityByAccountNumber(any());
+            verify(accountService, never()).findEntityByAccountNumber(any(), any());
             verify(transactionRepository, never()).save(any());
         }
 
@@ -233,8 +238,8 @@ public class TransactionServiceTest {
         }
 
         private void mockAccountLookup() {
-            when(accountService.findEntityByAccountNumber(fromAccountNumber)).thenReturn(fromAccount);
-            when(accountService.findEntityByAccountNumber(toAccountNumber)).thenReturn(toAccount);
+            when(accountService.findEntityByAccountNumber(fromAccountNumber, fromAccountDigit)).thenReturn(fromAccount);
+            when(accountService.findEntityByAccountNumber(toAccountNumber, toAccountDigit)).thenReturn(toAccount);
         }
     }
 
@@ -242,7 +247,8 @@ public class TransactionServiceTest {
     @DisplayName("Ao aplicar rendimento")
     class ApplyYieldTests {
         private final Long accountId = 1L;
-        private final String accountNumber = "000022";
+        private final String accountNumber = "00002";
+        private final String accountDigit = "2";
         private SavingsAccount savingsAccount;
 
         @BeforeEach
@@ -255,11 +261,12 @@ public class TransactionServiceTest {
         @Test
         @DisplayName("Deve lançar exceção ao tentar aplicar rendimento em uma conta que não é poupança.")
         void shouldThrowExceptionWhenAccountIsNotSavingsAccount() {
-            Account invalidAccount = new Account() {};
+            Account invalidAccount = new Account() {
+            };
             ReflectionTestUtils.setField(invalidAccount, "id", accountId);
-            when(accountService.findEntityByAccountNumber(accountNumber)).thenReturn(invalidAccount);
+            when(accountService.findEntityByAccountNumber(accountNumber, accountDigit)).thenReturn(invalidAccount);
 
-            assertThrows(AccountIsNotSavingsException.class, () -> transactionService.applyYield(accountNumber));
+            assertThrows(AccountIsNotSavingsException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
             verify(transactionRepository, never()).save(any());
         }
 
@@ -269,7 +276,7 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
             when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(eq(accountId), any(), any(), any())).thenReturn(true);
 
-            assertThrows(YieldAlreadyAppliedException.class, () -> transactionService.applyYield(accountNumber));
+            assertThrows(YieldAlreadyAppliedException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
             verify(savingsAccount, never()).credit(any());
             verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
@@ -281,7 +288,7 @@ public class TransactionServiceTest {
             ReflectionTestUtils.setField(savingsAccount, "status", AccountStatus.CANCELLED);
             mockSavingsAccountLookup();
 
-            assertThrows(AccountIsNotActiveException.class, () -> transactionService.applyYield(accountNumber));
+            assertThrows(AccountIsNotActiveException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
             verify(savingsAccount, never()).credit(any());
             verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
@@ -293,7 +300,7 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
             doReturn(false).when(savingsAccount).isEligibleForYield();
 
-            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber));
+            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
             verify(savingsAccount, never()).credit(any());
             verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
@@ -305,7 +312,7 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
             doReturn(true).when(savingsAccount).isEligibleForYield();
             doReturn(BigDecimal.ZERO).when(savingsAccount).calculateYield();
-            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber));
+            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
             verify(savingsAccount, never()).credit(any());
             verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
@@ -324,7 +331,7 @@ public class TransactionServiceTest {
                     .thenReturn(false);
             BigDecimal initialBalance = savingsAccount.getBalance();
 
-            transactionService.applyYield(accountNumber);
+            transactionService.applyYield(accountNumber, accountDigit);
 
             assertEquals(initialBalance.add(yieldAmount), savingsAccount.getBalance());
             verify(savingsAccount).credit(any());
@@ -333,7 +340,7 @@ public class TransactionServiceTest {
         }
 
         private void mockSavingsAccountLookup() {
-            when(accountService.findEntityByAccountNumber(accountNumber)).thenReturn(savingsAccount);
+            when(accountService.findEntityByAccountNumber(accountNumber, accountDigit)).thenReturn(savingsAccount);
         }
     }
 }

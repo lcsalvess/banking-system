@@ -29,7 +29,7 @@ public class SavingsAccount extends Account {
             String accountDigit
     ) {
         super(client, accountNumber, accountDigit, AccountType.SAVINGS);
-        this.lastYieldDate = lastYieldDate;
+        this.lastYieldDate = LocalDate.now();
     }
 
     public LocalDate getLastYieldDate() {

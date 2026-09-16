@@ -24,8 +24,9 @@ public class AccountController {
     }
 
     @GetMapping("/{accountNumber}")
-    public AccountResponseDTO findByAccountNumber(@PathVariable String accountNumber) {
-        return accountService.findByAccountNumber(accountNumber);
+    public AccountResponseDTO findByAccountNumber(@PathVariable String accountNumber,
+                                                  @RequestParam String accountDigit) {
+        return accountService.findByAccountNumber(accountNumber, accountDigit);
     }
 
     @PostMapping
@@ -36,7 +37,8 @@ public class AccountController {
 
     @PatchMapping("/{accountNumber}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void cancel(@PathVariable String accountNumber) {
-        accountService.cancel(accountNumber);
+    public void cancel(@PathVariable String accountNumber,
+                       @RequestParam String accountDigit) {
+        accountService.cancel(accountNumber, accountDigit);
     }
 }

@@ -1,6 +1,6 @@
 package com.lucas.sistemabancario.entity;
 
-import com.lucas.sistemabancario.dto.request.AddressRequestDTO;
+import com.lucas.sistemabancario.dto.request.AddressUpdateRequestDTO;
 import com.lucas.sistemabancario.entity.enums.State;
 import com.lucas.sistemabancario.entity.enums.StreetType;
 import jakarta.persistence.*;
@@ -44,15 +44,15 @@ public class Address {
         this.postalCode = postalCode;
     }
 
-    public void update(AddressRequestDTO dto) {
-        this.streetType = dto.streetType();
-        this.streetName = dto.streetName();
-        this.streetNumber = dto.streetNumber();
-        this.complement = dto.complement();
-        this.neighborhood = dto.neighborhood();
-        this.city = dto.city();
-        this.state = dto.state();
-        this.postalCode = dto.postalCode();
+    public void update(AddressUpdateRequestDTO dto) {
+        if (dto.streetType() != null) {this.streetType = dto.streetType();}
+        if (dto.streetName() != null) {this.streetName = dto.streetName();}
+        if (dto.streetNumber() != null) {this.streetNumber = dto.streetNumber();}
+        if (dto.complement() != null) {this.complement = dto.complement();}
+        if (dto.neighborhood() != null) {this.neighborhood = dto.neighborhood();}
+        if (dto.city() != null) {this.city = dto.city();}
+        if (dto.state() != null) {this.state = dto.state();}
+        if (dto.postalCode() != null) {this.postalCode = dto.postalCode();}
     }
 
     public Long getId() {

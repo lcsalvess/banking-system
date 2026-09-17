@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/accounts")
+@RequestMapping("/api/v1/accounts")
 public class AccountController {
     private final AccountService accountService;
 
@@ -25,8 +25,8 @@ public class AccountController {
 
     @GetMapping("/{accountNumber}")
     public AccountResponseDTO findByAccountNumber(@PathVariable String accountNumber,
-                                                  @RequestParam String accountDigit) {
-        return accountService.findByAccountNumber(accountNumber, accountDigit);
+                                                  @RequestParam String digit) {
+        return accountService.findByAccountNumber(accountNumber, digit);
     }
 
     @PostMapping
@@ -38,7 +38,7 @@ public class AccountController {
     @PatchMapping("/{accountNumber}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancel(@PathVariable String accountNumber,
-                       @RequestParam String accountDigit) {
-        accountService.cancel(accountNumber, accountDigit);
+                       @RequestParam String digit) {
+        accountService.cancel(accountNumber, digit);
     }
 }

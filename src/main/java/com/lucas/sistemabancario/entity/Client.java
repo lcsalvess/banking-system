@@ -57,10 +57,10 @@ public class Client {
     }
 
     public void update(ClientUpdateRequestDTO dto) {
-        this.name = dto.name();
-        this.email = dto.email();
-        this.phoneNumber = dto.phoneNumber();
-        this.address.update(dto.address());
+        if (dto.name() != null) {this.name = dto.name();}
+        if (dto.email() != null) {this.email = dto.email();}
+        if (dto.phoneNumber() != null) {this.phoneNumber = dto.phoneNumber();}
+        if (dto.address() != null) {this.address.update(dto.address());}
     }
 
     public Long getId() {

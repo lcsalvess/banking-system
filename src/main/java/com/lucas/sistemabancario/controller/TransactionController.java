@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/transactions")
+@RequestMapping("/api/v1/transactions")
 public class TransactionController {
     private final TransactionService transactionService;
 
@@ -25,9 +25,9 @@ public class TransactionController {
         return transactionService.deposit(dto);
     }
 
-    @GetMapping("/account/{accountNumber}")
-    public List<TransactionResponseDTO> listByAccountNumber(@PathVariable String accountNumber, @RequestParam String accountDigit) {
-        return transactionService.findByAccountNumber(accountNumber, accountDigit);
+    @GetMapping("/accounts/{accountNumber}")
+    public List<TransactionResponseDTO> findByAccountNumber(@PathVariable String accountNumber, @RequestParam String digit) {
+        return transactionService.findByAccountNumber(accountNumber, digit);
     }
 
     @PostMapping("/withdraw")
@@ -44,7 +44,7 @@ public class TransactionController {
 
     @PostMapping("/yield/{accountNumber}")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO applyYield(@PathVariable String accountNumber, @RequestParam String accountDigit) {
-        return transactionService.applyYield(accountNumber, accountDigit);
+    public TransactionResponseDTO applyYield(@PathVariable String accountNumber, @RequestParam String digit) {
+        return transactionService.applyYield(accountNumber, digit);
     }
 }

@@ -1,8 +1,9 @@
 package com.lucas.sistemabancario.service;
 
+import com.lucas.sistemabancario.dto.request.AddressRequestDTO;
+import com.lucas.sistemabancario.dto.request.AddressUpdateRequestDTO;
 import com.lucas.sistemabancario.dto.request.ClientRequestDTO;
 import com.lucas.sistemabancario.dto.request.ClientUpdateRequestDTO;
-import com.lucas.sistemabancario.dto.request.AddressRequestDTO;
 import com.lucas.sistemabancario.dto.response.ClientResponseDTO;
 import com.lucas.sistemabancario.entity.Client;
 import com.lucas.sistemabancario.entity.enums.State;
@@ -174,9 +175,9 @@ public class ClientServiceTest {
     @DisplayName("Ao atualizar um cliente")
     class UpdateTests {
         private ClientUpdateRequestDTO createClientUpdateRequestDTO() {
-            AddressRequestDTO address = new AddressRequestDTO(
+            AddressUpdateRequestDTO  address = new AddressUpdateRequestDTO(
                     StreetType.AVENIDA,
-                    "Avenida Atualizada",
+                    "Atualizada",
                     "456",
                     "Apto 22",
                     "Bairro Atualizado",

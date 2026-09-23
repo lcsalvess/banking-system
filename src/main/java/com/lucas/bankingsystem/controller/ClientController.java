@@ -113,7 +113,8 @@ public class ClientController {
     public ClientResponseDTO findById(
             @Parameter(
                     description = "Client unique identifier",
-                    example = "1"
+                    example = "1",
+                    required = true
             )
             @PathVariable Long id) {
         return clientService.findById(id);
@@ -134,7 +135,7 @@ public class ClientController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid client data",
+                    description = "Invalid client data or request format",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class)
@@ -153,7 +154,8 @@ public class ClientController {
     public ClientResponseDTO update(
             @Parameter(
                     description = "Client unique identifier",
-                    example = "1"
+                    example = "1",
+                    required = true
             )
             @PathVariable Long id, @Valid @RequestBody ClientUpdateRequestDTO dto) {
         Client updatedClient = clientService.update(id, dto);

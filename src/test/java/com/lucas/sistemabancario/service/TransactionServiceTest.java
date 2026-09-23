@@ -58,7 +58,7 @@ public class TransactionServiceTest {
             account = new Account() {
             };
             ReflectionTestUtils.setField(account, "accountNumber", accountNumber);
-            ReflectionTestUtils.setField(account, "accountDigit", accountDigit);
+            ReflectionTestUtils.setField(account, "digit", accountDigit);
         }
 
         @Test
@@ -248,7 +248,7 @@ public class TransactionServiceTest {
     class ApplyYieldTests {
         private final Long accountId = 1L;
         private final String accountNumber = "00002";
-        private final String accountDigit = "2";
+        private final String digit = "2";
         private SavingsAccount savingsAccount;
 
         @BeforeEach
@@ -264,9 +264,9 @@ public class TransactionServiceTest {
             Account invalidAccount = new Account() {
             };
             ReflectionTestUtils.setField(invalidAccount, "id", accountId);
-            when(accountService.findEntityByAccountNumber(accountNumber, accountDigit)).thenReturn(invalidAccount);
+            when(accountService.findEntityByAccountNumber(accountNumber, digit)).thenReturn(invalidAccount);
 
-            assertThrows(AccountIsNotSavingsException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
+            assertThrows(AccountIsNotSavingsException.class, () -> transactionService.applyYield(accountNumber, digit));
             verify(transactionRepository, never()).save(any());
         }
 
@@ -276,7 +276,7 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
             when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(eq(accountId), any(), any(), any())).thenReturn(true);
 
-            assertThrows(YieldAlreadyAppliedException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
+            assertThrows(YieldAlreadyAppliedException.class, () -> transactionService.applyYield(accountNumber, digit));
             verify(savingsAccount, never()).credit(any());
             verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
@@ -288,7 +288,7 @@ public class TransactionServiceTest {
             ReflectionTestUtils.setField(savingsAccount, "status", AccountStatus.CANCELLED);
             mockSavingsAccountLookup();
 
-            assertThrows(AccountIsNotActiveException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
+            assertThrows(AccountIsNotActiveException.class, () -> transactionService.applyYield(accountNumber, digit));
             verify(savingsAccount, never()).credit(any());
             verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
@@ -300,7 +300,7 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
             doReturn(false).when(savingsAccount).isEligibleForYield();
 
-            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
+            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber, digit));
             verify(savingsAccount, never()).credit(any());
             verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
@@ -312,7 +312,7 @@ public class TransactionServiceTest {
             mockSavingsAccountLookup();
             doReturn(true).when(savingsAccount).isEligibleForYield();
             doReturn(BigDecimal.ZERO).when(savingsAccount).calculateYield();
-            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber, accountDigit));
+            assertThrows(YieldNotAvailableException.class, () -> transactionService.applyYield(accountNumber, digit));
             verify(savingsAccount, never()).credit(any());
             verify(savingsAccount, never()).updateLastYieldDate();
             verify(transactionRepository, never()).save(any());
@@ -331,7 +331,7 @@ public class TransactionServiceTest {
                     .thenReturn(false);
             BigDecimal initialBalance = savingsAccount.getBalance();
 
-            transactionService.applyYield(accountNumber, accountDigit);
+            transactionService.applyYield(accountNumber, digit);
 
             assertEquals(initialBalance.add(yieldAmount), savingsAccount.getBalance());
             verify(savingsAccount).credit(any());
@@ -340,7 +340,7 @@ public class TransactionServiceTest {
         }
 
         private void mockSavingsAccountLookup() {
-            when(accountService.findEntityByAccountNumber(accountNumber, accountDigit)).thenReturn(savingsAccount);
+            when(accountService.findEntityByAccountNumber(accountNumber, digit)).thenReturn(savingsAccount);
         }
     }
 }

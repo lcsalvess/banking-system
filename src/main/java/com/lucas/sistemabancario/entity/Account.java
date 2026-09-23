@@ -25,7 +25,7 @@ public abstract class Account {
     @Column(name = "account_number", nullable = false, length = 5)
     private String accountNumber;
     @Column(name = "account_digit", nullable = false, length = 1)
-    private String accountDigit;
+    private String digit;
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal balance = BigDecimal.ZERO;
     @Enumerated(EnumType.STRING)
@@ -38,10 +38,10 @@ public abstract class Account {
     public Account() {
     }
 
-    public Account(Client client, String accountNumber, String accountDigit, AccountType type) {
+    public Account(Client client, String accountNumber, String digit, AccountType type) {
         this.client = client;
         this.accountNumber = accountNumber;
-        this.accountDigit = accountDigit;
+        this.digit = digit;
         this.type = type;
     }
 
@@ -69,12 +69,12 @@ public abstract class Account {
         this.accountNumber = accountNumber;
     }
 
-    public String getAccountDigit() {
-        return accountDigit;
+    public String getDigit() {
+        return digit;
     }
 
-    public void setAccountDigit(String accountDigit) {
-        this.accountDigit = accountDigit;
+    public void setDigit(String digit) {
+        this.digit = digit;
     }
 
     public BigDecimal getBalance() {

@@ -16,7 +16,7 @@ public record AccountResponseDTO(
     public static AccountResponseDTO fromEntity(Account account) {
         return new AccountResponseDTO(
                 account.getAccountNumber(),
-                account.getAccountDigit(),
+                account.getDigit(),
                 account.getClient().getName(),
                 account.getBalance(),
                 account.getType(),

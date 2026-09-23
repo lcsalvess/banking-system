@@ -37,7 +37,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO deposit(AccountOperationRequestDTO dto) {
-        Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.accountDigit());
+        Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.digit());
         validateActiveAccount(account);
         validateAmount(dto.amount());
         account.credit(dto.amount());
@@ -52,7 +52,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO withdraw(AccountOperationRequestDTO dto) {
-        Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.accountDigit());
+        Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.digit());
         validateActiveAccount(account);
         validateAmount(dto.amount());
         validateBalance(account, dto.amount());

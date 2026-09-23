@@ -3,6 +3,7 @@ package com.lucas.bankingsystem.controller.security;
 import com.lucas.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lucas.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lucas.bankingsystem.service.security.AuthService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,6 +19,7 @@ public class AuthController {
         this.authService = authService;
     }
 
+    @SecurityRequirements
     @PostMapping("/login")
     public LoginResponseDTO login(@Valid @RequestBody LoginRequestDTO dto) {
         LoginResponseDTO responseDTO = authService.authenticate(dto);

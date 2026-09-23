@@ -70,7 +70,7 @@ public class AccountService {
 
     private void validateDigit(String accountNumber, String accountDigit) {
         if (!accountNumberGenerator.isValid(accountNumber, accountDigit)) {
-            throw new InvalidAccountDigitException("Número de conta inválido.");
+            throw new InvalidAccountDigitException("Digito da conta inválido.");
         }
     }
 

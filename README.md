@@ -35,7 +35,7 @@ The application follows a layered architecture, separating responsibilities into
 ### Package Structure
 
 ```text
-src/main/java/com/lucas/sistemabancario
+src/main/java/com/lucas/bankingsystem
 ├── config/       # Application and security configuration
 ├── controller/   # REST API endpoints
 ├── dto/          # Request and response DTOs

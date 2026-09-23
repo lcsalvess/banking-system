@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.lucas</groupId>
-    <artifactId>sistema-bancario</artifactId>
+    <artifactId>banking-system</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>sistema-bancario</name>
-    <description>sistema-bancario</description>
+    <name>Banking System</name>
+    <description>RESTful banking system developed with Java and Spring Boot</description>
     <url/>
     <licenses>
         <license/>

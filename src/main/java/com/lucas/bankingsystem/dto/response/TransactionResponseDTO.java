@@ -1,7 +1,9 @@
 package com.lucas.bankingsystem.dto.response;
 
+import com.lucas.bankingsystem.config.MoneySerializer;
 import com.lucas.bankingsystem.entity.Transaction;
 import com.lucas.bankingsystem.entity.enums.TransactionType;
+import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -9,6 +11,7 @@ import java.time.LocalDateTime;
 public record TransactionResponseDTO(
         Long id,
         TransactionType transactionType,
+        @JsonSerialize(using = MoneySerializer.class)
         BigDecimal amount,
         LocalDateTime createdAt
 ) {

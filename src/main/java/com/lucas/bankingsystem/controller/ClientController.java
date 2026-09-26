@@ -101,6 +101,14 @@ public class ClientController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid client ID format",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "Client not found",
                     content = @Content(

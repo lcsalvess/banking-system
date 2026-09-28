@@ -464,12 +464,8 @@ public class ClientControllerTests {
 
     private static AddressUpdateRequestDTO validAddressUpdateRequest() {
         return new AddressUpdateRequestDTO(
-                "Rua Teste",
                 "123",
                 null,
-                "Centro",
-                "São Paulo",
-                State.SP,
                 "01001000"
         );
     }

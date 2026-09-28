@@ -40,13 +40,8 @@ public class Address {
     }
 
     public void update(AddressUpdateRequestDTO dto) {
-        if (dto.streetName() != null) {this.streetName = dto.streetName();}
         if (dto.streetNumber() != null) {this.streetNumber = dto.streetNumber();}
         if (dto.complement() != null) {this.complement = dto.complement();}
-        if (dto.neighborhood() != null) {this.neighborhood = dto.neighborhood();}
-        if (dto.city() != null) {this.city = dto.city();}
-        if (dto.state() != null) {this.state = dto.state();}
-        if (dto.postalCode() != null) {this.postalCode = dto.postalCode();}
     }
 
     public Long getId() {

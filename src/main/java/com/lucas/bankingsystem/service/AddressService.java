@@ -1,6 +1,7 @@
 package com.lucas.bankingsystem.service;
 
 import com.lucas.bankingsystem.dto.request.AddressRequestDTO;
+import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.integration.address.AddressLookupService;
@@ -29,5 +30,20 @@ public class AddressService {
                 State.valueOf(addressData.state()),
                 addressData.postalCode().replace("-", "")
         );
+    }
+
+    public void updateFromPostalCode(Address address, AddressUpdateRequestDTO dto) {
+        if (dto.postalCode() != null) {
+            AddressLookupResponse addressData =
+                    addressLookupService.findByPostalCode(dto.postalCode());
+
+            address.setStreetName(addressData.streetName());
+            address.setNeighborhood(addressData.neighborhood());
+            address.setCity(addressData.city());
+            address.setState(State.valueOf(addressData.state()));
+            address.setPostalCode(addressData.postalCode().replace("-", ""));
+        }
+
+        address.update(dto);
     }
 }

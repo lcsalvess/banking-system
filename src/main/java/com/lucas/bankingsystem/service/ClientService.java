@@ -27,34 +27,22 @@ public class ClientService {
     @Transactional
     public Client save(ClientRequestDTO dto) {
         if (clientRepository.existsByCpf(dto.cpf())) {
-            throw new ClientCpfAlreadyExistsException(
-                    "CPF já cadastrado: " + dto.cpf()
-            );
+            throw new ClientCpfAlreadyExistsException("CPF já cadastrado: " + dto.cpf());
         }
 
         Address address = addressService.createFromPostalCode(dto.address());
 
-        Client client = new Client(
-                dto.name(),
-                dto.cpf(),
-                dto.email(),
-                dto.phoneNumber(),
-                address
-        );
+        Client client = new Client(dto.name(), dto.cpf(), dto.email(), dto.phoneNumber(), address);
 
         return clientRepository.save(client);
     }
 
     public List<ClientResponseDTO> findAll() {
-        return clientRepository.findAll()
-                .stream()
-                .map(ClientResponseDTO::fromEntity)
-                .toList();
+        return clientRepository.findAll().stream().map(ClientResponseDTO::fromEntity).toList();
     }
 
     public Client findEntityById(Long id) {
-        return clientRepository.findById(id)
-                .orElseThrow(() -> new ClientNotFoundException("Cliente não encontrado."));
+        return clientRepository.findById(id).orElseThrow(() -> new ClientNotFoundException("Cliente não encontrado."));
     }
 
     public ClientResponseDTO findById(Long id) {
@@ -65,7 +53,13 @@ public class ClientService {
     @Transactional
     public Client update(Long id, ClientUpdateRequestDTO dto) {
         Client existingClient = findEntityById(id);
+
         existingClient.update(dto);
+
+        if (dto.address() != null) {
+            addressService.updateFromPostalCode(existingClient.getAddress(), dto.address());
+        }
+
         return clientRepository.save(existingClient);
     }
 

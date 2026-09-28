@@ -256,12 +256,8 @@ public class ClientServiceTest {
 
         private ClientUpdateRequestDTO createClientUpdateRequestDTO() {
             AddressUpdateRequestDTO address = new AddressUpdateRequestDTO(
-                    "Rua Atualizada",
                     "456",
                     "Apto 22",
-                    "Bairro Atualizado",
-                    "São Paulo",
-                    State.SP,
                     "87654321"
             );
 
@@ -301,7 +297,11 @@ public class ClientServiceTest {
             verify(clientRepository).findById(clientId);
             verify(clientRepository).save(client);
             verifyNoMoreInteractions(clientRepository);
-            verifyNoInteractions(addressService);
+            verify(addressService).updateFromPostalCode(
+                    client.getAddress(),
+                    updatedDto.address()
+            );
+            verifyNoMoreInteractions(addressService);
         }
 
         @Test

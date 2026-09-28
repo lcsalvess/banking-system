@@ -3,7 +3,7 @@ package com.lucas.bankingsystem.controller;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
-import com.lucas.bankingsystem.dto.response.ErrorResponse;
+import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.service.ClientService;
 import io.swagger.v3.oas.annotations.Operation;

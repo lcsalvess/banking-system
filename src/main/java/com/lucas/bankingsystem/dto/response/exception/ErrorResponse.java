@@ -1,4 +1,4 @@
-package com.lucas.bankingsystem.dto.response;
+package com.lucas.bankingsystem.dto.response.exception;
 
 import java.time.Instant;
 

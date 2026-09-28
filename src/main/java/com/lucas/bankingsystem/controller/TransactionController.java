@@ -2,7 +2,7 @@ package com.lucas.bankingsystem.controller;
 
 import com.lucas.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lucas.bankingsystem.dto.request.transaction.TransferRequestDTO;
-import com.lucas.bankingsystem.dto.response.ErrorResponse;
+import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lucas.bankingsystem.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;

@@ -3,6 +3,7 @@ package com.lucas.bankingsystem.exception.handler;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.exception.ValidationErrorResponse;
 import com.lucas.bankingsystem.exception.BusinessException;
+import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,9 +41,7 @@ public class GlobalExceptionHandler {
     public ValidationErrorResponse handleValidationExceptions(MethodArgumentNotValidException exception) {
         Map<String, String> errors = new HashMap<>();
 
-        exception.getBindingResult().getFieldErrors().forEach(error -> {
-            errors.put(error.getField(), error.getDefaultMessage());
-        });
+        exception.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
 
         return new ValidationErrorResponse(HttpStatus.BAD_REQUEST.value(), "Erro de validação.", errors);
     }
@@ -78,6 +77,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleMissingParameter() {
         return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Parâmetro de requisição obrigatório ausente.");
+    }
+
+    @ExceptionHandler(AddressProviderUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ErrorResponse handleAddressProviderUnavailable() {
+        return new ErrorResponse(HttpStatus.SERVICE_UNAVAILABLE.value(), "O serviço de consulta de endereços está temporariamente indisponível.");
     }
 
     @ExceptionHandler(Exception.class)

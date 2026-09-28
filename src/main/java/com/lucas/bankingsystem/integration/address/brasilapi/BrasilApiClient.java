@@ -1,4 +1,4 @@
-package com.lucas.bankingsystem.integration.address.viacep;
+package com.lucas.bankingsystem.integration.address.brasilapi;
 
 import com.lucas.bankingsystem.integration.address.AddressProvider;
 import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
@@ -6,15 +6,16 @@ import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnav
 import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 @Component
-public class ViaCepClient implements AddressProvider {
+public class BrasilApiClient implements AddressProvider {
 
     private final RestClient restClient;
 
-    public ViaCepClient(RestClient.Builder restClientBuilder, @Value("${integration.address.viacep.base-url}") String baseUrl) {
+    public BrasilApiClient(RestClient.Builder restClientBuilder, @Value("${integration.address.brasilapi.base-url}") String baseUrl) {
         this.restClient = restClientBuilder
                 .baseUrl(baseUrl)
                 .build();
@@ -23,27 +24,33 @@ public class ViaCepClient implements AddressProvider {
     @Override
     public AddressLookupResponse findByPostalCode(String postalCode) {
         try {
-            ViaCepResponse response = restClient.get()
-                    .uri("/ws/{postalCode}/json/", postalCode)
+            BrasilApiResponse response = restClient.get()
+                    .uri("/api/cep/v1/{postalCode}", postalCode)
                     .retrieve()
-                    .body(ViaCepResponse.class);
+                    .body(BrasilApiResponse.class);
 
-            if (response == null || Boolean.TRUE.equals(response.erro())) {
-                throw new PostalCodeNotFoundException(
-                        "CEP não encontrado: " + postalCode
+            if (response == null) {
+                throw new AddressProviderUnavailableException(
+                        "A Brasil API retornou uma resposta vazia.",
+                        null
                 );
             }
 
             return new AddressLookupResponse(
-                    response.logradouro(),
-                    response.bairro(),
-                    response.localidade(),
-                    response.uf(),
+                    response.street(),
+                    response.neighborhood(),
+                    response.city(),
+                    response.state(),
                     response.cep()
+            );
+
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new PostalCodeNotFoundException(
+                    "CEP não encontrado: " + postalCode
             );
         } catch (RestClientException ex) {
             throw new AddressProviderUnavailableException(
-                    "Não foi possível consultar a ViaCEP.",
+                    "Não foi possível consultar a Brasil API.",
                     ex
             );
         }

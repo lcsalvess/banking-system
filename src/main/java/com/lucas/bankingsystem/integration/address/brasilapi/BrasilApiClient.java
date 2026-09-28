@@ -4,6 +4,7 @@ import com.lucas.bankingsystem.integration.address.AddressProvider;
 import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -14,9 +15,9 @@ public class BrasilApiClient implements AddressProvider {
 
     private final RestClient restClient;
 
-    public BrasilApiClient(RestClient.Builder restClientBuilder) {
+    public BrasilApiClient(RestClient.Builder restClientBuilder, @Value("${integration.address.brasilapi.base-url}") String baseUrl) {
         this.restClient = restClientBuilder
-                .baseUrl("https://brasilapi.com.br")
+                .baseUrl(baseUrl)
                 .build();
     }
 

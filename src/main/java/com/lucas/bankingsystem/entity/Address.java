@@ -2,7 +2,6 @@ package com.lucas.bankingsystem.entity;
 
 import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.entity.enums.State;
-import com.lucas.bankingsystem.entity.enums.StreetType;
 import jakarta.persistence.*;
 
 @Entity
@@ -11,9 +10,6 @@ public class Address {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private StreetType streetType;
     @Column(nullable = false, length = 150)
     private String streetName;
     @Column(nullable = false, length = 10)
@@ -33,8 +29,7 @@ public class Address {
     public Address() {
     }
 
-    public Address(StreetType streetType, String streetName, String streetNumber, String complement, String neighborhood, String city, State state, String postalCode) {
-        this.streetType = streetType;
+    public Address(String streetName, String streetNumber, String complement, String neighborhood, String city, State state, String postalCode) {
         this.streetName = streetName;
         this.streetNumber = streetNumber;
         this.complement = complement;
@@ -45,7 +40,6 @@ public class Address {
     }
 
     public void update(AddressUpdateRequestDTO dto) {
-        if (dto.streetType() != null) {this.streetType = dto.streetType();}
         if (dto.streetName() != null) {this.streetName = dto.streetName();}
         if (dto.streetNumber() != null) {this.streetNumber = dto.streetNumber();}
         if (dto.complement() != null) {this.complement = dto.complement();}
@@ -57,14 +51,6 @@ public class Address {
 
     public Long getId() {
         return id;
-    }
-
-    public StreetType getStreetType() {
-        return streetType;
-    }
-
-    public void setStreetType(StreetType streetType) {
-        this.streetType = streetType;
     }
 
     public String getStreetName() {

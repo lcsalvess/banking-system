@@ -45,7 +45,6 @@ public class Client {
         this.phoneNumber = dto.phoneNumber();
 
         this.address = new Address(
-                dto.address().streetType(),
                 dto.address().streetName(),
                 dto.address().streetNumber(),
                 dto.address().complement(),

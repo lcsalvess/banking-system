@@ -1,12 +1,10 @@
 package com.lucas.bankingsystem.dto.request;
 
 import com.lucas.bankingsystem.entity.enums.State;
-import com.lucas.bankingsystem.entity.enums.StreetType;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record AddressUpdateRequestDTO (
-        StreetType streetType,
 
         @Size(max = 150, message = "O logradouro deve ter no máximo 150 caracteres.")
         String streetName,

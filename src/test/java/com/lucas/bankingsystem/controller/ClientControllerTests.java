@@ -7,7 +7,6 @@ import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
-import com.lucas.bankingsystem.entity.enums.StreetType;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.service.ClientService;
@@ -443,7 +442,6 @@ public class ClientControllerTests {
 
     private static AddressRequestDTO validAddressRequest() {
         return new AddressRequestDTO(
-                StreetType.RUA,
                 "Logradouro Teste",
                 "123",
                 null,
@@ -470,7 +468,6 @@ public class ClientControllerTests {
 
     private static AddressUpdateRequestDTO validAddressUpdateRequest() {
         return new AddressUpdateRequestDTO(
-                StreetType.RUA,
                 "Rua Teste",
                 "123",
                 null,

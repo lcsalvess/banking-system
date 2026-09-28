@@ -1,15 +1,12 @@
 package com.lucas.bankingsystem.dto.request;
 
 import com.lucas.bankingsystem.entity.enums.State;
-import com.lucas.bankingsystem.entity.enums.StreetType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record AddressRequestDTO(
-        @NotNull(message = "O tipo do logradouro é obrigatório.")
-        StreetType streetType,
 
         @NotBlank(message = "O logradouro não pode ser vazio.")
         @Size(max = 150, message = "O logradouro deve ter no máximo 150 caracteres.")

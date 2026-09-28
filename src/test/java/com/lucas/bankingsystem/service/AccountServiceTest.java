@@ -11,7 +11,6 @@ import com.lucas.bankingsystem.entity.SavingsAccount;
 import com.lucas.bankingsystem.entity.enums.AccountStatus;
 import com.lucas.bankingsystem.entity.enums.AccountType;
 import com.lucas.bankingsystem.entity.enums.State;
-import com.lucas.bankingsystem.entity.enums.StreetType;
 import com.lucas.bankingsystem.exception.account.*;
 import com.lucas.bankingsystem.repository.AccountRepository;
 import com.lucas.bankingsystem.repository.CheckingAccountRepository;
@@ -52,7 +51,6 @@ public class AccountServiceTest {
 
     private Client createClient() {
         AddressRequestDTO address = new AddressRequestDTO(
-                StreetType.AVENIDA,
                 "Teste",
                 "123",
                 null,                // complement

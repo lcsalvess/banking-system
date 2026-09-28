@@ -1,6 +1,5 @@
 package com.lucas.bankingsystem.entity;
 
-import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import jakarta.persistence.*;
 
@@ -36,23 +35,6 @@ public class Client {
         this.email = email;
         this.phoneNumber = phoneNumber;
         this.address = address;
-    }
-
-    public Client(ClientRequestDTO dto) {
-        this.name = dto.name();
-        this.cpf = dto.cpf();
-        this.email = dto.email();
-        this.phoneNumber = dto.phoneNumber();
-
-        this.address = new Address(
-                dto.address().streetName(),
-                dto.address().streetNumber(),
-                dto.address().complement(),
-                dto.address().neighborhood(),
-                dto.address().city(),
-                dto.address().state(),
-                dto.address().postalCode()
-        );
     }
 
     public void update(ClientUpdateRequestDTO dto) {

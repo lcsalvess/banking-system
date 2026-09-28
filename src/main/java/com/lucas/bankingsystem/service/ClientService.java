@@ -3,6 +3,7 @@ package com.lucas.bankingsystem.service;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
+import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
@@ -16,16 +17,31 @@ import java.util.List;
 public class ClientService {
     private final ClientRepository clientRepository;
 
-    public ClientService(ClientRepository clientRepository) {
+    private final AddressService addressService;
+
+    public ClientService(ClientRepository clientRepository, AddressService addressService) {
         this.clientRepository = clientRepository;
+        this.addressService = addressService;
     }
 
     @Transactional
     public Client save(ClientRequestDTO dto) {
         if (clientRepository.existsByCpf(dto.cpf())) {
-            throw new ClientCpfAlreadyExistsException("CPF já cadastrado: " + dto.cpf());
+            throw new ClientCpfAlreadyExistsException(
+                    "CPF já cadastrado: " + dto.cpf()
+            );
         }
-        Client client = new Client(dto);
+
+        Address address = addressService.createFromPostalCode(dto.address());
+
+        Client client = new Client(
+                dto.name(),
+                dto.cpf(),
+                dto.email(),
+                dto.phoneNumber(),
+                address
+        );
+
         return clientRepository.save(client);
     }
 

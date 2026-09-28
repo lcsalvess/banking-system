@@ -1,13 +1,8 @@
 package com.lucas.bankingsystem.service;
 
 import com.lucas.bankingsystem.dto.request.AccountRequestDTO;
-import com.lucas.bankingsystem.dto.request.AddressRequestDTO;
-import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.response.AccountResponseDTO;
-import com.lucas.bankingsystem.entity.Account;
-import com.lucas.bankingsystem.entity.CheckingAccount;
-import com.lucas.bankingsystem.entity.Client;
-import com.lucas.bankingsystem.entity.SavingsAccount;
+import com.lucas.bankingsystem.entity.*;
 import com.lucas.bankingsystem.entity.enums.AccountStatus;
 import com.lucas.bankingsystem.entity.enums.AccountType;
 import com.lucas.bankingsystem.entity.enums.State;
@@ -50,25 +45,10 @@ public class AccountServiceTest {
     private AccountService accountService;
 
     private Client createClient() {
-        AddressRequestDTO address = new AddressRequestDTO(
-                "Teste",
-                "123",
-                null,                // complement
-                "Centro",            // neighborhood
-                "Mogi das Cruzes",   // city
-                State.SP,            // state
-                "12345678"
-        );
+        Address address = new Address("Rua Teste", "123", null, "Centro", "Mogi das Cruzes", State.SP, "08710000");
 
-        ClientRequestDTO dto = new ClientRequestDTO(
-                "Cliente Teste",
-                "12345678901",
-                "teste@email.com",
-                "11999999999",
-                address
-        );
+        Client client = new Client("Cliente Teste", "12345678901", "teste@email.com", "11999999999", address);
 
-        Client client = new Client(dto);
         ReflectionTestUtils.setField(client, "id", 1L);
         return client;
     }
@@ -139,11 +119,8 @@ public class AccountServiceTest {
         void shouldReturnAccountEntityWhenAccountNumberExists() {
             //Arrange
             CheckingAccount checkingAccount = createCheckingAccount();
-            when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), checkingAccount.getDigit()))
-                    .thenReturn(true);
-            when(accountRepository
-                    .findByAccountNumber(checkingAccount.getAccountNumber()))
-                    .thenReturn(Optional.of(checkingAccount));
+            when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), checkingAccount.getDigit())).thenReturn(true);
+            when(accountRepository.findByAccountNumber(checkingAccount.getAccountNumber())).thenReturn(Optional.of(checkingAccount));
             //Act
             Account result = accountService.findEntityByAccountNumber(checkingAccount.getAccountNumber(), checkingAccount.getDigit());
             //Assert
@@ -162,8 +139,7 @@ public class AccountServiceTest {
             //Arrange
             String nonExistentAccountNumber = "99999";
             String nonExistentAccountDigit = "9";
-            when(accountNumberGenerator.isValid(nonExistentAccountNumber, nonExistentAccountDigit))
-                    .thenReturn(true);
+            when(accountNumberGenerator.isValid(nonExistentAccountNumber, nonExistentAccountDigit)).thenReturn(true);
             when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
             //Act + Assert
             assertThrows(AccountNotFoundException.class, () -> accountService.findEntityByAccountNumber(nonExistentAccountNumber, nonExistentAccountDigit));
@@ -175,8 +151,7 @@ public class AccountServiceTest {
         @DisplayName("Deve lançar exceção quando o dígito da conta for inválido")
         void shouldThrowExceptionWhenAccountDigitIsInvalid() {
             CheckingAccount checkingAccount = createCheckingAccount();
-            when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), "8"))
-                    .thenReturn(false);
+            when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), "8")).thenReturn(false);
             assertThrows(InvalidAccountDigitException.class, () -> accountService.findEntityByAccountNumber(checkingAccount.getAccountNumber(), "8"));
             verify(accountRepository, never()).findByAccountNumber(any());
         }
@@ -190,8 +165,7 @@ public class AccountServiceTest {
         void shouldReturnAccountResponseDTOWhenAccountNumberExists() {
             // Arrange
             SavingsAccount savingsAccount = createSavingsAccount();
-            when(accountNumberGenerator.isValid(savingsAccount.getAccountNumber(), savingsAccount.getDigit()))
-                    .thenReturn(true);
+            when(accountNumberGenerator.isValid(savingsAccount.getAccountNumber(), savingsAccount.getDigit())).thenReturn(true);
             when(accountRepository.findByAccountNumber(savingsAccount.getAccountNumber())).thenReturn(Optional.of(savingsAccount));
             // Act
             AccountResponseDTO result = accountService.findByAccountNumber(savingsAccount.getAccountNumber(), savingsAccount.getDigit());
@@ -210,8 +184,7 @@ public class AccountServiceTest {
             //Arrange
             String nonExistentAccountNumber = "99999";
             String nonExistentAccountDigit = "9";
-            when(accountNumberGenerator.isValid(nonExistentAccountNumber, nonExistentAccountDigit))
-                    .thenReturn(true);
+            when(accountNumberGenerator.isValid(nonExistentAccountNumber, nonExistentAccountDigit)).thenReturn(true);
             when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
             //Act + Assert
             assertThrows(AccountNotFoundException.class, () -> accountService.findByAccountNumber(nonExistentAccountNumber, nonExistentAccountDigit));
@@ -312,8 +285,7 @@ public class AccountServiceTest {
         @DisplayName("Deve cancelar conta com sucesso quando ela está ativa e saldo zerado")
         void shouldCancelAccountSuccessfullyWhenActiveAndBalanceIsZero() {
             CheckingAccount checkingAccount = createCheckingAccount();
-            when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), checkingAccount.getDigit()))
-                    .thenReturn(true);
+            when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), checkingAccount.getDigit())).thenReturn(true);
             when(accountRepository.findByAccountNumber(checkingAccount.getAccountNumber())).thenReturn(Optional.of(checkingAccount));
             accountService.cancel(checkingAccount.getAccountNumber(), checkingAccount.getDigit());
             assertEquals(AccountStatus.CANCELLED, checkingAccount.getStatus());
@@ -325,8 +297,7 @@ public class AccountServiceTest {
         void shouldThrowExceptionWhenCancellingNonExistentAccount() {
             String nonExistentAccountNumber = "99999";
             String nonExistentAccountDigit = "9";
-            when(accountNumberGenerator.isValid(nonExistentAccountNumber, nonExistentAccountDigit))
-                    .thenReturn(true);
+            when(accountNumberGenerator.isValid(nonExistentAccountNumber, nonExistentAccountDigit)).thenReturn(true);
             when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
             assertThrows(AccountNotFoundException.class, () -> accountService.cancel(nonExistentAccountNumber, nonExistentAccountDigit));
             verify(accountRepository).findByAccountNumber(nonExistentAccountNumber);
@@ -337,8 +308,7 @@ public class AccountServiceTest {
         void shouldThrowExceptionWhenCancellingInactiveAccount() {
             SavingsAccount savingsAccount = createSavingsAccount();
             ReflectionTestUtils.setField(savingsAccount, "status", AccountStatus.CANCELLED);
-            when(accountNumberGenerator.isValid(savingsAccount.getAccountNumber(), savingsAccount.getDigit()))
-                    .thenReturn(true);
+            when(accountNumberGenerator.isValid(savingsAccount.getAccountNumber(), savingsAccount.getDigit())).thenReturn(true);
             when(accountRepository.findByAccountNumber(savingsAccount.getAccountNumber())).thenReturn(Optional.of(savingsAccount));
             assertThrows(AccountIsNotActiveException.class, () -> accountService.cancel(savingsAccount.getAccountNumber(), savingsAccount.getDigit()));
             verify(accountRepository).findByAccountNumber(savingsAccount.getAccountNumber());
@@ -349,8 +319,7 @@ public class AccountServiceTest {
         void shouldThrowExceptionWhenCancellingAccountWithBalance() {
             CheckingAccount checkingAccount = createCheckingAccount();
             ReflectionTestUtils.setField(checkingAccount, "balance", BigDecimal.TEN);
-            when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), checkingAccount.getDigit()))
-                    .thenReturn(true);
+            when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), checkingAccount.getDigit())).thenReturn(true);
             when(accountRepository.findByAccountNumber(checkingAccount.getAccountNumber())).thenReturn(Optional.of(checkingAccount));
             assertThrows(AccountHasBalanceException.class, () -> accountService.cancel(checkingAccount.getAccountNumber(), checkingAccount.getDigit()));
             verify(accountRepository).findByAccountNumber(checkingAccount.getAccountNumber());

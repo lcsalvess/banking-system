@@ -442,12 +442,8 @@ public class ClientControllerTests {
 
     private static AddressRequestDTO validAddressRequest() {
         return new AddressRequestDTO(
-                "Logradouro Teste",
                 "123",
                 null,
-                "Bairro Teste",
-                "Cidade Teste",
-                State.SP,
                 "12345678"
         );
     }

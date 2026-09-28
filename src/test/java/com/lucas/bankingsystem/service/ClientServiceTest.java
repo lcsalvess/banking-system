@@ -5,6 +5,7 @@ import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
+import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
@@ -27,20 +28,22 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class ClientServiceTest {
+
     @Mock
     private ClientRepository clientRepository;
+
+    @Mock
+    private AddressService addressService;
+
     @InjectMocks
     private ClientService clientService;
 
     private ClientRequestDTO createClientRequestDTO() {
         AddressRequestDTO address = new AddressRequestDTO(
-                "Logradouro Teste",
                 "123",
                 null,
-                "Bairro Teste",
-                "Cidade Teste",
-                State.SP,
-                "12345678");
+                "12345678"
+        );
 
         return new ClientRequestDTO(
                 "Cliente Teste",
@@ -51,34 +54,76 @@ public class ClientServiceTest {
         );
     }
 
+    private Address createAddress() {
+        return new Address(
+                "Rua Teste",
+                "123",
+                null,
+                "Centro",
+                "São Paulo",
+                State.SP,
+                "01001000"
+        );
+    }
+
+    private Client createClient() {
+        return new Client(
+                "Cliente Teste",
+                "12345678901",
+                "teste@email.com",
+                "11999999999",
+                createAddress()
+        );
+    }
+
     @Nested
     @DisplayName("Ao salvar um cliente")
     class SaveTests {
+
         @Test
         @DisplayName("Deve lançar exceção ao tentar salvar cliente com CPF já cadastrado.")
         void shouldThrowExceptionWhenCpfAlreadyExists() {
             ClientRequestDTO dto = createClientRequestDTO();
+
             when(clientRepository.existsByCpf(dto.cpf())).thenReturn(true);
-            assertThrows(ClientCpfAlreadyExistsException.class, () -> clientService.save(dto));
+
+            assertThrows(
+                    ClientCpfAlreadyExistsException.class,
+                    () -> clientService.save(dto)
+            );
+
+            verify(clientRepository).existsByCpf(dto.cpf());
             verify(clientRepository, never()).save(any(Client.class));
+            verifyNoInteractions(addressService);
         }
 
         @Test
         @DisplayName("Deve salvar cliente com sucesso quando CPF estiver livre.")
         void shouldSaveClientSuccessfully() {
             ClientRequestDTO dto = createClientRequestDTO();
+
             when(clientRepository.existsByCpf(dto.cpf())).thenReturn(false);
-            when(clientRepository.save(any(Client.class))).thenAnswer(i -> {
-                Client savedClient = i.getArgument(0);
+
+            when(addressService.createFromPostalCode(dto.address()))
+                    .thenReturn(createAddress());
+
+            when(clientRepository.save(any(Client.class))).thenAnswer(invocation -> {
+                Client savedClient = invocation.getArgument(0);
                 ReflectionTestUtils.setField(savedClient, "id", 1L);
                 return savedClient;
             });
+
             Client savedClient = clientService.save(dto);
+
             assertNotNull(savedClient);
             assertEquals(1L, savedClient.getId());
             assertEquals(dto.cpf(), savedClient.getCpf());
             assertEquals(dto.name(), savedClient.getName());
-            verify(clientRepository, times(1)).save(any(Client.class));
+
+            verify(clientRepository).existsByCpf(dto.cpf());
+            verify(addressService).createFromPostalCode(dto.address());
+            verify(clientRepository).save(any(Client.class));
+            verifyNoMoreInteractions(clientRepository, addressService);
         }
     }
 
@@ -89,93 +134,129 @@ public class ClientServiceTest {
         @Test
         @DisplayName("Deve retornar lista de DTOs quando existirem clientes cadastrados.")
         void shouldReturnListOfClientsWhenRecordsExist() {
-            Client client = new Client(createClientRequestDTO());
+            Client client = createClient();
             ReflectionTestUtils.setField(client, "id", 1L);
+
             when(clientRepository.findAll()).thenReturn(List.of(client));
+
             List<ClientResponseDTO> result = clientService.findAll();
+
             assertNotNull(result);
             assertEquals(1, result.size());
             assertEquals(1L, result.getFirst().id());
             assertEquals(client.getName(), result.getFirst().name());
             assertEquals(client.getCpf(), result.getFirst().cpf());
+
             verify(clientRepository).findAll();
+            verifyNoMoreInteractions(clientRepository);
         }
 
         @Test
         @DisplayName("Deve retornar lista vazia quando não existirem clientes cadastrados.")
         void shouldReturnEmptyListWhenNoRecordsExist() {
             when(clientRepository.findAll()).thenReturn(List.of());
+
             List<ClientResponseDTO> result = clientService.findAll();
+
             assertNotNull(result);
             assertTrue(result.isEmpty());
+
             verify(clientRepository).findAll();
+            verifyNoMoreInteractions(clientRepository);
         }
     }
 
     @Nested
     @DisplayName("Ao buscar uma entidade de cliente por ID")
     class FindEntityByIdTests {
+
         @Test
         @DisplayName("Deve retornar Cliente quando ID existir.")
         void shouldReturnClientEntityWhenIdExists() {
-            //Arrange
-            Client client = new Client(createClientRequestDTO());
+            Client client = createClient();
             ReflectionTestUtils.setField(client, "id", 1L);
-            when(clientRepository.findById(1L)).thenReturn(Optional.of(client));
-            //Act
+
+            when(clientRepository.findById(1L))
+                    .thenReturn(Optional.of(client));
+
             Client result = clientService.findEntityById(1L);
-            //Assert
+
             assertNotNull(result);
             assertEquals(1L, result.getId());
             assertEquals(client.getName(), result.getName());
             assertEquals(client.getCpf(), result.getCpf());
-            //Verify
+
             verify(clientRepository).findById(1L);
+            verifyNoMoreInteractions(clientRepository);
         }
 
         @Test
         @DisplayName("Deve lançar exceção quando Cliente não existir")
         void shouldThrowExceptionWhenClientDoesNotExist() {
             Long nonExistentId = 1L;
-            when(clientRepository.findById(nonExistentId)).thenReturn(Optional.empty());
-            assertThrows(ClientNotFoundException.class, () -> clientService.findEntityById(nonExistentId));
+
+            when(clientRepository.findById(nonExistentId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(
+                    ClientNotFoundException.class,
+                    () -> clientService.findEntityById(nonExistentId)
+            );
+
             verify(clientRepository).findById(nonExistentId);
+            verifyNoMoreInteractions(clientRepository);
         }
     }
 
     @Nested
     @DisplayName("Ao buscar um cliente por ID")
     class FindByIdTests {
+
         @Test
-        @DisplayName("Deve retornar ClienteResponseDTO quando ID existir")
+        @DisplayName("Deve retornar ClientResponseDTO quando ID existir")
         void shouldReturnClientResponseDTOWhenIdExists() {
-            Client client = new Client(createClientRequestDTO());
+            Client client = createClient();
             ReflectionTestUtils.setField(client, "id", 1L);
-            when(clientRepository.findById(1L)).thenReturn(Optional.of(client));
+
+            when(clientRepository.findById(1L))
+                    .thenReturn(Optional.of(client));
+
             ClientResponseDTO result = clientService.findById(1L);
+
             assertNotNull(result);
             assertEquals(client.getId(), result.id());
             assertEquals(client.getName(), result.name());
             assertEquals(client.getCpf(), result.cpf());
+
             verify(clientRepository).findById(1L);
+            verifyNoMoreInteractions(clientRepository);
         }
 
         @Test
         @DisplayName("Deve lançar exceção quando ID não existir")
         void shouldThrowExceptionWhenClientDoesNotExist() {
             Long nonExistentId = 1L;
-            when(clientRepository.findById(nonExistentId)).thenReturn(Optional.empty());
-            assertThrows(ClientNotFoundException.class, () -> clientService.findById(nonExistentId));
+
+            when(clientRepository.findById(nonExistentId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(
+                    ClientNotFoundException.class,
+                    () -> clientService.findById(nonExistentId)
+            );
+
             verify(clientRepository).findById(nonExistentId);
+            verifyNoMoreInteractions(clientRepository);
         }
     }
 
     @Nested
     @DisplayName("Ao atualizar um cliente")
     class UpdateTests {
+
         private ClientUpdateRequestDTO createClientUpdateRequestDTO() {
-            AddressUpdateRequestDTO  address = new AddressUpdateRequestDTO(
-                    "Atualizada",
+            AddressUpdateRequestDTO address = new AddressUpdateRequestDTO(
+                    "Rua Atualizada",
                     "456",
                     "Apto 22",
                     "Bairro Atualizado",
@@ -196,20 +277,31 @@ public class ClientServiceTest {
         @DisplayName("Deve atualizar cliente com sucesso quando cliente existir")
         void shouldUpdateClientSuccessfullyWhenClientExists() {
             Long clientId = 1L;
-            Client client = new Client(createClientRequestDTO());
+            Client client = createClient();
             ReflectionTestUtils.setField(client, "id", clientId);
+
             String originalCpf = client.getCpf();
-            when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
+
+            when(clientRepository.findById(clientId))
+                    .thenReturn(Optional.of(client));
+
             ClientUpdateRequestDTO updatedDto = createClientUpdateRequestDTO();
-            when(clientRepository.save(any(Client.class))).thenReturn(client);
+
+            when(clientRepository.save(any(Client.class)))
+                    .thenReturn(client);
+
             Client result = clientService.update(clientId, updatedDto);
+
             assertEquals(clientId, result.getId());
             assertEquals(updatedDto.name(), result.getName());
             assertEquals(originalCpf, result.getCpf());
             assertEquals(updatedDto.email(), result.getEmail());
             assertEquals(updatedDto.phoneNumber(), result.getPhoneNumber());
+
             verify(clientRepository).findById(clientId);
             verify(clientRepository).save(client);
+            verifyNoMoreInteractions(clientRepository);
+            verifyNoInteractions(addressService);
         }
 
         @Test
@@ -217,10 +309,19 @@ public class ClientServiceTest {
         void shouldThrowExceptionWhenUpdatingNonExistentClient() {
             Long nonExistentId = 1L;
             ClientUpdateRequestDTO dto = createClientUpdateRequestDTO();
-            when(clientRepository.findById(nonExistentId)).thenReturn(Optional.empty());
-            assertThrows(ClientNotFoundException.class, () -> clientService.update(nonExistentId, dto));
+
+            when(clientRepository.findById(nonExistentId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(
+                    ClientNotFoundException.class,
+                    () -> clientService.update(nonExistentId, dto)
+            );
+
             verify(clientRepository).findById(nonExistentId);
             verify(clientRepository, never()).save(any(Client.class));
+            verifyNoMoreInteractions(clientRepository);
+            verifyNoInteractions(addressService);
         }
     }
 }

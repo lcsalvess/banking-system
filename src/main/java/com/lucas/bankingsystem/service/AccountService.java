@@ -42,7 +42,7 @@ public class AccountService {
 
     public Account findEntityByAccountNumber(String accountNumber, String accountDigit) {
         validateDigit(accountNumber, accountDigit);
-        return accountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new AccountNotFoundException("Conta não encontrada"));
+        return accountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
     }
 
     public AccountResponseDTO findByAccountNumber(String accountNumber, String accountDigit) {
@@ -70,7 +70,7 @@ public class AccountService {
 
     private void validateDigit(String accountNumber, String accountDigit) {
         if (!accountNumberGenerator.isValid(accountNumber, accountDigit)) {
-            throw new InvalidAccountDigitException("Digito da conta inválido.");
+            throw new InvalidAccountDigitException("Dígito da conta inválido.");
         }
     }
 

@@ -10,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -71,6 +72,12 @@ public class GlobalExceptionHandler {
             return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "O rendimento já foi aplicado para esta conta hoje.");
         }
         return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Erro de integridade de dados no banco.");
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMissingParameter() {
+        return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Parâmetro de requisição obrigatório ausente.");
     }
 
     @ExceptionHandler(Exception.class)

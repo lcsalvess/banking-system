@@ -8,17 +8,18 @@ import com.lucas.bankingsystem.entity.SavingsAccount;
 import com.lucas.bankingsystem.entity.Transaction;
 import com.lucas.bankingsystem.entity.enums.AccountStatus;
 import com.lucas.bankingsystem.entity.enums.TransactionType;
+import com.lucas.bankingsystem.event.TransactionOperationEvent;
+import com.lucas.bankingsystem.event.TransactionTransferEvent;
 import com.lucas.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lucas.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lucas.bankingsystem.exception.account.AccountsAreSameException;
-import com.lucas.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
-import com.lucas.bankingsystem.exception.transaction.YieldNotAvailableException;
 import com.lucas.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lucas.bankingsystem.exception.transaction.InvalidAmountException;
+import com.lucas.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
+import com.lucas.bankingsystem.exception.transaction.YieldNotAvailableException;
 import com.lucas.bankingsystem.repository.TransactionRepository;
 import jakarta.transaction.Transactional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -31,12 +32,12 @@ import java.util.List;
 public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountService accountService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
-
-    public TransactionService(TransactionRepository transactionRepository, AccountService accountService) {
+    public TransactionService(TransactionRepository transactionRepository, AccountService accountService, ApplicationEventPublisher eventPublisher) {
         this.transactionRepository = transactionRepository;
         this.accountService = accountService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -46,8 +47,7 @@ public class TransactionService {
         validateAmount(dto.amount());
         account.credit(dto.amount());
         Transaction transaction = registerTransaction(TransactionType.DEPOSIT, dto.amount(), account);
-        log.info("Deposit successfully processed: account={}, amount={}",
-                account.getAccountNumber(), dto.amount());
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount()));
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
@@ -64,8 +64,7 @@ public class TransactionService {
         validateBalance(account, dto.amount());
         account.debit(dto.amount());
         Transaction transaction = registerTransaction(TransactionType.WITHDRAWAL, dto.amount(), account);
-        log.info("Withdraw successfully processed: account={}, amount={}",
-                account.getAccountNumber(), dto.amount());
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.WITHDRAWAL, account.getAccountNumber(), dto.amount()));
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
@@ -82,10 +81,7 @@ public class TransactionService {
         toAccount.credit(dto.amount());
         Transaction sentTransaction = registerTransaction(TransactionType.TRANSFER_SENT, dto.amount(), fromAccount);
         registerTransaction(TransactionType.TRANSFER_RECEIVED, dto.amount(), toAccount);
-        log.info("Transfer successfully processed: from={}, to={}, amount={}",
-                fromAccount.getAccountNumber(),
-                toAccount.getAccountNumber(),
-                dto.amount());
+        eventPublisher.publishEvent(new TransactionTransferEvent(TransactionType.TRANSFER_SENT, fromAccount.getAccountNumber(), toAccount.getAccountNumber(), dto.amount()));
         return TransactionResponseDTO.fromEntity(sentTransaction);
     }
 
@@ -100,8 +96,7 @@ public class TransactionService {
         savingsAccount.credit(yieldAmount);
         savingsAccount.updateLastYieldDate();
         Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount);
-        log.info("Yield successfully processed: account={}, amount={}",
-                savingsAccount.getAccountNumber(), yieldAmount);
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.YIELD, savingsAccount.getAccountNumber(), yieldAmount));
         return TransactionResponseDTO.fromEntity(transaction);
     }
 

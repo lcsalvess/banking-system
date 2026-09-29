@@ -8,6 +8,8 @@ import com.lucas.bankingsystem.entity.SavingsAccount;
 import com.lucas.bankingsystem.entity.Transaction;
 import com.lucas.bankingsystem.entity.enums.AccountStatus;
 import com.lucas.bankingsystem.entity.enums.TransactionType;
+import com.lucas.bankingsystem.event.TransactionOperationEvent;
+import com.lucas.bankingsystem.event.TransactionTransferEvent;
 import com.lucas.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lucas.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lucas.bankingsystem.exception.account.AccountsAreSameException;
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -39,6 +42,8 @@ public class TransactionServiceTest {
     private TransactionRepository transactionRepository;
     @Mock
     private AccountService accountService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
     @InjectMocks
     private TransactionService transactionService;
 
@@ -89,6 +94,15 @@ public class TransactionServiceTest {
             assertEquals(TransactionType.DEPOSIT, result.transactionType());
             verify(accountService).findEntityByAccountNumber(accountNumber, accountDigit);
             verify(transactionRepository, times(1)).save(any(Transaction.class));
+
+            verify(eventPublisher).publishEvent(argThat(
+                    (Object event) -> event instanceof TransactionOperationEvent(
+                            TransactionType type, String number, BigDecimal amount
+                    )
+                            && type == TransactionType.DEPOSIT
+                            && number.equals(accountNumber)
+                            && amount.equals(BigDecimal.TEN)
+            ));
         }
     }
 
@@ -151,6 +165,15 @@ public class TransactionServiceTest {
 
             assertEquals(new BigDecimal("70.00"), account.getBalance());
             verify(transactionRepository, times(1)).save(any(Transaction.class));
+
+            verify(eventPublisher).publishEvent(argThat(
+                    (Object event) -> event instanceof TransactionOperationEvent(
+                            TransactionType type, String number, BigDecimal amount
+                    )
+                            && type == TransactionType.WITHDRAWAL
+                            && number.equals(accountNumber)
+                            && amount.equals(dto.amount())
+            ));
         }
     }
 
@@ -235,6 +258,19 @@ public class TransactionServiceTest {
             assertEquals(new BigDecimal("70.00"), fromAccount.getBalance());
             assertEquals(new BigDecimal("80.00"), toAccount.getBalance());
             verify(transactionRepository, times(2)).save(any(Transaction.class));
+
+            verify(eventPublisher).publishEvent(argThat(
+                    (Object event) -> event instanceof TransactionTransferEvent(
+                            TransactionType type,
+                            String eventFromAccountNumber,
+                            String eventToAccountNumber,
+                            BigDecimal eventAmount
+                    )
+                            && type == TransactionType.TRANSFER_SENT
+                            && eventFromAccountNumber.equals(fromAccount.getAccountNumber())
+                            && eventToAccountNumber.equals(toAccount.getAccountNumber())
+                            && eventAmount.equals(dto.amount())
+            ));
         }
 
         private void mockAccountLookup() {
@@ -337,6 +373,15 @@ public class TransactionServiceTest {
             verify(savingsAccount).credit(any());
             verify(savingsAccount).updateLastYieldDate();
             verify(transactionRepository).save(any(Transaction.class));
+
+            verify(eventPublisher).publishEvent(argThat(
+                    (Object event) -> event instanceof TransactionOperationEvent(
+                            TransactionType type, String number, BigDecimal amount
+                    )
+                            && type == TransactionType.YIELD
+                            && number.equals(accountNumber)
+                            && amount.equals(yieldAmount)
+            ));
         }
 
         private void mockSavingsAccountLookup() {

@@ -4,6 +4,8 @@ import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.exception.ValidationErrorResponse;
 import com.lucas.bankingsystem.exception.BusinessException;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,16 +25,21 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final String DUPLICATE_YIELD_CONSTRAINT = "uk_transaction_daily_yield";
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
         ErrorResponse error = new ErrorResponse(exception.getStatus().value(), exception.getMessage());
+        log.warn("Business exception: status={}, message={}",
+                exception.getStatus().value(),
+                exception.getMessage());
         return ResponseEntity.status(exception.getStatus()).body(error);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleBadCredentials() {
+        log.warn("Authentication failed: invalid username or password");
         return new ErrorResponse(HttpStatus.UNAUTHORIZED.value(), "Usuário ou senha inválidos.");
     }
 
@@ -49,6 +56,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthorizationDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleAuthorizationDenied() {
+        log.warn("Authorization denied: access forbidden");
         return new ErrorResponse(HttpStatus.FORBIDDEN.value(), "Acesso negado.");
     }
 
@@ -68,8 +76,10 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleDataIntegrityViolation(DataIntegrityViolationException exception) {
         if (exception.getMessage() != null && exception.getMessage().contains(DUPLICATE_YIELD_CONSTRAINT)) {
+            log.warn("Daily yield already applied");
             return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "O rendimento já foi aplicado para esta conta hoje.");
         }
+        log.warn("Data integrity violation", exception);
         return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Erro de integridade de dados no banco.");
     }
 
@@ -82,12 +92,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AddressProviderUnavailableException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public ErrorResponse handleAddressProviderUnavailable() {
+        log.error("Address provider unavailable");
         return new ErrorResponse(HttpStatus.SERVICE_UNAVAILABLE.value(), "O serviço de consulta de endereços está temporariamente indisponível.");
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ErrorResponse handleGenericException() {
+    public ErrorResponse handleGenericException(Exception exception) {
+        log.error("Unexpected error occurred", exception);
         return new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Ocorreu um erro interno no servidor.");
     }
 }

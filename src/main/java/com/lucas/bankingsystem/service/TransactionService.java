@@ -17,6 +17,8 @@ import com.lucas.bankingsystem.exception.transaction.InsufficientBalanceExceptio
 import com.lucas.bankingsystem.exception.transaction.InvalidAmountException;
 import com.lucas.bankingsystem.repository.TransactionRepository;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -30,6 +32,8 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountService accountService;
 
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
+
     public TransactionService(TransactionRepository transactionRepository, AccountService accountService) {
         this.transactionRepository = transactionRepository;
         this.accountService = accountService;
@@ -42,6 +46,8 @@ public class TransactionService {
         validateAmount(dto.amount());
         account.credit(dto.amount());
         Transaction transaction = registerTransaction(TransactionType.DEPOSIT, dto.amount(), account);
+        log.info("Deposit successfully processed: account={}, amount={}",
+                account.getAccountNumber(), dto.amount());
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
@@ -58,6 +64,8 @@ public class TransactionService {
         validateBalance(account, dto.amount());
         account.debit(dto.amount());
         Transaction transaction = registerTransaction(TransactionType.WITHDRAWAL, dto.amount(), account);
+        log.info("Withdraw successfully processed: account={}, amount={}",
+                account.getAccountNumber(), dto.amount());
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
@@ -74,6 +82,10 @@ public class TransactionService {
         toAccount.credit(dto.amount());
         Transaction sentTransaction = registerTransaction(TransactionType.TRANSFER_SENT, dto.amount(), fromAccount);
         registerTransaction(TransactionType.TRANSFER_RECEIVED, dto.amount(), toAccount);
+        log.info("Transfer successfully processed: from={}, to={}, amount={}",
+                fromAccount.getAccountNumber(),
+                toAccount.getAccountNumber(),
+                dto.amount());
         return TransactionResponseDTO.fromEntity(sentTransaction);
     }
 
@@ -88,6 +100,8 @@ public class TransactionService {
         savingsAccount.credit(yieldAmount);
         savingsAccount.updateLastYieldDate();
         Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount);
+        log.info("Yield successfully processed: account={}, amount={}",
+                savingsAccount.getAccountNumber(), yieldAmount);
         return TransactionResponseDTO.fromEntity(transaction);
     }
 

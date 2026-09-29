@@ -1,13 +1,12 @@
-package com.lucas.bankingsystem.event;
+package com.lucas.bankingsystem.event.transaction;
 
 import com.lucas.bankingsystem.entity.enums.TransactionType;
 
 import java.math.BigDecimal;
 
-public record TransactionTransferEvent(
+public record TransactionOperationEvent(
         TransactionType type,
-        String fromAccountNumber,
-        String toAccountNumber,
+        String accountNumber,
         BigDecimal amount
 ) {
 }

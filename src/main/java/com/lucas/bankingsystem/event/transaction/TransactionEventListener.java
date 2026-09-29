@@ -1,4 +1,4 @@
-package com.lucas.bankingsystem.event;
+package com.lucas.bankingsystem.event.transaction;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

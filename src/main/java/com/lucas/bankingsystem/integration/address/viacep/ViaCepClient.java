@@ -15,7 +15,7 @@ public class ViaCepClient implements AddressProvider {
     private final RestClient restClient;
 
     public ViaCepClient(RestClient.Builder restClientBuilder, @Value("${integration.address.viacep.base-url}") String baseUrl) {
-        this.restClient = restClientBuilder
+        this.restClient = restClientBuilder.clone()
                 .baseUrl(baseUrl)
                 .build();
     }

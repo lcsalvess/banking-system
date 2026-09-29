@@ -16,7 +16,7 @@ public class BrasilApiClient implements AddressProvider {
     private final RestClient restClient;
 
     public BrasilApiClient(RestClient.Builder restClientBuilder, @Value("${integration.address.brasilapi.base-url}") String baseUrl) {
-        this.restClient = restClientBuilder
+        this.restClient = restClientBuilder.clone()
                 .baseUrl(baseUrl)
                 .build();
     }

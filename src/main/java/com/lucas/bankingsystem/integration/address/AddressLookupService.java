@@ -3,6 +3,7 @@ package com.lucas.bankingsystem.integration.address;
 import com.lucas.bankingsystem.integration.address.brasilapi.BrasilApiClient;
 import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
+import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lucas.bankingsystem.integration.address.viacep.ViaCepClient;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,7 @@ public class AddressLookupService {
     public AddressLookupResponse findByPostalCode(String postalCode) {
         try {
             return viaCepClient.findByPostalCode(postalCode);
-        } catch (AddressProviderUnavailableException ex) {
+        } catch (AddressProviderUnavailableException | PostalCodeNotFoundException ex) {
             return brasilApiClient.findByPostalCode(postalCode);
         }
     }

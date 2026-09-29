@@ -38,10 +38,7 @@ public class BrasilApiClient implements AddressProvider {
                     .body(BrasilApiResponse.class);
 
             if (response == null) {
-                throw new AddressProviderUnavailableException(
-                        "A Brasil API retornou uma resposta vazia.",
-                        null
-                );
+                throw new AddressProviderUnavailableException("A Brasil API retornou uma resposta vazia.");
             }
 
             return new AddressLookupResponse(

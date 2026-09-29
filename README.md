@@ -2,31 +2,32 @@
 
 ## About
 A banking system backend developed with Java and Spring Boot.
-<br>
+
 The project started as a pure Java application and has evolved into a RESTful API using Spring Boot, PostgreSQL, Spring Data JPA, and Spring Security.
-<br>
-The main goal is to apply backend development concepts such as layered architecture, object-oriented programming, database persistence, authentication, authorization, business rules, and automated testing.
+
+The main goal is to apply backend development concepts such as layered architecture, object-oriented programming, database persistence, authentication, authorization, business rules, external API integration, and automated testing.
 
 ---
 
 ## Technologies
 
-| Technology      | Version | Description                         |
-|-----------------|---------|-------------------------------------|
-| Java            | 21      | Programming language                |
-| Spring Boot     | 4.1.1   | Backend framework                   |
-| Spring Web MVC  | -       | REST API development                |
-| Bean Validation | -       | Request validation                  |
-| Spring Data JPA | -       | Data access and persistence         |
-| Hibernate       | -       | JPA implementation and ORM          |
-| Spring Security | -       | Authentication and authorization    |
-| JWT (JJWT)      | 0.13.0  | Stateless authentication            |
-| BCrypt          | -       | Password hashing                    |
-| PostgreSQL      | 18      | Relational database                 |
-| springdoc-openapi | 3.1.1 | OpenAPI / Swagger UI documentation  |
-| Maven           | -       | Dependency management and build     |
-| JUnit           | 6       | Unit and integration testing        |
-| Mockito         | 5       | Mocking for tests                   |
+| Technology        | Version | Description                           |
+| ----------------- | ------- | ------------------------------------- |
+| Java              | 21      | Programming language                  |
+| Spring Boot       | 4.1.1   | Backend framework                     |
+| Spring Web MVC    | -       | REST API development                  |
+| Spring RestClient | -       | HTTP communication with external APIs |
+| Bean Validation   | -       | Request validation                    |
+| Spring Data JPA   | -       | Data access and persistence           |
+| Hibernate         | -       | JPA implementation and ORM            |
+| Spring Security   | -       | Authentication and authorization      |
+| JWT (JJWT)        | 0.13.0  | Stateless authentication              |
+| BCrypt            | -       | Password hashing                      |
+| PostgreSQL        | 18      | Relational database                   |
+| springdoc-openapi | 3.1.1   | OpenAPI / Swagger UI documentation    |
+| Maven             | -       | Dependency management and build       |
+| JUnit             | 6       | Unit and integration testing          |
+| Mockito           | 5       | Mocking for tests                     |
 
 ---
 
@@ -43,6 +44,8 @@ src/main/java/com/lucas/bankingsystem
 ├── dto/          # Request and response DTOs
 ├── entity/       # JPA entities and domain models (enums in entity/enums)
 ├── exception/    # Custom exceptions and global exception handler
+├── integration/  # External API integrations
+│ └── address/    # Address lookup providers and related components
 ├── repository/   # Database access through Spring Data JPA
 └── service/      # Business rules and application logic
 ```
@@ -66,7 +69,7 @@ Shows the full request/response cycle, including authentication and authorizatio
          │
          ▼
 ┌─────────────────┐
-│   Controller    │
+│  Controller     │
 └────────┬────────┘
          │
          ▼
@@ -82,14 +85,15 @@ Shows the full request/response cycle, including authentication and authorizatio
          │                     │
          │◄────────────────────┘
          │
-         ▼
-┌─────────────────┐
-│  Response DTO   │
-└────────┬────────┘
+         ├──────────────► Integration
+         │                     │
+         │                     ▼
+         │              External APIs
+         │              ViaCEP / BrasilAPI
          │
          ▼
 ┌─────────────────┐
-│   Controller    │
+│  Response DTO   │
 └────────┬────────┘
          │
          ▼
@@ -103,11 +107,14 @@ Shows the full request/response cycle, including authentication and authorizatio
 ## Features
 
 - **Authentication and authorization** with JWT and role-based access (`ADMIN` and `EMPLOYEE`)
+- **User management**: user creation with role assignment and secure password storage
 - **Client management**: registration, listing, lookup, and update, including address data
+- **Address lookup**: automatic address lookup by postal code using ViaCEP and BrasilAPI as fallback providers
 - **Account management**: checking and savings accounts, with generated account numbers and check digits
 - **Transactions**: deposit, withdrawal, transfer between accounts, and transaction history per account
 - **Savings yield**: monthly yield applied to savings accounts
 - **Account cancellation** with balance and status validation
+- **Input validation** using Bean Validation and custom CPF validation
 - **Global exception handling** with a consistent error response
 - **Interactive API documentation** with Swagger UI
 
@@ -117,14 +124,16 @@ Shows the full request/response cycle, including authentication and authorizatio
 
 ### Clients
 - CPF must be unique and contain exactly 11 digits.
+- CPF validation includes format checks and verification digit calculation.
 - Phone number must contain 10 to 11 digits, including the area code.
-- Every client requires a complete address (street type, street name, number, neighborhood, city, state, and 8-digit postal code).
+- Every client requires an address with a postal code (CEP), a street number, and an optional complement.
+- Address details such as street name, neighborhood, city, and state are retrieved through external postal code providers.
 
 ### Accounts
 - A client can have at most one checking account and one savings account.
 - Account numbers are generated from a database sequence (5 digits) followed by a check digit (modulo 11).
 - Every operation that receives an account number also requires the check digit, which is validated before the account lookup.
-- An account can only be cancelled if it is active and has a zero balance.
+- An account can only be canceled if it is active and has a zero balance.
 
 ### Transactions
 - Deposits, withdrawals, and transfers require an active account and a positive amount.
@@ -142,6 +151,13 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Usernames and e-mails must be unique, and passwords must have at least 8 characters.
 - Passwords are stored as BCrypt hashes.
 - An initial `ADMIN` is created at startup from environment variables when no admin exists (see [Configuration](#configuration)).
+
+### Address Lookup
+
+- Address lookup is performed using the postal code provided in the request.
+- ViaCEP is the primary provider.
+- BrasilAPI is used as a fallback when ViaCEP cannot provide the address.
+- Provider failures are handled separately from postal codes that are not found.
 
 ---
 
@@ -185,6 +201,14 @@ Full request and response schemas are available in Swagger UI.
 | POST   | `/api/v1/transactions/transfer`                     | Transfer between accounts          | Authenticated |
 | GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account | Authenticated |
 | POST   | `/api/v1/transactions/yield/{accountNumber}?digit=` | Apply yield to a savings account   | Authenticated |
+
+### Address Lookup Endpoint
+
+| Method | Endpoint                                 | Description                        | Access        |
+| ------ | ---------------------------------------- | ---------------------------------- | ------------- |
+| GET    | `/api/v1/addresses/lookup/{postalCode}`  | Look up an address by postal code  | Authenticated |
+
+---
 
 ### Example
 
@@ -295,21 +319,31 @@ Use the **Authorize** button and paste the JWT returned by `/auth/login` to call
 ./mvnw test
 ```
 
-The test suite has more than 50 tests and covers:
+The test suite covers:
 
-- **Unit tests** for services, using JUnit and Mockito: accounts, clients, transactions (deposit, withdrawal, transfer, yield), users, JWT, authentication, and user details loading
-- **Integration tests** with `MockMvc` for the authentication endpoint
-- **Context test** to verify the application starts
+- **Unit tests** for services, using JUnit and Mockito: accounts, clients, transactions (deposit, withdrawal, transfer, yield), users, JWT, authentication, user details loading, and address lookup provider orchestration.
+- **Controller tests** using `MockMvc` for clients, accounts, transactions, and authentication.
+- **Validation tests** for CPF validation.
+- **Context test** to verify the application starts.
 
 Tests run with the `test` profile against the `banking_system_test` database, which is recreated on each run (`create-drop`).
+
 
 ---
 
 ## Roadmap
 
-- [ ] Pagination and filtering on list endpoints
-- [ ] Concurrency control on balance updates (locking)
-- [ ] Integration tests for the remaining controllers
+## Roadmap
+
+- [ ] Unit tests for external address providers (`ViaCepClient` and `BrasilApiClient`)
+- [ ] Review logging and observability
+- [ ] Tests for `AddressService` and `AddressLookupController`
+- [ ] Review and expand entity constraints and relationships
+- [ ] Integration tests with PostgreSQL for transaction and concurrency scenarios
 - [ ] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
+- [ ] Pagination and filtering on list endpoints
 - [ ] Docker Compose for the application and database
+- [ ] CI/CD pipeline with GitHub Actions
+- [ ] Evaluate migration management with Flyway
 - [ ] Refresh tokens
+- [ ] Consider a microservices architecture after consolidating the current application

@@ -5,6 +5,7 @@ import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -14,9 +15,14 @@ public class ViaCepClient implements AddressProvider {
 
     private final RestClient restClient;
 
-    public ViaCepClient(RestClient.Builder restClientBuilder, @Value("${integration.address.viacep.base-url}") String baseUrl) {
+    public ViaCepClient(
+            RestClient.Builder restClientBuilder,
+            JdkClientHttpRequestFactory requestFactory,
+            @Value("${integration.address.viacep.base-url}") String baseUrl
+    ) {
         this.restClient = restClientBuilder.clone()
                 .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
                 .build();
     }
 

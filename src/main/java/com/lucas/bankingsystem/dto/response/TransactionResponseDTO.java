@@ -7,9 +7,11 @@ import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record TransactionResponseDTO(
         Long id,
+        UUID transactionCode,
         TransactionType transactionType,
         @JsonSerialize(using = MoneySerializer.class)
         BigDecimal amount,
@@ -18,6 +20,7 @@ public record TransactionResponseDTO(
     public static TransactionResponseDTO fromEntity(Transaction transaction) {
         return new TransactionResponseDTO(
                 transaction.getId(),
+                transaction.getTransactionCode(),
                 transaction.getType(),
                 transaction.getAmount(),
                 transaction.getCreatedAt()

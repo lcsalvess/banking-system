@@ -33,6 +33,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -780,6 +781,7 @@ public class TransactionControllerTests {
             TransactionResponseDTO actual
     ) {
         assertEquals(expected.id(), actual.id());
+        assertEquals(expected.transactionCode(), actual.transactionCode());
         assertEquals(expected.transactionType(), actual.transactionType());
         assertEquals(0, expected.amount().compareTo(actual.amount()));
         assertEquals(expected.createdAt(), actual.createdAt());
@@ -796,6 +798,7 @@ public class TransactionControllerTests {
     private static TransactionResponseDTO mockTransaction(Long id, TransactionType type) {
         return new TransactionResponseDTO(
                 id,
+                UUID.randomUUID(),
                 type,
                 new BigDecimal("100.00"),
                 LocalDateTime.of(2026, 1, 15, 10, 30, 45)

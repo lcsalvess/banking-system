@@ -95,7 +95,7 @@ public class AccountServiceTest {
             // Arrange
             CheckingAccount checkingAccount = createCheckingAccount();
             SavingsAccount savingsAccount = createSavingsAccount();
-            when(accountRepository.findAll()).thenReturn(List.of(checkingAccount, savingsAccount));
+            when(accountRepository.findAllWithClient()).thenReturn(List.of(checkingAccount, savingsAccount));
             // Act
             List<AccountResponseDTO> result = accountService.findAll();
             // Assert
@@ -104,21 +104,21 @@ public class AccountServiceTest {
             assertEquals(checkingAccount.getAccountNumber(), result.getFirst().accountNumber());
             assertEquals(savingsAccount.getAccountNumber(), result.getLast().accountNumber());
             // Verify
-            verify(accountRepository).findAll();
+            verify(accountRepository).findAllWithClient();
         }
 
         @Test
         @DisplayName("Deve retornar lista vazia quando não existirem contas cadastradas.")
         void shouldReturnEmptyListWhenNoRecordsExist() {
             // Arrange
-            when(accountRepository.findAll()).thenReturn(List.of());
+            when(accountRepository.findAllWithClient()).thenReturn(List.of());
             // Act
             List<AccountResponseDTO> result = accountService.findAll();
             // Assert
             assertNotNull(result);
             assertTrue(result.isEmpty());
             // Verify
-            verify(accountRepository).findAll();
+            verify(accountRepository).findAllWithClient();
         }
     }
 
@@ -180,7 +180,7 @@ public class AccountServiceTest {
             // Arrange
             SavingsAccount savingsAccount = createSavingsAccount();
             when(accountNumberGenerator.isValid(savingsAccount.getAccountNumber(), savingsAccount.getDigit())).thenReturn(true);
-            when(accountRepository.findByAccountNumber(savingsAccount.getAccountNumber())).thenReturn(Optional.of(savingsAccount));
+            when(accountRepository.findByAccountNumberWithClient(savingsAccount.getAccountNumber())).thenReturn(Optional.of(savingsAccount));
             // Act
             AccountResponseDTO result = accountService.findByAccountNumber(savingsAccount.getAccountNumber(), savingsAccount.getDigit());
             // Assert
@@ -189,7 +189,7 @@ public class AccountServiceTest {
             assertEquals(savingsAccount.getType(), result.type());
             assertEquals(savingsAccount.getClient().getName(), result.clientName());
             // Verify
-            verify(accountRepository).findByAccountNumber(savingsAccount.getAccountNumber());
+            verify(accountRepository).findByAccountNumberWithClient(savingsAccount.getAccountNumber());
         }
 
         @Test
@@ -199,11 +199,11 @@ public class AccountServiceTest {
             String nonExistentAccountNumber = "99999";
             String nonExistentAccountDigit = "9";
             when(accountNumberGenerator.isValid(nonExistentAccountNumber, nonExistentAccountDigit)).thenReturn(true);
-            when(accountRepository.findByAccountNumber(nonExistentAccountNumber)).thenReturn(Optional.empty());
+            when(accountRepository.findByAccountNumberWithClient(nonExistentAccountNumber)).thenReturn(Optional.empty());
             // Act + Assert
             assertThrows(AccountNotFoundException.class, () -> accountService.findByAccountNumber(nonExistentAccountNumber, nonExistentAccountDigit));
             // Verify
-            verify(accountRepository).findByAccountNumber(nonExistentAccountNumber);
+            verify(accountRepository).findByAccountNumberWithClient(nonExistentAccountNumber);
         }
     }
 

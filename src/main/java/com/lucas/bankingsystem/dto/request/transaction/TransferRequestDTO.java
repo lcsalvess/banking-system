@@ -1,9 +1,6 @@
 package com.lucas.bankingsystem.dto.request.transaction;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
@@ -32,5 +29,11 @@ public record TransferRequestDTO(
 
         @NotNull(message = "O valor da transferência é obrigatório.")
         @Positive(message = "O valor da transferência deve ser maior que zero.")
-        BigDecimal amount) {
+        @Digits(
+                integer = 17,
+                fraction = 2,
+                message = "O valor deve ter no máximo 17 dígitos inteiros e 2 casas decimais."
+        )
+        BigDecimal amount
+) {
 }

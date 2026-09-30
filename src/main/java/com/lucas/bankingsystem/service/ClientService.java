@@ -5,10 +5,13 @@ import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
+import com.lucas.bankingsystem.event.client.ClientOperationEvent;
+import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.repository.ClientRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,9 +22,12 @@ public class ClientService {
 
     private final AddressService addressService;
 
-    public ClientService(ClientRepository clientRepository, AddressService addressService) {
+    private final ApplicationEventPublisher eventPublisher;
+
+    public ClientService(ClientRepository clientRepository, AddressService addressService, ApplicationEventPublisher eventPublisher) {
         this.clientRepository = clientRepository;
         this.addressService = addressService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -34,7 +40,13 @@ public class ClientService {
 
         Client client = new Client(dto.name(), dto.cpf(), dto.email(), dto.phoneNumber(), address);
 
-        return clientRepository.save(client);
+        Client savedClient = clientRepository.save(client);
+
+        eventPublisher.publishEvent(
+                new ClientOperationEvent(savedClient.getId(), ClientOperationType.CREATED)
+        );
+
+        return savedClient;
     }
 
     public List<ClientResponseDTO> findAll() {
@@ -60,7 +72,13 @@ public class ClientService {
             addressService.updateFromPostalCode(existingClient.getAddress(), dto.address());
         }
 
-        return clientRepository.save(existingClient);
+        Client updatedClient = clientRepository.save(existingClient);
+
+        eventPublisher.publishEvent(
+                new ClientOperationEvent(updatedClient.getId(), ClientOperationType.UPDATED)
+        );
+
+        return updatedClient;
     }
 
 }

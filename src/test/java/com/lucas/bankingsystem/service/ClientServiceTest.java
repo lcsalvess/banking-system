@@ -8,6 +8,8 @@ import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
+import com.lucas.bankingsystem.event.client.ClientOperationEvent;
+import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.repository.ClientRepository;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -34,6 +37,9 @@ public class ClientServiceTest {
 
     @Mock
     private AddressService addressService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ClientService clientService;
@@ -95,6 +101,7 @@ public class ClientServiceTest {
             verify(clientRepository).existsByCpf(dto.cpf());
             verify(clientRepository, never()).save(any(Client.class));
             verifyNoInteractions(addressService);
+            verifyNoInteractions(eventPublisher);
         }
 
         @Test
@@ -124,6 +131,10 @@ public class ClientServiceTest {
             verify(addressService).createFromPostalCode(dto.address());
             verify(clientRepository).save(any(Client.class));
             verifyNoMoreInteractions(clientRepository, addressService);
+
+            verify(eventPublisher).publishEvent(
+                    new ClientOperationEvent(1L, ClientOperationType.CREATED)
+            );
         }
     }
 
@@ -302,6 +313,10 @@ public class ClientServiceTest {
                     updatedDto.address()
             );
             verifyNoMoreInteractions(addressService);
+
+            verify(eventPublisher).publishEvent(
+                    new ClientOperationEvent(clientId, ClientOperationType.UPDATED)
+            );
         }
 
         @Test
@@ -322,6 +337,7 @@ public class ClientServiceTest {
             verify(clientRepository, never()).save(any(Client.class));
             verifyNoMoreInteractions(clientRepository);
             verifyNoInteractions(addressService);
+            verifyNoInteractions(eventPublisher);
         }
     }
 }

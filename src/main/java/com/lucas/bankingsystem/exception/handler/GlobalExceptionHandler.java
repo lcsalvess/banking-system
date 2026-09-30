@@ -3,7 +3,6 @@ package com.lucas.bankingsystem.exception.handler;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.exception.ValidationErrorResponse;
 import com.lucas.bankingsystem.exception.BusinessException;
-import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,13 +109,6 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleMissingParameter() {
         return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Parâmetro de requisição obrigatório ausente.");
-    }
-
-    @ExceptionHandler(AddressProviderUnavailableException.class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public ErrorResponse handleAddressProviderUnavailable() {
-        log.error("Address provider unavailable");
-        return new ErrorResponse(HttpStatus.SERVICE_UNAVAILABLE.value(), "O serviço de consulta de endereços está temporariamente indisponível.");
     }
 
     @ExceptionHandler(Exception.class)

@@ -8,6 +8,8 @@ import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.SavingsAccount;
 import com.lucas.bankingsystem.entity.enums.AccountStatus;
 import com.lucas.bankingsystem.entity.enums.AccountType;
+import com.lucas.bankingsystem.event.account.AccountOperationEvent;
+import com.lucas.bankingsystem.event.account.AccountOperationType;
 import com.lucas.bankingsystem.exception.account.*;
 import com.lucas.bankingsystem.repository.AccountRepository;
 import com.lucas.bankingsystem.repository.CheckingAccountRepository;
@@ -15,6 +17,7 @@ import com.lucas.bankingsystem.repository.SavingsAccountRepository;
 import com.lucas.bankingsystem.service.account.AccountNumberGenerator;
 import com.lucas.bankingsystem.service.account.GeneratedAccountNumber;
 import jakarta.transaction.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,17 +26,24 @@ import java.util.List;
 @Service
 public class AccountService {
     private final AccountRepository accountRepository;
+
     private final CheckingAccountRepository checkingAccountRepository;
+
     private final SavingsAccountRepository savingsAccountRepository;
+
     private final AccountNumberGenerator accountNumberGenerator;
+
     private final ClientService clientService;
 
-    public AccountService(AccountRepository accountRepository, CheckingAccountRepository checkingAccountRepository, SavingsAccountRepository savingsAccountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService) {
+    private final ApplicationEventPublisher eventPublisher;
+
+    public AccountService(AccountRepository accountRepository, CheckingAccountRepository checkingAccountRepository, SavingsAccountRepository savingsAccountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService, ApplicationEventPublisher eventPublisher) {
         this.accountRepository = accountRepository;
         this.checkingAccountRepository = checkingAccountRepository;
         this.savingsAccountRepository = savingsAccountRepository;
         this.accountNumberGenerator = accountNumberGenerator;
         this.clientService = clientService;
+        this.eventPublisher = eventPublisher;
     }
 
     public List<AccountResponseDTO> findAll() {
@@ -54,18 +64,32 @@ public class AccountService {
     public AccountResponseDTO create(AccountRequestDTO dto) {
         Client client = clientService.findEntityById(dto.clientId());
         validateAccountTypeAndAvailability(dto);
+
         GeneratedAccountNumber accountNumber = accountNumberGenerator.generate();
+
         Account account = createAccount(dto, client, accountNumber);
+
         Account savedAccount = accountRepository.save(account);
+
+        eventPublisher.publishEvent(
+                new AccountOperationEvent(savedAccount.getId(), AccountOperationType.CREATED)
+        );
+
         return AccountResponseDTO.fromEntity(savedAccount);
     }
 
     @Transactional
     public void cancel(String accountNumber, String accountDigit) {
         Account account = findEntityByAccountNumber(accountNumber, accountDigit);
+
         validateActiveAccount(account);
         validateAccountHasNoBalance(account);
+
         account.cancel();
+
+        eventPublisher.publishEvent(
+                new AccountOperationEvent(account.getId(), AccountOperationType.CANCELLED)
+        );
     }
 
     private void validateDigit(String accountNumber, String accountDigit) {

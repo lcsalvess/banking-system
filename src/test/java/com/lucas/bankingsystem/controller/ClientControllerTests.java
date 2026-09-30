@@ -6,7 +6,6 @@ import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
 import com.lucas.bankingsystem.entity.Client;
-import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.service.ClientService;
@@ -205,7 +204,7 @@ public class ClientControllerTests {
                     "Cliente Teste", "teste@email.com"
             );
 
-            when(clientService.save(any(ClientRequestDTO.class))).thenReturn(savedClient);
+            when(clientService.create(any(ClientRequestDTO.class))).thenReturn(savedClient);
 
             mockMvc.perform(
                             post("/api/v1/clients")
@@ -220,7 +219,7 @@ public class ClientControllerTests {
                     .andExpect(jsonPath("$.email").value(savedClient.getEmail()))
                     .andExpect(jsonPath("$.phoneNumber").value(savedClient.getPhoneNumber()));
 
-            verify(clientService).save(eq(request));
+            verify(clientService).create(eq(request));
             verifyNoMoreInteractions(clientService);
         }
 
@@ -277,7 +276,7 @@ public class ClientControllerTests {
         void shouldReturnConflictWhenCpfAlreadyExists() throws Exception {
             ClientRequestDTO request = validClientRequest();
 
-            when(clientService.save(any(ClientRequestDTO.class)))
+            when(clientService.create(any(ClientRequestDTO.class)))
                     .thenThrow(new ClientCpfAlreadyExistsException("CPF já cadastrado: 52998224725"));
 
             mockMvc.perform(
@@ -290,7 +289,7 @@ public class ClientControllerTests {
                     .andExpect(jsonPath("$.status").value(409))
                     .andExpect(jsonPath("$.message").value("CPF já cadastrado: 52998224725"));
 
-            verify(clientService).save(eq(request));
+            verify(clientService).create(eq(request));
             verifyNoMoreInteractions(clientService);
         }
 
@@ -299,7 +298,7 @@ public class ClientControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             ClientRequestDTO request = validClientRequest();
 
-            when(clientService.save(any(ClientRequestDTO.class)))
+            when(clientService.create(any(ClientRequestDTO.class)))
                     .thenThrow(new RuntimeException("Unexpected error"));
 
             mockMvc.perform(
@@ -312,7 +311,7 @@ public class ClientControllerTests {
                     .andExpect(jsonPath("$.status").value(500))
                     .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
 
-            verify(clientService).save(eq(request));
+            verify(clientService).create(eq(request));
             verifyNoMoreInteractions(clientService);
         }
     }

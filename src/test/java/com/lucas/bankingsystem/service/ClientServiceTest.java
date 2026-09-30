@@ -95,7 +95,7 @@ public class ClientServiceTest {
 
             assertThrows(
                     ClientCpfAlreadyExistsException.class,
-                    () -> clientService.save(dto)
+                    () -> clientService.create(dto)
             );
 
             verify(clientRepository).existsByCpf(dto.cpf());
@@ -120,7 +120,7 @@ public class ClientServiceTest {
                 return savedClient;
             });
 
-            Client savedClient = clientService.save(dto);
+            Client savedClient = clientService.create(dto);
 
             assertNotNull(savedClient);
             assertEquals(1L, savedClient.getId());

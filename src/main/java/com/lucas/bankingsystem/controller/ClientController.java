@@ -61,7 +61,7 @@ public class ClientController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ClientResponseDTO create(@Valid @RequestBody ClientRequestDTO dto) {
-        Client savedClient = clientService.save(dto);
+        Client savedClient = clientService.create(dto);
         return ClientResponseDTO.fromEntity(savedClient);
     }
 

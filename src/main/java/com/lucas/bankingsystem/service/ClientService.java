@@ -31,7 +31,7 @@ public class ClientService {
     }
 
     @Transactional
-    public Client save(ClientRequestDTO dto) {
+    public Client create(ClientRequestDTO dto) {
         if (clientRepository.existsByCpf(dto.cpf())) {
             throw new ClientCpfAlreadyExistsException("CPF já cadastrado: " + dto.cpf());
         }

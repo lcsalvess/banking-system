@@ -25,7 +25,7 @@ public class AddressLookupResponseValidator {
         if (!violations.isEmpty()) {
             String errors = violations.stream()
                     .map(ConstraintViolation::getMessage)
-                    .collect(Collectors.joining());
+                    .collect(Collectors.joining("; "));
 
             throw new AddressProviderUnavailableException(
                     "O provedor retornou um endereço inválido: " + errors

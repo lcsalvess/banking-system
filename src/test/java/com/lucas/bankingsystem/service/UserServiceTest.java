@@ -4,6 +4,8 @@ import com.lucas.bankingsystem.dto.request.UserRequestDTO;
 import com.lucas.bankingsystem.dto.response.UserResponseDTO;
 import com.lucas.bankingsystem.entity.User;
 import com.lucas.bankingsystem.entity.enums.Role;
+import com.lucas.bankingsystem.event.user.UserOperationEvent;
+import com.lucas.bankingsystem.event.user.UserOperationType;
 import com.lucas.bankingsystem.exception.user.UserEmailAlreadyExistsException;
 import com.lucas.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lucas.bankingsystem.repository.UserRepository;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,8 +28,13 @@ import static org.mockito.Mockito.*;
 public class UserServiceTest {
     @Mock
     private UserRepository userRepository;
+
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private UserService userService;
 
@@ -49,6 +57,9 @@ public class UserServiceTest {
             verify(userRepository).existsByEmail(dto.email());
             verify(passwordEncoder).encode(dto.password());
             verify(userRepository).save(any(User.class));
+            verify(eventPublisher).publishEvent(
+                    new UserOperationEvent(savedUser.getId(), UserOperationType.CREATED)
+            );
         }
 
         @Test
@@ -61,6 +72,7 @@ public class UserServiceTest {
             verify(userRepository, never()).existsByEmail(any());
             verify(passwordEncoder, never()).encode(dto.password());
             verify(userRepository, never()).save(any(User.class));
+            verifyNoInteractions(eventPublisher);
         }
 
         @Test
@@ -74,6 +86,7 @@ public class UserServiceTest {
             verify(userRepository).existsByEmail(dto.email());
             verify(passwordEncoder, never()).encode(dto.password());
             verify(userRepository, never()).save(any(User.class));
+            verifyNoInteractions(eventPublisher);
         }
 
         private UserRequestDTO createUserRequestDTO() {

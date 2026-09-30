@@ -4,6 +4,7 @@ import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.exception.ValidationErrorResponse;
 import com.lucas.bankingsystem.exception.BusinessException;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -51,6 +52,28 @@ public class GlobalExceptionHandler {
         exception.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
 
         return new ValidationErrorResponse(HttpStatus.BAD_REQUEST.value(), "Erro de validação.", errors);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ValidationErrorResponse handleConstraintViolation(
+            ConstraintViolationException exception) {
+
+        Map<String, String> errors = new HashMap<>();
+
+        exception.getConstraintViolations().forEach(violation -> {
+            String field = violation.getPropertyPath()
+                    .toString()
+                    .substring(violation.getPropertyPath().toString().lastIndexOf('.') + 1);
+
+            errors.put(field, violation.getMessage());
+        });
+
+        return new ValidationErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Erro de validação.",
+                errors
+        );
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)

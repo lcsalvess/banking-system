@@ -8,7 +8,7 @@ import com.lucas.bankingsystem.event.user.UserOperationType;
 import com.lucas.bankingsystem.exception.user.UserEmailAlreadyExistsException;
 import com.lucas.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lucas.bankingsystem.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

@@ -15,7 +15,7 @@ import com.lucas.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lucas.bankingsystem.exception.account.AccountsAreSameException;
 import com.lucas.bankingsystem.exception.transaction.*;
 import com.lucas.bankingsystem.repository.TransactionRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -53,11 +53,13 @@ public class TransactionService {
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
+    @Transactional(readOnly = true)
     public List<TransactionResponseDTO> findByAccountNumber(String accountNumber, String accountDigit) {
         Account account = accountService.findEntityByAccountNumber(accountNumber, accountDigit);
         return transactionRepository.findByAccountId(account.getId()).stream().map(TransactionResponseDTO::fromEntity).toList();
     }
 
+    @Transactional(readOnly = true)
     public TransactionResponseDTO findByTransactionCode(UUID transactionCode) {
         Transaction transaction = transactionRepository.findByTransactionCode(transactionCode)
                 .orElseThrow(() -> new TransactionNotFoundException(

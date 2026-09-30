@@ -10,7 +10,7 @@ import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.repository.ClientRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -49,14 +49,17 @@ public class ClientService {
         return savedClient;
     }
 
+    @Transactional(readOnly = true)
     public List<ClientResponseDTO> findAll() {
         return clientRepository.findAll().stream().map(ClientResponseDTO::fromEntity).toList();
     }
 
+    @Transactional(readOnly = true)
     public Client findEntityById(Long id) {
         return clientRepository.findById(id).orElseThrow(() -> new ClientNotFoundException("Cliente não encontrado."));
     }
 
+    @Transactional(readOnly = true)
     public ClientResponseDTO findById(Long id) {
         Client client = findEntityById(id);
         return ClientResponseDTO.fromEntity(client);

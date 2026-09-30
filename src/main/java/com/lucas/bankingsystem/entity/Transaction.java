@@ -7,13 +7,25 @@ import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "transaction")
+@Table(
+        name = "transaction",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_transaction_code",
+                        columnNames = "transaction_code"
+                )
+        }
+)
 public class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @NotNull
+    @Column(name = "transaction_code", nullable = false, updatable = false)
+    private UUID transactionCode;
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false, length = 30)
@@ -34,6 +46,7 @@ public class Transaction {
     public Transaction() {}
 
     public Transaction(TransactionType type, BigDecimal amount, LocalDateTime createdAt, Account account) {
+        this.transactionCode = UUID.randomUUID();
         this.type = type;
         this.amount = amount;
         this.createdAt = createdAt;
@@ -43,6 +56,8 @@ public class Transaction {
     public Long getId() {
         return id;
     }
+
+    public UUID getTransactionCode() { return transactionCode; }
 
     public TransactionType getType() {
         return type;

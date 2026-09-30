@@ -91,7 +91,7 @@ public class TransactionServiceTest {
             assertEquals(BigDecimal.TEN, account.getBalance());
             assertNotNull(result);
             assertEquals(BigDecimal.TEN, result.amount());
-            assertEquals(TransactionType.DEPOSIT, result.transactionType());
+            assertEquals(TransactionType.DEPOSIT, result.type());
             verify(accountService).findEntityByAccountNumber(accountNumber, accountDigit);
             verify(transactionRepository, times(1)).save(any(Transaction.class));
 

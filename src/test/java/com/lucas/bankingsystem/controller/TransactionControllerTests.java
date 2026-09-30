@@ -77,7 +77,7 @@
             @DisplayName("Should deposit successfully")
             void shouldDepositSuccessfully() throws Exception {
                 AccountOperationRequestDTO request = operationRequest();
-                TransactionResponseDTO expected = mockTransaction(1L, TransactionType.DEPOSIT);
+                TransactionResponseDTO expected = mockTransaction(TransactionType.DEPOSIT);
 
                 when(transactionService.deposit(request)).thenReturn(expected);
 
@@ -183,7 +183,7 @@
             @DisplayName("Should withdraw successfully")
             void shouldWithdrawSuccessfully() throws Exception {
                 AccountOperationRequestDTO request = operationRequest();
-                TransactionResponseDTO expected = mockTransaction(2L, TransactionType.WITHDRAWAL);
+                TransactionResponseDTO expected = mockTransaction(TransactionType.WITHDRAWAL);
 
                 when(transactionService.withdraw(request)).thenReturn(expected);
 
@@ -303,7 +303,7 @@
             @DisplayName("Should transfer successfully")
             void shouldTransferSuccessfully() throws Exception {
                 TransferRequestDTO request = transferRequest();
-                TransactionResponseDTO expected = mockTransaction(3L, TransactionType.TRANSFER_SENT);
+                TransactionResponseDTO expected = mockTransaction(TransactionType.TRANSFER_SENT);
 
                 when(transactionService.transfer(request)).thenReturn(expected);
 
@@ -434,7 +434,7 @@
             @Test
             @DisplayName("Should apply yield successfully")
             void shouldApplyYieldSuccessfully() throws Exception {
-                TransactionResponseDTO expected = mockTransaction(4L, TransactionType.YIELD);
+                TransactionResponseDTO expected = mockTransaction(TransactionType.YIELD);
 
                 when(transactionService.applyYield("99999", "5")).thenReturn(expected);
 
@@ -563,8 +563,8 @@
             @Test
             @DisplayName("Should return the account transactions successfully")
             void shouldReturnTheAccountTransactionsSuccessfully() throws Exception {
-                TransactionResponseDTO transaction1 = mockTransaction(1L, TransactionType.DEPOSIT);
-                TransactionResponseDTO transaction2 = mockTransaction(2L, TransactionType.WITHDRAWAL);
+                TransactionResponseDTO transaction1 = mockTransaction(TransactionType.DEPOSIT);
+                TransactionResponseDTO transaction2 = mockTransaction(TransactionType.WITHDRAWAL);
 
                 when(transactionService.findByAccountNumber("99999", "5"))
                         .thenReturn(List.of(transaction1, transaction2));
@@ -674,7 +674,6 @@
                 UUID transactionCode = UUID.randomUUID();
 
                 TransactionResponseDTO expected = new TransactionResponseDTO(
-                        1L,
                         transactionCode,
                         TransactionType.DEPOSIT,
                         new BigDecimal("100.00"),
@@ -687,10 +686,9 @@
                 MvcResult result = performGetByTransactionCode(transactionCode.toString())
                         .andExpect(status().isOk())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(jsonPath("$.id").value(1))
                         .andExpect(jsonPath("$.transactionCode")
                                 .value(transactionCode.toString()))
-                        .andExpect(jsonPath("$.transactionType").value("DEPOSIT"))
+                        .andExpect(jsonPath("$.type").value("DEPOSIT"))
                         .andExpect(jsonPath("$.amount").value(100.00))
                         .andReturn();
 
@@ -864,9 +862,8 @@
                 TransactionResponseDTO expected,
                 TransactionResponseDTO actual
         ) {
-            assertEquals(expected.id(), actual.id());
             assertEquals(expected.transactionCode(), actual.transactionCode());
-            assertEquals(expected.transactionType(), actual.transactionType());
+            assertEquals(expected.type(), actual.type());
             assertEquals(0, expected.amount().compareTo(actual.amount()));
             assertEquals(expected.createdAt(), actual.createdAt());
         }
@@ -879,9 +876,8 @@
             return new TransferRequestDTO("99999", "5", "88888", "3", new BigDecimal("100.00"));
         }
 
-        private static TransactionResponseDTO mockTransaction(Long id, TransactionType type) {
+        private static TransactionResponseDTO mockTransaction(TransactionType type) {
             return new TransactionResponseDTO(
-                    id,
                     UUID.randomUUID(),
                     type,
                     new BigDecimal("100.00"),

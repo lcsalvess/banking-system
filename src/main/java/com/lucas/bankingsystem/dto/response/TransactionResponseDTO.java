@@ -10,16 +10,14 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record TransactionResponseDTO(
-        Long id,
         UUID transactionCode,
-        TransactionType transactionType,
+        TransactionType type,
         @JsonSerialize(using = MoneySerializer.class)
         BigDecimal amount,
         LocalDateTime createdAt
 ) {
     public static TransactionResponseDTO fromEntity(Transaction transaction) {
         return new TransactionResponseDTO(
-                transaction.getId(),
                 transaction.getTransactionCode(),
                 transaction.getType(),
                 transaction.getAmount(),

@@ -129,8 +129,8 @@ public class ClientController {
     }
 
     @Operation(
-            summary = "Update client by ID",
-            description = "Updates the information of an existing client."
+            summary = "Partially update client by ID",
+            description = "Updates only the fields sent in the request. Omitted (null) fields are left unchanged."
     )
     @ApiResponses({
             @ApiResponse(
@@ -158,7 +158,7 @@ public class ClientController {
                     )
             )
     })
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     public ClientResponseDTO update(
             @Parameter(
                     description = "Client unique identifier",

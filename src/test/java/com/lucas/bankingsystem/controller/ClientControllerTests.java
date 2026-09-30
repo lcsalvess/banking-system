@@ -317,7 +317,7 @@ public class ClientControllerTests {
     }
 
     @Nested
-    @DisplayName("PUT /api/v1/clients/{id}")
+    @DisplayName("PATCH /api/v1/clients/{id}")
     class Update {
 
         @Test
@@ -331,7 +331,7 @@ public class ClientControllerTests {
             when(clientService.update(eq(1L), any(ClientUpdateRequestDTO.class))).thenReturn(client);
 
             mockMvc.perform(
-                            put("/api/v1/clients/{id}", 1L)
+                            patch("/api/v1/clients/{id}", 1L)
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(objectMapper.writeValueAsString(request))
                     )
@@ -356,7 +356,7 @@ public class ClientControllerTests {
                     .thenThrow(new ClientNotFoundException("Cliente não encontrado."));
 
             mockMvc.perform(
-                            put("/api/v1/clients/{id}", 1L)
+                            patch("/api/v1/clients/{id}", 1L)
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(objectMapper.writeValueAsString(request))
                     )
@@ -375,7 +375,7 @@ public class ClientControllerTests {
             ClientUpdateRequestDTO request = validClientUpdateRequest();
 
             mockMvc.perform(
-                            put("/api/v1/clients/{id}", "abc")
+                            patch("/api/v1/clients/{id}", "abc")
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(objectMapper.writeValueAsString(request))
                     )
@@ -395,7 +395,7 @@ public class ClientControllerTests {
             );
 
             mockMvc.perform(
-                            put("/api/v1/clients/{id}", 1L)
+                            patch("/api/v1/clients/{id}", 1L)
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(objectMapper.writeValueAsString(request))
                     )
@@ -408,7 +408,7 @@ public class ClientControllerTests {
         @DisplayName("Should return 400 when request body is missing")
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
             mockMvc.perform(
-                            put("/api/v1/clients/{id}", 1L)
+                            patch("/api/v1/clients/{id}", 1L)
                                     .contentType(MediaType.APPLICATION_JSON)
                     )
                     .andExpect(status().isBadRequest());
@@ -425,7 +425,7 @@ public class ClientControllerTests {
                     .thenThrow(new RuntimeException("Unexpected error"));
 
             mockMvc.perform(
-                            put("/api/v1/clients/{id}", 1L)
+                            patch("/api/v1/clients/{id}", 1L)
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(objectMapper.writeValueAsString(request))
                     )

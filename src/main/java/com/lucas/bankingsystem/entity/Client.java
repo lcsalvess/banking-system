@@ -41,7 +41,6 @@ public class Client {
         if (dto.name() != null) {this.name = dto.name();}
         if (dto.email() != null) {this.email = dto.email();}
         if (dto.phoneNumber() != null) {this.phoneNumber = dto.phoneNumber();}
-        if (dto.address() != null) {this.address.update(dto.address());}
     }
 
     public Long getId() {

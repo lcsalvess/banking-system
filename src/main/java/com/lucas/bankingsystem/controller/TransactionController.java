@@ -115,7 +115,7 @@ public class TransactionController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Transaction retrieves successfully",
+                    description = "Transaction retrieved successfully",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = TransactionResponseDTO.class)

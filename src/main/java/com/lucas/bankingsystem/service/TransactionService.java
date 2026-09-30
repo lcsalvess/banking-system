@@ -13,10 +13,7 @@ import com.lucas.bankingsystem.event.transaction.TransactionTransferEvent;
 import com.lucas.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lucas.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lucas.bankingsystem.exception.account.AccountsAreSameException;
-import com.lucas.bankingsystem.exception.transaction.InsufficientBalanceException;
-import com.lucas.bankingsystem.exception.transaction.InvalidAmountException;
-import com.lucas.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
-import com.lucas.bankingsystem.exception.transaction.YieldNotAvailableException;
+import com.lucas.bankingsystem.exception.transaction.*;
 import com.lucas.bankingsystem.repository.TransactionRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class TransactionService {
@@ -43,11 +41,15 @@ public class TransactionService {
     @Transactional
     public TransactionResponseDTO deposit(AccountOperationRequestDTO dto) {
         Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.digit());
+
         validateActiveAccount(account);
         validateAmount(dto.amount());
+
         account.credit(dto.amount());
+
         Transaction transaction = registerTransaction(TransactionType.DEPOSIT, dto.amount(), account);
         eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount()));
+
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
@@ -56,47 +58,72 @@ public class TransactionService {
         return transactionRepository.findByAccountId(account.getId()).stream().map(TransactionResponseDTO::fromEntity).toList();
     }
 
+    public TransactionResponseDTO findByTransactionCode(UUID transactionCode) {
+        Transaction transaction = transactionRepository.findByTransactionCode(transactionCode)
+                .orElseThrow(() -> new TransactionNotFoundException(
+                        "Transação não encontrada."
+                ));
+
+        return TransactionResponseDTO.fromEntity(transaction);
+    }
+
     @Transactional
     public TransactionResponseDTO withdraw(AccountOperationRequestDTO dto) {
         Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.digit());
+
         validateActiveAccount(account);
         validateAmount(dto.amount());
         validateBalance(account, dto.amount());
+
         account.debit(dto.amount());
+
         Transaction transaction = registerTransaction(TransactionType.WITHDRAWAL, dto.amount(), account);
         eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.WITHDRAWAL, account.getAccountNumber(), dto.amount()));
+
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
     @Transactional
     public TransactionResponseDTO transfer(TransferRequestDTO dto) {
         validateDistinctAccounts(dto.fromAccountNumber(), dto.toAccountNumber());
+
         Account fromAccount = accountService.findEntityByAccountNumber(dto.fromAccountNumber(), dto.fromAccountDigit());
         Account toAccount = accountService.findEntityByAccountNumber(dto.toAccountNumber(), dto.toAccountDigit());
+
         validateActiveAccount(fromAccount);
         validateActiveAccount(toAccount);
         validateAmount(dto.amount());
         validateBalance(fromAccount, dto.amount());
+
         fromAccount.debit(dto.amount());
         toAccount.credit(dto.amount());
+
         Transaction sentTransaction = registerTransaction(TransactionType.TRANSFER_SENT, dto.amount(), fromAccount);
         registerTransaction(TransactionType.TRANSFER_RECEIVED, dto.amount(), toAccount);
+
         eventPublisher.publishEvent(new TransactionTransferEvent(TransactionType.TRANSFER_SENT, fromAccount.getAccountNumber(), toAccount.getAccountNumber(), dto.amount()));
+
         return TransactionResponseDTO.fromEntity(sentTransaction);
     }
 
     @Transactional
     public TransactionResponseDTO applyYield(String accountNumber, String accountDigit) {
         Account account = accountService.findEntityByAccountNumber(accountNumber, accountDigit);
+
         SavingsAccount savingsAccount = validateAndGetSavingsAccount(account);
+
         validateActiveAccount(savingsAccount);
         validateYieldAlreadyApplied(savingsAccount.getId());
+
         BigDecimal yieldAmount = savingsAccount.calculateYield();
         validateYieldAvailable(savingsAccount, yieldAmount);
+
         savingsAccount.credit(yieldAmount);
         savingsAccount.updateLastYieldDate();
+
         Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount);
         eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.YIELD, savingsAccount.getAccountNumber(), yieldAmount));
+
         return TransactionResponseDTO.fromEntity(transaction);
     }
 

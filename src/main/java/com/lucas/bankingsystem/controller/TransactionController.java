@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/transactions")
@@ -105,6 +106,43 @@ public class TransactionController {
     @GetMapping("/accounts/{accountNumber}")
     public List<TransactionResponseDTO> findByAccountNumber(@PathVariable String accountNumber, @RequestParam String digit) {
         return transactionService.findByAccountNumber(accountNumber, digit);
+    }
+
+    @Operation(
+            summary = "Retrieve a transaction by its public identifier",
+            description = "Retrieves a transaction using its unique public UUID."
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Transaction retrieves successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = TransactionResponseDTO.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid transaction UUID format",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Transaction not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            )
+    })
+    @GetMapping("/code/{transactionCode}")
+    public TransactionResponseDTO findByTransactionCode(
+            @PathVariable UUID transactionCode
+            ) {
+        return transactionService.findByTransactionCode(transactionCode);
     }
 
     @Operation(

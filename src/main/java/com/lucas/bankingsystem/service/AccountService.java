@@ -16,7 +16,7 @@ import com.lucas.bankingsystem.repository.CheckingAccountRepository;
 import com.lucas.bankingsystem.repository.SavingsAccountRepository;
 import com.lucas.bankingsystem.service.account.AccountNumberGenerator;
 import com.lucas.bankingsystem.service.account.GeneratedAccountNumber;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -46,17 +46,22 @@ public class AccountService {
         this.eventPublisher = eventPublisher;
     }
 
+    @Transactional(readOnly = true)
     public List<AccountResponseDTO> findAll() {
-        return accountRepository.findAll().stream().map(AccountResponseDTO::fromEntity).toList();
+        return accountRepository.findAllWithClient().stream().map(AccountResponseDTO::fromEntity).toList();
     }
 
+    @Transactional(readOnly = true)
     public Account findEntityByAccountNumber(String accountNumber, String accountDigit) {
         validateDigit(accountNumber, accountDigit);
         return accountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
     }
 
+    @Transactional(readOnly = true)
     public AccountResponseDTO findByAccountNumber(String accountNumber, String accountDigit) {
-        Account account = findEntityByAccountNumber(accountNumber, accountDigit);
+       validateDigit(accountNumber, accountDigit);
+       Account account = accountRepository.findByAccountNumberWithClient(accountNumber)
+               .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada"));
         return AccountResponseDTO.fromEntity(account);
     }
 

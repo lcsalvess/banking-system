@@ -100,12 +100,12 @@ public class AccountService {
 
     private void validateAccountTypeAndAvailability(AccountRequestDTO dto) {
         if (dto.type() == AccountType.CHECKING &&
-                checkingAccountRepository.existsByClientId(dto.clientId())) {
+                checkingAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)) {
             throw new AccountAlreadyExistsException("O cliente já possui uma conta corrente.");
         }
 
         if (dto.type() == AccountType.SAVINGS &&
-                savingsAccountRepository.existsByClientId(dto.clientId())) {
+                savingsAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)) {
             throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança.");
         }
 

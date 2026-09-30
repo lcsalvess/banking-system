@@ -218,7 +218,7 @@ public class AccountServiceTest {
             Client client = createClient();
 
             when(clientService.findEntityById(dto.clientId())).thenReturn(client);
-            when(checkingAccountRepository.existsByClientId(dto.clientId())).thenReturn(false);
+            when(checkingAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)).thenReturn(false);
             when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber("00001", "5"));
             when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
                 Account savedAccount = invocation.getArgument(0);
@@ -234,7 +234,7 @@ public class AccountServiceTest {
             assertEquals(client.getName(), result.clientName());
             // Verify
             verify(clientService).findEntityById(dto.clientId());
-            verify(checkingAccountRepository).existsByClientId(dto.clientId());
+            verify(checkingAccountRepository).existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE);
             verify(accountNumberGenerator).generate();
             verify(accountRepository).save(any(Account.class));
             verify(eventPublisher).publishEvent(
@@ -250,7 +250,7 @@ public class AccountServiceTest {
             Client client = createClient();
 
             when(clientService.findEntityById(dto.clientId())).thenReturn(client);
-            when(savingsAccountRepository.existsByClientId(dto.clientId())).thenReturn(false);
+            when(savingsAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)).thenReturn(false);
             when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber("00002", "0"));
             when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
                 Account savedAccount = invocation.getArgument(0);
@@ -267,7 +267,7 @@ public class AccountServiceTest {
             assertEquals(client.getName(), result.clientName());
             // Verify
             verify(clientService).findEntityById(dto.clientId());
-            verify(savingsAccountRepository).existsByClientId(dto.clientId());
+            verify(savingsAccountRepository).existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE);
             verify(accountNumberGenerator).generate();
             verify(accountRepository).save(any(Account.class));
             verify(eventPublisher).publishEvent(
@@ -283,12 +283,12 @@ public class AccountServiceTest {
             Client client = createClient();
 
             when(clientService.findEntityById(dto.clientId())).thenReturn(client);
-            when(checkingAccountRepository.existsByClientId(dto.clientId())).thenReturn(true);
+            when(checkingAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)).thenReturn(true);
             // Act + Assert
             assertThrows(AccountAlreadyExistsException.class, () -> accountService.create(dto));
             // Verify
             verify(clientService).findEntityById(dto.clientId());
-            verify(checkingAccountRepository).existsByClientId(dto.clientId());
+            verify(checkingAccountRepository).existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE);
             verify(accountNumberGenerator, never()).generate();
             verify(accountRepository, never()).save(any(Account.class));
             verifyNoInteractions(eventPublisher);
@@ -302,12 +302,12 @@ public class AccountServiceTest {
             Client client = createClient();
 
             when(clientService.findEntityById(dto.clientId())).thenReturn(client);
-            when(savingsAccountRepository.existsByClientId(dto.clientId())).thenReturn(true);
+            when(savingsAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)).thenReturn(true);
             // Act + Assert
             assertThrows(AccountAlreadyExistsException.class, () -> accountService.create(dto));
             // Verify
             verify(clientService).findEntityById(dto.clientId());
-            verify(savingsAccountRepository).existsByClientId(dto.clientId());
+            verify(savingsAccountRepository).existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE);
             verify(accountNumberGenerator, never()).generate();
             verify(accountRepository, never()).save(any(Account.class));
             verifyNoInteractions(eventPublisher);

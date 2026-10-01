@@ -16,6 +16,7 @@ import com.lucas.bankingsystem.repository.CheckingAccountRepository;
 import com.lucas.bankingsystem.repository.SavingsAccountRepository;
 import com.lucas.bankingsystem.service.account.AccountNumberGenerator;
 import com.lucas.bankingsystem.service.account.GeneratedAccountNumber;
+import com.lucas.bankingsystem.service.security.CurrentUserService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -35,14 +36,17 @@ public class AccountService {
 
     private final ClientService clientService;
 
+    private final CurrentUserService currentUserService;
+
     private final ApplicationEventPublisher eventPublisher;
 
-    public AccountService(AccountRepository accountRepository, CheckingAccountRepository checkingAccountRepository, SavingsAccountRepository savingsAccountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService, ApplicationEventPublisher eventPublisher) {
+    public AccountService(AccountRepository accountRepository, CheckingAccountRepository checkingAccountRepository, SavingsAccountRepository savingsAccountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher) {
         this.accountRepository = accountRepository;
         this.checkingAccountRepository = checkingAccountRepository;
         this.savingsAccountRepository = savingsAccountRepository;
         this.accountNumberGenerator = accountNumberGenerator;
         this.clientService = clientService;
+        this.currentUserService = currentUserService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -68,7 +72,10 @@ public class AccountService {
     @Transactional
     public AccountResponseDTO create(AccountRequestDTO dto) {
         Client client = clientService.findEntityById(dto.clientId());
+
         validateAccountTypeAndAvailability(dto);
+
+        String username = getCurrentUsername();
 
         GeneratedAccountNumber accountNumber = accountNumberGenerator.generate();
 
@@ -77,7 +84,7 @@ public class AccountService {
         Account savedAccount = accountRepository.save(account);
 
         eventPublisher.publishEvent(
-                new AccountOperationEvent(savedAccount.getId(), AccountOperationType.CREATED)
+                new AccountOperationEvent(savedAccount.getId(), AccountOperationType.CREATED, username)
         );
 
         return AccountResponseDTO.fromEntity(savedAccount);
@@ -90,10 +97,12 @@ public class AccountService {
         validateActiveAccount(account);
         validateAccountHasNoBalance(account);
 
+        String username = getCurrentUsername();
+
         account.cancel();
 
         eventPublisher.publishEvent(
-                new AccountOperationEvent(account.getId(), AccountOperationType.CANCELLED)
+                new AccountOperationEvent(account.getId(), AccountOperationType.CANCELLED, username)
         );
     }
 
@@ -145,5 +154,9 @@ public class AccountService {
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new AccountIsNotActiveException("Não é possível cancelar uma conta que não está ativa.");
         }
+    }
+
+    private String getCurrentUsername() {
+        return currentUserService.getUsername();
     }
 }

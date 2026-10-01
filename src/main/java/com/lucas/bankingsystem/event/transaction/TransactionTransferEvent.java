@@ -8,6 +8,7 @@ public record TransactionTransferEvent(
         TransactionType type,
         String fromAccountNumber,
         String toAccountNumber,
-        BigDecimal amount
+        BigDecimal amount,
+        String username
 ) {
 }

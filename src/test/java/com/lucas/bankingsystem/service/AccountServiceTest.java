@@ -14,6 +14,7 @@ import com.lucas.bankingsystem.repository.CheckingAccountRepository;
 import com.lucas.bankingsystem.repository.SavingsAccountRepository;
 import com.lucas.bankingsystem.service.account.AccountNumberGenerator;
 import com.lucas.bankingsystem.service.account.GeneratedAccountNumber;
+import com.lucas.bankingsystem.service.security.CurrentUserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,10 +51,15 @@ public class AccountServiceTest {
     private AccountNumberGenerator accountNumberGenerator;
 
     @Mock
+    private CurrentUserService currentUserService;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AccountService accountService;
+
+    private static final String USERNAME = "usuario.teste";
 
     private Client createClient() {
         Address address = new Address("Rua Teste", "123", null, "Centro", "Mogi das Cruzes", State.SP, "08710000");
@@ -220,6 +226,7 @@ public class AccountServiceTest {
             when(clientService.findEntityById(dto.clientId())).thenReturn(client);
             when(checkingAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)).thenReturn(false);
             when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber("00001", "5"));
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
                 Account savedAccount = invocation.getArgument(0);
                 ReflectionTestUtils.setField(savedAccount, "id", 1L);
@@ -237,9 +244,14 @@ public class AccountServiceTest {
             verify(checkingAccountRepository).existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE);
             verify(accountNumberGenerator).generate();
             verify(accountRepository).save(any(Account.class));
-            verify(eventPublisher).publishEvent(
-                    new AccountOperationEvent(1L, AccountOperationType.CREATED)
-            );
+            verify(eventPublisher).publishEvent(argThat(
+                    (Object event) -> event instanceof AccountOperationEvent(
+                            Long accountId, AccountOperationType type, String username
+                    )
+                            && accountId.equals(1L)
+                            && type == AccountOperationType.CREATED
+                            && username.equals(USERNAME)
+            ));
         }
 
         @Test
@@ -252,6 +264,7 @@ public class AccountServiceTest {
             when(clientService.findEntityById(dto.clientId())).thenReturn(client);
             when(savingsAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)).thenReturn(false);
             when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber("00002", "0"));
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
                 Account savedAccount = invocation.getArgument(0);
                 ReflectionTestUtils.setField(savedAccount, "id", 2L);
@@ -270,9 +283,14 @@ public class AccountServiceTest {
             verify(savingsAccountRepository).existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE);
             verify(accountNumberGenerator).generate();
             verify(accountRepository).save(any(Account.class));
-            verify(eventPublisher).publishEvent(
-                    new AccountOperationEvent(2L, AccountOperationType.CREATED)
-            );
+            verify(eventPublisher).publishEvent(argThat(
+                    (Object event) -> event instanceof AccountOperationEvent(
+                            Long accountId, AccountOperationType type, String username
+                    )
+                            && accountId.equals(2L)
+                            && type == AccountOperationType.CREATED
+                            && username.equals(USERNAME)
+            ));
         }
 
         @Test
@@ -325,15 +343,21 @@ public class AccountServiceTest {
 
             when(accountNumberGenerator.isValid(checkingAccount.getAccountNumber(), checkingAccount.getDigit())).thenReturn(true);
             when(accountRepository.findByAccountNumber(checkingAccount.getAccountNumber())).thenReturn(Optional.of(checkingAccount));
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
             // Act
             accountService.cancel(checkingAccount.getAccountNumber(), checkingAccount.getDigit());
             // Assert
             assertEquals(AccountStatus.CANCELLED, checkingAccount.getStatus());
             // Verify
             verify(accountRepository).findByAccountNumber(checkingAccount.getAccountNumber());
-            verify(eventPublisher).publishEvent(
-                    new AccountOperationEvent(1L, AccountOperationType.CANCELLED)
-            );
+            verify(eventPublisher).publishEvent(argThat(
+                    (Object event) -> event instanceof AccountOperationEvent(
+                            Long accountId, AccountOperationType type, String username
+                    )
+                            && accountId.equals(1L)
+                            && type == AccountOperationType.CANCELLED
+                            && username.equals(USERNAME)
+            ));
         }
 
         @Test

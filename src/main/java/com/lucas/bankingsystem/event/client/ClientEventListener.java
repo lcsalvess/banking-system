@@ -13,8 +13,9 @@ public class ClientEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleClientOperation(ClientOperationEvent event) {
-        log.info("Client operation {} successfully completed: id={}",
+        log.info("Client operation {} successfully completed: id={}, user={}",
                 event.type(),
-                event.clientId());
+                event.clientId(),
+                event.username());
     }
 }

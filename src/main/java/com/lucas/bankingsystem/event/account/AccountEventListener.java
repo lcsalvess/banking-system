@@ -13,8 +13,9 @@ public class AccountEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleAccountOperation(AccountOperationEvent event) {
-        log.info("Account operation {} successfully completed: id={}",
+        log.info("Account operation {} successfully completed: id={}, user={}",
                 event.type(),
-                event.accountId());
+                event.accountId(),
+                event.username());
     }
 }

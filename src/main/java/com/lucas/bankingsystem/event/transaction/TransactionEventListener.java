@@ -13,18 +13,20 @@ public class TransactionEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleTransactionOperation(TransactionOperationEvent event) {
-        log.info("{} successfully processed: account={}, amount={}",
+        log.info("{} successfully processed: account={}, amount={}, user={}",
                 event.type(),
                 event.accountNumber(),
-                event.amount());
+                event.amount(),
+                event.username());
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleTransactionTransferOperation(TransactionTransferEvent event) {
-        log.info("{} successfully processed: from={}, to={}, amount={}",
+        log.info("{} successfully processed: from={}, to={}, amount={}, user={}",
                 event.type(),
                 event.fromAccountNumber(),
                 event.toAccountNumber(),
-                event.amount());
+                event.amount(),
+                event.username());
     }
 }

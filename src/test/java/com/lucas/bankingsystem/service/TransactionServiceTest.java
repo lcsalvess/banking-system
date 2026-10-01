@@ -17,6 +17,7 @@ import com.lucas.bankingsystem.exception.transaction.InsufficientBalanceExceptio
 import com.lucas.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
 import com.lucas.bankingsystem.exception.transaction.YieldNotAvailableException;
 import com.lucas.bankingsystem.repository.TransactionRepository;
+import com.lucas.bankingsystem.service.security.CurrentUserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -43,9 +44,13 @@ public class TransactionServiceTest {
     @Mock
     private AccountService accountService;
     @Mock
+    private CurrentUserService currentUserService;
+    @Mock
     private ApplicationEventPublisher eventPublisher;
     @InjectMocks
     private TransactionService transactionService;
+
+    private static final String USERNAME = "usuario.teste";
 
     private AccountOperationRequestDTO createOperationDTO(String accountNumber, String accountDigit, BigDecimal amount) {
         return new AccountOperationRequestDTO(accountNumber, accountDigit, amount);
@@ -82,6 +87,7 @@ public class TransactionServiceTest {
         @DisplayName("Deve realizar depósito em uma conta ativa e valor válido.")
         void shouldDepositSuccessfullyWhenAccountIsActiveAndAmountIsValid() {
             when(accountService.findEntityByAccountNumber(accountNumber, accountDigit)).thenReturn(account);
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
 
             AccountOperationRequestDTO dto = createOperationDTO(accountNumber, accountDigit, BigDecimal.TEN);
@@ -97,11 +103,12 @@ public class TransactionServiceTest {
 
             verify(eventPublisher).publishEvent(argThat(
                     (Object event) -> event instanceof TransactionOperationEvent(
-                            TransactionType type, String number, BigDecimal amount
+                            TransactionType type, String number, BigDecimal amount, String username
                     )
                             && type == TransactionType.DEPOSIT
                             && number.equals(accountNumber)
                             && amount.equals(BigDecimal.TEN)
+                            && username.equals(USERNAME)
             ));
         }
     }
@@ -159,6 +166,7 @@ public class TransactionServiceTest {
         @DisplayName("Deve realizar saque com sucesso quando o valor for menor que o saldo")
         void shouldWithdrawSuccessfullyWhenAmountIsLessThanBalance() {
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
             AccountOperationRequestDTO dto = createOperationDTO(accountNumber, accountDigit, new BigDecimal("30.00"));
 
             transactionService.withdraw(dto);
@@ -168,11 +176,12 @@ public class TransactionServiceTest {
 
             verify(eventPublisher).publishEvent(argThat(
                     (Object event) -> event instanceof TransactionOperationEvent(
-                            TransactionType type, String number, BigDecimal amount
+                            TransactionType type, String number, BigDecimal amount, String username
                     )
                             && type == TransactionType.WITHDRAWAL
                             && number.equals(accountNumber)
                             && amount.equals(dto.amount())
+                            && username.equals(USERNAME)
             ));
         }
     }
@@ -248,6 +257,7 @@ public class TransactionServiceTest {
         @DisplayName("Deve realizar transferência com sucesso, alterar dados e salvar duas transações.")
         void shouldTransferSuccessfully() {
             mockAccountLookup();
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
 
             BigDecimal amount = new BigDecimal("30.00");
@@ -264,12 +274,14 @@ public class TransactionServiceTest {
                             TransactionType type,
                             String eventFromAccountNumber,
                             String eventToAccountNumber,
-                            BigDecimal eventAmount
+                            BigDecimal eventAmount,
+                            String username
                     )
                             && type == TransactionType.TRANSFER_SENT
                             && eventFromAccountNumber.equals(fromAccount.getAccountNumber())
                             && eventToAccountNumber.equals(toAccount.getAccountNumber())
                             && eventAmount.equals(dto.amount())
+                            && username.equals(USERNAME)
             ));
         }
 
@@ -358,6 +370,7 @@ public class TransactionServiceTest {
         @DisplayName("Deve aplicar rendimento com sucesso quando ainda não foi aplicado hoje.")
         void shouldApplyYieldSuccessfully() {
             mockSavingsAccountLookup();
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArgument(0));
 
             BigDecimal yieldAmount = new BigDecimal("15.50");
@@ -376,11 +389,12 @@ public class TransactionServiceTest {
 
             verify(eventPublisher).publishEvent(argThat(
                     (Object event) -> event instanceof TransactionOperationEvent(
-                            TransactionType type, String number, BigDecimal amount
+                            TransactionType type, String number, BigDecimal amount, String username
                     )
                             && type == TransactionType.YIELD
                             && number.equals(accountNumber)
                             && amount.equals(yieldAmount)
+                            && username.equals(USERNAME)
             ));
         }
 

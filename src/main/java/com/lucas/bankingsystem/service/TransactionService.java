@@ -15,6 +15,7 @@ import com.lucas.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lucas.bankingsystem.exception.account.AccountsAreSameException;
 import com.lucas.bankingsystem.exception.transaction.*;
 import com.lucas.bankingsystem.repository.TransactionRepository;
+import com.lucas.bankingsystem.service.security.CurrentUserService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -30,11 +31,13 @@ import java.util.UUID;
 public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountService accountService;
+    private final CurrentUserService currentUserService;
     private final ApplicationEventPublisher eventPublisher;
 
-    public TransactionService(TransactionRepository transactionRepository, AccountService accountService, ApplicationEventPublisher eventPublisher) {
+    public TransactionService(TransactionRepository transactionRepository, AccountService accountService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher) {
         this.transactionRepository = transactionRepository;
         this.accountService = accountService;
+        this.currentUserService = currentUserService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -45,10 +48,12 @@ public class TransactionService {
         validateActiveAccount(account);
         validateAmount(dto.amount());
 
+        String username = getCurrentUsername();
+
         account.credit(dto.amount());
 
         Transaction transaction = registerTransaction(TransactionType.DEPOSIT, dto.amount(), account);
-        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount()));
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount(), username));
 
         return TransactionResponseDTO.fromEntity(transaction);
     }
@@ -77,10 +82,12 @@ public class TransactionService {
         validateAmount(dto.amount());
         validateBalance(account, dto.amount());
 
+        String username = getCurrentUsername();
+
         account.debit(dto.amount());
 
         Transaction transaction = registerTransaction(TransactionType.WITHDRAWAL, dto.amount(), account);
-        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.WITHDRAWAL, account.getAccountNumber(), dto.amount()));
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.WITHDRAWAL, account.getAccountNumber(), dto.amount(), username));
 
         return TransactionResponseDTO.fromEntity(transaction);
     }
@@ -97,13 +104,15 @@ public class TransactionService {
         validateAmount(dto.amount());
         validateBalance(fromAccount, dto.amount());
 
+        String username = getCurrentUsername();
+
         fromAccount.debit(dto.amount());
         toAccount.credit(dto.amount());
 
         Transaction sentTransaction = registerTransaction(TransactionType.TRANSFER_SENT, dto.amount(), fromAccount);
         registerTransaction(TransactionType.TRANSFER_RECEIVED, dto.amount(), toAccount);
 
-        eventPublisher.publishEvent(new TransactionTransferEvent(TransactionType.TRANSFER_SENT, fromAccount.getAccountNumber(), toAccount.getAccountNumber(), dto.amount()));
+        eventPublisher.publishEvent(new TransactionTransferEvent(TransactionType.TRANSFER_SENT, fromAccount.getAccountNumber(), toAccount.getAccountNumber(), dto.amount(), username));
 
         return TransactionResponseDTO.fromEntity(sentTransaction);
     }
@@ -120,11 +129,13 @@ public class TransactionService {
         BigDecimal yieldAmount = savingsAccount.calculateYield();
         validateYieldAvailable(savingsAccount, yieldAmount);
 
+        String username = getCurrentUsername();
+
         savingsAccount.credit(yieldAmount);
         savingsAccount.updateLastYieldDate();
 
         Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount);
-        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.YIELD, savingsAccount.getAccountNumber(), yieldAmount));
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.YIELD, savingsAccount.getAccountNumber(), yieldAmount, username));
 
         return TransactionResponseDTO.fromEntity(transaction);
     }
@@ -181,5 +192,9 @@ public class TransactionService {
     private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account) {
         Transaction transaction = new Transaction(type, amount, LocalDateTime.now(), account);
         return transactionRepository.save(transaction);
+    }
+
+    private String getCurrentUsername() {
+        return currentUserService.getUsername();
     }
 }

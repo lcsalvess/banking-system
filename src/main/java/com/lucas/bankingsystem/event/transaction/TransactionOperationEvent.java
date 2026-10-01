@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 public record TransactionOperationEvent(
         TransactionType type,
         String accountNumber,
-        BigDecimal amount
+        BigDecimal amount,
+        String username
 ) {
 }

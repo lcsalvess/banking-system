@@ -45,7 +45,7 @@ src/main/java/com/lucas/bankingsystem
 ├── dto/          # Request and response DTOs
 ├── entity/       # JPA entities and domain models (enums in entity/enums)
 ├── event/        # Operation events and listeners used for logging
-├── exception/    # Custom exceptions and global exception handler
+├── exception/    # Custom exceptions and exception handlers (global and address-specific)
 ├── integration/  # External API integrations
 │   └── address/  # Address lookup providers (ViaCEP, BrasilAPI) and related components
 ├── repository/   # Database access through Spring Data JPA
@@ -118,7 +118,8 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Address lookup**: automatic address lookup by postal code using ViaCEP, with BrasilAPI as a fallback provider
 - **Provider response validation**: addresses returned by external providers are validated before being used
 - **Account management**: checking and savings accounts, with generated account numbers and check digits
-- **Transactions**: deposit, withdrawal, transfer between accounts, and transaction history per account
+- **Transactions**: deposit, withdrawal, transfer between accounts, transaction history per account, and lookup by public identifier
+- **Public transaction identifier**: every transaction has a UUID (`transactionCode`) exposed in responses, while the internal database ID is never returned
 - **Savings yield**: monthly yield applied to savings accounts
 - **Account cancellation** with balance and status validation
 - **Input validation** using Bean Validation and custom CPF validation
@@ -151,6 +152,8 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Withdrawals and transfers require sufficient balance.
 - A transfer requires distinct and active source and destination accounts, and records one `TRANSFER_SENT` and one `TRANSFER_RECEIVED` transaction.
 - All operations run inside a database transaction, so balance changes and transaction records are saved together or not at all.
+- Every transaction receives a random UUID (`transactionCode`) when it is created. It is unique, immutable, and is the only identifier exposed by the API; the internal numeric ID is not part of the response.
+- A transaction can be retrieved by its `transactionCode`: `404 Not Found` if it does not exist and `400 Bad Request` if the value is not a valid UUID.
 
 ### Savings Yield
 - Yield is calculated as 0.5% of the current balance, rounded to 2 decimal places.
@@ -171,8 +174,8 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Requests to providers use a 3-second connection timeout and a 5-second read timeout.
 - Provider responses are validated (street, neighborhood, city, state, and an 8-digit postal code are required). An invalid response is treated as a provider failure.
 - Provider failures are handled separately from postal codes that are not found:
-    - `404 Not Found` when every provider answered and none found the postal code.
-    - `503 Service Unavailable` when at least one provider failed and no other provider found the postal code.
+  - `404 Not Found` when every provider answered and none found the postal code.
+  - `503 Service Unavailable` when at least one provider failed and no other provider found the postal code.
 
 ---
 
@@ -215,6 +218,7 @@ Full request and response schemas are available in Swagger UI.
 | POST   | `/api/v1/transactions/withdraw`                        | Withdraw                             | Authenticated |
 | POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts            | Authenticated |
 | GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account    | Authenticated |
+| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID | Authenticated |
 | POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account     | Authenticated |
 
 ### Address Lookup Endpoint
@@ -246,13 +250,30 @@ curl -X PATCH http://localhost:8080/api/v1/clients/1 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"phoneNumber": "11987654321", "address": {"postalCode": "01001000", "streetNumber": "100"}}'
+
+# 4. Look up a transaction by its public code
+curl http://localhost:8080/api/v1/transactions/code/<transaction-code> \
+  -H "Authorization: Bearer <token>"
 ```
+
+Transactions are returned with their public identifier, and the internal ID is not exposed:
+
+```json
+{
+  "transactionCode": "3f6c1d52-8a0e-4b7d-9c41-2e5a7b9d0f13",
+  "type": "DEPOSIT",
+  "amount": 150.00,
+  "createdAt": "2026-09-30T14:32:10"
+}
+```
+
+`type` is one of `DEPOSIT`, `WITHDRAWAL`, `TRANSFER_SENT`, `TRANSFER_RECEIVED`, or `YIELD`.
 
 ---
 
 ## Error Handling
 
-Errors are handled by a global exception handler, and business rule violations extend a common `BusinessException`. Every error returns the same structure:
+Errors are handled by a global exception handler, and business rule violations extend a common `BusinessException`. Address provider failures are handled separately by `AddressExceptionHandler`, which applies only to the address lookup and client controllers. Every error returns the same structure:
 
 ```json
 {
@@ -273,14 +294,14 @@ Validation errors also include the invalid fields:
 }
 ```
 
-| Scenario                                                       | Status                    |
-|----------------------------------------------------------------|---------------------------|
-| Business rule violation                                        | Defined by each exception |
-| Bean Validation failure, invalid parameters, or malformed body | `400`                     |
-| Invalid credentials                                            | `401`                     |
-| Access denied                                                  | `403`                     |
-| Address providers unavailable                                  | `503`                     |
-| Unexpected error                                               | `500`                     |
+| Scenario                                                       | Status                      |
+|----------------------------------------------------------------|-----------------------------|
+| Business rule violation                                        | Defined by each exception   |
+| Bean Validation failure, invalid parameters, or malformed body | `400 Bad Request`           |
+| Invalid credentials                                            | `401 Unauthorized`          |
+| Access denied                                                  | `403 Forbidden`             |
+| Address providers unavailable                                  | `503 Service Unavailable`   |
+| Unexpected error                                               | `500 Internal Server Error` |
 
 ---
 
@@ -290,7 +311,7 @@ Operations are logged through Spring application events:
 
 - Services publish an event after creating or changing data: client `CREATED`/`UPDATED`, account `CREATED`/`CANCELLED`, user `CREATED`, and transactions (deposit, withdrawal, transfer, and yield).
 - Listeners use `@TransactionalEventListener` in the `AFTER_COMMIT` phase, so an operation is only logged as successful after its database transaction is committed.
-- The global exception handler logs business errors, authentication and authorization failures, data integrity violations, provider failures, and unexpected errors.
+- The global exception handler logs business errors, authentication and authorization failures, data integrity violations, and unexpected errors. Address provider failures are logged by `AddressExceptionHandler`.
 - The log level is controlled by `logging.level.com.lucas.bankingsystem` (`INFO` by default), and SQL logging is disabled.
 
 ---
@@ -301,7 +322,9 @@ Operations are logged through Spring application events:
 - `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it).
 - `schema.sql` creates the account number sequence and the partial unique index that prevents more than one yield per account per day.
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).
+- `Transaction` has a `transaction_code` column (UUID, not null, not updatable) with the `uk_transaction_code` unique constraint, used as its public identifier.
 - Open Session in View is disabled (`spring.jpa.open-in-view=false`). Account queries that need the client use `JOIN FETCH` to avoid lazy loading outside a transaction.
+- Read operations in the services run with `@Transactional(readOnly = true)`, while operations that change data use regular transactions.
 
 ---
 
@@ -375,7 +398,7 @@ To disable the documentation (for example, in production), set `SWAGGER_ENABLED=
 The test suite covers:
 
 - **Unit tests** for services, using JUnit and Mockito: accounts, clients, transactions (deposit, withdrawal, transfer, yield), users, JWT, authentication, user details loading, and address lookup provider orchestration.
-- **Controller tests** using `MockMvc` for clients, accounts, transactions, and authentication.
+- **Controller tests** using `MockMvc` for clients, accounts, transactions (including lookup by public transaction code and invalid UUID handling), and authentication.
 - **Validation tests** for CPF validation.
 - **Context test** to verify the application starts.
 

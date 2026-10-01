@@ -16,13 +16,18 @@ public class CpfConstraintValidator
 
     /**
      * Executa a validação quando o Bean Validation encontra a anotação @ValidCpf.
+     * Valida apenas os dígitos verificadores: nulo e formato ficam a cargo de
+     * @NotBlank e @Pattern, evitando duas violações no mesmo campo.
      *
      * @param cpf valor do CPF que será validado.
      * @param context contexto fornecido pelo Bean Validation.
-     * @return true se o CPF for válido; false caso contrário.
+     * @return true se o CPF for válido ou não tiver 11 dígitos numéricos; false se os dígitos verificadores forem inválidos.
      */
     @Override
     public boolean isValid(String cpf, ConstraintValidatorContext context) {
+        if (cpf == null || !cpf.matches("^[0-9]{11}$")) {
+            return true;
+        }
         return cpfValidator.isValid(cpf);
     }
 }

@@ -7,9 +7,11 @@ import jakarta.validation.constraints.Size;
 
 public record ClientUpdateRequestDTO(
         @Size(max = 125, message = "O nome deve ter no máximo 125 caracteres.")
+        @Pattern(regexp = "(?s).*\\S.*", message = "O nome não pode ser vazio.")
         String name,
         @Email(message = "O formato do e-mail é inválido.")
         @Size(max = 150, message = "O e-mail deve ter no máximo 150 caracteres.")
+        @Pattern(regexp = "(?s).*\\S.*", message = "O e-mail não pode ser vazio.")
         String email,
         @Pattern(regexp = "^[0-9]{10,11}$", message = "O telefone deve conter de 10 a 11 números, incluindo o DDD.")
         String phoneNumber,

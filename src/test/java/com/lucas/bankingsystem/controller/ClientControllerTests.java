@@ -5,33 +5,86 @@ import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
+import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
+import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
+import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
+import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lucas.bankingsystem.service.ClientService;
 import com.lucas.bankingsystem.service.security.CustomUserDetailsService;
 import com.lucas.bankingsystem.service.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ClientController.class)
 @AutoConfigureMockMvc(addFilters = false)
 public class ClientControllerTests {
+
+    private static final String PROVIDER = "com.lucas.bankingsystem.controller.ClientControllerTests#";
+    private static final String CLIENTS_URL = "/api/v1/clients";
+    private static final String CLIENT_URL = "/api/v1/clients/{id}";
+
+    private static final String INTERNAL_ERROR_MESSAGE = "Ocorreu um erro interno no servidor.";
+    private static final String INVALID_BODY_MESSAGE = "Dados da requisição inválidos.";
+    private static final String INVALID_PARAM_MESSAGE = "Parâmetro de requisição inválido.";
+    private static final String VALIDATION_MESSAGE = "Erro de validação.";
+    private static final String CLIENT_NOT_FOUND_MESSAGE = "Cliente não encontrado.";
+    private static final String CPF_ALREADY_EXISTS_MESSAGE = "Já existe um cliente cadastrado com este CPF.";
+    private static final String POSTAL_CODE_NOT_FOUND_MESSAGE = "CEP 01001000 não encontrado em nenhum provedor.";
+    private static final String ADDRESS_UNAVAILABLE_MESSAGE =
+            "O serviço de consulta de endereços está temporariamente indisponível.";
+
+    private static final String NAME_BLANK_MESSAGE = "O nome não pode ser vazio.";
+    private static final String NAME_TOO_LONG_MESSAGE = "O nome deve ter no máximo 125 caracteres.";
+    private static final String EMAIL_BLANK_MESSAGE = "O e-mail não pode ser vazio.";
+    private static final String EMAIL_INVALID_MESSAGE = "O formato do e-mail é inválido.";
+    private static final String EMAIL_TOO_LONG_MESSAGE = "O e-mail deve ter no máximo 150 caracteres.";
+    private static final String PHONE_INVALID_MESSAGE = "O telefone deve conter de 10 a 11 números, incluindo o DDD.";
+    private static final String STREET_NUMBER_BLANK_MESSAGE = "O número não pode ser vazio.";
+    private static final String STREET_NUMBER_TOO_LONG_MESSAGE = "O número deve ter no máximo 10 caracteres.";
+    private static final String COMPLEMENT_TOO_LONG_MESSAGE = "O complemento deve ter no máximo 100 caracteres.";
+    private static final String POSTAL_CODE_INVALID_MESSAGE =
+            "O CEP deve conter exatamente 8 números, sem traços ou espaços.";
+
+    private static final String VALID_NAME = "Cliente Teste";
+    private static final String VALID_CPF = "52998224725";
+    private static final String VALID_EMAIL = "teste@email.com";
+    private static final String VALID_PHONE = "11999999999";
+    private static final String UPDATED_NAME = "Cliente Atualizado";
+    private static final String UPDATED_EMAIL = "atualizado@email.com";
+
+    // Formato válido (parte local curta, rótulos de domínio <= 63), 188 caracteres:
+    // viola somente o @Size(max = 150).
+    private static final String EMAIL_ABOVE_LIMIT =
+            "a@" + "b".repeat(60) + "." + "b".repeat(60) + "." + "b".repeat(60) + ".com";
 
     @Autowired
     private MockMvc mockMvc;
@@ -56,36 +109,21 @@ public class ClientControllerTests {
         @DisplayName("Should return all clients successfully")
         void shouldReturnAllClientsSuccessfully() throws Exception {
             ClientResponseDTO client1 = new ClientResponseDTO(
-                    1L,
-                    "Lucas Alves",
-                    "62934118037",
-                    "lucas@email.com",
-                    "11999999999"
+                    1L, "Lucas Alves", "62934118037", "lucas@email.com", "11999999999"
             );
             ClientResponseDTO client2 = new ClientResponseDTO(
-                    2L,
-                    "Maria Silva",
-                    "91741354064",
-                    "maria@email.com",
-                    "11988888888"
+                    2L, "Maria Silva", "91741354064", "maria@email.com", "11988888888"
             );
 
             when(clientService.findAll()).thenReturn(List.of(client1, client2));
 
-            mockMvc.perform(get("/api/v1/clients"))
+            MvcResult result = mockMvc.perform(get(CLIENTS_URL))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$", hasSize(2)))
-                    .andExpect(jsonPath("$[0].id").value(client1.id()))
-                    .andExpect(jsonPath("$[0].name").value(client1.name()))
-                    .andExpect(jsonPath("$[0].cpf").value(client1.cpf()))
-                    .andExpect(jsonPath("$[0].email").value(client1.email()))
-                    .andExpect(jsonPath("$[0].phoneNumber").value(client1.phoneNumber()))
-                    .andExpect(jsonPath("$[1].id").value(client2.id()))
-                    .andExpect(jsonPath("$[1].name").value(client2.name()))
-                    .andExpect(jsonPath("$[1].cpf").value(client2.cpf()))
-                    .andExpect(jsonPath("$[1].email").value(client2.email()))
-                    .andExpect(jsonPath("$[1].phoneNumber").value(client2.phoneNumber()));
+                    .andReturn();
+
+            assertEquals(List.of(client1, client2), List.of(readClients(result)));
 
             verify(clientService).findAll();
             verifyNoMoreInteractions(clientService);
@@ -96,7 +134,7 @@ public class ClientControllerTests {
         void shouldReturnEmptyListWhenThereAreNoClients() throws Exception {
             when(clientService.findAll()).thenReturn(List.of());
 
-            mockMvc.perform(get("/api/v1/clients"))
+            mockMvc.perform(get(CLIENTS_URL))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$", hasSize(0)));
@@ -108,13 +146,9 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(clientService.findAll()).thenThrow(new RuntimeException("Unexpected error"));
+            when(clientService.findAll()).thenThrow(new RuntimeException("Unexpected exception"));
 
-            mockMvc.perform(get("/api/v1/clients"))
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(500))
-                    .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
+            performErrorResponse(mockMvc.perform(get(CLIENTS_URL)), 500, INTERNAL_ERROR_MESSAGE);
 
             verify(clientService).findAll();
             verifyNoMoreInteractions(clientService);
@@ -128,24 +162,16 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return client successfully when client exists")
         void shouldReturnClientWhenClientExists() throws Exception {
-            ClientResponseDTO client = new ClientResponseDTO(
-                    1L,
-                    "Lucas Alves",
-                    "52998224725",
-                    "lucas@email.com",
-                    "11999999999"
-            );
+            ClientResponseDTO expected = clientResponse(VALID_NAME, VALID_EMAIL);
 
-            when(clientService.findById(1L)).thenReturn(client);
+            when(clientService.findById(1L)).thenReturn(expected);
 
-            mockMvc.perform(get("/api/v1/clients/{id}", 1L))
+            MvcResult result = mockMvc.perform(get(CLIENT_URL, 1L))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.id").value(client.id()))
-                    .andExpect(jsonPath("$.name").value(client.name()))
-                    .andExpect(jsonPath("$.cpf").value(client.cpf()))
-                    .andExpect(jsonPath("$.email").value(client.email()))
-                    .andExpect(jsonPath("$.phoneNumber").value(client.phoneNumber()));
+                    .andReturn();
+
+            assertEquals(expected, readClient(result));
 
             verify(clientService).findById(1L);
             verifyNoMoreInteractions(clientService);
@@ -155,13 +181,9 @@ public class ClientControllerTests {
         @DisplayName("Should return 404 when client does not exist")
         void shouldReturnNotFoundWhenClientDoesNotExist() throws Exception {
             when(clientService.findById(1L))
-                    .thenThrow(new ClientNotFoundException("Cliente não encontrado."));
+                    .thenThrow(new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE));
 
-            mockMvc.perform(get("/api/v1/clients/{id}", 1L))
-                    .andExpect(status().isNotFound())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.message").value("Cliente não encontrado."));
+            performErrorResponse(mockMvc.perform(get(CLIENT_URL, 1L)), 404, CLIENT_NOT_FOUND_MESSAGE);
 
             verify(clientService).findById(1L);
             verifyNoMoreInteractions(clientService);
@@ -170,8 +192,7 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return 400 when ID is invalid")
         void shouldReturnBadRequestWhenIdIsInvalid() throws Exception {
-            mockMvc.perform(get("/api/v1/clients/{id}", "abc"))
-                    .andExpect(status().isBadRequest());
+            performErrorResponse(mockMvc.perform(get(CLIENT_URL, "abc")), 400, INVALID_PARAM_MESSAGE);
 
             verifyNoInteractions(clientService);
         }
@@ -179,13 +200,9 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(clientService.findById(1L)).thenThrow(new RuntimeException("Unexpected error"));
+            when(clientService.findById(1L)).thenThrow(new RuntimeException("Unexpected exception"));
 
-            mockMvc.perform(get("/api/v1/clients/{id}", 1L))
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(500))
-                    .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
+            performErrorResponse(mockMvc.perform(get(CLIENT_URL, 1L)), 500, INTERNAL_ERROR_MESSAGE);
 
             verify(clientService).findById(1L);
             verifyNoMoreInteractions(clientService);
@@ -200,61 +217,31 @@ public class ClientControllerTests {
         @DisplayName("Should create client successfully")
         void shouldCreateClientSuccessfully() throws Exception {
             ClientRequestDTO request = validClientRequest();
-            Client savedClient = mockClient(
-                    "Cliente Teste", "teste@email.com"
-            );
+            ClientResponseDTO expected = clientResponse(VALID_NAME, VALID_EMAIL);
 
-            when(clientService.create(any(ClientRequestDTO.class))).thenReturn(savedClient);
+            when(clientService.create(request)).thenReturn(client(VALID_NAME, VALID_EMAIL));
 
-            mockMvc.perform(
-                            post("/api/v1/clients")
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
+            MvcResult result = postClient(request)
                     .andExpect(status().isCreated())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.id").value(savedClient.getId()))
-                    .andExpect(jsonPath("$.name").value(savedClient.getName()))
-                    .andExpect(jsonPath("$.cpf").value(savedClient.getCpf()))
-                    .andExpect(jsonPath("$.email").value(savedClient.getEmail()))
-                    .andExpect(jsonPath("$.phoneNumber").value(savedClient.getPhoneNumber()));
+                    .andReturn();
 
-            verify(clientService).create(eq(request));
+            assertEquals(expected, readClient(result));
+
+            verify(clientService).create(request);
             verifyNoMoreInteractions(clientService);
         }
 
-        @Test
-        @DisplayName("Should return 400 when CPF is invalid")
-        void shouldReturnBadRequestWhenCpfIsInvalid() throws Exception {
-            ClientRequestDTO request = validClientRequest("52998224724");
-
-            mockMvc.perform(
-                            post("/api/v1/clients")
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(clientService);
-        }
-
-        @Test
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "invalidClientRequests")
         @DisplayName("Should return 400 when request body is invalid")
-        void shouldReturnBadRequestWhenRequestBodyIsInvalid() throws Exception {
-            ClientRequestDTO request = new ClientRequestDTO(
-                    "",
-                    "52998224725",
-                    "email-invalido",
-                    "123",
-                    validAddressRequest()
-            );
-
-            mockMvc.perform(
-                            post("/api/v1/clients")
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
-                    .andExpect(status().isBadRequest());
+        void shouldReturnBadRequestWhenRequestBodyIsInvalid(
+                String scenario,
+                ClientRequestDTO request,
+                String field,
+                String message
+        ) throws Exception {
+            performValidationError(postClient(request), field, message);
 
             verifyNoInteractions(clientService);
         }
@@ -262,13 +249,23 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return 400 when request body is missing")
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
-            mockMvc.perform(
-                            post("/api/v1/clients")
-                                    .contentType(MediaType.APPLICATION_JSON)
-                    )
-                    .andExpect(status().isBadRequest());
+            performMissingBody(post(CLIENTS_URL));
 
             verifyNoInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should return 404 when postal code is not found")
+        void shouldReturnNotFoundWhenPostalCodeIsNotFound() throws Exception {
+            ClientRequestDTO request = validClientRequest();
+
+            when(clientService.create(request))
+                    .thenThrow(new PostalCodeNotFoundException(POSTAL_CODE_NOT_FOUND_MESSAGE));
+
+            performErrorResponse(postClient(request), 404, POSTAL_CODE_NOT_FOUND_MESSAGE);
+
+            verify(clientService).create(request);
+            verifyNoMoreInteractions(clientService);
         }
 
         @Test
@@ -276,20 +273,26 @@ public class ClientControllerTests {
         void shouldReturnConflictWhenCpfAlreadyExists() throws Exception {
             ClientRequestDTO request = validClientRequest();
 
-            when(clientService.create(any(ClientRequestDTO.class)))
-                    .thenThrow(new ClientCpfAlreadyExistsException("CPF já cadastrado: 52998224725"));
+            when(clientService.create(request))
+                    .thenThrow(new ClientCpfAlreadyExistsException(CPF_ALREADY_EXISTS_MESSAGE));
 
-            mockMvc.perform(
-                            post("/api/v1/clients")
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
-                    .andExpect(status().isConflict())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(409))
-                    .andExpect(jsonPath("$.message").value("CPF já cadastrado: 52998224725"));
+            performErrorResponse(postClient(request), 409, CPF_ALREADY_EXISTS_MESSAGE);
 
-            verify(clientService).create(eq(request));
+            verify(clientService).create(request);
+            verifyNoMoreInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should return 503 when address provider is unavailable")
+        void shouldReturnServiceUnavailableWhenAddressProviderIsUnavailable() throws Exception {
+            ClientRequestDTO request = validClientRequest();
+
+            when(clientService.create(request))
+                    .thenThrow(new AddressProviderUnavailableException("Serviços de CEP indisponíveis no momento."));
+
+            performErrorResponse(postClient(request), 503, ADDRESS_UNAVAILABLE_MESSAGE);
+
+            verify(clientService).create(request);
             verifyNoMoreInteractions(clientService);
         }
 
@@ -298,20 +301,11 @@ public class ClientControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             ClientRequestDTO request = validClientRequest();
 
-            when(clientService.create(any(ClientRequestDTO.class)))
-                    .thenThrow(new RuntimeException("Unexpected error"));
+            when(clientService.create(request)).thenThrow(new RuntimeException("Unexpected exception"));
 
-            mockMvc.perform(
-                            post("/api/v1/clients")
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(500))
-                    .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
+            performErrorResponse(postClient(request), 500, INTERNAL_ERROR_MESSAGE);
 
-            verify(clientService).create(eq(request));
+            verify(clientService).create(request);
             verifyNoMoreInteractions(clientService);
         }
     }
@@ -324,82 +318,65 @@ public class ClientControllerTests {
         @DisplayName("Should update client successfully")
         void shouldUpdateClientSuccessfully() throws Exception {
             ClientUpdateRequestDTO request = validClientUpdateRequest();
-            Client client = mockClient(
-                    "Cliente Atualizado", "cliente@email.com"
-            );
+            ClientResponseDTO expected = clientResponse(UPDATED_NAME, UPDATED_EMAIL);
 
-            when(clientService.update(eq(1L), any(ClientUpdateRequestDTO.class))).thenReturn(client);
+            when(clientService.update(1L, request)).thenReturn(client(UPDATED_NAME, UPDATED_EMAIL));
 
-            mockMvc.perform(
-                            patch("/api/v1/clients/{id}", 1L)
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
+            MvcResult result = patchClient(1L, request)
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.id").value(client.getId()))
-                    .andExpect(jsonPath("$.name").value(client.getName()))
-                    .andExpect(jsonPath("$.cpf").value(client.getCpf()))
-                    .andExpect(jsonPath("$.email").value(client.getEmail()))
-                    .andExpect(jsonPath("$.phoneNumber").value(client.getPhoneNumber()));
+                    .andReturn();
 
-            verify(clientService).update(eq(1L), eq(request));
+            assertEquals(expected, readClient(result));
+
+            verify(clientService).update(1L, request);
             verifyNoMoreInteractions(clientService);
         }
 
         @Test
-        @DisplayName("Should return 404 when client does not exist")
-        void shouldReturnNotFoundWhenClientDoesNotExist() throws Exception {
-            ClientUpdateRequestDTO request = validClientUpdateRequest();
+        @DisplayName("Should accept an empty JSON object since every field is optional")
+        void shouldAcceptEmptyJsonObject() throws Exception {
+            ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(null, null, null, null);
 
-            when(clientService.update(eq(1L), any(ClientUpdateRequestDTO.class)))
-                    .thenThrow(new ClientNotFoundException("Cliente não encontrado."));
+            when(clientService.update(1L, request)).thenReturn(client(VALID_NAME, VALID_EMAIL));
 
-            mockMvc.perform(
-                            patch("/api/v1/clients/{id}", 1L)
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
-                    .andExpect(status().isNotFound())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.message").value("Cliente não encontrado."));
+            mockMvc.perform(patch(CLIENT_URL, 1L)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON));
 
-            verify(clientService).update(eq(1L), eq(request));
+            verify(clientService).update(1L, request);
             verifyNoMoreInteractions(clientService);
         }
 
         @Test
-        @DisplayName("Should return 400 when ID is invalid")
-        void shouldReturnBadRequestWhenIdIsInvalid() throws Exception {
-            ClientUpdateRequestDTO request = validClientUpdateRequest();
-
-            mockMvc.perform(
-                            patch("/api/v1/clients/{id}", "abc")
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(clientService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when request body is invalid")
-        void shouldReturnBadRequestWhenRequestBodyIsInvalid() throws Exception {
+        @DisplayName("Should accept an empty complement to clear it")
+        void shouldAcceptEmptyComplement() throws Exception {
             ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(
-                    "Cliente Atualizado",
-                    "email-invalido",
-                    "123",
-                    validAddressUpdateRequest()
+                    null, null, null, new AddressUpdateRequestDTO(null, "", null)
             );
 
-            mockMvc.perform(
-                            patch("/api/v1/clients/{id}", 1L)
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
-                    .andExpect(status().isBadRequest());
+            when(clientService.update(1L, request)).thenReturn(client(VALID_NAME, VALID_EMAIL));
+
+            patchClient(1L, request)
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON));
+
+            verify(clientService).update(1L, request);
+            verifyNoMoreInteractions(clientService);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "invalidClientUpdateRequests")
+        @DisplayName("Should return 400 when request body is invalid")
+        void shouldReturnBadRequestWhenRequestBodyIsInvalid(
+                String scenario,
+                ClientUpdateRequestDTO request,
+                String field,
+                String message
+        ) throws Exception {
+            performValidationError(patchClient(1L, request), field, message);
 
             verifyNoInteractions(clientService);
         }
@@ -407,13 +384,63 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return 400 when request body is missing")
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
-            mockMvc.perform(
-                            patch("/api/v1/clients/{id}", 1L)
-                                    .contentType(MediaType.APPLICATION_JSON)
-                    )
-                    .andExpect(status().isBadRequest());
+            performMissingBody(patch(CLIENT_URL, 1L));
 
             verifyNoInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when ID is invalid")
+        void shouldReturnBadRequestWhenIdIsInvalid() throws Exception {
+            performErrorResponse(
+                    patchClient("abc", validClientUpdateRequest()),
+                    400,
+                    INVALID_PARAM_MESSAGE
+            );
+
+            verifyNoInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should return 404 when client does not exist")
+        void shouldReturnNotFoundWhenClientDoesNotExist() throws Exception {
+            ClientUpdateRequestDTO request = validClientUpdateRequest();
+
+            when(clientService.update(1L, request))
+                    .thenThrow(new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE));
+
+            performErrorResponse(patchClient(1L, request), 404, CLIENT_NOT_FOUND_MESSAGE);
+
+            verify(clientService).update(1L, request);
+            verifyNoMoreInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should return 404 when postal code is not found")
+        void shouldReturnNotFoundWhenPostalCodeIsNotFound() throws Exception {
+            ClientUpdateRequestDTO request = validClientUpdateRequest();
+
+            when(clientService.update(1L, request))
+                    .thenThrow(new PostalCodeNotFoundException(POSTAL_CODE_NOT_FOUND_MESSAGE));
+
+            performErrorResponse(patchClient(1L, request), 404, POSTAL_CODE_NOT_FOUND_MESSAGE);
+
+            verify(clientService).update(1L, request);
+            verifyNoMoreInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should return 503 when address provider is unavailable")
+        void shouldReturnServiceUnavailableWhenAddressProviderIsUnavailable() throws Exception {
+            ClientUpdateRequestDTO request = validClientUpdateRequest();
+
+            when(clientService.update(1L, request))
+                    .thenThrow(new AddressProviderUnavailableException("Serviços de CEP indisponíveis no momento."));
+
+            performErrorResponse(patchClient(1L, request), 503, ADDRESS_UNAVAILABLE_MESSAGE);
+
+            verify(clientService).update(1L, request);
+            verifyNoMoreInteractions(clientService);
         }
 
         @Test
@@ -421,70 +448,236 @@ public class ClientControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             ClientUpdateRequestDTO request = validClientUpdateRequest();
 
-            when(clientService.update(eq(1L), any(ClientUpdateRequestDTO.class)))
-                    .thenThrow(new RuntimeException("Unexpected error"));
+            when(clientService.update(1L, request)).thenThrow(new RuntimeException("Unexpected exception"));
 
-            mockMvc.perform(
-                            patch("/api/v1/clients/{id}", 1L)
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                    )
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(500))
-                    .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
+            performErrorResponse(patchClient(1L, request), 500, INTERNAL_ERROR_MESSAGE);
 
-            verify(clientService).update(eq(1L), eq(request));
+            verify(clientService).update(1L, request);
             verifyNoMoreInteractions(clientService);
         }
     }
 
-    private static AddressRequestDTO validAddressRequest() {
-        return new AddressRequestDTO(
-                "123",
-                null,
-                "12345678"
+    // Cada cenário tem UMA violação: o handler (HashMap) guarda uma única mensagem por campo.
+    // Por isso não se usa "" em CPF, telefone, CEP e número (@NotBlank + @Pattern falhariam juntos).
+    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    static Stream<Arguments> invalidClientRequests() {
+        AddressRequestDTO address = validAddressRequest();
+
+        return Stream.of(
+                Arguments.of("name is null",
+                        new ClientRequestDTO(null, VALID_CPF, VALID_EMAIL, VALID_PHONE, address),
+                        "name", "O nome é obrigatório."),
+                Arguments.of("name is blank",
+                        new ClientRequestDTO("   ", VALID_CPF, VALID_EMAIL, VALID_PHONE, address),
+                        "name", "O nome é obrigatório."),
+                Arguments.of("name exceeds 125 characters",
+                        new ClientRequestDTO("a".repeat(126), VALID_CPF, VALID_EMAIL, VALID_PHONE, address),
+                        "name", NAME_TOO_LONG_MESSAGE),
+                Arguments.of("cpf is null",
+                        new ClientRequestDTO(VALID_NAME, null, VALID_EMAIL, VALID_PHONE, address),
+                        "cpf", "O CPF é obrigatório."),
+                Arguments.of("cpf does not have 11 digits",
+                        new ClientRequestDTO(VALID_NAME, "1234", VALID_EMAIL, VALID_PHONE, address),
+                        "cpf", "O CPF deve conter exatamente 11 números."),
+                Arguments.of("cpf contains non-numeric characters",
+                        new ClientRequestDTO(VALID_NAME, "5299822472a", VALID_EMAIL, VALID_PHONE, address),
+                        "cpf", "O CPF deve conter exatamente 11 números."),
+                Arguments.of("cpf has invalid check digits",
+                        new ClientRequestDTO(VALID_NAME, "52998224724", VALID_EMAIL, VALID_PHONE, address),
+                        "cpf", "CPF inválido."),
+                Arguments.of("email is null",
+                        new ClientRequestDTO(VALID_NAME, VALID_CPF, null, VALID_PHONE, address),
+                        "email", "O e-mail é obrigatório."),
+                Arguments.of("email is empty",
+                        new ClientRequestDTO(VALID_NAME, VALID_CPF, "", VALID_PHONE, address),
+                        "email", "O e-mail é obrigatório."),
+                Arguments.of("email format is invalid",
+                        new ClientRequestDTO(VALID_NAME, VALID_CPF, "email-invalido", VALID_PHONE, address),
+                        "email", EMAIL_INVALID_MESSAGE),
+                Arguments.of("email exceeds 150 characters",
+                        new ClientRequestDTO(VALID_NAME, VALID_CPF, EMAIL_ABOVE_LIMIT, VALID_PHONE, address),
+                        "email", EMAIL_TOO_LONG_MESSAGE),
+                Arguments.of("phone number is null",
+                        new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, null, address),
+                        "phoneNumber", "O telefone é obrigatório."),
+                Arguments.of("phone number has fewer than 10 digits",
+                        new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, "123", address),
+                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                Arguments.of("phone number has more than 11 digits",
+                        new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, "119999999999", address),
+                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                Arguments.of("phone number contains non-numeric characters",
+                        new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, "1199999999a", address),
+                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                Arguments.of("address is null",
+                        clientRequest(null),
+                        "address", "Os dados de endereço são obrigatórios."),
+                Arguments.of("address street number is null",
+                        clientRequest(new AddressRequestDTO(null, null, "01001000")),
+                        "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
+                Arguments.of("address street number is empty",
+                        clientRequest(new AddressRequestDTO("", null, "01001000")),
+                        "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
+                Arguments.of("address street number exceeds 10 characters",
+                        clientRequest(new AddressRequestDTO("12345678901", null, "01001000")),
+                        "address.streetNumber", STREET_NUMBER_TOO_LONG_MESSAGE),
+                Arguments.of("address complement exceeds 100 characters",
+                        clientRequest(new AddressRequestDTO("123", "a".repeat(101), "01001000")),
+                        "address.complement", COMPLEMENT_TOO_LONG_MESSAGE),
+                Arguments.of("address postal code is null",
+                        clientRequest(new AddressRequestDTO("123", null, null)),
+                        "address.postalCode", "O CEP é obrigatório."),
+                Arguments.of("address postal code has fewer than 8 digits",
+                        clientRequest(new AddressRequestDTO("123", null, "1234567")),
+                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE),
+                Arguments.of("address postal code contains a dash",
+                        clientRequest(new AddressRequestDTO("123", null, "01001-000")),
+                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE)
         );
+    }
+
+    // Campos omitidos (null) são válidos no PATCH; cada cenário preenche só o campo inválido.
+    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    static Stream<Arguments> invalidClientUpdateRequests() {
+        return Stream.of(
+                Arguments.of("name is empty",
+                        new ClientUpdateRequestDTO("", null, null, null),
+                        "name", NAME_BLANK_MESSAGE),
+                Arguments.of("name exceeds 125 characters",
+                        new ClientUpdateRequestDTO("a".repeat(126), null, null, null),
+                        "name", NAME_TOO_LONG_MESSAGE),
+                Arguments.of("email is empty",
+                        new ClientUpdateRequestDTO(null, "", null, null),
+                        "email", EMAIL_BLANK_MESSAGE),
+                Arguments.of("email format is invalid",
+                        new ClientUpdateRequestDTO(null, "email-invalido", null, null),
+                        "email", EMAIL_INVALID_MESSAGE),
+                Arguments.of("email exceeds 150 characters",
+                        new ClientUpdateRequestDTO(null, EMAIL_ABOVE_LIMIT, null, null),
+                        "email", EMAIL_TOO_LONG_MESSAGE),
+                Arguments.of("phone number is empty",
+                        new ClientUpdateRequestDTO(null, null, "", null),
+                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                Arguments.of("phone number has fewer than 10 digits",
+                        new ClientUpdateRequestDTO(null, null, "123", null),
+                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                Arguments.of("phone number has more than 11 digits",
+                        new ClientUpdateRequestDTO(null, null, "119999999999", null),
+                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                Arguments.of("phone number contains non-numeric characters",
+                        new ClientUpdateRequestDTO(null, null, "1199999999a", null),
+                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                Arguments.of("address street number is empty",
+                        clientUpdateRequest(new AddressUpdateRequestDTO("", null, null)),
+                        "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
+                Arguments.of("address street number exceeds 10 characters",
+                        clientUpdateRequest(new AddressUpdateRequestDTO("12345678901", null, null)),
+                        "address.streetNumber", STREET_NUMBER_TOO_LONG_MESSAGE),
+                Arguments.of("address complement exceeds 100 characters",
+                        clientUpdateRequest(new AddressUpdateRequestDTO(null, "a".repeat(101), null)),
+                        "address.complement", COMPLEMENT_TOO_LONG_MESSAGE),
+                Arguments.of("address postal code has fewer than 8 digits",
+                        clientUpdateRequest(new AddressUpdateRequestDTO(null, null, "1234567")),
+                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE),
+                Arguments.of("address postal code contains a dash",
+                        clientUpdateRequest(new AddressUpdateRequestDTO(null, null, "01001-000")),
+                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE)
+        );
+    }
+
+    private ResultActions postClient(Object request) throws Exception {
+        return mockMvc.perform(post(CLIENTS_URL)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)));
+    }
+
+    private ResultActions patchClient(Object id, Object request) throws Exception {
+        return mockMvc.perform(patch(CLIENT_URL, id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)));
+    }
+
+    private void performErrorResponse(
+            ResultActions result,
+            int status,
+            String message
+    ) throws Exception {
+        result.andExpect(status().is(status))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(status))
+                .andExpect(jsonPath("$.message").value(message));
+    }
+
+    // Colchetes: campos aninhados chegam como chave plana ("address.streetNumber"),
+    // e "$.errors.address.streetNumber" seria lido como caminho aninhado.
+    private void performValidationError(
+            ResultActions result,
+            String field,
+            String message
+    ) throws Exception {
+        result.andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.errors['" + field + "']").value(message));
+    }
+
+    private void performMissingBody(MockHttpServletRequestBuilder request) throws Exception {
+        performErrorResponse(
+                mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON)),
+                400,
+                INVALID_BODY_MESSAGE
+        );
+    }
+
+    private ClientResponseDTO readClient(MvcResult result) throws Exception {
+        return objectMapper.readValue(
+                result.getResponse().getContentAsString(),
+                ClientResponseDTO.class
+        );
+    }
+
+    private ClientResponseDTO[] readClients(MvcResult result) throws Exception {
+        return objectMapper.readValue(
+                result.getResponse().getContentAsString(),
+                ClientResponseDTO[].class
+        );
+    }
+
+    private static AddressRequestDTO validAddressRequest() {
+        return new AddressRequestDTO("123", null, "01001000");
     }
 
     private static ClientRequestDTO validClientRequest() {
-        return validClientRequest("52998224725");
+        return clientRequest(validAddressRequest());
     }
 
-    private static ClientRequestDTO validClientRequest(String cpf) {
-        return new ClientRequestDTO(
-                "Cliente Teste",
-                cpf,
-                "teste@email.com",
-                "11999999999",
-                validAddressRequest()
-        );
+    private static ClientRequestDTO clientRequest(AddressRequestDTO address) {
+        return new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, VALID_PHONE, address);
     }
 
     private static AddressUpdateRequestDTO validAddressUpdateRequest() {
-        return new AddressUpdateRequestDTO(
-                "123",
-                null,
-                "01001000"
-        );
+        return new AddressUpdateRequestDTO("123", null, "01001000");
     }
 
     private static ClientUpdateRequestDTO validClientUpdateRequest() {
-        return new ClientUpdateRequestDTO(
-                "Cliente Atualizado",
-                "cliente@email.com",
-                "11999999999",
-                validAddressUpdateRequest()
-        );
+        return new ClientUpdateRequestDTO(UPDATED_NAME, UPDATED_EMAIL, VALID_PHONE, validAddressUpdateRequest());
     }
 
-    private static Client mockClient(String name, String email) {
-        Client client = mock(Client.class);
-        when(client.getId()).thenReturn(1L);
-        when(client.getName()).thenReturn(name);
-        when(client.getCpf()).thenReturn("52998224725");
-        when(client.getEmail()).thenReturn(email);
-        when(client.getPhoneNumber()).thenReturn("11999999999");
+    private static ClientUpdateRequestDTO clientUpdateRequest(AddressUpdateRequestDTO address) {
+        return new ClientUpdateRequestDTO(null, null, null, address);
+    }
+
+    private static Client client(String name, String email) {
+        Address address = new Address(
+                "Praça da Sé", "123", null, "Sé", "São Paulo", State.SP, "01001000"
+        );
+        Client client = new Client(name, VALID_CPF, email, VALID_PHONE, address);
+        ReflectionTestUtils.setField(client, "id", 1L);
         return client;
+    }
+
+    private static ClientResponseDTO clientResponse(String name, String email) {
+        return new ClientResponseDTO(1L, name, VALID_CPF, email, VALID_PHONE);
     }
 }

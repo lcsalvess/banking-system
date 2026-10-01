@@ -65,7 +65,7 @@ public class AccountService {
     public AccountResponseDTO findByAccountNumber(String accountNumber, String accountDigit) {
        validateDigit(accountNumber, accountDigit);
        Account account = accountRepository.findByAccountNumberWithClient(accountNumber)
-               .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada"));
+               .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
         return AccountResponseDTO.fromEntity(account);
     }
 

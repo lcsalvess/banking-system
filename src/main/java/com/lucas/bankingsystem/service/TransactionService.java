@@ -173,7 +173,7 @@ public class TransactionService {
 
     private void validateYieldAvailable(SavingsAccount savingsAccount, BigDecimal yieldAmount) {
         if (!savingsAccount.isEligibleForYield()) {
-            throw new YieldNotAvailableException("A conta ainda não está disponível para receber rendimento");
+            throw new YieldNotAvailableException("A conta ainda não está disponível para receber rendimento.");
         }
         if (yieldAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new YieldNotAvailableException("Não há rendimento disponível para esta conta.");

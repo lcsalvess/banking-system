@@ -17,9 +17,11 @@ import com.lucas.bankingsystem.repository.SavingsAccountRepository;
 import com.lucas.bankingsystem.service.account.AccountNumberGenerator;
 import com.lucas.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lucas.bankingsystem.service.security.CurrentUserService;
-import org.springframework.transaction.annotation.Transactional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -81,7 +83,7 @@ public class AccountService {
 
         Account account = createAccount(dto, client, accountNumber);
 
-        Account savedAccount = accountRepository.save(account);
+        Account savedAccount = saveAccount(account);
 
         eventPublisher.publishEvent(
                 new AccountOperationEvent(savedAccount.getId(), AccountOperationType.CREATED, username)
@@ -142,6 +144,38 @@ public class AccountService {
                 accountNumber.number(),
                 accountNumber.digit()
         );
+    }
+
+    private boolean isDuplicateActiveAccount(DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException violation) {
+                return "uk_account_client_type_active".equals(violation.getConstraintName());
+            }
+            cause = cause.getCause();
+        }
+        return false;
+    }
+
+    private String getDuplicateAccountMessage(AccountType type) {
+        return switch (type) {
+            case CHECKING -> "O cliente já possui uma conta corrente.";
+            case SAVINGS -> "O cliente já possui uma conta poupança.";
+        };
+    }
+
+    private Account saveAccount(Account account) {
+        try {
+            return accountRepository.saveAndFlush(account);
+        } catch (DataIntegrityViolationException exception) {
+            if (isDuplicateActiveAccount(exception)) {
+                throw new AccountAlreadyExistsException(
+                        getDuplicateAccountMessage(account.getType())
+                );
+            }
+            throw exception;
+        }
     }
 
     private void validateAccountHasNoBalance(Account account) {

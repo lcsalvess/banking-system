@@ -264,7 +264,7 @@ public class AccountServiceTest {
             stubActiveAccountExists(type, false);
             when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber(number, digit));
             when(currentUserService.getUsername()).thenReturn(USERNAME);
-            when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> {
+            when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer(invocation -> {
                 Account savedAccount = invocation.getArgument(0);
                 ReflectionTestUtils.setField(savedAccount, "id", SAVED_ACCOUNT_ID);
                 return savedAccount;
@@ -280,7 +280,7 @@ public class AccountServiceTest {
             verifyActiveAccountChecked(type);
             verify(accountNumberGenerator).generate();
             verify(currentUserService).getUsername();
-            verify(accountRepository).save(accountCaptor.capture());
+            verify(accountRepository).saveAndFlush(accountCaptor.capture());
             verify(eventPublisher).publishEvent(
                     new AccountOperationEvent(SAVED_ACCOUNT_ID, AccountOperationType.CREATED, USERNAME)
             );

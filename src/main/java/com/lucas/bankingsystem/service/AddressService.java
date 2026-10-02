@@ -41,16 +41,14 @@ public class AddressService {
     }
 
     public void updateFromPostalCode(Address address, AddressUpdateRequestDTO dto) {
-        if (dto.postalCode() != null) {
-            AddressLookupResponse addressData =
-                    addressLookupService.findByPostalCode(dto.postalCode());
+        AddressLookupResponse addressData =
+                addressLookupService.findByPostalCode(dto.postalCode());
 
-            address.setStreetName(addressData.streetName());
-            address.setNeighborhood(addressData.neighborhood());
-            address.setCity(addressData.city());
-            address.setState(State.valueOf(addressData.state()));
-            address.setPostalCode(addressData.postalCode().replace("-", ""));
-        }
+        address.setStreetName(addressData.streetName());
+        address.setNeighborhood(addressData.neighborhood());
+        address.setCity(addressData.city());
+        address.setState(State.valueOf(addressData.state()));
+        address.setPostalCode(addressData.postalCode().replace("-", ""));
 
         address.update(dto);
 

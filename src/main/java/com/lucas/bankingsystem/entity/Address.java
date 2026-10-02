@@ -40,8 +40,10 @@ public class Address {
     }
 
     public void update(AddressUpdateRequestDTO dto) {
-        if (dto.streetNumber() != null) {this.streetNumber = dto.streetNumber();}
-        if (dto.complement() != null) {this.complement = dto.complement();}
+        this.streetNumber = dto.streetNumber();
+        this.complement = dto.complement() == null || dto.complement().isBlank()
+                ? null
+                : dto.complement();
     }
 
     public Long getId() {

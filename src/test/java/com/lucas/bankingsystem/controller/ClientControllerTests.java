@@ -68,9 +68,10 @@ public class ClientControllerTests {
     private static final String EMAIL_INVALID_MESSAGE = "O formato do e-mail é inválido.";
     private static final String EMAIL_TOO_LONG_MESSAGE = "O e-mail deve ter no máximo 150 caracteres.";
     private static final String PHONE_INVALID_MESSAGE = "O telefone deve conter de 10 a 11 números, incluindo o DDD.";
-    private static final String STREET_NUMBER_BLANK_MESSAGE = "O número não pode ser vazio.";
+    private static final String STREET_NUMBER_BLANK_MESSAGE = "O número é obrigatório.";
     private static final String STREET_NUMBER_TOO_LONG_MESSAGE = "O número deve ter no máximo 10 caracteres.";
     private static final String COMPLEMENT_TOO_LONG_MESSAGE = "O complemento deve ter no máximo 100 caracteres.";
+    private static final String POSTAL_CODE_REQUIRED_MESSAGE = "O CEP é obrigatório.";
     private static final String POSTAL_CODE_INVALID_MESSAGE =
             "O CEP deve conter exatamente 8 números, sem traços ou espaços.";
 
@@ -80,6 +81,9 @@ public class ClientControllerTests {
     private static final String VALID_PHONE = "11999999999";
     private static final String UPDATED_NAME = "Cliente Atualizado";
     private static final String UPDATED_EMAIL = "atualizado@email.com";
+    private static final String VALID_STREET_NUMBER = "123";
+    private static final String VALID_CREATION_POSTAL_CODE = "01001000";
+    private static final String VALID_UPDATE_POSTAL_CODE = "08710000";
 
     // Formato válido (parte local curta, rótulos de domínio <= 63), 188 caracteres:
     // viola somente o @Size(max = 150).
@@ -354,7 +358,7 @@ public class ClientControllerTests {
         @DisplayName("Should accept an empty complement to clear it")
         void shouldAcceptEmptyComplement() throws Exception {
             ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(
-                    null, null, null, new AddressUpdateRequestDTO(null, "", null)
+                    null, null, null, new AddressUpdateRequestDTO(VALID_STREET_NUMBER, "", VALID_UPDATE_POSTAL_CODE)
             );
 
             when(clientService.update(1L, request)).thenReturn(client(VALID_NAME, VALID_EMAIL));
@@ -536,7 +540,9 @@ public class ClientControllerTests {
         );
     }
 
-    // Campos omitidos (null) são válidos no PATCH; cada cenário preenche só o campo inválido.
+    // Os campos do cliente são opcionais no PATCH.
+// Quando o objeto address é informado, streetNumber e postalCode são obrigatórios.
+// Cada cenário deve conter apenas uma violação de validação.
     @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
     static Stream<Arguments> invalidClientUpdateRequests() {
         return Stream.of(
@@ -568,20 +574,33 @@ public class ClientControllerTests {
                         new ClientUpdateRequestDTO(null, null, "1199999999a", null),
                         "phoneNumber", PHONE_INVALID_MESSAGE),
                 Arguments.of("address street number is empty",
-                        clientUpdateRequest(new AddressUpdateRequestDTO("", null, null)),
+                        clientUpdateRequest(new AddressUpdateRequestDTO(
+                                "", null, VALID_UPDATE_POSTAL_CODE)),
                         "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
                 Arguments.of("address street number exceeds 10 characters",
-                        clientUpdateRequest(new AddressUpdateRequestDTO("12345678901", null, null)),
+                        clientUpdateRequest(new AddressUpdateRequestDTO(
+                                "12345678901", null, VALID_UPDATE_POSTAL_CODE)),
                         "address.streetNumber", STREET_NUMBER_TOO_LONG_MESSAGE),
                 Arguments.of("address complement exceeds 100 characters",
-                        clientUpdateRequest(new AddressUpdateRequestDTO(null, "a".repeat(101), null)),
+                        clientUpdateRequest(new AddressUpdateRequestDTO(
+                                VALID_STREET_NUMBER, "a".repeat(101), VALID_UPDATE_POSTAL_CODE)),
                         "address.complement", COMPLEMENT_TOO_LONG_MESSAGE),
                 Arguments.of("address postal code has fewer than 8 digits",
-                        clientUpdateRequest(new AddressUpdateRequestDTO(null, null, "1234567")),
+                        clientUpdateRequest(new AddressUpdateRequestDTO(
+                                VALID_STREET_NUMBER, null, "1234567")),
                         "address.postalCode", POSTAL_CODE_INVALID_MESSAGE),
                 Arguments.of("address postal code contains a dash",
-                        clientUpdateRequest(new AddressUpdateRequestDTO(null, null, "01001-000")),
-                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE)
+                        clientUpdateRequest(new AddressUpdateRequestDTO(
+                                VALID_STREET_NUMBER, null, "01001-000")),
+                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE),
+                Arguments.of("address street number is null",
+                        clientUpdateRequest(new AddressUpdateRequestDTO(
+                                null, null, VALID_UPDATE_POSTAL_CODE)),
+                        "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
+                Arguments.of("address postal code is null",
+                        clientUpdateRequest(new AddressUpdateRequestDTO(
+                                VALID_STREET_NUMBER, null, null)),
+                        "address.postalCode", POSTAL_CODE_REQUIRED_MESSAGE)
         );
     }
 
@@ -645,7 +664,7 @@ public class ClientControllerTests {
     }
 
     private static AddressRequestDTO validAddressRequest() {
-        return new AddressRequestDTO("123", null, "01001000");
+        return new AddressRequestDTO(VALID_STREET_NUMBER, null, VALID_CREATION_POSTAL_CODE);
     }
 
     private static ClientRequestDTO validClientRequest() {
@@ -657,7 +676,7 @@ public class ClientControllerTests {
     }
 
     private static AddressUpdateRequestDTO validAddressUpdateRequest() {
-        return new AddressUpdateRequestDTO("123", null, "01001000");
+        return new AddressUpdateRequestDTO(VALID_STREET_NUMBER, null, VALID_UPDATE_POSTAL_CODE);
     }
 
     private static ClientUpdateRequestDTO validClientUpdateRequest() {
@@ -670,7 +689,7 @@ public class ClientControllerTests {
 
     private static Client client(String name, String email) {
         Address address = new Address(
-                "Praça da Sé", "123", null, "Sé", "São Paulo", State.SP, "01001000"
+                "Praça da Sé", VALID_STREET_NUMBER, null, "Sé", "São Paulo", State.SP, VALID_CREATION_POSTAL_CODE
         );
         Client client = new Client(name, VALID_CPF, email, VALID_PHONE, address);
         ReflectionTestUtils.setField(client, "id", 1L);

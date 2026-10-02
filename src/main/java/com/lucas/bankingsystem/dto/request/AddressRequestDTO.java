@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 
 public record AddressRequestDTO(
 
-        @NotBlank(message = "O número não pode ser vazio.")
+        @NotBlank(message = "O número é obrigatório.")
         @Size(max = 10, message = "O número deve ter no máximo 10 caracteres.")
         String streetNumber,
 

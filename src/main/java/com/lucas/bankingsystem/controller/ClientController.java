@@ -5,6 +5,7 @@ import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
 import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
+import com.lucas.bankingsystem.dto.response.exception.ValidationErrorResponse;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.service.ClientService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,7 +48,12 @@ public class ClientController {
                     description = "Invalid client data or request format",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(
+                                    oneOf = {
+                                            ErrorResponse.class,
+                                            ValidationErrorResponse.class
+                                    }
+                            )
                     )
             ),
             @ApiResponse(
@@ -147,7 +153,12 @@ public class ClientController {
                     description = "Invalid client data or request format",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(
+                                    oneOf = {
+                                            ErrorResponse.class,
+                                            ValidationErrorResponse.class
+                                    }
+                            )
                     )
             ),
             @ApiResponse(

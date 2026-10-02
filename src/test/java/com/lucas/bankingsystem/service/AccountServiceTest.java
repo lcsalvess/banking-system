@@ -25,6 +25,7 @@ import com.lucas.bankingsystem.repository.SavingsAccountRepository;
 import com.lucas.bankingsystem.service.account.AccountNumberGenerator;
 import com.lucas.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lucas.bankingsystem.service.security.CurrentUserService;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -346,6 +348,84 @@ public class AccountServiceTest {
             );
 
             verify(clientService).findEntityById(CLIENT_ID);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should throw when database rejects duplicate active account")
+        void shouldThrowWhenDatabaseRejectsDuplicateActiveAccount() {
+            AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, AccountType.CHECKING);
+
+            when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
+            stubActiveAccountExists(AccountType.CHECKING, false);
+            when(accountNumberGenerator.generate())
+                    .thenReturn(new GeneratedAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT));
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
+
+            ConstraintViolationException cause = new ConstraintViolationException(
+                    "Unique index violation",
+                    null,
+                    "uk_account_client_type_active"
+            );
+
+            when(accountRepository.saveAndFlush(any(Account.class)))
+                    .thenThrow(new DataIntegrityViolationException(
+                            "Could not execute statement",
+                            cause
+                    ));
+
+            assertThrowsWithMessage(
+                    AccountAlreadyExistsException.class,
+                    CHECKING_ALREADY_EXISTS_MESSAGE,
+                    () -> accountService.create(request)
+            );
+
+            verify(clientService).findEntityById(CLIENT_ID);
+            verifyActiveAccountChecked(AccountType.CHECKING);
+            verify(accountNumberGenerator).generate();
+            verify(currentUserService).getUsername();
+            verify(accountRepository).saveAndFlush(any(Account.class));
+            verifyNoInteractions(eventPublisher);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should propagate unrelated data integrity violations")
+        void shouldPropagateUnrelatedDataIntegrityViolation() {
+            AccountRequestDTO request =
+                    new AccountRequestDTO(CLIENT_ID, AccountType.CHECKING);
+
+            when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
+            stubActiveAccountExists(AccountType.CHECKING, false);
+            when(accountNumberGenerator.generate())
+                    .thenReturn(new GeneratedAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT));
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
+
+            ConstraintViolationException cause = new ConstraintViolationException(
+                    "Other constraint violation",
+                    null,
+                    "uk_other_constraint"
+            );
+
+            DataIntegrityViolationException exception =
+                    new DataIntegrityViolationException("Database error", cause);
+
+            when(accountRepository.saveAndFlush(any(Account.class)))
+                    .thenThrow(exception);
+
+            DataIntegrityViolationException thrown = assertThrows(
+                    DataIntegrityViolationException.class,
+                    () -> accountService.create(request)
+            );
+
+            assertSame(exception, thrown);
+
+            verify(clientService).findEntityById(CLIENT_ID);
+            verifyActiveAccountChecked(AccountType.CHECKING);
+            verify(accountNumberGenerator).generate();
+            verify(currentUserService).getUsername();
+            verify(accountRepository).saveAndFlush(any(Account.class));
+            verifyNoInteractions(eventPublisher);
             verifyNoMoreInteractionsOnMocks();
         }
     }

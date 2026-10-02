@@ -4,7 +4,9 @@ import com.lucas.bankingsystem.dto.request.AddressRequestDTO;
 import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
+import com.lucas.bankingsystem.dto.response.AddressResponseDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
+import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
@@ -167,12 +169,12 @@ public class ClientServiceTest {
 
             when(clientRepository.findAll()).thenReturn(List.of(client1, client2));
 
-            List<ClientResponseDTO> result = clientService.findAll();
+            List<ClientSummaryResponseDTO> result = clientService.findAll();
 
             assertEquals(
                     List.of(
-                            clientResponse(),
-                            new ClientResponseDTO(2L, "Maria Silva", "91741354064", "maria@email.com", "11988888888")
+                            clientSummaryResponse(),
+                            new ClientSummaryResponseDTO(2L, "Maria Silva", "91741354064", "maria@email.com", "11988888888")
                     ),
                     result
             );
@@ -186,7 +188,7 @@ public class ClientServiceTest {
         void shouldReturnEmptyListWhenThereAreNoClients() {
             when(clientRepository.findAll()).thenReturn(List.of());
 
-            List<ClientResponseDTO> result = clientService.findAll();
+            List<ClientSummaryResponseDTO> result = clientService.findAll();
 
             assertEquals(List.of(), result);
 
@@ -441,7 +443,17 @@ public class ClientServiceTest {
         return client;
     }
 
+    private static ClientSummaryResponseDTO clientSummaryResponse() {
+        return new ClientSummaryResponseDTO(
+                CLIENT_ID,
+                NAME,
+                CPF,
+                EMAIL,
+                PHONE
+        );
+    }
+
     private static ClientResponseDTO clientResponse() {
-        return new ClientResponseDTO(CLIENT_ID, NAME, CPF, EMAIL, PHONE);
+        return new ClientResponseDTO(CLIENT_ID, NAME, CPF, EMAIL, PHONE, AddressResponseDTO.fromEntity(address()));
     }
 }

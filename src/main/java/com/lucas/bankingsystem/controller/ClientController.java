@@ -3,6 +3,7 @@ package com.lucas.bankingsystem.controller;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
+import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.service.ClientService;
@@ -76,14 +77,14 @@ public class ClientController {
                     content = @Content(
                             mediaType = "application/json",
                             array = @ArraySchema(
-                                    schema = @Schema(implementation = ClientResponseDTO.class)
+                                    schema = @Schema(implementation = ClientSummaryResponseDTO.class)
                             )
                     )
             )
     })
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<ClientResponseDTO> findAll() {
+    public List<ClientSummaryResponseDTO> findAll() {
         return clientService.findAll();
     }
 

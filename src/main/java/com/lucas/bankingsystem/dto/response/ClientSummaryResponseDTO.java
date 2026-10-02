@@ -2,22 +2,20 @@ package com.lucas.bankingsystem.dto.response;
 
 import com.lucas.bankingsystem.entity.Client;
 
-public record ClientResponseDTO(
+public record ClientSummaryResponseDTO(
         Long id,
         String name,
         String cpf,
         String email,
-        String phoneNumber,
-        AddressResponseDTO address
+        String phoneNumber
 ) {
-    public static ClientResponseDTO fromEntity(Client client) {
-        return new ClientResponseDTO(
+    public static ClientSummaryResponseDTO fromEntity(Client client) {
+        return new ClientSummaryResponseDTO(
                 client.getId(),
                 client.getName(),
                 client.getCpf(),
                 client.getEmail(),
-                client.getPhoneNumber(),
-                AddressResponseDTO.fromEntity(client.getAddress())
+                client.getPhoneNumber()
         );
     }
 }

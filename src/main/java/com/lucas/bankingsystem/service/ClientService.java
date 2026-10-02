@@ -3,6 +3,7 @@ package com.lucas.bankingsystem.service;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
+import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.event.client.ClientOperationEvent;
@@ -11,9 +12,9 @@ import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.repository.ClientRepository;
 import com.lucas.bankingsystem.service.security.CurrentUserService;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -56,8 +57,8 @@ public class ClientService {
     }
 
     @Transactional(readOnly = true)
-    public List<ClientResponseDTO> findAll() {
-        return clientRepository.findAll().stream().map(ClientResponseDTO::fromEntity).toList();
+    public List<ClientSummaryResponseDTO> findAll() {
+        return clientRepository.findAll().stream().map(ClientSummaryResponseDTO::fromEntity).toList();
     }
 
     @Transactional(readOnly = true)

@@ -4,7 +4,9 @@ import com.lucas.bankingsystem.dto.request.AddressRequestDTO;
 import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
+import com.lucas.bankingsystem.dto.response.AddressResponseDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
+import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
@@ -112,10 +114,10 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return all clients successfully")
         void shouldReturnAllClientsSuccessfully() throws Exception {
-            ClientResponseDTO client1 = new ClientResponseDTO(
+            ClientSummaryResponseDTO client1 = new ClientSummaryResponseDTO(
                     1L, "Lucas Alves", "62934118037", "lucas@email.com", "11999999999"
             );
-            ClientResponseDTO client2 = new ClientResponseDTO(
+            ClientSummaryResponseDTO client2 = new ClientSummaryResponseDTO(
                     2L, "Maria Silva", "91741354064", "maria@email.com", "11988888888"
             );
 
@@ -656,10 +658,10 @@ public class ClientControllerTests {
         );
     }
 
-    private ClientResponseDTO[] readClients(MvcResult result) throws Exception {
+    private ClientSummaryResponseDTO[] readClients(MvcResult result) throws Exception {
         return objectMapper.readValue(
                 result.getResponse().getContentAsString(),
-                ClientResponseDTO[].class
+                ClientSummaryResponseDTO[].class
         );
     }
 
@@ -687,16 +689,32 @@ public class ClientControllerTests {
         return new ClientUpdateRequestDTO(null, null, null, address);
     }
 
-    private static Client client(String name, String email) {
-        Address address = new Address(
-                "Praça da Sé", VALID_STREET_NUMBER, null, "Sé", "São Paulo", State.SP, VALID_CREATION_POSTAL_CODE
+    private static Address address() {
+        return new Address(
+                "Praça da Sé",
+                VALID_STREET_NUMBER,
+                null,
+                "Sé",
+                "São Paulo",
+                State.SP,
+                VALID_CREATION_POSTAL_CODE
         );
-        Client client = new Client(name, VALID_CPF, email, VALID_PHONE, address);
+    }
+
+    private static Client client(String name, String email) {
+        Client client = new Client(name, VALID_CPF, email, VALID_PHONE, address());
         ReflectionTestUtils.setField(client, "id", 1L);
         return client;
     }
 
     private static ClientResponseDTO clientResponse(String name, String email) {
-        return new ClientResponseDTO(1L, name, VALID_CPF, email, VALID_PHONE);
+        return new ClientResponseDTO(
+                1L,
+                name,
+                VALID_CPF,
+                email,
+                VALID_PHONE,
+                AddressResponseDTO.fromEntity(address())
+        );
     }
 }

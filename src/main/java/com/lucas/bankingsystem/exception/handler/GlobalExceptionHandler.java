@@ -4,10 +4,15 @@ import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.exception.ValidationErrorResponse;
 import com.lucas.bankingsystem.exception.BusinessException;
 import jakarta.validation.ConstraintViolationException;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -17,13 +22,14 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final String DUPLICATE_YIELD_CONSTRAINT = "uk_transaction_daily_yield";
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -41,16 +47,6 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleBadCredentials() {
         log.warn("Authentication failed: invalid username or password");
         return new ErrorResponse(HttpStatus.UNAUTHORIZED.value(), "Usuário ou senha inválidos.");
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ValidationErrorResponse handleValidationExceptions(MethodArgumentNotValidException exception) {
-        Map<String, String> errors = new HashMap<>();
-
-        exception.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
-
-        return new ValidationErrorResponse(HttpStatus.BAD_REQUEST.value(), "Erro de validação.", errors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -82,18 +78,6 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(HttpStatus.FORBIDDEN.value(), "Acesso negado.");
     }
 
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleHttpMessageNotReadable() {
-        return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Dados da requisição inválidos.");
-    }
-
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleMethodArgumentTypeMismatch() {
-        return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Parâmetro de requisição inválido.");
-    }
-
     @ExceptionHandler(DataIntegrityViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleDataIntegrityViolation(DataIntegrityViolationException exception) {
@@ -105,16 +89,78 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Erro de integridade de dados no banco.");
     }
 
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleMissingParameter() {
-        return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Parâmetro de requisição obrigatório ausente.");
+    @Override
+    protected @Nullable ResponseEntity<Object> handleHttpMessageNotReadable(
+            @NonNull HttpMessageNotReadableException ex,
+            @NonNull HttpHeaders headers,
+            HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        ErrorResponse error = new ErrorResponse(status.value(), "Dados da requisição inválidos.");
+
+        return handleExceptionInternal(ex, error, headers, status, request);
     }
 
-    @ExceptionHandler(Exception.class)
+    @Override
+    protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex,
+            @NonNull HttpHeaders headers,
+            HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        Map<String, String> errors = new HashMap<>();
+
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+                errors.put(error.getField(), error.getDefaultMessage())
+        );
+
+        ValidationErrorResponse response = new ValidationErrorResponse(
+                status.value(),
+                "Erro de validação.",
+                errors
+        );
+
+        return handleExceptionInternal(ex, response, headers, status, request);
+    }
+
+    @Override
+    protected @Nullable ResponseEntity<Object> handleMissingServletRequestParameter(
+            @NonNull MissingServletRequestParameterException ex,
+            @NonNull HttpHeaders headers,
+            HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        ErrorResponse error = new ErrorResponse(
+                status.value(),
+                "Parâmetro de requisição obrigatório ausente."
+        );
+
+        return handleExceptionInternal(ex, error, headers, status, request);
+    }
+
+    @Override
+    protected @Nullable ResponseEntity<Object> handleTypeMismatch(
+            @NonNull TypeMismatchException ex,
+            @NonNull HttpHeaders headers,
+            HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        ErrorResponse error = new ErrorResponse(
+                status.value(),
+                "Parâmetro de requisição inválido."
+        );
+
+        return handleExceptionInternal(ex, error, headers, status, request);
+    }
+
+    @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ErrorResponse handleGenericException(Exception exception) {
+    public ErrorResponse handleUnexpectedRuntimeException(RuntimeException exception) {
         log.error("Unexpected error occurred", exception);
-        return new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Ocorreu um erro interno no servidor.");
+
+        return new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Ocorreu um erro interno no servidor."
+        );
     }
 }

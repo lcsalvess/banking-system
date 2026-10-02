@@ -22,8 +22,8 @@ public class AddressExceptionHandler {
 
     @ExceptionHandler(AddressProviderUnavailableException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public ErrorResponse handleAddressProviderUnavailable() {
-        log.error("Address provider unavailable");
+    public ErrorResponse handleAddressProviderUnavailable(AddressProviderUnavailableException ex) {
+        log.error("Address provider unavailable", ex);
 
         return new ErrorResponse(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),

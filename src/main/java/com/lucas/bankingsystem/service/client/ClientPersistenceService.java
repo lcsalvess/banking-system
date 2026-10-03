@@ -10,6 +10,8 @@ import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.repository.ClientRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,13 +21,15 @@ public class ClientPersistenceService {
 
     private final ClientRepository clientRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final MeterRegistry meterRegistry;
 
     public ClientPersistenceService(
             ClientRepository clientRepository,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher, MeterRegistry meterRegistry
     ) {
         this.clientRepository = clientRepository;
         this.eventPublisher = eventPublisher;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -34,23 +38,28 @@ public class ClientPersistenceService {
             Address address,
             String username
     ) {
-        Client client = new Client(
-                dto.name(),
-                dto.cpf(),
-                dto.email(),
-                dto.phoneNumber(),
-                address
-        );
+        return Timer.builder("client.persistence.create")
+                .description("Tempo total da persistência de um cliente")
+                .register(meterRegistry)
+                .record(() -> {
+                    Client client = new Client(
+                            dto.name(),
+                            dto.cpf(),
+                            dto.email(),
+                            dto.phoneNumber(),
+                            address
+                    );
 
-        Client savedClient = clientRepository.save(client);
+                    Client savedClient = clientRepository.save(client);
 
-        publishClientOperationEvent(
-                savedClient,
-                ClientOperationType.CREATED,
-                username
-        );
+                    publishClientOperationEvent(
+                            savedClient,
+                            ClientOperationType.CREATED,
+                            username
+                    );
 
-        return savedClient;
+                    return savedClient;
+                });
     }
 
     @Transactional

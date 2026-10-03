@@ -12,6 +12,9 @@ import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.repository.ClientRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -21,7 +24,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -66,8 +68,18 @@ class ClientPersistenceServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
+    private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
     private ClientPersistenceService clientPersistenceService;
+
+    @BeforeEach
+    void setUp() {
+        clientPersistenceService = new ClientPersistenceService(
+                clientRepository,
+                eventPublisher,
+                meterRegistry
+        );
+    }
 
     @Nested
     @DisplayName("create(ClientRequestDTO, Address, String)")

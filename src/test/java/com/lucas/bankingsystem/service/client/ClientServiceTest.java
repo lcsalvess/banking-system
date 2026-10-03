@@ -1,7 +1,6 @@
-package com.lucas.bankingsystem.service;
+package com.lucas.bankingsystem.service.client;
 
 import com.lucas.bankingsystem.dto.request.AddressRequestDTO;
-import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.AddressResponseDTO;
@@ -10,13 +9,14 @@ import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
-import com.lucas.bankingsystem.event.client.ClientOperationEvent;
-import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
+import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lucas.bankingsystem.repository.ClientRepository;
+import com.lucas.bankingsystem.service.AddressService;
+import com.lucas.bankingsystem.service.ClientService;
 import com.lucas.bankingsystem.service.security.CurrentUserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,12 +26,9 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -45,7 +42,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class ClientServiceTest {
 
-    private static final String PROVIDER = "com.lucas.bankingsystem.service.ClientServiceTest#";
+    private static final String PROVIDER = "com.lucas.bankingsystem.service.client.ClientServiceTest#";
 
     private static final String USERNAME = "usuario.teste";
 
@@ -67,13 +64,13 @@ public class ClientServiceTest {
     private ClientRepository clientRepository;
 
     @Mock
+    private ClientPersistenceService clientPersistenceService;
+
+    @Mock
     private AddressService addressService;
 
     @Mock
     private CurrentUserService currentUserService;
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ClientService clientService;
@@ -87,38 +84,23 @@ public class ClientServiceTest {
         void shouldCreateClientSuccessfully() {
             ClientRequestDTO request = clientRequest();
             Address address = address();
+            Client savedClient = client();
 
             when(clientRepository.existsByCpf(CPF)).thenReturn(false);
             when(addressService.createFromPostalCode(request.address())).thenReturn(address);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
-            when(clientRepository.save(any(Client.class))).thenAnswer(invocation -> {
-                Client savedClient = invocation.getArgument(0);
-                ReflectionTestUtils.setField(savedClient, "id", CLIENT_ID);
-                return savedClient;
-            });
+            when(clientPersistenceService.create(request, address, USERNAME))
+                    .thenReturn(savedClient);
 
             Client result = clientService.create(request);
 
-            ArgumentCaptor<Client> clientCaptor = ArgumentCaptor.forClass(Client.class);
+            assertSame(savedClient, result);
 
             verify(clientRepository).existsByCpf(CPF);
             verify(addressService).createFromPostalCode(request.address());
             verify(currentUserService).getUsername();
-            verify(clientRepository).save(clientCaptor.capture());
-            verify(eventPublisher).publishEvent(
-                    new ClientOperationEvent(CLIENT_ID, ClientOperationType.CREATED, USERNAME)
-            );
+            verify(clientPersistenceService).create(request, address, USERNAME);
             verifyNoMoreInteractionsOnMocks();
-
-            Client saved = clientCaptor.getValue();
-
-            assertEquals(NAME, saved.getName());
-            assertEquals(CPF, saved.getCpf());
-            assertEquals(EMAIL, saved.getEmail());
-            assertEquals(PHONE, saved.getPhoneNumber());
-            assertSame(address, saved.getAddress());
-            assertSame(saved, result);
-            assertEquals(CLIENT_ID, result.getId());
         }
 
         @Test
@@ -141,13 +123,20 @@ public class ClientServiceTest {
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "addressLookupFailures")
         @DisplayName("Should propagate the failure and save nothing when address lookup fails")
-        void shouldPropagateFailureWhenAddressLookupFails(String scenario, RuntimeException exception) {
+        void shouldPropagateFailureWhenAddressLookupFails(
+                String scenario,
+                RuntimeException exception
+        ) {
             ClientRequestDTO request = clientRequest();
 
             when(clientRepository.existsByCpf(CPF)).thenReturn(false);
-            when(addressService.createFromPostalCode(request.address())).thenThrow(exception);
+            when(addressService.createFromPostalCode(request.address()))
+                    .thenThrow(exception);
 
-            RuntimeException thrown = assertThrows(RuntimeException.class, () -> clientService.create(request));
+            RuntimeException thrown = assertThrows(
+                    RuntimeException.class,
+                    () -> clientService.create(request)
+            );
 
             assertSame(exception, thrown);
 
@@ -165,7 +154,13 @@ public class ClientServiceTest {
         @DisplayName("Should return all clients successfully")
         void shouldReturnAllClientsSuccessfully() {
             Client client1 = client();
-            Client client2 = client(2L, "Maria Silva", "91741354064", "maria@email.com", "11988888888");
+            Client client2 = client(
+                    2L,
+                    "Maria Silva",
+                    "91741354064",
+                    "maria@email.com",
+                    "11988888888"
+            );
 
             when(clientRepository.findAll()).thenReturn(List.of(client1, client2));
 
@@ -174,7 +169,13 @@ public class ClientServiceTest {
             assertEquals(
                     List.of(
                             clientSummaryResponse(),
-                            new ClientSummaryResponseDTO(2L, "Maria Silva", "91741354064", "maria@email.com", "11988888888")
+                            new ClientSummaryResponseDTO(
+                                    2L,
+                                    "Maria Silva",
+                                    "91741354064",
+                                    "maria@email.com",
+                                    "11988888888"
+                            )
                     ),
                     result
             );
@@ -274,82 +275,100 @@ public class ClientServiceTest {
         void shouldUpdateClientAndAddressSuccessfully() {
             Client client = client();
             ClientUpdateRequestDTO request = fullUpdateRequest();
+            AddressLookupResponse addressData = addressLookupResponse();
 
-            stubClientLookup(client);
+            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
-            when(clientRepository.save(client)).thenReturn(client);
+            when(addressService.findAddressByPostalCode(
+                    request.address().postalCode()
+            )).thenReturn(addressData);
+            when(clientPersistenceService.update(
+                    CLIENT_ID,
+                    request,
+                    addressData,
+                    USERNAME
+            )).thenReturn(client);
 
             Client result = clientService.update(CLIENT_ID, request);
 
             assertSame(client, result);
-            assertEquals(CLIENT_ID, result.getId());
-            assertEquals(UPDATED_NAME, result.getName());
-            assertEquals(CPF, result.getCpf());
-            assertEquals(UPDATED_EMAIL, result.getEmail());
-            assertEquals(UPDATED_PHONE, result.getPhoneNumber());
 
-            verify(clientRepository).findById(CLIENT_ID);
+            verify(clientRepository).existsById(CLIENT_ID);
             verify(currentUserService).getUsername();
-            verify(addressService).updateFromPostalCode(client.getAddress(), request.address());
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(
-                    new ClientOperationEvent(CLIENT_ID, ClientOperationType.UPDATED, USERNAME)
+            verify(addressService).findAddressByPostalCode(
+                    request.address().postalCode()
+            );
+            verify(clientPersistenceService).update(
+                    CLIENT_ID,
+                    request,
+                    addressData,
+                    USERNAME
             );
             verifyNoMoreInteractionsOnMocks();
         }
 
-        // Todos os cenários têm address = null: além de ignorar campos null,
-        // o service não deve chamar o AddressService (verifyNoMoreInteractions cobre isso).
+        // Todos os cenários têm address = null:
+        // o serviço não deve consultar o endereço.
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "partialUpdates")
-        @DisplayName("Should update only the provided fields and skip address update when address is not sent")
+        @DisplayName("Should forward partial updates without looking up the address")
         void shouldUpdateOnlyTheProvidedFields(
                 String scenario,
-                ClientUpdateRequestDTO request,
-                String expectedName,
-                String expectedEmail,
-                String expectedPhone
+                ClientUpdateRequestDTO request
         ) {
             Client client = client();
 
-            stubClientLookup(client);
+            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
-            when(clientRepository.save(client)).thenReturn(client);
+            when(clientPersistenceService.update(
+                    CLIENT_ID,
+                    request,
+                    null,
+                    USERNAME
+            )).thenReturn(client);
 
             Client result = clientService.update(CLIENT_ID, request);
 
-            assertEquals(expectedName, result.getName());
-            assertEquals(CPF, result.getCpf());
-            assertEquals(expectedEmail, result.getEmail());
-            assertEquals(expectedPhone, result.getPhoneNumber());
+            assertSame(client, result);
 
-            verify(clientRepository).findById(CLIENT_ID);
+            verify(clientRepository).existsById(CLIENT_ID);
             verify(currentUserService).getUsername();
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(
-                    new ClientOperationEvent(CLIENT_ID, ClientOperationType.UPDATED, USERNAME)
+            verify(clientPersistenceService).update(
+                    CLIENT_ID,
+                    request,
+                    null,
+                    USERNAME
             );
             verifyNoMoreInteractionsOnMocks();
         }
 
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "addressLookupFailures")
-        @DisplayName("Should propagate the failure and save nothing when address update fails")
-        void shouldPropagateFailureWhenAddressUpdateFails(String scenario, RuntimeException exception) {
-            Client client = client();
+        @DisplayName("Should propagate the failure and not persist when address lookup fails")
+        void shouldPropagateFailureWhenAddressLookupFails(
+                String scenario,
+                RuntimeException exception
+        ) {
             ClientUpdateRequestDTO request = fullUpdateRequest();
 
-            stubClientLookup(client);
+            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
-            doThrow(exception).when(addressService).updateFromPostalCode(client.getAddress(), request.address());
+            when(addressService.findAddressByPostalCode(
+                    request.address().postalCode()
+            )).thenThrow(exception);
 
-            RuntimeException thrown = assertThrows(RuntimeException.class, () -> clientService.update(CLIENT_ID, request));
+            RuntimeException thrown = assertThrows(
+                    RuntimeException.class,
+                    () -> clientService.update(CLIENT_ID, request)
+            );
 
             assertSame(exception, thrown);
 
-            verify(clientRepository).findById(CLIENT_ID);
+            verify(clientRepository).existsById(CLIENT_ID);
             verify(currentUserService).getUsername();
-            verify(addressService).updateFromPostalCode(client.getAddress(), request.address());
+            verify(addressService).findAddressByPostalCode(
+                    request.address().postalCode()
+            );
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -358,7 +377,7 @@ public class ClientServiceTest {
         void shouldThrowWhenClientDoesNotExist() {
             ClientUpdateRequestDTO request = fullUpdateRequest();
 
-            when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.empty());
+            when(clientRepository.existsById(CLIENT_ID)).thenReturn(false);
 
             assertThrowsWithMessage(
                     ClientNotFoundException.class,
@@ -366,7 +385,7 @@ public class ClientServiceTest {
                     () -> clientService.update(CLIENT_ID, request)
             );
 
-            verify(clientRepository).findById(CLIENT_ID);
+            verify(clientRepository).existsById(CLIENT_ID);
             verifyNoMoreInteractionsOnMocks();
         }
     }
@@ -374,28 +393,52 @@ public class ClientServiceTest {
     @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
     static Stream<Arguments> addressLookupFailures() {
         return Stream.of(
-                Arguments.of("postal code is not found",
-                        new PostalCodeNotFoundException("CEP 01001000 não encontrado em nenhum provedor.")),
-                Arguments.of("address provider is unavailable",
-                        new AddressProviderUnavailableException("Serviços de CEP indisponíveis no momento."))
+                Arguments.of(
+                        "postal code is not found",
+                        new PostalCodeNotFoundException(
+                                "CEP 01001000 não encontrado em nenhum provedor."
+                        )
+                ),
+                Arguments.of(
+                        "address provider is unavailable",
+                        new AddressProviderUnavailableException(
+                                "Serviços de CEP indisponíveis no momento."
+                        )
+                )
         );
     }
 
     @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
     static Stream<Arguments> partialUpdates() {
         return Stream.of(
-                Arguments.of("only name is sent",
+                Arguments.of(
+                        "only name is sent",
                         new ClientUpdateRequestDTO(UPDATED_NAME, null, null, null),
-                        UPDATED_NAME, EMAIL, PHONE),
-                Arguments.of("only email is sent",
+                        UPDATED_NAME,
+                        EMAIL,
+                        PHONE
+                ),
+                Arguments.of(
+                        "only email is sent",
                         new ClientUpdateRequestDTO(null, UPDATED_EMAIL, null, null),
-                        NAME, UPDATED_EMAIL, PHONE),
-                Arguments.of("only phone number is sent",
+                        NAME,
+                        UPDATED_EMAIL,
+                        PHONE
+                ),
+                Arguments.of(
+                        "only phone number is sent",
                         new ClientUpdateRequestDTO(null, null, UPDATED_PHONE, null),
-                        NAME, EMAIL, UPDATED_PHONE),
-                Arguments.of("nothing is sent",
+                        NAME,
+                        EMAIL,
+                        UPDATED_PHONE
+                ),
+                Arguments.of(
+                        "nothing is sent",
                         new ClientUpdateRequestDTO(null, null, null, null),
-                        NAME, EMAIL, PHONE)
+                        NAME,
+                        EMAIL,
+                        PHONE
+                )
         );
     }
 
@@ -404,7 +447,12 @@ public class ClientServiceTest {
     }
 
     private void verifyNoMoreInteractionsOnMocks() {
-        verifyNoMoreInteractions(clientRepository, addressService, currentUserService, eventPublisher);
+        verifyNoMoreInteractions(
+                clientRepository,
+                clientPersistenceService,
+                addressService,
+                currentUserService
+        );
     }
 
     private static void assertThrowsWithMessage(
@@ -417,7 +465,13 @@ public class ClientServiceTest {
     }
 
     private static ClientRequestDTO clientRequest() {
-        return new ClientRequestDTO(NAME, CPF, EMAIL, PHONE, new AddressRequestDTO("123", null, POSTAL_CODE));
+        return new ClientRequestDTO(
+                NAME,
+                CPF,
+                EMAIL,
+                PHONE,
+                new AddressRequestDTO("123", null, POSTAL_CODE)
+        );
     }
 
     private static ClientUpdateRequestDTO fullUpdateRequest() {
@@ -425,21 +479,49 @@ public class ClientServiceTest {
                 UPDATED_NAME,
                 UPDATED_EMAIL,
                 UPDATED_PHONE,
-                new AddressUpdateRequestDTO("456", "Apto 22", "87654321")
+                new com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO(
+                        "456",
+                        "Apto 22",
+                        "87654321"
+                )
+        );
+    }
+
+    private static AddressLookupResponse addressLookupResponse() {
+        return new AddressLookupResponse(
+                "Rua Atualizada",
+                "Centro",
+                "São Paulo",
+                "SP",
+                "87654321"
         );
     }
 
     private static Address address() {
-        return new Address("Rua Teste", "123", null, "Centro", "São Paulo", State.SP, POSTAL_CODE);
+        return new Address(
+                "Rua Teste",
+                "123",
+                null,
+                "Centro",
+                "São Paulo",
+                State.SP,
+                POSTAL_CODE
+        );
     }
 
     private static Client client() {
         return client(CLIENT_ID, NAME, CPF, EMAIL, PHONE);
     }
 
-    private static Client client(Long id, String name, String cpf, String email, String phoneNumber) {
+    private static Client client(
+            Long id,
+            String name,
+            String cpf,
+            String email,
+            String phoneNumber
+    ) {
         Client client = new Client(name, cpf, email, phoneNumber, address());
-        ReflectionTestUtils.setField(client, "id", id);
+        org.springframework.test.util.ReflectionTestUtils.setField(client, "id", id);
         return client;
     }
 
@@ -454,6 +536,13 @@ public class ClientServiceTest {
     }
 
     private static ClientResponseDTO clientResponse() {
-        return new ClientResponseDTO(CLIENT_ID, NAME, CPF, EMAIL, PHONE, AddressResponseDTO.fromEntity(address()));
+        return new ClientResponseDTO(
+                CLIENT_ID,
+                NAME,
+                CPF,
+                EMAIL,
+                PHONE,
+                AddressResponseDTO.fromEntity(address())
+        );
     }
 }

@@ -6,13 +6,12 @@ import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
 import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
-import com.lucas.bankingsystem.event.client.ClientOperationEvent;
-import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
+import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.repository.ClientRepository;
+import com.lucas.bankingsystem.service.client.ClientPersistenceService;
 import com.lucas.bankingsystem.service.security.CurrentUserService;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,38 +21,31 @@ import java.util.List;
 public class ClientService {
     private final ClientRepository clientRepository;
 
+    private final ClientPersistenceService clientPersistenceService;
+
     private final AddressService addressService;
 
     private final CurrentUserService currentUserService;
 
-    private final ApplicationEventPublisher eventPublisher;
-
-    public ClientService(ClientRepository clientRepository, AddressService addressService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher) {
+    public ClientService(ClientRepository clientRepository, ClientPersistenceService clientPersistenceService, AddressService addressService, CurrentUserService currentUserService) {
         this.clientRepository = clientRepository;
+        this.clientPersistenceService = clientPersistenceService;
         this.addressService = addressService;
         this.currentUserService = currentUserService;
-        this.eventPublisher = eventPublisher;
     }
 
-    @Transactional
     public Client create(ClientRequestDTO dto) {
         if (clientRepository.existsByCpf(dto.cpf())) {
-            throw new ClientCpfAlreadyExistsException("Já existe um cliente cadastrado com este CPF.");
+            throw new ClientCpfAlreadyExistsException(
+                    "Já existe um cliente cadastrado com este CPF."
+            );
         }
 
         Address address = addressService.createFromPostalCode(dto.address());
 
         String username = getCurrentUsername();
 
-        Client client = new Client(dto.name(), dto.cpf(), dto.email(), dto.phoneNumber(), address);
-
-        Client savedClient = clientRepository.save(client);
-
-        eventPublisher.publishEvent(
-                new ClientOperationEvent(savedClient.getId(), ClientOperationType.CREATED, username)
-        );
-
-        return savedClient;
+        return clientPersistenceService.create(dto, address, username);
     }
 
     @Transactional(readOnly = true)
@@ -72,25 +64,25 @@ public class ClientService {
         return ClientResponseDTO.fromEntity(client);
     }
 
-    @Transactional
     public Client update(Long id, ClientUpdateRequestDTO dto) {
-        Client existingClient = findEntityById(id);
+        if (!clientRepository.existsById(id)) {
+            throw new ClientNotFoundException("Cliente não encontrado.");
+        }
 
         String username = getCurrentUsername();
 
-        existingClient.update(dto);
-
-        if (dto.address() != null) {
-            addressService.updateFromPostalCode(existingClient.getAddress(), dto.address());
-        }
-
-        Client updatedClient = clientRepository.save(existingClient);
-
-        eventPublisher.publishEvent(
-                new ClientOperationEvent(updatedClient.getId(), ClientOperationType.UPDATED, username)
+        AddressLookupResponse addressData = dto.address() == null
+                ? null
+                : addressService.findAddressByPostalCode(
+                dto.address().postalCode()
         );
 
-        return updatedClient;
+        return clientPersistenceService.update(
+                id,
+                dto,
+                addressData,
+                username
+        );
     }
 
     private String getCurrentUsername() {

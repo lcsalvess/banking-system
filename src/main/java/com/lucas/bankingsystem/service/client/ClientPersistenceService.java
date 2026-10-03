@@ -10,9 +10,9 @@ import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.repository.ClientRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ClientPersistenceService {
@@ -60,6 +60,12 @@ public class ClientPersistenceService {
             AddressLookupResponse addressData,
             String username
     ) {
+        if (dto.address() != null && addressData == null) {
+            throw new IllegalArgumentException(
+                    "Os dados do endereço consultado são obrigatórios quando o endereço é informado."
+            );
+        }
+
         Client existingClient = clientRepository.findById(id)
                 .orElseThrow(() -> new ClientNotFoundException(
                         "Cliente não encontrado."
@@ -67,7 +73,7 @@ public class ClientPersistenceService {
 
         existingClient.update(dto);
 
-        if (addressData != null) {
+        if (dto.address() != null) {
             Address address = existingClient.getAddress();
 
             address.setStreetName(addressData.streetName());

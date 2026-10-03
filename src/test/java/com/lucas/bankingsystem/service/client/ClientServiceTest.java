@@ -1,6 +1,7 @@
 package com.lucas.bankingsystem.service.client;
 
 import com.lucas.bankingsystem.dto.request.AddressRequestDTO;
+import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.dto.response.AddressResponseDTO;
@@ -26,15 +27,22 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
@@ -80,7 +88,7 @@ public class ClientServiceTest {
     class Create {
 
         @Test
-        @DisplayName("Should create client successfully")
+        @DisplayName("Should look up the address before calling the persistence service")
         void shouldCreateClientSuccessfully() {
             ClientRequestDTO request = clientRequest();
             Address address = address();
@@ -96,10 +104,16 @@ public class ClientServiceTest {
 
             assertSame(savedClient, result);
 
-            verify(clientRepository).existsByCpf(CPF);
-            verify(addressService).createFromPostalCode(request.address());
-            verify(currentUserService).getUsername();
-            verify(clientPersistenceService).create(request, address, USERNAME);
+            InOrder inOrder = inOrder(
+                    clientRepository,
+                    addressService,
+                    currentUserService,
+                    clientPersistenceService
+            );
+            inOrder.verify(clientRepository).existsByCpf(CPF);
+            inOrder.verify(addressService).createFromPostalCode(request.address());
+            inOrder.verify(currentUserService).getUsername();
+            inOrder.verify(clientPersistenceService).create(request, address, USERNAME);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -122,7 +136,7 @@ public class ClientServiceTest {
 
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "addressLookupFailures")
-        @DisplayName("Should propagate the failure and save nothing when address lookup fails")
+        @DisplayName("Should propagate the failure and not persist when address lookup fails")
         void shouldPropagateFailureWhenAddressLookupFails(
                 String scenario,
                 RuntimeException exception
@@ -142,6 +156,34 @@ public class ClientServiceTest {
 
             verify(clientRepository).existsByCpf(CPF);
             verify(addressService).createFromPostalCode(request.address());
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should propagate the failure when persistence fails")
+        void shouldPropagateFailureWhenPersistenceFails() {
+            ClientRequestDTO request = clientRequest();
+            Address address = address();
+            DataIntegrityViolationException exception =
+                    new DataIntegrityViolationException("uk_client_cpf");
+
+            when(clientRepository.existsByCpf(CPF)).thenReturn(false);
+            when(addressService.createFromPostalCode(request.address())).thenReturn(address);
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
+            when(clientPersistenceService.create(request, address, USERNAME))
+                    .thenThrow(exception);
+
+            RuntimeException thrown = assertThrows(
+                    RuntimeException.class,
+                    () -> clientService.create(request)
+            );
+
+            assertSame(exception, thrown);
+
+            verify(clientRepository).existsByCpf(CPF);
+            verify(addressService).createFromPostalCode(request.address());
+            verify(currentUserService).getUsername();
+            verify(clientPersistenceService).create(request, address, USERNAME);
             verifyNoMoreInteractionsOnMocks();
         }
     }
@@ -271,7 +313,7 @@ public class ClientServiceTest {
     class Update {
 
         @Test
-        @DisplayName("Should update client and address successfully")
+        @DisplayName("Should look up the address before calling the persistence service")
         void shouldUpdateClientAndAddressSuccessfully() {
             Client client = client();
             ClientUpdateRequestDTO request = fullUpdateRequest();
@@ -293,12 +335,18 @@ public class ClientServiceTest {
 
             assertSame(client, result);
 
-            verify(clientRepository).existsById(CLIENT_ID);
-            verify(currentUserService).getUsername();
-            verify(addressService).findAddressByPostalCode(
+            InOrder inOrder = inOrder(
+                    clientRepository,
+                    currentUserService,
+                    addressService,
+                    clientPersistenceService
+            );
+            inOrder.verify(clientRepository).existsById(CLIENT_ID);
+            inOrder.verify(currentUserService).getUsername();
+            inOrder.verify(addressService).findAddressByPostalCode(
                     request.address().postalCode()
             );
-            verify(clientPersistenceService).update(
+            inOrder.verify(clientPersistenceService).update(
                     CLIENT_ID,
                     request,
                     addressData,
@@ -308,11 +356,11 @@ public class ClientServiceTest {
         }
 
         // Todos os cenários têm address = null:
-        // o serviço não deve consultar o endereço.
+        // o serviço não deve consultar o endereço e deve repassar addressData = null.
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "partialUpdates")
-        @DisplayName("Should forward partial updates without looking up the address")
-        void shouldUpdateOnlyTheProvidedFields(
+        @DisplayName("Should forward updates without address and without looking it up")
+        void shouldForwardUpdatesWithoutLookingUpTheAddress(
                 String scenario,
                 ClientUpdateRequestDTO request
         ) {
@@ -373,6 +421,47 @@ public class ClientServiceTest {
         }
 
         @Test
+        @DisplayName("Should propagate the failure when persistence fails")
+        void shouldPropagateFailureWhenPersistenceFails() {
+            ClientUpdateRequestDTO request = fullUpdateRequest();
+            AddressLookupResponse addressData = addressLookupResponse();
+            ClientNotFoundException exception =
+                    new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE);
+
+            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
+            when(addressService.findAddressByPostalCode(
+                    request.address().postalCode()
+            )).thenReturn(addressData);
+            when(clientPersistenceService.update(
+                    CLIENT_ID,
+                    request,
+                    addressData,
+                    USERNAME
+            )).thenThrow(exception);
+
+            RuntimeException thrown = assertThrows(
+                    RuntimeException.class,
+                    () -> clientService.update(CLIENT_ID, request)
+            );
+
+            assertSame(exception, thrown);
+
+            verify(clientRepository).existsById(CLIENT_ID);
+            verify(currentUserService).getUsername();
+            verify(addressService).findAddressByPostalCode(
+                    request.address().postalCode()
+            );
+            verify(clientPersistenceService).update(
+                    CLIENT_ID,
+                    request,
+                    addressData,
+                    USERNAME
+            );
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
         @DisplayName("Should throw when client does not exist")
         void shouldThrowWhenClientDoesNotExist() {
             ClientUpdateRequestDTO request = fullUpdateRequest();
@@ -387,6 +476,29 @@ public class ClientServiceTest {
 
             verify(clientRepository).existsById(CLIENT_ID);
             verifyNoMoreInteractionsOnMocks();
+        }
+    }
+
+    @Nested
+    @DisplayName("transaction boundaries")
+    class TransactionBoundaries {
+
+        // A transação de escrita pertence ao ClientPersistenceService.
+        // Se create/update (ou a classe) voltarem a ser @Transactional aqui,
+        // a conexão passa a ficar aberta durante a consulta de CEP.
+        @Test
+        @DisplayName("create and update should not run inside a transaction")
+        void createAndUpdateShouldNotBeTransactional() throws NoSuchMethodException {
+            Method create = ClientService.class.getMethod("create", ClientRequestDTO.class);
+            Method update = ClientService.class.getMethod(
+                    "update",
+                    Long.class,
+                    ClientUpdateRequestDTO.class
+            );
+
+            assertFalse(AnnotatedElementUtils.hasAnnotation(ClientService.class, Transactional.class));
+            assertFalse(AnnotatedElementUtils.hasAnnotation(create, Transactional.class));
+            assertFalse(AnnotatedElementUtils.hasAnnotation(update, Transactional.class));
         }
     }
 
@@ -413,31 +525,19 @@ public class ClientServiceTest {
         return Stream.of(
                 Arguments.of(
                         "only name is sent",
-                        new ClientUpdateRequestDTO(UPDATED_NAME, null, null, null),
-                        UPDATED_NAME,
-                        EMAIL,
-                        PHONE
+                        new ClientUpdateRequestDTO(UPDATED_NAME, null, null, null)
                 ),
                 Arguments.of(
                         "only email is sent",
-                        new ClientUpdateRequestDTO(null, UPDATED_EMAIL, null, null),
-                        NAME,
-                        UPDATED_EMAIL,
-                        PHONE
+                        new ClientUpdateRequestDTO(null, UPDATED_EMAIL, null, null)
                 ),
                 Arguments.of(
                         "only phone number is sent",
-                        new ClientUpdateRequestDTO(null, null, UPDATED_PHONE, null),
-                        NAME,
-                        EMAIL,
-                        UPDATED_PHONE
+                        new ClientUpdateRequestDTO(null, null, UPDATED_PHONE, null)
                 ),
                 Arguments.of(
                         "nothing is sent",
-                        new ClientUpdateRequestDTO(null, null, null, null),
-                        NAME,
-                        EMAIL,
-                        PHONE
+                        new ClientUpdateRequestDTO(null, null, null, null)
                 )
         );
     }
@@ -479,7 +579,7 @@ public class ClientServiceTest {
                 UPDATED_NAME,
                 UPDATED_EMAIL,
                 UPDATED_PHONE,
-                new com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO(
+                new AddressUpdateRequestDTO(
                         "456",
                         "Apto 22",
                         "87654321"
@@ -521,7 +621,7 @@ public class ClientServiceTest {
             String phoneNumber
     ) {
         Client client = new Client(name, cpf, email, phoneNumber, address());
-        org.springframework.test.util.ReflectionTestUtils.setField(client, "id", id);
+        ReflectionTestUtils.setField(client, "id", id);
         return client;
     }
 

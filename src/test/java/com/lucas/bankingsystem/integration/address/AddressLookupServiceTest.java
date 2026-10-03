@@ -3,6 +3,7 @@ package com.lucas.bankingsystem.integration.address;
 import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,7 +35,7 @@ class AddressLookupServiceTest {
 
     @BeforeEach
     void setUp() {
-        addressLookupService = new AddressLookupService(List.of(viaCepClient, brasilApiClient));
+        addressLookupService = new AddressLookupService(List.of(viaCepClient, brasilApiClient), new SimpleMeterRegistry());
     }
 
     @Nested
@@ -44,7 +45,7 @@ class AddressLookupServiceTest {
         @Test
         @DisplayName("Should return address without calling Brasil API")
         void shouldReturnAddressWithoutCallingBrasilApi() {
-            AddressLookupResponse expected = expectedAddressResponse(POSTAL_CODE);
+            AddressLookupResponse expected = expectedAddressResponse();
 
             when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenReturn(expected);
 
@@ -64,7 +65,7 @@ class AddressLookupServiceTest {
         @Test
         @DisplayName("Should return address from Brasil API")
         void shouldReturnAddressFromBrasilApi() {
-            AddressLookupResponse expected = expectedAddressResponse(POSTAL_CODE);
+            AddressLookupResponse expected = expectedAddressResponse();
 
             when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenThrow(new PostalCodeNotFoundException("CEP não encontrado no ViaCEP."));
 
@@ -86,7 +87,7 @@ class AddressLookupServiceTest {
         @Test
         @DisplayName("Should return address from Brasil API")
         void shouldReturnAddressFromBrasilApi() {
-            AddressLookupResponse expected = expectedAddressResponse(POSTAL_CODE);
+            AddressLookupResponse expected = expectedAddressResponse();
 
             when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenThrow(new AddressProviderUnavailableException("Via CEP indisponível."));
 
@@ -181,7 +182,7 @@ class AddressLookupServiceTest {
         }
     }
 
-    private static AddressLookupResponse expectedAddressResponse(String postalCode) {
-        return new AddressLookupResponse("Praça da Sé", "Sé", "São Paulo", "SP", postalCode);
+    private static AddressLookupResponse expectedAddressResponse() {
+        return new AddressLookupResponse("Praça da Sé", "Sé", "São Paulo", "SP", AddressLookupServiceTest.POSTAL_CODE);
     }
 }

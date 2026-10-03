@@ -10,8 +10,8 @@ import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.event.client.ClientOperationEvent;
 import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
-import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.repository.ClientRepository;
+import com.lucas.bankingsystem.service.address.AddressData;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -264,7 +264,7 @@ class ClientPersistenceServiceTest {
         void shouldUpdateClientAddressSuccessfully() {
             Client client = client();
             ClientUpdateRequestDTO request = fullUpdateRequest();
-            AddressLookupResponse addressData = addressLookupResponse();
+            AddressData addressData = addressData();
 
             when(clientRepository.findById(CLIENT_ID))
                     .thenReturn(Optional.of(client));
@@ -303,7 +303,7 @@ class ClientPersistenceServiceTest {
                 String expectedComplement
         ) {
             Client client = client();
-            AddressLookupResponse addressData = addressLookupResponse();
+            AddressData addressData = addressData();
 
             ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(
                     null,
@@ -338,7 +338,7 @@ class ClientPersistenceServiceTest {
         @DisplayName("Should throw when client does not exist")
         void shouldThrowWhenClientDoesNotExist() {
             ClientUpdateRequestDTO request = fullUpdateRequest();
-            AddressLookupResponse addressData = addressLookupResponse();
+            AddressData addressData = addressData();
 
             when(clientRepository.findById(CLIENT_ID))
                     .thenReturn(Optional.empty());
@@ -454,7 +454,7 @@ class ClientPersistenceServiceTest {
                     "update",
                     Long.class,
                     ClientUpdateRequestDTO.class,
-                    AddressLookupResponse.class,
+                    AddressData.class,
                     String.class
             );
 
@@ -587,12 +587,12 @@ class ClientPersistenceServiceTest {
         );
     }
 
-    private static AddressLookupResponse addressLookupResponse() {
-        return new AddressLookupResponse(
+    private static AddressData addressData() {
+        return new AddressData(
                 "Rua Atualizada",
                 "Centro",
                 "São Paulo",
-                "SP",
+                State.SP,
                 "87654321"
         );
     }

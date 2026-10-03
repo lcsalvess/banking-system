@@ -12,12 +12,12 @@ import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
-import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lucas.bankingsystem.repository.ClientRepository;
 import com.lucas.bankingsystem.service.AddressService;
 import com.lucas.bankingsystem.service.ClientService;
+import com.lucas.bankingsystem.service.address.AddressData;
 import com.lucas.bankingsystem.service.security.CurrentUserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -314,7 +314,7 @@ public class ClientServiceTest {
         void shouldUpdateClientAndAddressSuccessfully() {
             Client client = client();
             ClientUpdateRequestDTO request = fullUpdateRequest();
-            AddressLookupResponse addressData = addressLookupResponse();
+            AddressData addressData = addressData();
 
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(addressService.findAddressByPostalCode(
@@ -414,7 +414,7 @@ public class ClientServiceTest {
         @DisplayName("Should propagate the failure when persistence fails")
         void shouldPropagateFailureWhenPersistenceFails() {
             ClientUpdateRequestDTO request = fullUpdateRequest();
-            AddressLookupResponse addressData = addressLookupResponse();
+            AddressData addressData = addressData();
             ClientNotFoundException exception =
                     new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE);
 
@@ -558,12 +558,12 @@ public class ClientServiceTest {
         );
     }
 
-    private static AddressLookupResponse addressLookupResponse() {
-        return new AddressLookupResponse(
+    private static AddressData addressData() {
+        return new AddressData(
                 "Rua Atualizada",
                 "Centro",
                 "São Paulo",
-                "SP",
+                State.SP,
                 "87654321"
         );
     }

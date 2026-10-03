@@ -4,12 +4,11 @@ import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
 import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
-import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.event.client.ClientOperationEvent;
 import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
-import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.repository.ClientRepository;
+import com.lucas.bankingsystem.service.address.AddressData;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.context.ApplicationEventPublisher;
@@ -66,7 +65,7 @@ public class ClientPersistenceService {
     public Client update(
             Long id,
             ClientUpdateRequestDTO dto,
-            AddressLookupResponse addressData,
+            AddressData addressData,
             String username
     ) {
         if (dto.address() != null && addressData == null) {
@@ -88,8 +87,8 @@ public class ClientPersistenceService {
             address.setStreetName(addressData.streetName());
             address.setNeighborhood(addressData.neighborhood());
             address.setCity(addressData.city());
-            address.setState(State.valueOf(addressData.state()));
-            address.setPostalCode(addressData.postalCode().replace("-", ""));
+            address.setState(addressData.state());
+            address.setPostalCode(addressData.postalCode());
 
             address.update(dto.address());
         }

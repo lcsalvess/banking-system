@@ -8,8 +8,8 @@ import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
-import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.repository.ClientRepository;
+import com.lucas.bankingsystem.service.address.AddressData;
 import com.lucas.bankingsystem.service.client.ClientPersistenceService;
 import com.lucas.bankingsystem.service.security.CurrentUserService;
 import org.springframework.stereotype.Service;
@@ -68,7 +68,7 @@ public class ClientService {
 
         String username = getCurrentUsername();
 
-        AddressLookupResponse addressData = dto.address() == null
+        AddressData addressData = dto.address() == null
                 ? null
                 : addressService.findAddressByPostalCode(
                 dto.address().postalCode()

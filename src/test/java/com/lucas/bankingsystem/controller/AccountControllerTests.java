@@ -16,6 +16,9 @@ import com.lucas.bankingsystem.service.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -23,11 +26,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import tools.jackson.databind.JsonNode;
+import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,6 +44,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AccountController.class)
 @AutoConfigureMockMvc(addFilters = false)
 public class AccountControllerTests {
+
+    private static final String PROVIDER = "com.lucas.bankingsystem.controller.AccountControllerTests#";
+    private static final String INTERNAL_ERROR_MESSAGE = "Ocorreu um erro interno no servidor.";
+    private static final String INVALID_BODY_MESSAGE = "Dados da requisição inválidos.";
+    private static final String VALIDATION_MESSAGE = "Erro de validação.";
+    private static final String MISSING_PARAM_MESSAGE = "Parâmetro de requisição obrigatório ausente.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -61,52 +71,29 @@ public class AccountControllerTests {
     @DisplayName("GET /api/v1/accounts")
     class FindAll {
 
+        private static final String URL = "/api/v1/accounts";
+
         @Test
         @DisplayName("Should return all accounts successfully")
         void shouldReturnAllAccountsSuccessfully() throws Exception {
-            AccountResponseDTO account1 = mockAccount(
-                    "99999",
-                    "5",
-                    AccountType.CHECKING
-            );
-
-            AccountResponseDTO account2 = mockAccount(
-                    "99998",
-                    "6",
-                    AccountType.SAVINGS
-            );
+            AccountResponseDTO account1 = mockAccount("99999", "5", AccountType.CHECKING);
+            AccountResponseDTO account2 = mockAccount("99998", "6", AccountType.SAVINGS);
 
             when(accountService.findAll()).thenReturn(List.of(account1, account2));
 
-            MvcResult result = mockMvc.perform(get("/api/v1/accounts"))
+            MvcResult result = mockMvc.perform(get(URL))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$", hasSize(2)))
-                    .andExpect(jsonPath("$[0].accountNumber").value(account1.accountNumber()))
-                    .andExpect(jsonPath("$[0].accountDigit").value(account1.accountDigit()))
-                    .andExpect(jsonPath("$[0].clientName").value(account1.clientName()))
-                    .andExpect(jsonPath("$[0].type").value(account1.type().name()))
-                    .andExpect(jsonPath("$[0].status").value(account1.status().name()))
-                    .andExpect(jsonPath("$[1].accountNumber").value(account2.accountNumber()))
-                    .andExpect(jsonPath("$[1].accountDigit").value(account2.accountDigit()))
-                    .andExpect(jsonPath("$[1].clientName").value(account2.clientName()))
-                    .andExpect(jsonPath("$[1].type").value(account2.type().name()))
-                    .andExpect(jsonPath("$[1].status").value(account2.status().name()))
                     .andReturn();
 
-            JsonNode response = objectMapper.readTree(
-                    result.getResponse().getContentAsString()
+            AccountResponseDTO[] response = objectMapper.readValue(
+                    result.getResponse().getContentAsString(),
+                    AccountResponseDTO[].class
             );
 
-            assertBalanceEquals(
-                    account1.balance(),
-                    response.get(0).get("balance")
-            );
-
-            assertBalanceEquals(
-                    account2.balance(),
-                    response.get(1).get("balance")
-            );
+            assertAccountEquals(account1, response[0]);
+            assertAccountEquals(account2, response[1]);
 
             verify(accountService).findAll();
             verifyNoMoreInteractions(accountService);
@@ -117,7 +104,7 @@ public class AccountControllerTests {
         void shouldReturnEmptyListWhenThereAreNoAccounts() throws Exception {
             when(accountService.findAll()).thenReturn(List.of());
 
-            mockMvc.perform(get("/api/v1/accounts"))
+            mockMvc.perform(get(URL))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$", hasSize(0)));
@@ -129,13 +116,10 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(accountService.findAll()).thenThrow(new RuntimeException("Unexpected exception"));
+            when(accountService.findAll())
+                    .thenThrow(new RuntimeException("Unexpected exception"));
 
-            mockMvc.perform(get("/api/v1/accounts"))
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(500))
-                    .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
+            performErrorResponse(mockMvc.perform(get(URL)), 500, INTERNAL_ERROR_MESSAGE);
 
             verify(accountService).findAll();
             verifyNoMoreInteractions(accountService);
@@ -146,39 +130,24 @@ public class AccountControllerTests {
     @DisplayName("GET /api/v1/accounts/{accountNumber}")
     class FindByAccountNumber {
 
+        private static final String URL = "/api/v1/accounts/{accountNumber}";
+
         @Test
         @DisplayName("Should return the account successfully")
         void shouldReturnTheAccountSuccessfully() throws Exception {
-            AccountResponseDTO account = mockAccount(
-                    "99999",
-                    "5",
-                    AccountType.CHECKING
-            );
+            AccountResponseDTO expected = mockAccount("99999", "5", AccountType.CHECKING);
 
-            when(accountService.findByAccountNumber(account.accountNumber(), account.accountDigit()))
-                    .thenReturn(account);
+            when(accountService.findByAccountNumber("99999", "5")).thenReturn(expected);
 
-            MvcResult result = mockMvc.perform(get("/api/v1/accounts/{accountNumber}", account.accountNumber())
-                            .param("digit", account.accountDigit()))
+            MvcResult result = mockMvc.perform(get(URL, "99999")
+                            .param("digit", "5"))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.accountNumber").value(account.accountNumber()))
-                    .andExpect(jsonPath("$.accountDigit").value(account.accountDigit()))
-                    .andExpect(jsonPath("$.clientName").value(account.clientName()))
-                    .andExpect(jsonPath("$.type").value(account.type().name()))
-                    .andExpect(jsonPath("$.status").value(account.status().name()))
                     .andReturn();
 
-            JsonNode response = objectMapper.readTree(
-                    result.getResponse().getContentAsString()
-            );
+            assertAccountEquals(expected, readAccount(result));
 
-            assertBalanceEquals(
-                    account.balance(),
-                    response.get("balance")
-            );
-
-            verify(accountService).findByAccountNumber(account.accountNumber(), account.accountDigit());
+            verify(accountService).findByAccountNumber("99999", "5");
             verifyNoMoreInteractions(accountService);
         }
 
@@ -188,12 +157,7 @@ public class AccountControllerTests {
             when(accountService.findByAccountNumber("99999", "3"))
                     .thenThrow(new InvalidAccountDigitException("Dígito da conta inválido."));
 
-            mockMvc.perform(get("/api/v1/accounts/{accountNumber}", "99999")
-                            .param("digit", "3"))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value("Dígito da conta inválido."));
+            performGet("3", 400, "Dígito da conta inválido.");
 
             verify(accountService).findByAccountNumber("99999", "3");
             verifyNoMoreInteractions(accountService);
@@ -205,12 +169,7 @@ public class AccountControllerTests {
             when(accountService.findByAccountNumber("99999", "5"))
                     .thenThrow(new AccountNotFoundException("Conta não encontrada."));
 
-            mockMvc.perform(get("/api/v1/accounts/{accountNumber}", "99999")
-                            .param("digit", "5"))
-                    .andExpect(status().isNotFound())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.message").value("Conta não encontrada."));
+            performGet("5", 404, "Conta não encontrada.");
 
             verify(accountService).findByAccountNumber("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -222,15 +181,31 @@ public class AccountControllerTests {
             when(accountService.findByAccountNumber("99999", "5"))
                     .thenThrow(new RuntimeException("Unexpected exception"));
 
-            mockMvc.perform(get("/api/v1/accounts/{accountNumber}", "99999")
-                            .param("digit", "5"))
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(500))
-                    .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
+            performGet("5", 500, INTERNAL_ERROR_MESSAGE);
 
             verify(accountService).findByAccountNumber("99999", "5");
             verifyNoMoreInteractions(accountService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when digit is missing")
+        void shouldReturnBadRequestWhenDigitIsMissing() throws Exception {
+            performErrorResponse(
+                    mockMvc.perform(get(URL, "99999")),
+                    400,
+                    MISSING_PARAM_MESSAGE
+            );
+
+            verifyNoInteractions(accountService);
+        }
+
+        private void performGet(String digit, int status, String message) throws Exception {
+            ResultActions result = mockMvc.perform(
+                    get(URL, "99999")
+                            .param("digit", digit)
+            );
+
+            performErrorResponse(result, status, message);
         }
     }
 
@@ -238,102 +213,55 @@ public class AccountControllerTests {
     @DisplayName("POST /api/v1/accounts")
     class Create {
 
+        private static final String URL = "/api/v1/accounts";
+
         @Test
         @DisplayName("Should create an account successfully")
         void shouldCreateAnAccountSuccessfully() throws Exception {
-            AccountRequestDTO request = new AccountRequestDTO(
-                    1L,
-                    AccountType.CHECKING
-            );
+            AccountRequestDTO request = accountRequest();
+            AccountResponseDTO expected = mockAccount("12345", "6", AccountType.CHECKING);
 
-            AccountResponseDTO expectedResponse = mockAccount(
-                    "12345",
-                    "6",
-                    AccountType.CHECKING
-            );
+            when(accountService.create(request)).thenReturn(expected);
 
-            when(accountService.create(request)).thenReturn(expectedResponse);
-
-            MvcResult result = mockMvc.perform(post("/api/v1/accounts")
+            MvcResult result = mockMvc.perform(post(URL)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isCreated())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.accountNumber").value(expectedResponse.accountNumber()))
-                    .andExpect(jsonPath("$.accountDigit").value(expectedResponse.accountDigit()))
-                    .andExpect(jsonPath("$.clientName").value(expectedResponse.clientName()))
-                    .andExpect(jsonPath("$.type").value(expectedResponse.type().name()))
-                    .andExpect(jsonPath("$.status").value(expectedResponse.status().name()))
                     .andReturn();
 
-            JsonNode response = objectMapper.readTree(
-                    result.getResponse().getContentAsString()
-            );
-
-            assertBalanceEquals(
-                    expectedResponse.balance(),
-                    response.get("balance")
-            );
+            assertAccountEquals(expected, readAccount(result));
 
             verify(accountService).create(request);
             verifyNoMoreInteractions(accountService);
         }
 
-        @Test
-        @DisplayName("Should return 400 when client ID is null")
-        void shouldReturnBadRequestWhenClientIdIsNull() throws Exception {
-            assertValidationError(
-                    new AccountRequestDTO(null, AccountType.CHECKING),
-                    "clientId",
-                    "O ID do titular é obrigatório."
-            );
-        }
-
-        @Test
-        @DisplayName("Should return 400 when client ID is not positive")
-        void shouldReturnBadRequestWhenClientIdIsNotPositive() throws Exception {
-            assertValidationError(
-                    new AccountRequestDTO(0L, AccountType.CHECKING),
-                    "clientId",
-                    "O ID do titular deve ser maior que zero."
-            );
-        }
-
-        @Test
-        @DisplayName("Should return 400 when account type is null")
-        void shouldReturnBadRequestWhenTypeIsNull() throws Exception {
-            assertValidationError(
-                    new AccountRequestDTO(1L, null),
-                    "type",
-                    "O tipo de conta é obrigatório."
-            );
-        }
-
-        @Test
-        @DisplayName("Should return 400 when account type is not a valid enum value")
-        void shouldReturnBadRequestWhenTypeIsInvalidEnumValue() throws Exception {
-            mockMvc.perform(post("/api/v1/accounts")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"clientId": 1, "type": "INVALID"}
-                                    """))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value("Dados da requisição inválidos."));
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "invalidAccountRequests")
+        @DisplayName("Should return 400 when request body is invalid")
+        void shouldReturnBadRequestWhenRequestBodyIsInvalid(
+                String scenario,
+                AccountRequestDTO request,
+                String field,
+                String message
+        ) throws Exception {
+            performValidationError(request, field, message);
 
             verifyNoInteractions(accountService);
         }
 
-        @Test
-        @DisplayName("Should return 400 when request body is malformed")
-        void shouldReturnBadRequestWhenRequestBodyIsMalformed() throws Exception {
-            mockMvc.perform(post("/api/v1/accounts")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{clientId: "))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value("Dados da requisição inválidos."));
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "unreadableRequestBodies")
+        @DisplayName("Should return 400 when request body cannot be read")
+        void shouldReturnBadRequestWhenRequestBodyCannotBeRead(
+                String scenario,
+                String body
+        ) throws Exception {
+            ResultActions result = mockMvc.perform(post(URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body));
+
+            performErrorResponse(result, 400, INVALID_BODY_MESSAGE);
 
             verifyNoInteractions(accountService);
         }
@@ -341,11 +269,7 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 400 when request body is missing")
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
-            mockMvc.perform(post("/api/v1/accounts")
-                            .contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value("Dados da requisição inválidos."));
+            performMissingBody();
 
             verifyNoInteractions(accountService);
         }
@@ -353,18 +277,12 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 404 when client does not exist")
         void shouldReturnNotFoundWhenClientDoesNotExist() throws Exception {
-            AccountRequestDTO request = new AccountRequestDTO(99L, AccountType.CHECKING);
+            AccountRequestDTO request = accountRequest();
 
             when(accountService.create(request))
                     .thenThrow(new ClientNotFoundException("Cliente não encontrado."));
 
-            mockMvc.perform(post("/api/v1/accounts")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isNotFound())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.message").value("Cliente não encontrado."));
+            performPost(request, 404, "Cliente não encontrado.");
 
             verify(accountService).create(request);
             verifyNoMoreInteractions(accountService);
@@ -373,18 +291,12 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 409 when client already has an account of the same type")
         void shouldReturnConflictWhenAccountAlreadyExists() throws Exception {
-            AccountRequestDTO request = new AccountRequestDTO(1L, AccountType.CHECKING);
+            AccountRequestDTO request = accountRequest();
 
             when(accountService.create(request))
                     .thenThrow(new AccountAlreadyExistsException("O cliente já possui uma conta corrente."));
 
-            mockMvc.perform(post("/api/v1/accounts")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isConflict())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(409))
-                    .andExpect(jsonPath("$.message").value("O cliente já possui uma conta corrente."));
+            performPost(request, 409, "O cliente já possui uma conta corrente.");
 
             verify(accountService).create(request);
             verifyNoMoreInteractions(accountService);
@@ -393,38 +305,15 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            AccountRequestDTO request = new AccountRequestDTO(1L, AccountType.CHECKING);
+            AccountRequestDTO request = accountRequest();
 
             when(accountService.create(request))
                     .thenThrow(new RuntimeException("Unexpected exception"));
 
-            mockMvc.perform(post("/api/v1/accounts")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(500))
-                    .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
+            performPost(request, 500, INTERNAL_ERROR_MESSAGE);
 
             verify(accountService).create(request);
             verifyNoMoreInteractions(accountService);
-        }
-
-        private void assertValidationError(
-                AccountRequestDTO request,
-                String field,
-                String message
-        ) throws Exception {
-            mockMvc.perform(post("/api/v1/accounts")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value("Erro de validação."))
-                    .andExpect(jsonPath("$.errors." + field).value(message));
-
-            verifyNoInteractions(accountService);
         }
     }
 
@@ -432,10 +321,12 @@ public class AccountControllerTests {
     @DisplayName("PATCH /api/v1/accounts/{accountNumber}")
     class Cancel {
 
+        private static final String URL = "/api/v1/accounts/{accountNumber}";
+
         @Test
         @DisplayName("Should cancel the account successfully")
         void shouldCancelTheAccountSuccessfully() throws Exception {
-            mockMvc.perform(patch("/api/v1/accounts/{accountNumber}", "99999")
+            mockMvc.perform(patch(URL, "99999")
                             .param("digit", "5"))
                     .andExpect(status().isNoContent())
                     .andExpect(content().string(""));
@@ -450,12 +341,7 @@ public class AccountControllerTests {
             doThrow(new InvalidAccountDigitException("Dígito da conta inválido."))
                     .when(accountService).cancel("99999", "3");
 
-            mockMvc.perform(patch("/api/v1/accounts/{accountNumber}", "99999")
-                            .param("digit", "3"))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value("Dígito da conta inválido."));
+            performCancel("3", 400, "Dígito da conta inválido.");
 
             verify(accountService).cancel("99999", "3");
             verifyNoMoreInteractions(accountService);
@@ -467,12 +353,7 @@ public class AccountControllerTests {
             doThrow(new AccountNotFoundException("Conta não encontrada."))
                     .when(accountService).cancel("99999", "5");
 
-            mockMvc.perform(patch("/api/v1/accounts/{accountNumber}", "99999")
-                            .param("digit", "5"))
-                    .andExpect(status().isNotFound())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.message").value("Conta não encontrada."));
+            performCancel("5", 404, "Conta não encontrada.");
 
             verify(accountService).cancel("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -484,12 +365,7 @@ public class AccountControllerTests {
             doThrow(new AccountIsNotActiveException("Não é possível cancelar uma conta que não está ativa."))
                     .when(accountService).cancel("99999", "5");
 
-            mockMvc.perform(patch("/api/v1/accounts/{accountNumber}", "99999")
-                            .param("digit", "5"))
-                    .andExpect(status().isConflict())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(409))
-                    .andExpect(jsonPath("$.message").value("Não é possível cancelar uma conta que não está ativa."));
+            performCancel("5", 409, "Não é possível cancelar uma conta que não está ativa.");
 
             verify(accountService).cancel("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -501,12 +377,7 @@ public class AccountControllerTests {
             doThrow(new AccountHasBalanceException("Não é possível cancelar uma conta com saldo."))
                     .when(accountService).cancel("99999", "5");
 
-            mockMvc.perform(patch("/api/v1/accounts/{accountNumber}", "99999")
-                            .param("digit", "5"))
-                    .andExpect(status().isConflict())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(409))
-                    .andExpect(jsonPath("$.message").value("Não é possível cancelar uma conta com saldo."));
+            performCancel("5", 409, "Não é possível cancelar uma conta com saldo.");
 
             verify(accountService).cancel("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -518,23 +389,129 @@ public class AccountControllerTests {
             doThrow(new RuntimeException("Unexpected exception"))
                     .when(accountService).cancel("99999", "5");
 
-            mockMvc.perform(patch("/api/v1/accounts/{accountNumber}", "99999")
-                            .param("digit", "5"))
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(500))
-                    .andExpect(jsonPath("$.message").value("Ocorreu um erro interno no servidor."));
+            performCancel("5", 500, INTERNAL_ERROR_MESSAGE);
 
             verify(accountService).cancel("99999", "5");
             verifyNoMoreInteractions(accountService);
         }
+
+        @Test
+        @DisplayName("Should return 400 when digit is missing")
+        void shouldReturnBadRequestWhenDigitIsMissing() throws Exception {
+            performErrorResponse(
+                    mockMvc.perform(patch(URL, "99999")),
+                    400,
+                    MISSING_PARAM_MESSAGE
+            );
+
+            verifyNoInteractions(accountService);
+        }
+
+        private void performCancel(String digit, int status, String message) throws Exception {
+            ResultActions result = mockMvc.perform(
+                    patch(URL, "99999")
+                            .param("digit", digit)
+            );
+
+            performErrorResponse(result, status, message);
+        }
     }
 
-    private static void assertBalanceEquals(
-            BigDecimal expected,
-            JsonNode actual
+    // Cada cenário tem UMA violação: o @NotNull e o @Positive de clientId não falham juntos
+    // (null só viola @NotNull; 0 e -1 só violam @Positive).
+    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    static Stream<Arguments> invalidAccountRequests() {
+        return Stream.of(
+                Arguments.of("client ID is null",
+                        new AccountRequestDTO(null, AccountType.CHECKING),
+                        "clientId", "O ID do titular é obrigatório."),
+                Arguments.of("client ID is zero",
+                        new AccountRequestDTO(0L, AccountType.CHECKING),
+                        "clientId", "O ID do titular deve ser maior que zero."),
+                Arguments.of("client ID is negative",
+                        new AccountRequestDTO(-1L, AccountType.CHECKING),
+                        "clientId", "O ID do titular deve ser maior que zero."),
+                Arguments.of("account type is null",
+                        new AccountRequestDTO(1L, null),
+                        "type", "O tipo de conta é obrigatório.")
+        );
+    }
+
+    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    static Stream<Arguments> unreadableRequestBodies() {
+        return Stream.of(
+                Arguments.of("request body is malformed",
+                        "{clientId: "),
+                Arguments.of("account type is not a valid enum value",
+                        "{\"clientId\": 1, \"type\": \"INVALID\"}"),
+                Arguments.of("client ID is not a number",
+                        "{\"clientId\": \"abc\", \"type\": \"CHECKING\"}")
+        );
+    }
+
+    private void performPost(Object request, int status, String message) throws Exception {
+        ResultActions result = mockMvc.perform(post(Create.URL)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)));
+
+        performErrorResponse(result, status, message);
+    }
+
+    private void performErrorResponse(
+            ResultActions result,
+            int status,
+            String message
+    ) throws Exception {
+        result.andExpect(status().is(status))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(status))
+                .andExpect(jsonPath("$.message").value(message));
+    }
+
+    private void performValidationError(
+            Object request,
+            String field,
+            String message
+    ) throws Exception {
+        mockMvc.perform(post(Create.URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.errors." + field).value(message));
+    }
+
+    private void performMissingBody() throws Exception {
+        mockMvc.perform(post(Create.URL).contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(INVALID_BODY_MESSAGE));
+    }
+
+    private AccountResponseDTO readAccount(MvcResult result) throws Exception {
+        return objectMapper.readValue(
+                result.getResponse().getContentAsString(),
+                AccountResponseDTO.class
+        );
+    }
+
+    private static void assertAccountEquals(
+            AccountResponseDTO expected,
+            AccountResponseDTO actual
     ) {
-        assertEquals(0, expected.compareTo(actual.decimalValue()));
+        assertEquals(expected.accountNumber(), actual.accountNumber());
+        assertEquals(expected.accountDigit(), actual.accountDigit());
+        assertEquals(expected.clientName(), actual.clientName());
+        assertEquals(0, expected.balance().compareTo(actual.balance()));
+        assertEquals(expected.type(), actual.type());
+        assertEquals(expected.status(), actual.status());
+    }
+
+    private static AccountRequestDTO accountRequest() {
+        return new AccountRequestDTO(1L, AccountType.CHECKING);
     }
 
     private static AccountResponseDTO mockAccount(

@@ -39,9 +39,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +52,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
@@ -351,15 +355,22 @@ public class AccountServiceTest {
             verifyNoMoreInteractionsOnMocks();
         }
 
-        @Test
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "databaseDuplicateScenarios")
         @DisplayName("Should throw when database rejects duplicate active account")
-        void shouldThrowWhenDatabaseRejectsDuplicateActiveAccount() {
-            AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, AccountType.CHECKING);
+        void shouldThrowWhenDatabaseRejectsDuplicateActiveAccount(
+                String scenario,
+                AccountType type,
+                String number,
+                String digit,
+                String message
+        ) {
+            AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, type);
 
             when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
-            stubActiveAccountExists(AccountType.CHECKING, false);
+            stubActiveAccountExists(type, false);
             when(accountNumberGenerator.generate())
-                    .thenReturn(new GeneratedAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT));
+                    .thenReturn(new GeneratedAccountNumber(number, digit));
             when(currentUserService.getUsername()).thenReturn(USERNAME);
 
             ConstraintViolationException cause = new ConstraintViolationException(
@@ -376,12 +387,12 @@ public class AccountServiceTest {
 
             assertThrowsWithMessage(
                     AccountAlreadyExistsException.class,
-                    CHECKING_ALREADY_EXISTS_MESSAGE,
+                    message,
                     () -> accountService.create(request)
             );
 
             verify(clientService).findEntityById(CLIENT_ID);
-            verifyActiveAccountChecked(AccountType.CHECKING);
+            verifyActiveAccountChecked(type);
             verify(accountNumberGenerator).generate();
             verify(currentUserService).getUsername();
             verify(accountRepository).saveAndFlush(any(Account.class));
@@ -389,9 +400,13 @@ public class AccountServiceTest {
             verifyNoMoreInteractionsOnMocks();
         }
 
-        @Test
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "unrelatedDataIntegrityViolations")
         @DisplayName("Should propagate unrelated data integrity violations")
-        void shouldPropagateUnrelatedDataIntegrityViolation() {
+        void shouldPropagateUnrelatedDataIntegrityViolation(
+                String scenario,
+                DataIntegrityViolationException exception
+        ) {
             AccountRequestDTO request =
                     new AccountRequestDTO(CLIENT_ID, AccountType.CHECKING);
 
@@ -400,16 +415,6 @@ public class AccountServiceTest {
             when(accountNumberGenerator.generate())
                     .thenReturn(new GeneratedAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT));
             when(currentUserService.getUsername()).thenReturn(USERNAME);
-
-            ConstraintViolationException cause = new ConstraintViolationException(
-                    "Other constraint violation",
-                    null,
-                    "uk_other_constraint"
-            );
-
-            DataIntegrityViolationException exception =
-                    new DataIntegrityViolationException("Database error", cause);
-
             when(accountRepository.saveAndFlush(any(Account.class)))
                     .thenThrow(exception);
 
@@ -523,6 +528,30 @@ public class AccountServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("transaction boundaries")
+    class TransactionBoundaries {
+
+        // Consultas devem ser read-only; create e cancel precisam de transação de escrita.
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "transactionModes")
+        @DisplayName("Should declare the expected transaction mode")
+        void shouldDeclareExpectedTransactionMode(
+                String scenario,
+                String methodName,
+                Class<?>[] parameterTypes,
+                boolean readOnly
+        ) throws NoSuchMethodException {
+            Method method = AccountService.class.getMethod(methodName, parameterTypes);
+
+            Transactional transactional =
+                    AnnotatedElementUtils.findMergedAnnotation(method, Transactional.class);
+
+            assertNotNull(transactional);
+            assertEquals(readOnly, transactional.readOnly());
+        }
+    }
+
     @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
     static Stream<Arguments> accountTypes() {
         return Stream.of(
@@ -540,6 +569,49 @@ public class AccountServiceTest {
                         AccountType.CHECKING, CHECKING_ALREADY_EXISTS_MESSAGE),
                 Arguments.of("client already has a savings account",
                         AccountType.SAVINGS, SAVINGS_ALREADY_EXISTS_MESSAGE)
+        );
+    }
+
+    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    static Stream<Arguments> databaseDuplicateScenarios() {
+        return Stream.of(
+                Arguments.of("database rejects duplicate checking account", AccountType.CHECKING,
+                        CHECKING_NUMBER, CHECKING_DIGIT, CHECKING_ALREADY_EXISTS_MESSAGE),
+                Arguments.of("database rejects duplicate savings account", AccountType.SAVINGS,
+                        SAVINGS_NUMBER, SAVINGS_DIGIT, SAVINGS_ALREADY_EXISTS_MESSAGE)
+        );
+    }
+
+    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    static Stream<Arguments> unrelatedDataIntegrityViolations() {
+        return Stream.of(
+                Arguments.of("another constraint is violated",
+                        new DataIntegrityViolationException(
+                                "Database error",
+                                new ConstraintViolationException(
+                                        "Other constraint violation",
+                                        null,
+                                        "uk_other_constraint"
+                                )
+                        )),
+                Arguments.of("no constraint violation in the cause chain",
+                        new DataIntegrityViolationException("Database error"))
+        );
+    }
+
+    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    static Stream<Arguments> transactionModes() {
+        return Stream.of(
+                Arguments.of("findAll is read-only", "findAll",
+                        new Class<?>[]{}, true),
+                Arguments.of("findEntityByAccountNumber is read-only", "findEntityByAccountNumber",
+                        new Class<?>[]{String.class, String.class}, true),
+                Arguments.of("findByAccountNumber is read-only", "findByAccountNumber",
+                        new Class<?>[]{String.class, String.class}, true),
+                Arguments.of("create is a write transaction", "create",
+                        new Class<?>[]{AccountRequestDTO.class}, false),
+                Arguments.of("cancel is a write transaction", "cancel",
+                        new Class<?>[]{String.class, String.class}, false)
         );
     }
 

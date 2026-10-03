@@ -41,10 +41,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -319,7 +316,6 @@ public class ClientServiceTest {
             ClientUpdateRequestDTO request = fullUpdateRequest();
             AddressLookupResponse addressData = addressLookupResponse();
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(addressService.findAddressByPostalCode(
                     request.address().postalCode()
@@ -336,12 +332,10 @@ public class ClientServiceTest {
             assertSame(client, result);
 
             InOrder inOrder = inOrder(
-                    clientRepository,
                     currentUserService,
                     addressService,
                     clientPersistenceService
             );
-            inOrder.verify(clientRepository).existsById(CLIENT_ID);
             inOrder.verify(currentUserService).getUsername();
             inOrder.verify(addressService).findAddressByPostalCode(
                     request.address().postalCode()
@@ -366,7 +360,6 @@ public class ClientServiceTest {
         ) {
             Client client = client();
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.update(
                     CLIENT_ID,
@@ -379,7 +372,6 @@ public class ClientServiceTest {
 
             assertSame(client, result);
 
-            verify(clientRepository).existsById(CLIENT_ID);
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).update(
                     CLIENT_ID,
@@ -399,7 +391,6 @@ public class ClientServiceTest {
         ) {
             ClientUpdateRequestDTO request = fullUpdateRequest();
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(addressService.findAddressByPostalCode(
                     request.address().postalCode()
@@ -412,7 +403,6 @@ public class ClientServiceTest {
 
             assertSame(exception, thrown);
 
-            verify(clientRepository).existsById(CLIENT_ID);
             verify(currentUserService).getUsername();
             verify(addressService).findAddressByPostalCode(
                     request.address().postalCode()
@@ -428,7 +418,6 @@ public class ClientServiceTest {
             ClientNotFoundException exception =
                     new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE);
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(addressService.findAddressByPostalCode(
                     request.address().postalCode()
@@ -447,7 +436,6 @@ public class ClientServiceTest {
 
             assertSame(exception, thrown);
 
-            verify(clientRepository).existsById(CLIENT_ID);
             verify(currentUserService).getUsername();
             verify(addressService).findAddressByPostalCode(
                     request.address().postalCode()
@@ -458,23 +446,6 @@ public class ClientServiceTest {
                     addressData,
                     USERNAME
             );
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when client does not exist")
-        void shouldThrowWhenClientDoesNotExist() {
-            ClientUpdateRequestDTO request = fullUpdateRequest();
-
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(false);
-
-            assertThrowsWithMessage(
-                    ClientNotFoundException.class,
-                    CLIENT_NOT_FOUND_MESSAGE,
-                    () -> clientService.update(CLIENT_ID, request)
-            );
-
-            verify(clientRepository).existsById(CLIENT_ID);
             verifyNoMoreInteractionsOnMocks();
         }
     }

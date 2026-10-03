@@ -65,9 +65,6 @@ public class ClientService {
     }
 
     public Client update(Long id, ClientUpdateRequestDTO dto) {
-        if (!clientRepository.existsById(id)) {
-            throw new ClientNotFoundException("Cliente não encontrado.");
-        }
 
         String username = getCurrentUsername();
 

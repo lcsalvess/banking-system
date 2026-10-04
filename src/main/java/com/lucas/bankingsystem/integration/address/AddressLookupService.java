@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class AddressLookupService {
@@ -18,21 +21,33 @@ public class AddressLookupService {
             LoggerFactory.getLogger(AddressLookupService.class);
 
     private final List<AddressProvider> providers;
-    private final MeterRegistry meterRegistry;
+    private final Timer addressLookupTimer;
+    private final Map<AddressProvider, Timer> providerTimers;
 
     public AddressLookupService(
             List<AddressProvider> providers,
             MeterRegistry meterRegistry
     ) {
         this.providers = providers;
-        this.meterRegistry = meterRegistry;
+
+        this.addressLookupTimer = Timer.builder("address.lookup")
+                .description("Tempo total da busca de endereço")
+                .register(meterRegistry);
+
+        this.providerTimers = providers.stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        provider -> Timer.builder("address.provider.lookup")
+                                .description("Tempo de consulta de cada provedor de endereço")
+                                .tag("provider", provider.getClass().getSimpleName())
+                                .register(meterRegistry)
+                ));
     }
 
     public AddressLookupResponse findByPostalCode(String postalCode) {
-        return Timer.builder("address.lookup")
-                .description("Tempo total da busca de endereço")
-                .register(meterRegistry)
-                .record(() -> findAddress(postalCode));
+        return addressLookupTimer.record(
+                () -> findAddress(postalCode)
+        );
     }
 
     private AddressLookupResponse findAddress(String postalCode) {
@@ -40,11 +55,11 @@ public class AddressLookupService {
 
         for (AddressProvider provider : providers) {
             try {
-                return Timer.builder("address.provider.lookup")
-                        .description("Tempo de consulta de cada provedor de endereço")
-                        .tag("provider", provider.getClass().getSimpleName())
-                        .register(meterRegistry)
-                        .record(() -> provider.findByPostalCode(postalCode));
+                Timer timer = providerTimers.get(provider);
+
+                return timer.record(
+                        () -> provider.findByPostalCode(postalCode)
+                );
 
             } catch (AddressProviderUnavailableException ex) {
                 log.warn(

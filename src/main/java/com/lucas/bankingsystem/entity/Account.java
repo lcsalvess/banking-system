@@ -57,24 +57,12 @@ public abstract class Account {
         return client;
     }
 
-    public void setClient(Client client) {
-        this.client = client;
-    }
-
     public String getAccountNumber() {
         return accountNumber;
     }
 
-    public void setAccountNumber(String accountNumber) {
-        this.accountNumber = accountNumber;
-    }
-
     public String getDigit() {
         return digit;
-    }
-
-    public void setDigit(String digit) {
-        this.digit = digit;
     }
 
     public BigDecimal getBalance() {

@@ -65,55 +65,27 @@ public class Address {
         return streetName;
     }
 
-    public void setStreetName(String streetName) {
-        this.streetName = streetName;
-    }
-
     public String getStreetNumber() {
         return streetNumber;
-    }
-
-    public void setStreetNumber(String streetNumber) {
-        this.streetNumber = streetNumber;
     }
 
     public String getComplement() {
         return complement;
     }
 
-    public void setComplement(String complement) {
-        this.complement = complement;
-    }
-
     public String getNeighborhood() {
         return neighborhood;
-    }
-
-    public void setNeighborhood(String neighborhood) {
-        this.neighborhood = neighborhood;
     }
 
     public String getCity() {
         return city;
     }
 
-    public void setCity(String city) {
-        this.city = city;
-    }
-
     public State getState() {
         return state;
     }
 
-    public void setState(State state) {
-        this.state = state;
-    }
-
     public String getPostalCode() {
         return postalCode;
-    }
-
-    public void setPostalCode(String postalCode) {
-        this.postalCode = postalCode;
     }
 }

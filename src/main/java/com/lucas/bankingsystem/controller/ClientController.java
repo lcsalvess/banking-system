@@ -6,7 +6,6 @@ import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
 import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.exception.ValidationErrorResponse;
-import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.service.ClientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -68,8 +67,7 @@ public class ClientController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ClientResponseDTO create(@Valid @RequestBody ClientRequestDTO dto) {
-        Client savedClient = clientService.create(dto);
-        return ClientResponseDTO.fromEntity(savedClient);
+        return clientService.create(dto);
     }
 
     @Operation(
@@ -178,7 +176,6 @@ public class ClientController {
                     required = true
             )
             @PathVariable Long id, @Valid @RequestBody ClientUpdateRequestDTO dto) {
-        Client updatedClient = clientService.update(id, dto);
-        return ClientResponseDTO.fromEntity(updatedClient);
+        return clientService.update(id, dto);
     }
 }

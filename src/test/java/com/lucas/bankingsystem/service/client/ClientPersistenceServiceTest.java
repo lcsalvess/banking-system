@@ -1,9 +1,5 @@
 package com.lucas.bankingsystem.service.client;
 
-import com.lucas.bankingsystem.dto.request.AddressRequestDTO;
-import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
-import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
-import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
@@ -12,6 +8,7 @@ import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.repository.ClientRepository;
 import com.lucas.bankingsystem.service.address.AddressData;
+import com.lucas.bankingsystem.service.client.ClientUpdateData.AddressUpdateData;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +39,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ClientPersistenceService tests")
 class ClientPersistenceServiceTest {
+
+    private static final String CREATE_TIMER_NAME = "client.persistence.create";
+    private static final String UPDATE_TIMER_NAME = "client.persistence.update";
 
     private static final String PROVIDER =
             "com.lucas.bankingsystem.service.client.ClientPersistenceServiceTest#";
@@ -82,64 +82,26 @@ class ClientPersistenceServiceTest {
     }
 
     @Nested
-    @DisplayName("create(ClientRequestDTO, Address, String)")
+    @DisplayName("create(Client, String)")
     class Create {
 
         @Test
-        @DisplayName("Should create client successfully")
+        @DisplayName("Should save the received client and return the saved entity")
         void shouldCreateClientSuccessfully() {
-            ClientRequestDTO request = clientRequest();
-            Address address = address();
+            Client client = unsavedClient();
 
-            when(clientRepository.save(any(Client.class)))
-                    .thenAnswer(invocation -> {
-                        Client client = invocation.getArgument(0);
-                        setClientId(client);
-                        return client;
-                    });
+            when(clientRepository.save(client)).thenAnswer(invocation -> {
+                Client toSave = invocation.getArgument(0);
+                setClientId(toSave);
+                return toSave;
+            });
 
-            Client result = clientPersistenceService.create(
-                    request,
-                    address,
-                    USERNAME
-            );
+            Client result = clientPersistenceService.create(client, USERNAME);
 
+            assertSame(client, result);
             assertEquals(CLIENT_ID, result.getId());
-            assertEquals(NAME, result.getName());
-            assertEquals(CPF, result.getCpf());
-            assertEquals(EMAIL, result.getEmail());
-            assertEquals(PHONE, result.getPhoneNumber());
-            assertSame(address, result.getAddress());
 
-            verify(clientRepository).save(any(Client.class));
-            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should save client with the provided address")
-        void shouldSaveClientWithProvidedAddress() {
-            ClientRequestDTO request = clientRequest();
-            Address address = address();
-
-            when(clientRepository.save(any(Client.class)))
-                    .thenAnswer(invocation -> invocation.getArgument(0));
-
-            clientPersistenceService.create(request, address, USERNAME);
-
-            ArgumentCaptor<Client> clientCaptor =
-                    ArgumentCaptor.forClass(Client.class);
-
-            verify(clientRepository).save(clientCaptor.capture());
-
-            Client savedClient = clientCaptor.getValue();
-
-            assertEquals(NAME, savedClient.getName());
-            assertEquals(CPF, savedClient.getCpf());
-            assertEquals(EMAIL, savedClient.getEmail());
-            assertEquals(PHONE, savedClient.getPhoneNumber());
-            assertSame(address, savedClient.getAddress());
-
+            verify(clientRepository).save(client);
             verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
             verifyNoMoreInteractionsOnMocks();
         }
@@ -147,16 +109,15 @@ class ClientPersistenceServiceTest {
         @Test
         @DisplayName("Should publish client created event")
         void shouldPublishClientCreatedEvent() {
-            ClientRequestDTO request = clientRequest();
+            Client client = unsavedClient();
 
-            when(clientRepository.save(any(Client.class)))
-                    .thenAnswer(invocation -> {
-                        Client client = invocation.getArgument(0);
-                        setClientId(client);
-                        return client;
-                    });
+            when(clientRepository.save(client)).thenAnswer(invocation -> {
+                Client toSave = invocation.getArgument(0);
+                setClientId(toSave);
+                return toSave;
+            });
 
-            clientPersistenceService.create(request, address(), USERNAME);
+            clientPersistenceService.create(client, USERNAME);
 
             ClientOperationEvent event = capturePublishedEvent();
 
@@ -164,35 +125,50 @@ class ClientPersistenceServiceTest {
             assertEquals(ClientOperationType.CREATED, event.type());
             assertEquals(USERNAME, event.username());
 
-            verify(clientRepository).save(any(Client.class));
+            verify(clientRepository).save(client);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should record the persistence timer")
+        void shouldRecordPersistenceTimer() {
+            Client client = unsavedClient();
+
+            when(clientRepository.save(client)).thenReturn(client);
+
+            clientPersistenceService.create(client, USERNAME);
+
+            assertEquals(1, meterRegistry.get(CREATE_TIMER_NAME).timer().count());
+
+            verify(clientRepository).save(client);
+            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
             verifyNoMoreInteractionsOnMocks();
         }
 
         @Test
         @DisplayName("Should propagate the failure and not publish the event when save fails")
         void shouldNotPublishEventWhenSaveFails() {
-            ClientRequestDTO request = clientRequest();
-            Address address = address();
+            Client client = unsavedClient();
             DataIntegrityViolationException exception =
                     new DataIntegrityViolationException("uk_client_cpf");
 
-            when(clientRepository.save(any(Client.class))).thenThrow(exception);
+            when(clientRepository.save(client)).thenThrow(exception);
 
             DataIntegrityViolationException thrown = assertThrows(
                     DataIntegrityViolationException.class,
-                    () -> clientPersistenceService.create(request, address, USERNAME)
+                    () -> clientPersistenceService.create(client, USERNAME)
             );
 
             assertSame(exception, thrown);
 
-            verify(clientRepository).save(any(Client.class));
+            verify(clientRepository).save(client);
             verifyNoInteractions(eventPublisher);
             verifyNoMoreInteractions(clientRepository);
         }
     }
 
     @Nested
-    @DisplayName("update(Long, ClientUpdateRequestDTO, AddressLookupResponse, String)")
+    @DisplayName("update(Long, ClientUpdateData, String)")
     class Update {
 
         @Test
@@ -200,7 +176,6 @@ class ClientPersistenceServiceTest {
         void shouldUpdateClientSuccessfully() {
             Client client = client();
             Address originalAddress = client.getAddress();
-            ClientUpdateRequestDTO request = clientOnlyUpdateRequest();
 
             when(clientRepository.findById(CLIENT_ID))
                     .thenReturn(Optional.of(client));
@@ -208,8 +183,7 @@ class ClientPersistenceServiceTest {
 
             Client result = clientPersistenceService.update(
                     CLIENT_ID,
-                    request,
-                    null,
+                    clientOnlyUpdateData(),
                     USERNAME
             );
 
@@ -231,7 +205,7 @@ class ClientPersistenceServiceTest {
         @DisplayName("Should update only the provided client fields")
         void shouldUpdateOnlyTheProvidedFields(
                 String scenario,
-                ClientUpdateRequestDTO request,
+                ClientUpdateData data,
                 String expectedName,
                 String expectedEmail,
                 String expectedPhone
@@ -244,14 +218,14 @@ class ClientPersistenceServiceTest {
 
             Client result = clientPersistenceService.update(
                     CLIENT_ID,
-                    request,
-                    null,
+                    data,
                     USERNAME
             );
 
             assertEquals(expectedName, result.getName());
             assertEquals(expectedEmail, result.getEmail());
             assertEquals(expectedPhone, result.getPhoneNumber());
+            assertAddressUnchanged(result.getAddress());
 
             verify(clientRepository).findById(CLIENT_ID);
             verify(clientRepository).save(client);
@@ -263,8 +237,12 @@ class ClientPersistenceServiceTest {
         @DisplayName("Should update client address successfully")
         void shouldUpdateClientAddressSuccessfully() {
             Client client = client();
-            ClientUpdateRequestDTO request = fullUpdateRequest();
-            AddressData addressData = addressData();
+            ClientUpdateData data = new ClientUpdateData(
+                    UPDATED_NAME,
+                    UPDATED_EMAIL,
+                    UPDATED_PHONE,
+                    new AddressUpdateData(addressData(), "456", "Apto 22")
+            );
 
             when(clientRepository.findById(CLIENT_ID))
                     .thenReturn(Optional.of(client));
@@ -272,8 +250,7 @@ class ClientPersistenceServiceTest {
 
             Client result = clientPersistenceService.update(
                     CLIENT_ID,
-                    request,
-                    addressData,
+                    data,
                     USERNAME
             );
 
@@ -295,21 +272,20 @@ class ClientPersistenceServiceTest {
 
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "addressUpdates")
-        @DisplayName("Should update address fields according to the request")
+        @DisplayName("Should update address fields according to the update data")
         void shouldUpdateAddressFields(
                 String scenario,
-                AddressUpdateRequestDTO addressRequest,
+                String streetNumber,
+                String complement,
                 String expectedStreetNumber,
                 String expectedComplement
         ) {
             Client client = client();
-            AddressData addressData = addressData();
-
-            ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(
+            ClientUpdateData data = new ClientUpdateData(
                     null,
                     null,
                     null,
-                    addressRequest
+                    new AddressUpdateData(addressData(), streetNumber, complement)
             );
 
             when(clientRepository.findById(CLIENT_ID))
@@ -318,8 +294,7 @@ class ClientPersistenceServiceTest {
 
             Client result = clientPersistenceService.update(
                     CLIENT_ID,
-                    request,
-                    addressData,
+                    data,
                     USERNAME
             );
 
@@ -337,17 +312,13 @@ class ClientPersistenceServiceTest {
         @Test
         @DisplayName("Should throw when client does not exist")
         void shouldThrowWhenClientDoesNotExist() {
-            ClientUpdateRequestDTO request = fullUpdateRequest();
-            AddressData addressData = addressData();
-
             when(clientRepository.findById(CLIENT_ID))
                     .thenReturn(Optional.empty());
 
             assertClientNotFound(
                     () -> clientPersistenceService.update(
                             CLIENT_ID,
-                            request,
-                            addressData,
+                            fullUpdateData(),
                             USERNAME
                     )
             );
@@ -358,28 +329,9 @@ class ClientPersistenceServiceTest {
         }
 
         @Test
-        @DisplayName("Should reject an address update without the looked-up address data")
-        void shouldRejectAddressUpdateWithoutLookupData() {
-            ClientUpdateRequestDTO request = fullUpdateRequest();
-
-            assertThrows(
-                    IllegalArgumentException.class,
-                    () -> clientPersistenceService.update(
-                            CLIENT_ID,
-                            request,
-                            null,
-                            USERNAME
-                    )
-            );
-
-            verifyNoInteractions(clientRepository, eventPublisher);
-        }
-
-        @Test
         @DisplayName("Should propagate the failure and not publish the event when save fails")
         void shouldNotPublishEventWhenSaveFails() {
             Client client = client();
-            ClientUpdateRequestDTO request = clientOnlyUpdateRequest();
             DataIntegrityViolationException exception =
                     new DataIntegrityViolationException("update failed");
 
@@ -391,8 +343,7 @@ class ClientPersistenceServiceTest {
                     DataIntegrityViolationException.class,
                     () -> clientPersistenceService.update(
                             CLIENT_ID,
-                            request,
-                            null,
+                            clientOnlyUpdateData(),
                             USERNAME
                     )
             );
@@ -406,10 +357,9 @@ class ClientPersistenceServiceTest {
         }
 
         @Test
-        @DisplayName("Should publish client updated event")
-        void shouldPublishClientUpdatedEvent() {
+        @DisplayName("Should record the update timer")
+        void shouldRecordUpdateTimer() {
             Client client = client();
-            ClientUpdateRequestDTO request = clientOnlyUpdateRequest();
 
             when(clientRepository.findById(CLIENT_ID))
                     .thenReturn(Optional.of(client));
@@ -417,8 +367,30 @@ class ClientPersistenceServiceTest {
 
             clientPersistenceService.update(
                     CLIENT_ID,
-                    request,
-                    null,
+                    clientOnlyUpdateData(),
+                    USERNAME
+            );
+
+            assertEquals(1, meterRegistry.get(UPDATE_TIMER_NAME).timer().count());
+
+            verify(clientRepository).findById(CLIENT_ID);
+            verify(clientRepository).save(client);
+            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should publish client updated event")
+        void shouldPublishClientUpdatedEvent() {
+            Client client = client();
+
+            when(clientRepository.findById(CLIENT_ID))
+                    .thenReturn(Optional.of(client));
+            when(clientRepository.save(client)).thenReturn(client);
+
+            clientPersistenceService.update(
+                    CLIENT_ID,
+                    clientOnlyUpdateData(),
                     USERNAME
             );
 
@@ -446,15 +418,13 @@ class ClientPersistenceServiceTest {
         void createAndUpdateShouldBeTransactional() throws NoSuchMethodException {
             Method create = ClientPersistenceService.class.getMethod(
                     "create",
-                    ClientRequestDTO.class,
-                    Address.class,
+                    Client.class,
                     String.class
             );
             Method update = ClientPersistenceService.class.getMethod(
                     "update",
                     Long.class,
-                    ClientUpdateRequestDTO.class,
-                    AddressData.class,
+                    ClientUpdateData.class,
                     String.class
             );
 
@@ -468,28 +438,28 @@ class ClientPersistenceServiceTest {
         return Stream.of(
                 Arguments.of(
                         "only name is sent",
-                        new ClientUpdateRequestDTO(UPDATED_NAME, null, null, null),
+                        new ClientUpdateData(UPDATED_NAME, null, null, null),
                         UPDATED_NAME,
                         EMAIL,
                         PHONE
                 ),
                 Arguments.of(
                         "only email is sent",
-                        new ClientUpdateRequestDTO(null, UPDATED_EMAIL, null, null),
+                        new ClientUpdateData(null, UPDATED_EMAIL, null, null),
                         NAME,
                         UPDATED_EMAIL,
                         PHONE
                 ),
                 Arguments.of(
                         "only phone number is sent",
-                        new ClientUpdateRequestDTO(null, null, UPDATED_PHONE, null),
+                        new ClientUpdateData(null, null, UPDATED_PHONE, null),
                         NAME,
                         EMAIL,
                         UPDATED_PHONE
                 ),
                 Arguments.of(
                         "nothing is sent",
-                        new ClientUpdateRequestDTO(null, null, null, null),
+                        new ClientUpdateData(null, null, null, null),
                         NAME,
                         EMAIL,
                         PHONE
@@ -502,19 +472,22 @@ class ClientPersistenceServiceTest {
         return Stream.of(
                 Arguments.of(
                         "street number and complement are updated",
-                        new AddressUpdateRequestDTO("456", "Apto 22", POSTAL_CODE),
+                        "456",
+                        "Apto 22",
                         "456",
                         "Apto 22"
                 ),
                 Arguments.of(
                         "complement is cleared when blank",
-                        new AddressUpdateRequestDTO("456", "   ", POSTAL_CODE),
+                        "456",
+                        "   ",
                         "456",
                         null
                 ),
                 Arguments.of(
                         "complement is cleared when null",
-                        new AddressUpdateRequestDTO("456", null, POSTAL_CODE),
+                        "456",
+                        null,
                         "456",
                         null
                 )
@@ -553,19 +526,9 @@ class ClientPersistenceServiceTest {
         assertEquals(POSTAL_CODE, address.getPostalCode());
     }
 
-    private static ClientRequestDTO clientRequest() {
-        return new ClientRequestDTO(
-                NAME,
-                CPF,
-                EMAIL,
-                PHONE,
-                new AddressRequestDTO("123", null, POSTAL_CODE)
-        );
-    }
-
-    // Atualização sem endereço: nesse caso o ClientService repassa addressData = null.
-    private static ClientUpdateRequestDTO clientOnlyUpdateRequest() {
-        return new ClientUpdateRequestDTO(
+    // Atualização sem endereço: nesse caso o ClientService repassa address = null.
+    private static ClientUpdateData clientOnlyUpdateData() {
+        return new ClientUpdateData(
                 UPDATED_NAME,
                 UPDATED_EMAIL,
                 UPDATED_PHONE,
@@ -573,17 +536,13 @@ class ClientPersistenceServiceTest {
         );
     }
 
-    // Atualização com endereço: o ClientService repassa o addressData consultado.
-    private static ClientUpdateRequestDTO fullUpdateRequest() {
-        return new ClientUpdateRequestDTO(
+    // Atualização com endereço: o ClientService repassa o endereço consultado.
+    private static ClientUpdateData fullUpdateData() {
+        return new ClientUpdateData(
                 UPDATED_NAME,
                 UPDATED_EMAIL,
                 UPDATED_PHONE,
-                new AddressUpdateRequestDTO(
-                        "456",
-                        "Apto 22",
-                        "87654321"
-                )
+                new AddressUpdateData(addressData(), "456", "Apto 22")
         );
     }
 
@@ -609,8 +568,13 @@ class ClientPersistenceServiceTest {
         );
     }
 
+    // Cliente ainda não persistido (sem id), como chega do ClientService na criação.
+    private static Client unsavedClient() {
+        return new Client(NAME, CPF, EMAIL, PHONE, address());
+    }
+
     private static Client client() {
-        Client client = new Client(NAME, CPF, EMAIL, PHONE, address());
+        Client client = unsavedClient();
         setClientId(client);
         return client;
     }

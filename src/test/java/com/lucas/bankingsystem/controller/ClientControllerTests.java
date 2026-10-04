@@ -8,7 +8,6 @@ import com.lucas.bankingsystem.dto.response.AddressResponseDTO;
 import com.lucas.bankingsystem.dto.response.ClientResponseDTO;
 import com.lucas.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lucas.bankingsystem.entity.Address;
-import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
@@ -28,7 +27,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -41,9 +39,7 @@ import java.util.stream.Stream;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ClientController.class)
@@ -225,7 +221,7 @@ public class ClientControllerTests {
             ClientRequestDTO request = validClientRequest();
             ClientResponseDTO expected = clientResponse(VALID_NAME, VALID_EMAIL);
 
-            when(clientService.create(request)).thenReturn(client(VALID_NAME, VALID_EMAIL));
+            when(clientService.create(request)).thenReturn(expected);
 
             MvcResult result = postClient(request)
                     .andExpect(status().isCreated())
@@ -326,7 +322,7 @@ public class ClientControllerTests {
             ClientUpdateRequestDTO request = validClientUpdateRequest();
             ClientResponseDTO expected = clientResponse(UPDATED_NAME, UPDATED_EMAIL);
 
-            when(clientService.update(1L, request)).thenReturn(client(UPDATED_NAME, UPDATED_EMAIL));
+            when(clientService.update(1L, request)).thenReturn(expected);
 
             MvcResult result = patchClient(1L, request)
                     .andExpect(status().isOk())
@@ -343,8 +339,9 @@ public class ClientControllerTests {
         @DisplayName("Should accept an empty JSON object since every field is optional")
         void shouldAcceptEmptyJsonObject() throws Exception {
             ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(null, null, null, null);
+            ClientResponseDTO expected = clientResponse(VALID_NAME, VALID_EMAIL);
 
-            when(clientService.update(1L, request)).thenReturn(client(VALID_NAME, VALID_EMAIL));
+            when(clientService.update(1L, request)).thenReturn(expected);
 
             mockMvc.perform(patch(CLIENT_URL, 1L)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -362,8 +359,9 @@ public class ClientControllerTests {
             ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(
                     null, null, null, new AddressUpdateRequestDTO(VALID_STREET_NUMBER, "", VALID_UPDATE_POSTAL_CODE)
             );
+            ClientResponseDTO expected = clientResponse(VALID_NAME, VALID_EMAIL);
 
-            when(clientService.update(1L, request)).thenReturn(client(VALID_NAME, VALID_EMAIL));
+            when(clientService.update(1L, request)).thenReturn(expected);
 
             patchClient(1L, request)
                     .andExpect(status().isOk())
@@ -699,12 +697,6 @@ public class ClientControllerTests {
                 State.SP,
                 VALID_CREATION_POSTAL_CODE
         );
-    }
-
-    private static Client client(String name, String email) {
-        Client client = new Client(name, VALID_CPF, email, VALID_PHONE, address());
-        ReflectionTestUtils.setField(client, "id", 1L);
-        return client;
     }
 
     private static ClientResponseDTO clientResponse(String name, String email) {

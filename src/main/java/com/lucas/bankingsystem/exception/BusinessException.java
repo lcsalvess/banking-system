@@ -10,6 +10,15 @@ public abstract class BusinessException extends RuntimeException {
         this.status = status;
     }
 
+    protected BusinessException(
+            String message,
+            HttpStatus status,
+            Throwable cause
+    ) {
+        super(message, cause);
+        this.status = status;
+    }
+
     public HttpStatus getStatus() {
         return status;
     }

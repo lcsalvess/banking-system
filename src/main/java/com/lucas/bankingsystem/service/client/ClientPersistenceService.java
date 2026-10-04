@@ -1,14 +1,11 @@
 package com.lucas.bankingsystem.service.client;
 
-import com.lucas.bankingsystem.dto.request.ClientRequestDTO;
-import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
-import com.lucas.bankingsystem.entity.Address;
 import com.lucas.bankingsystem.entity.Client;
 import com.lucas.bankingsystem.event.client.ClientOperationEvent;
 import com.lucas.bankingsystem.event.client.ClientOperationType;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.repository.ClientRepository;
-import com.lucas.bankingsystem.service.address.AddressData;
+import com.lucas.bankingsystem.service.client.ClientUpdateData.AddressUpdateData;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.context.ApplicationEventPublisher;
@@ -20,92 +17,82 @@ public class ClientPersistenceService {
 
     private final ClientRepository clientRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final MeterRegistry meterRegistry;
+    private final Timer createTimer;
+    private final Timer updateTimer;
 
     public ClientPersistenceService(
             ClientRepository clientRepository,
-            ApplicationEventPublisher eventPublisher, MeterRegistry meterRegistry
+            ApplicationEventPublisher eventPublisher,
+            MeterRegistry meterRegistry
     ) {
         this.clientRepository = clientRepository;
         this.eventPublisher = eventPublisher;
-        this.meterRegistry = meterRegistry;
+        this.createTimer = Timer.builder("client.persistence.create")
+                .description("Tempo da persistência de um cliente dentro da transação (exclui o commit)")
+                .register(meterRegistry);
+        this.updateTimer = Timer.builder("client.persistence.update")
+                .description("Tempo da atualização de um cliente dentro da transação (exclui o commit)")
+                .register(meterRegistry);
     }
 
     @Transactional
     public Client create(
-            ClientRequestDTO dto,
-            Address address,
+            Client client,
             String username
     ) {
-        return Timer.builder("client.persistence.create")
-                .description("Tempo total da persistência de um cliente")
-                .register(meterRegistry)
-                .record(() -> {
-                    Client client = new Client(
-                            dto.name(),
-                            dto.cpf(),
-                            dto.email(),
-                            dto.phoneNumber(),
-                            address
-                    );
+        return createTimer.record(() -> {
+            Client savedClient = clientRepository.save(client);
 
-                    Client savedClient = clientRepository.save(client);
+            publishClientOperationEvent(
+                    savedClient,
+                    ClientOperationType.CREATED,
+                    username
+            );
 
-                    publishClientOperationEvent(
-                            savedClient,
-                            ClientOperationType.CREATED,
-                            username
-                    );
-
-                    return savedClient;
-                });
+            return savedClient;
+        });
     }
 
     @Transactional
     public Client update(
             Long id,
-            ClientUpdateRequestDTO dto,
-            AddressData addressData,
+            ClientUpdateData data,
             String username
     ) {
-        if (dto.address() != null && addressData == null) {
-            throw new IllegalArgumentException(
-                    "Os dados do endereço consultado são obrigatórios quando o endereço é informado."
+        return updateTimer.record(() -> {
+            Client client = clientRepository.findById(id)
+                    .orElseThrow(ClientNotFoundException::new);
+
+            client.update(
+                    data.name(),
+                    data.email(),
+                    data.phoneNumber()
             );
-        }
 
-        Client existingClient = clientRepository.findById(id)
-                .orElseThrow(() -> new ClientNotFoundException(
-                        "Cliente não encontrado."
-                ));
+            AddressUpdateData address = data.address();
 
-        existingClient.update(
-                dto.name(),
-                dto.email(),
-                dto.phoneNumber()
-        );
+            if (address != null) {
+                client.getAddress().updateFrom(
+                        address.addressData().streetName(),
+                        address.streetNumber(),
+                        address.complement(),
+                        address.addressData().neighborhood(),
+                        address.addressData().city(),
+                        address.addressData().state(),
+                        address.addressData().postalCode()
+                );
+            }
 
-        if (dto.address() != null) {
-            existingClient.getAddress().updateFrom(
-                    addressData.streetName(),
-                    dto.address().streetNumber(),
-                    dto.address().complement(),
-                    addressData.neighborhood(),
-                    addressData.city(),
-                    addressData.state(),
-                    addressData.postalCode()
+            Client updatedClient = clientRepository.save(client);
+
+            publishClientOperationEvent(
+                    updatedClient,
+                    ClientOperationType.UPDATED,
+                    username
             );
-        }
 
-        Client updatedClient = clientRepository.save(existingClient);
-
-        publishClientOperationEvent(
-                updatedClient,
-                ClientOperationType.UPDATED,
-                username
-        );
-
-        return updatedClient;
+            return updatedClient;
+        });
     }
 
     private void publishClientOperationEvent(

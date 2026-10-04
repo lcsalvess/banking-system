@@ -1,6 +1,5 @@
 package com.lucas.bankingsystem.entity;
 
-import com.lucas.bankingsystem.dto.request.AddressUpdateRequestDTO;
 import com.lucas.bankingsystem.entity.enums.State;
 import jakarta.persistence.*;
 
@@ -39,11 +38,23 @@ public class Address {
         this.postalCode = postalCode;
     }
 
-    public void update(AddressUpdateRequestDTO dto) {
-        this.streetNumber = dto.streetNumber();
-        this.complement = dto.complement() == null || dto.complement().isBlank()
+    public void updateFrom(
+            String streetName,
+            String streetNumber,
+            String complement,
+            String neighborhood,
+            String city,
+            State state,
+            String postalCode) {
+        this.streetName = streetName;
+        this.streetNumber = streetNumber;
+        this.complement = complement == null || complement.isBlank()
                 ? null
-                : dto.complement();
+                : complement;
+        this.neighborhood = neighborhood;
+        this.city = city;
+        this.state = state;
+        this.postalCode = postalCode;
     }
 
     public Long getId() {

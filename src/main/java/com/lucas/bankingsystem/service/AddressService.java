@@ -6,14 +6,10 @@ import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.integration.address.AddressLookupService;
 import com.lucas.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lucas.bankingsystem.service.address.AddressData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AddressService {
-
-    private static final Logger log = LoggerFactory.getLogger(AddressService.class);
 
     private final AddressLookupService addressLookupService;
 
@@ -22,22 +18,17 @@ public class AddressService {
     }
 
     public Address createFromPostalCode(AddressRequestDTO dto) {
-        AddressLookupResponse addressData =
-                addressLookupService.findByPostalCode(dto.postalCode());
+        AddressData addressData = findAddressByPostalCode(dto.postalCode());
 
-        Address address = new Address(
+        return new Address(
                 addressData.streetName(),
                 dto.streetNumber(),
                 dto.complement(),
                 addressData.neighborhood(),
                 addressData.city(),
-                State.valueOf(addressData.state()),
-                addressData.postalCode().replace("-", "")
+                addressData.state(),
+                addressData.postalCode()
         );
-
-        log.info("Address successfully created from postal code");
-
-        return address;
     }
 
     public AddressData findAddressByPostalCode(String postalCode) {
@@ -49,7 +40,7 @@ public class AddressService {
                 response.neighborhood(),
                 response.city(),
                 State.valueOf(response.state()),
-                response.postalCode().replace("-", "")
+                response.postalCode()
         );
     }
 }

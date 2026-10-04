@@ -79,18 +79,22 @@ public class ClientPersistenceService {
                         "Cliente não encontrado."
                 ));
 
-        existingClient.update(dto);
+        existingClient.update(
+                dto.name(),
+                dto.email(),
+                dto.phoneNumber()
+        );
 
         if (dto.address() != null) {
-            Address address = existingClient.getAddress();
-
-            address.setStreetName(addressData.streetName());
-            address.setNeighborhood(addressData.neighborhood());
-            address.setCity(addressData.city());
-            address.setState(addressData.state());
-            address.setPostalCode(addressData.postalCode());
-
-            address.update(dto.address());
+            existingClient.getAddress().updateFrom(
+                    addressData.streetName(),
+                    dto.address().streetNumber(),
+                    dto.address().complement(),
+                    addressData.neighborhood(),
+                    addressData.city(),
+                    addressData.state(),
+                    addressData.postalCode()
+            );
         }
 
         Client updatedClient = clientRepository.save(existingClient);

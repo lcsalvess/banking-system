@@ -1,6 +1,5 @@
 package com.lucas.bankingsystem.entity;
 
-import com.lucas.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import jakarta.persistence.*;
 
 @Entity
@@ -37,10 +36,12 @@ public class Client {
         this.address = address;
     }
 
-    public void update(ClientUpdateRequestDTO dto) {
-        if (dto.name() != null) {this.name = dto.name();}
-        if (dto.email() != null) {this.email = dto.email();}
-        if (dto.phoneNumber() != null) {this.phoneNumber = dto.phoneNumber();}
+    public void update(String name, String email, String phoneNumber) {
+        if (name != null) {this.name = name;}
+
+        if (email != null) {this.email = email;}
+
+        if (phoneNumber != null) {this.phoneNumber = phoneNumber;}
     }
 
     public Long getId() {

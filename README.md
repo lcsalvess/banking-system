@@ -1,56 +1,65 @@
 # Banking System
 
 ## About
-A banking system backend developed with Java and Spring Boot.
+A banking system backend developed with Java and Spring Boot, designed as a RESTful API with PostgreSQL persistence, authentication and authorization, external service integration, observability, and automated testing.
 
-The project started as a pure Java application and has evolved into a RESTful API using Spring Boot, PostgreSQL, Spring Data JPA, and Spring Security.
+The project evolved from a pure Java application into a modular Spring Boot backend, progressively introducing persistence, security, validation, transactional consistency, external integrations, observability, and automated testing. It focuses on practical backend engineering practices such as object-oriented design, business rule enforcement, database constraints, secure API design, resilient external integrations, application events for decoupled operational logging, and metrics.
 
-The main goal is to apply backend development concepts such as layered architecture, object-oriented programming, database persistence, authentication, authorization, business rules, external API integration, event-driven logging, and automated testing.
+The main goal is to build a realistic backend system while exploring software engineering concepts such as separation of responsibilities, transactional data consistency, validation, exception handling, concurrency, and maintainable architecture.
 
 ---
 
 ## Technologies
 
-| Technology         | Version | Description                              |
-| ------------------ | ------- | ---------------------------------------- |
-| Java               | 21      | Programming language                     |
-| Spring Boot        | 4.1.1   | Backend framework                        |
-| Spring Web MVC     | -       | REST API development                     |
-| Spring RestClient  | -       | HTTP communication with external APIs    |
-| Bean Validation    | -       | Request validation                       |
-| Spring Data JPA    | -       | Data access and persistence              |
-| Hibernate          | -       | JPA implementation and ORM               |
-| Spring Security    | -       | Authentication and authorization         |
-| Spring Events      | -       | Decoupled operation logging              |
-| JWT (JJWT)         | 0.13.0  | Stateless authentication                 |
-| BCrypt             | -       | Password hashing                         |
-| PostgreSQL         | 18      | Relational database                      |
-| springdoc-openapi  | 3.1.1   | OpenAPI / Swagger UI documentation       |
-| Maven              | -       | Dependency management and build          |
-| JUnit              | 6       | Unit and integration testing             |
-| Mockito            | 5       | Mocking for tests                        |
+| Technology            | Version | Description                              |
+| --------------------- | ------- | ---------------------------------------- |
+| Java                  | 21      | Programming language                     |
+| Spring Boot           | 4.1.1   | Backend framework                        |
+| Spring Web MVC        | -       | REST API development                     |
+| Spring RestClient     | -       | HTTP communication with external APIs    |
+| Bean Validation       | -       | Request and parameter validation         |
+| Spring Data JPA       | -       | Data access and persistence              |
+| Hibernate             | -       | JPA implementation and ORM               |
+| Spring Security       | -       | Authentication and authorization         |
+| Spring Events         | -       | Decoupled operation logging              |
+| Spring Boot Actuator  | -       | Health, info, and metrics endpoints      |
+| Micrometer            | -       | Metrics and observability                |
+| JWT (JJWT)            | 0.13.0  | Stateless authentication                 |
+| BCrypt                | -       | Password hashing                         |
+| PostgreSQL            | 18      | Relational database                      |
+| Flyway                | -       | Versioned database migrations            |
+| springdoc-openapi     | 3.1.1   | OpenAPI / Swagger UI documentation       |
+| Maven                 | -       | Dependency management and build          |
+| JUnit                 | 6       | Unit and integration testing             |
+| Mockito               | 5       | Mocking for tests                        |
 
 ---
 
 ## Architecture
 
-The application follows a layered architecture, separating responsibilities into distinct layers.
+The application follows a modular layered architecture, separating responsibilities into distinct components and layers.
 
 ### Package Structure
 
 ```text
 src/main/java/com/lucas/bankingsystem
-├── config/       # Application and security configuration
-├── controller/   # REST API endpoints
-├── dto/          # Request and response DTOs
-├── entity/       # JPA entities and domain models (enums in entity/enums)
-├── event/        # Operation events and listeners used for logging
-├── exception/    # Custom exceptions and exception handlers (global and address-specific)
-├── integration/  # External API integrations
-│   └── address/  # Address lookup providers (ViaCEP, BrasilAPI) and related components
-├── repository/   # Database access through Spring Data JPA
-├── service/      # Business rules and application logic
-└── validation/   # Custom validators (CPF)
+├── config/          # Application, security, and web filter configuration (JWT, correlation ID)
+├── controller/      # REST API endpoints
+├── dto/             # Request and response DTOs
+├── entity/          # Domain entities and enums
+├── event/           # Application events and event listeners
+├── exception/       # Business exceptions and the global exception handler
+├── integration/
+│   └── address/     # External address providers, lookup orchestration, and lookup endpoint
+├── repository/      # Database access through Spring Data JPA
+├── service/         # Business rules and application logic
+│   ├── account/     # Account number generation
+│   ├── address/     # Address data resolved from a postal code
+│   ├── client/      # Client persistence (transaction boundary) and update data
+│   └── security/    # JWT, authentication, and current user
+└── validation/      # Custom constraints and validators
+    ├── cpf/         # CPF
+    └── accountnumber/  # Account number and check digit format
 ```
 
 ### Request Flow
@@ -72,7 +81,7 @@ Shows the full request/response cycle, including authentication and authorizatio
          │
          ▼
 ┌─────────────────┐
-│  Controller     │
+│    Controller   │
 └────────┬────────┘
          │
          ▼
@@ -81,7 +90,10 @@ Shows the full request/response cycle, including authentication and authorizatio
 │ Business Rules  │
 └────────┬────────┘
          │
-         ├──────────────► Repository
+         ├──────────────► Persistence
+         │                     │
+         │                     ▼
+         │                Repository
          │                     │
          │                     ▼
          │                PostgreSQL
@@ -94,8 +106,8 @@ Shows the full request/response cycle, including authentication and authorizatio
          │              External APIs
          │              ViaCEP / BrasilAPI
          │
-         ├──────────────► Events (published during the operation,
-         │                logged by listeners after commit)
+         ├──────────────► Events
+         │
          │
          ▼
 ┌─────────────────┐
@@ -117,14 +129,17 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Client management**: registration, listing, lookup, and partial update (`PATCH`), including address data
 - **Address lookup**: automatic address lookup by postal code using ViaCEP, with BrasilAPI as a fallback provider
 - **Provider response validation**: addresses returned by external providers are validated before being used
+- **Versioned database schema** managed by Flyway migrations and validated by Hibernate at startup
 - **Account management**: checking and savings accounts, with generated account numbers and check digits
 - **Transactions**: deposit, withdrawal, transfer between accounts, transaction history per account, and lookup by public identifier
 - **Public transaction identifier**: every transaction has a UUID (`transactionCode`) exposed in responses, while the internal database ID is never returned
 - **Savings yield**: monthly yield applied to savings accounts
 - **Account cancellation** with balance and status validation
-- **Input validation** using Bean Validation and custom CPF validation
+- **Input validation** using Bean Validation, with custom constraints for CPF, account number, and check digit
 - **Global exception handling** with a consistent error response
-- **Event-driven logging** of user, client, account, and transaction operations
+- **Decoupled operation logging** using Spring application events
+- **Request tracing** with a correlation ID present in the response header and in every log line
+- **Observability** with Spring Boot Actuator (health, info, metrics) and Micrometer timers
 - **Interactive API documentation** with Swagger UI, which can be disabled through configuration
 
 ---
@@ -137,13 +152,17 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Phone number must contain 10 to 11 digits, including the area code.
 - Every client requires an address with a postal code (CEP), a street number, and an optional complement.
 - Address details such as street name, neighborhood, city, and state are retrieved through external postal code providers.
-- Client updates are partial: only the fields sent in the request are changed, and omitted fields are left as they are.
-- When an update includes an address, the street number and complement are updated as sent. If a new postal code is sent, the address details are looked up again through the providers.
+- Client updates are partial: only the fields sent in the request are changed, and omitted fields are left unchanged.
+- When an update includes an address, the postal code is looked up again through the providers, and the street number and complement are updated along with it.
+- Client creation checks whether the CPF already exists and also handles concurrent requests with the same CPF: if another request saves it first, the unique constraint violation is translated into `409 Conflict`.
+- The postal code lookup (external calls) happens before the database transaction starts, so no database connection is held while waiting for the providers.
 
 ### Accounts
 - A client can have at most one active checking account and one active savings account. A new account of the same type can be opened after the previous one is canceled.
 - Account numbers are generated from a database sequence (5 digits) followed by a check digit (modulo 11).
-- Every operation that receives an account number also requires the check digit, which is validated before the account lookup.
+- Every operation that receives an account number also requires the check digit.
+- The account number must contain exactly 5 digits and the check digit exactly 1 digit. Otherwise, the request is rejected with `400 Bad Request` before reaching the service.
+- The check digit is then validated against the account number before the account lookup, and a mismatch also returns `400 Bad Request`.
 - An account can only be canceled if it is active and has a zero balance.
 
 ### Transactions
@@ -151,7 +170,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Amounts accept at most 17 integer digits and 2 decimal places.
 - Withdrawals and transfers require sufficient balance.
 - A transfer requires distinct and active source and destination accounts, and records one `TRANSFER_SENT` and one `TRANSFER_RECEIVED` transaction.
-- All operations run inside a database transaction, so balance changes and transaction records are saved together or not at all.
+- All operations that change balances run inside a database transaction, so balance changes and transaction records are saved together or not at all.
 - Every transaction receives a random UUID (`transactionCode`) when it is created. It is unique, immutable, and is the only identifier exposed by the API; the internal numeric ID is not part of the response.
 - A transaction can be retrieved by its `transactionCode`: `404 Not Found` if it does not exist and `400 Bad Request` if the value is not a valid UUID.
 
@@ -172,7 +191,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Providers are queried in order: ViaCEP first, then BrasilAPI as a fallback. New providers can be added by implementing `AddressProvider` and defining their order with `@Order`.
 - If a provider fails or does not find the postal code, the next provider is tried.
 - Requests to providers use a 3-second connection timeout and a 5-second read timeout.
-- Provider responses are validated (street, neighborhood, city, state, and an 8-digit postal code are required). An invalid response is treated as a provider failure.
+- Provider responses are validated. Required address fields include street, neighborhood, city, state, and an 8-digit postal code. An invalid response is treated as a provider failure.
 - Provider failures are handled separately from postal codes that are not found:
   - `404 Not Found` when every provider answered and none found the postal code.
   - `503 Service Unavailable` when at least one provider failed and no other provider found the postal code.
@@ -191,7 +210,7 @@ Authorization: Bearer <token>
 |--------------------|--------------------------------------------------------------------------|
 | Token              | JWT signed with HMAC, valid for 1 hour                                   |
 | Public routes      | `/auth/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**`      |
-| Protected routes   | Everything else requires a valid token                                   |
+| Protected routes   | Everything else requires a valid token, including `/actuator/**`         |
 | Admin-only routes  | `POST /users` (`@PreAuthorize("hasRole('ADMIN')")`)                      |
 | Invalid token      | `401 Unauthorized`                                                       |
 | Insufficient role  | `403 Forbidden`                                                          |
@@ -221,6 +240,8 @@ Full request and response schemas are available in Swagger UI.
 | GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID | Authenticated |
 | POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account     | Authenticated |
 
+`accountNumber` must have exactly 5 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
+
 ### Address Lookup Endpoint
 
 | Method | Endpoint                                | Description                       | Access        |
@@ -228,6 +249,14 @@ Full request and response schemas are available in Swagger UI.
 | GET    | `/api/v1/addresses/lookup/{postalCode}` | Look up an address by postal code | Authenticated |
 
 Possible responses: `200` (address found), `400` (postal code is not 8 digits), `404` (postal code not found), and `503` (address providers unavailable).
+
+### Actuator Endpoints
+
+| Method | Endpoint             | Description                          | Access        |
+| ------ | -------------------- | ------------------------------------ | ------------- |
+| GET    | `/actuator/health`   | Application health                   | Authenticated |
+| GET    | `/actuator/info`     | Application information              | Authenticated |
+| GET    | `/actuator/metrics`  | Micrometer metrics                   | Authenticated |
 
 ---
 
@@ -273,7 +302,7 @@ Transactions are returned with their public identifier, and the internal ID is n
 
 ## Error Handling
 
-Errors are handled by a global exception handler, and business rule violations extend a common `BusinessException`. Address provider failures are handled separately by `AddressExceptionHandler`, which applies only to the address lookup and client controllers. Every error returns the same structure:
+Errors are handled by a single global exception handler (`GlobalExceptionHandler`), and business rule violations extend a common `BusinessException`. Every error returns the same structure:
 
 ```json
 {
@@ -282,7 +311,7 @@ Errors are handled by a global exception handler, and business rule violations e
 }
 ```
 
-Validation errors also include the invalid fields:
+Validation errors also include the invalid fields. The same structure is used for request bodies and for path and query parameters:
 
 ```json
 {
@@ -294,14 +323,15 @@ Validation errors also include the invalid fields:
 }
 ```
 
-| Scenario                                                       | Status                      |
-|----------------------------------------------------------------|-----------------------------|
-| Business rule violation                                        | Defined by each exception   |
-| Bean Validation failure, invalid parameters, or malformed body | `400 Bad Request`           |
-| Invalid credentials                                            | `401 Unauthorized`          |
-| Access denied                                                  | `403 Forbidden`             |
-| Address providers unavailable                                  | `503 Service Unavailable`   |
-| Unexpected error                                               | `500 Internal Server Error` |
+| Scenario                                                                           | Status                      |
+|------------------------------------------------------------------------------------|-----------------------------|
+| Business rule violation                                                            | Defined by each exception   |
+| Bean Validation failure, invalid parameters, or malformed body                     | `400 Bad Request`           |
+| Invalid credentials                                                                | `401 Unauthorized`          |
+| Access denied                                                                      | `403 Forbidden`             |
+| CPF already registered, including concurrent requests                              | `409 Conflict`              |
+| Address providers unavailable                                                      | `503 Service Unavailable`   |
+| Unexpected error                                                                   | `500 Internal Server Error` |
 
 ---
 
@@ -311,20 +341,47 @@ Operations are logged through Spring application events:
 
 - Services publish an event after creating or changing data: client `CREATED`/`UPDATED`, account `CREATED`/`CANCELLED`, user `CREATED`, and transactions (deposit, withdrawal, transfer, and yield).
 - Listeners use `@TransactionalEventListener` in the `AFTER_COMMIT` phase, so an operation is only logged as successful after its database transaction is committed.
-- The global exception handler logs business errors, authentication and authorization failures, data integrity violations, and unexpected errors. Address provider failures are logged by `AddressExceptionHandler`.
+- The global exception handler logs business errors, authentication and authorization failures, data integrity violations, address provider failures, and unexpected errors.
 - The log level is controlled by `logging.level.com.lucas.bankingsystem` (`INFO` by default), and SQL logging is disabled.
+
+### Correlation ID
+
+- Every request has a correlation ID, read from the `X-Correlation-ID` header.
+- The header value is reused only when it is a canonical UUID, and it is normalized to lowercase. A missing, blank, or invalid value is replaced by a new random UUID.
+- The ID is returned in the `X-Correlation-ID` response header, stored in the logging MDC (`correlationId`), shown in every log line, and removed when the request ends.
+
+---
+
+## Observability
+
+- Spring Boot Actuator exposes `health`, `info`, and `metrics`. These endpoints require authentication, and health details are shown only to authorized users.
+- Custom Micrometer timers:
+
+| Timer                       | Description                                                              |
+|-----------------------------|--------------------------------------------------------------------------|
+| `address.lookup`            | Total time of an address lookup                                          |
+| `address.provider.lookup`   | Time of each provider query, tagged by `provider`                        |
+| `client.persistence.create` | Client creation inside the transaction (excludes the commit)             |
+| `client.persistence.update` | Client update inside the transaction (excludes the commit)               |
 
 ---
 
 ## Database
 
-- PostgreSQL, with schema generated by Hibernate (`ddl-auto=update`).
-- `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it).
-- `schema.sql` creates the account number sequence and the partial unique index that prevents more than one yield per account per day.
+- PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
+- `V1__create_schema.sql` creates the whole schema: tables, constraints, indexes, and the `account_number_seq` sequence.
+- Schema changes must be added as new versioned migrations (`V2__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
+- Tables use plural snake_case names: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, and `transactions`.
+- Constraints follow a naming pattern: `uk_<table>_<column>` for unique constraints, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
+- `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`, `checking_accounts`, and `savings_accounts` tables.
+- Check constraints in the database enforce a non-negative account balance, a positive transaction amount, and the allowed values of state, role, account type, account status, and transaction type.
+- Two partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type per client) and `uk_transactions_daily_yield` (one yield per account per day).
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).
-- `Transaction` has a `transaction_code` column (UUID, not null, not updatable) with the `uk_transaction_code` unique constraint, used as its public identifier.
+- `Transaction` has a `transaction_code` column (UUID, not null, not updatable) with the `uk_transactions_code` unique constraint, used as its public identifier.
 - Open Session in View is disabled (`spring.jpa.open-in-view=false`). Account queries that need the client use `JOIN FETCH` to avoid lazy loading outside a transaction.
 - Read operations in the services run with `@Transactional(readOnly = true)`, while operations that change data use regular transactions.
+- For clients, the transaction boundary is in `ClientPersistenceService`: `ClientService` resolves the address first and only then calls it, so the transaction covers just the persistence work.
+- Entities have no public setters. Changes go through domain methods such as `Client.update(...)` and `Address.updateFrom(...)`.
 
 ---
 
@@ -338,7 +395,7 @@ Operations are logged through Spring application events:
 
 ### Configuration
 
-1. Create the databases:
+1. Create the empty databases (Flyway creates the schema on the first startup):
 
 ```sql
 CREATE DATABASE banking_system;
@@ -397,26 +454,24 @@ To disable the documentation (for example, in production), set `SWAGGER_ENABLED=
 
 The test suite covers:
 
-- **Unit tests** for services, using JUnit and Mockito: accounts, clients, transactions (deposit, withdrawal, transfer, yield), users, JWT, authentication, user details loading, and address lookup provider orchestration.
-- **Controller tests** using `MockMvc` for clients, accounts, transactions (including lookup by public transaction code and invalid UUID handling), and authentication.
-- **Validation tests** for CPF validation.
+- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, yield), users, JWT, authentication, user details loading, and address lookup provider orchestration.
+- **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), and authentication.
+- **Validation tests** for CPF, account number, and account digit.
+- **Filter tests** for the correlation ID: generation, reuse, lowercase normalization, rejection of non-canonical values, and MDC cleanup.
 - **Context test** to verify the application starts.
 
-Tests run with the `test` profile against the `banking_system_test` database, which is recreated on each run (`create-drop`).
+Tests run with the `test` profile against the `banking_system_test` database. Its schema is created by the same Flyway migrations used in the application and validated by Hibernate (`validate`).
 
 ---
 
 ## Roadmap
 
-- [ ] Unit tests for external address providers (`ViaCepClient` and `BrasilApiClient`)
+- [x] Migration management with Flyway
+- [x] Integration tests for external address providers (`ViaCepClient` and `BrasilApiClient`)
 - [ ] Tests for `AddressService` and `AddressLookupController`
-- [ ] Metrics and health checks (Spring Boot Actuator)
-- [ ] Review and expand entity constraints and relationships
 - [ ] Integration tests with PostgreSQL for transaction and concurrency scenarios
 - [ ] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
 - [ ] Pagination and filtering on list endpoints
 - [ ] Docker Compose for the application and database
 - [ ] CI/CD pipeline with GitHub Actions
-- [ ] Evaluate migration management with Flyway
 - [ ] Refresh tokens
-- [ ] Consider a microservices architecture after consolidating the current application

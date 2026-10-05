@@ -12,11 +12,14 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("/api/v1/accounts")
 public class AccountController {
@@ -62,7 +65,7 @@ public class AccountController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description =  "Account digit invalid",
+                    description =  "Invalid account number or check digit",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class)
@@ -84,13 +87,17 @@ public class AccountController {
                     example = "12345",
                     required = true
             )
-            @PathVariable String accountNumber,
+            @PathVariable
+            @Pattern(regexp = "\\d{5}", message = "O número da conta deve conter 5 dígitos.")
+            String accountNumber,
             @Parameter(
                     description = "Account check digit",
                     example = "1",
                     required = true
             )
-            @RequestParam String digit
+            @RequestParam
+            @Pattern(regexp = "\\d", message = "O dígito da conta deve conter 1 dígito.")
+            String digit
     ) {
         return accountService.findByAccountNumber(accountNumber, digit);
     }
@@ -142,7 +149,7 @@ public class AccountController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Account digit invalid",
+                    description = "Invalid account number or check digit",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class)
@@ -173,13 +180,17 @@ public class AccountController {
                     example = "12345",
                     required = true
             )
-            @PathVariable String accountNumber,
+            @PathVariable
+            @Pattern(regexp = "\\d{5}", message = "O número da conta deve conter 5 dígitos.")
+            String accountNumber,
             @Parameter(
                     description = "Account check digit",
                     example = "1",
                     required = true
             )
-            @RequestParam String digit
+            @RequestParam
+            @Pattern(regexp = "\\d", message = "O dígito da conta deve conter 1 dígito.")
+            String digit
     ) {
         accountService.cancel(accountNumber, digit);
     }

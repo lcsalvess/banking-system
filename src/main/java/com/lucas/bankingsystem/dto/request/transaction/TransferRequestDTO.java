@@ -1,30 +1,26 @@
 package com.lucas.bankingsystem.dto.request.transaction;
 
+import com.lucas.bankingsystem.validation.accountnumber.ValidAccountDigit;
+import com.lucas.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
 public record TransferRequestDTO(
         @NotBlank(message = "O número da conta de origem é obrigatório.")
-        @Pattern(
-                regexp = "^\\d{5}$",
-                message = "O número da conta de origem deve conter exatamente 5 dígitos."
-        )
+        @ValidAccountNumber(message = "O número da conta de origem deve conter exatamente 5 dígitos.")
         String fromAccountNumber,
 
         @NotBlank(message = "O dígito da conta de origem é obrigatório.")
-        @Pattern(regexp = "^\\d{1}$", message = "O dígito da conta de origem deve conter exatamente 1 dígito.")
+        @ValidAccountDigit(message = "O dígito da conta de origem deve conter exatamente 1 dígito.")
         String fromAccountDigit,
 
         @NotBlank(message = "O número da conta de destino é obrigatório.")
-        @Pattern(
-                regexp = "^\\d{5}$",
-                message = "O número da conta de destino deve conter exatamente 5 dígitos."
-        )
+        @ValidAccountNumber(message = "O número da conta de destino deve conter exatamente 5 dígitos.")
         String toAccountNumber,
 
         @NotBlank(message = "O dígito da conta de destino é obrigatório.")
-        @Pattern(regexp = "^\\d{1}$", message = "O dígito da conta de destino deve conter exatamente 1 dígito.")
+        @ValidAccountDigit(message = "O dígito da conta de destino deve conter exatamente 1 dígito.")
         String toAccountDigit,
 
         @NotNull(message = "O valor da transferência é obrigatório.")

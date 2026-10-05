@@ -40,6 +40,23 @@ class ValidAccountDigitValidatorTest {
     }
 
     @Nested
+    class NullAccountDigit {
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("nullAccountDigits")
+        void shouldAcceptNullAccountDigit(String scenario, String digit) {
+
+            assertTrue(validator.isValid(digit, null));
+        }
+
+        static Stream<Arguments> nullAccountDigits() {
+            return Stream.of(
+                    Arguments.of("null value", null)
+            );
+        }
+    }
+
+    @Nested
     class InvalidAccountDigit {
 
         @ParameterizedTest(name = "{0}")
@@ -51,7 +68,6 @@ class ValidAccountDigitValidatorTest {
 
         static Stream<Arguments> invalidAccountDigits() {
             return Stream.of(
-                    Arguments.of("null value", null),
                     Arguments.of("empty value", ""),
                     Arguments.of("blank value", " "),
                     Arguments.of("more than one digit", "12"),

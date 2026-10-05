@@ -8,7 +8,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ValidAccountNumberValidatorTest {
 
@@ -39,6 +40,23 @@ class ValidAccountNumberValidatorTest {
     }
 
     @Nested
+    class NullAccountNumber {
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("nullAccountNumbers")
+        void shouldAcceptNullAccountNumber(String scenario, String accountNumber) {
+
+            assertTrue(validator.isValid(accountNumber, null));
+        }
+
+        static Stream<Arguments> nullAccountNumbers() {
+            return Stream.of(
+                    Arguments.of("null value", null)
+            );
+        }
+    }
+
+    @Nested
     class InvalidAccountNumber {
 
         @ParameterizedTest(name = "{0}")
@@ -50,7 +68,6 @@ class ValidAccountNumberValidatorTest {
 
         static Stream<Arguments> invalidAccountNumbers() {
             return Stream.of(
-                    Arguments.of("null value", null),
                     Arguments.of("empty value", ""),
                     Arguments.of("blank value", "   "),
                     Arguments.of("less than five digits", "1234"),

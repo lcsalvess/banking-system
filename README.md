@@ -48,7 +48,7 @@ src/main/java/com/lucas/bankingsystem
 ├── dto/             # Request and response DTOs
 ├── entity/          # Domain entities and enums
 ├── event/           # Application events and event listeners
-├── exception/       # Business exceptions and the global exception handler
+├── exception/       # Business exceptions, database constraint names, and the global exception handler
 ├── integration/
 │   └── address/     # External address providers, lookup orchestration, and lookup endpoint
 ├── repository/      # Database access through Spring Data JPA
@@ -136,6 +136,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Savings yield**: monthly yield applied to savings accounts
 - **Account cancellation** with balance and status validation
 - **Input validation** using Bean Validation, with custom constraints for CPF, account number, and check digit
+- **Strict JSON input types**: text fields reject numbers and booleans, and monetary amounts reject strings
 - **Global exception handling** with a consistent error response
 - **Decoupled operation logging** using Spring application events
 - **Request tracing** with a correlation ID present in the response header and in every log line
@@ -148,20 +149,21 @@ Shows the full request/response cycle, including authentication and authorizatio
 
 ### Clients
 - CPF must be unique and contain exactly 11 digits.
+- E-mail must be unique.
 - CPF validation includes format checks and verification digit calculation.
 - Phone number must contain 10 to 11 digits, including the area code.
 - Every client requires an address with a postal code (CEP), a street number, and an optional complement.
 - Address details such as street name, neighborhood, city, and state are retrieved through external postal code providers.
 - Client updates are partial: only the fields sent in the request are changed, and omitted fields are left unchanged.
 - When an update includes an address, the postal code is looked up again through the providers, and the street number and complement are updated along with it.
-- Client creation checks whether the CPF already exists and also handles concurrent requests with the same CPF: if another request saves it first, the unique constraint violation is translated into `409 Conflict`.
+- Client creation checks whether the CPF already exists. Concurrent requests are also handled: if another request saves the same CPF or e-mail first, the unique constraint violation is translated into `409 Conflict` with a message that identifies the field. E-mail uniqueness is enforced by the database.
 - The postal code lookup (external calls) happens before the database transaction starts, so no database connection is held while waiting for the providers.
 
 ### Accounts
 - A client can have at most one active checking account and one active savings account. A new account of the same type can be opened after the previous one is canceled.
-- Account numbers are generated from a database sequence (5 digits) followed by a check digit (modulo 11).
+- Account numbers are generated from a database sequence, padded to at least 5 digits (for example `00001`), followed by a check digit (modulo 11). The `account_number` column holds up to 20 digits.
 - Every operation that receives an account number also requires the check digit.
-- The account number must contain exactly 5 digits and the check digit exactly 1 digit. Otherwise, the request is rejected with `400 Bad Request` before reaching the service.
+- The account number must contain between 5 and 20 digits and the check digit exactly 1 digit. Otherwise, the request is rejected with `400 Bad Request` before reaching the service.
 - The check digit is then validated against the account number before the account lookup, and a mismatch also returns `400 Bad Request`.
 - An account can only be canceled if it is active and has a zero balance.
 
@@ -173,6 +175,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - All operations that change balances run inside a database transaction, so balance changes and transaction records are saved together or not at all.
 - Every transaction receives a random UUID (`transactionCode`) when it is created. It is unique, immutable, and is the only identifier exposed by the API; the internal numeric ID is not part of the response.
 - A transaction can be retrieved by its `transactionCode`: `404 Not Found` if it does not exist and `400 Bad Request` if the value is not a valid UUID.
+- The transaction history of an account is returned from the newest to the oldest transaction.
 
 ### Savings Yield
 - Yield is calculated as 0.5% of the current balance, rounded to 2 decimal places.
@@ -240,7 +243,9 @@ Full request and response schemas are available in Swagger UI.
 | GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID | Authenticated |
 | POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account     | Authenticated |
 
-`accountNumber` must have exactly 5 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
+`accountNumber` must have between 5 and 20 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
+
+Request bodies are strict about JSON types: text fields reject numbers and booleans (`"accountNumber": 99999` is rejected), and monetary amounts reject strings (`"amount": "100.00"` is rejected; send `100.00`). Both return `400 Bad Request`.
 
 ### Address Lookup Endpoint
 
@@ -326,12 +331,14 @@ Validation errors also include the invalid fields. The same structure is used fo
 | Scenario                                                                           | Status                      |
 |------------------------------------------------------------------------------------|-----------------------------|
 | Business rule violation                                                            | Defined by each exception   |
-| Bean Validation failure, invalid parameters, or malformed body                     | `400 Bad Request`           |
+| Bean Validation failure, invalid parameters, malformed body, or wrong JSON type    | `400 Bad Request`           |
 | Invalid credentials                                                                | `401 Unauthorized`          |
 | Access denied                                                                      | `403 Forbidden`             |
-| CPF already registered, including concurrent requests                              | `409 Conflict`              |
+| CPF or e-mail already registered, including concurrent requests                    | `409 Conflict`              |
 | Address providers unavailable                                                      | `503 Service Unavailable`   |
 | Unexpected error                                                                   | `500 Internal Server Error` |
+
+Database integrity violations are translated by constraint name through the `DatabaseConstraint` enum: a client CPF or e-mail conflict returns `409 Conflict`, a second yield on the same day returns `400 Bad Request`, and any other violation returns `400 Bad Request` with a generic message. The constraint is identified by the name reported by the database, never by the exception message.
 
 ---
 
@@ -369,19 +376,20 @@ Operations are logged through Spring application events:
 ## Database
 
 - PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
-- `V1__create_schema.sql` creates the whole schema: tables, constraints, indexes, and the `account_number_seq` sequence.
-- Schema changes must be added as new versioned migrations (`V2__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
+- `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters.
+- Schema changes must be added as new versioned migrations (`V3__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
 - Tables use plural snake_case names: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, and `transactions`.
 - Constraints follow a naming pattern: `uk_<table>_<column>` for unique constraints, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
 - `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`, `checking_accounts`, and `savings_accounts` tables.
 - Check constraints in the database enforce a non-negative account balance, a positive transaction amount, and the allowed values of state, role, account type, account status, and transaction type.
 - Two partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type per client) and `uk_transactions_daily_yield` (one yield per account per day).
+- The constraints and indexes that the application translates into business errors are listed in the `DatabaseConstraint` enum, which is the only place in the code that holds their names. `DatabaseConstraintTest` checks that every name is declared in a migration, so renaming a constraint without updating the enum fails the test suite.
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).
 - `Transaction` has a `transaction_code` column (UUID, not null, not updatable) with the `uk_transactions_code` unique constraint, used as its public identifier.
 - Open Session in View is disabled (`spring.jpa.open-in-view=false`). Account queries that need the client use `JOIN FETCH` to avoid lazy loading outside a transaction.
 - Read operations in the services run with `@Transactional(readOnly = true)`, while operations that change data use regular transactions.
 - For clients, the transaction boundary is in `ClientPersistenceService`: `ClientService` resolves the address first and only then calls it, so the transaction covers just the persistence work.
-- Entities have no public setters. Changes go through domain methods such as `Client.update(...)` and `Address.updateFrom(...)`.
+- Most entities have no public setters: `Client` and `Address` change through domain methods such as `Client.update(...)` and `Address.updateFrom(...)`. `User` still exposes setters.
 
 ---
 
@@ -454,8 +462,12 @@ To disable the documentation (for example, in production), set `SWAGGER_ENABLED=
 
 The test suite covers:
 
-- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, yield), users, JWT, authentication, user details loading, and address lookup provider orchestration.
-- **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), and authentication.
+- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, yield), users, JWT, authentication, user details loading, address data resolution, and address lookup provider orchestration.
+- **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), address lookup, and authentication.
+- **Provider client tests** for ViaCEP and Brasil API against a local HTTP server: response mapping, postal code not found, invalid responses, error statuses, timeouts, and unreachable providers.
+- **Exception handler tests** for every response of `GlobalExceptionHandler`, including the translation of each database constraint into its status and message.
+- **Constraint tests** for `DatabaseConstraint`: detection in the exception cause chain and consistency of every constraint name with the Flyway migrations.
+- **JSON coercion tests** that import `JacksonConfig` into a controller slice to check that wrongly typed fields are rejected.
 - **Validation tests** for CPF, account number, and account digit.
 - **Filter tests** for the correlation ID: generation, reuse, lowercase normalization, rejection of non-canonical values, and MDC cleanup.
 - **Context test** to verify the application starts.
@@ -468,7 +480,7 @@ Tests run with the `test` profile against the `banking_system_test` database. It
 
 - [x] Migration management with Flyway
 - [x] Integration tests for external address providers (`ViaCepClient` and `BrasilApiClient`)
-- [ ] Tests for `AddressService` and `AddressLookupController`
+- [x] Tests for `AddressService` and `AddressLookupController`
 - [ ] Integration tests with PostgreSQL for transaction and concurrency scenarios
 - [ ] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
 - [ ] Pagination and filtering on list endpoints

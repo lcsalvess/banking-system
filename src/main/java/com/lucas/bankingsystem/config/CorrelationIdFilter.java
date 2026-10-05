@@ -18,12 +18,13 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     private static final String CORRELATION_ID_MDC_KEY = "correlationId";
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String correlationId = request.getHeader(CORRELATION_ID_HEADER);
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        if (correlationId == null || correlationId.isBlank()) {
-            correlationId = UUID.randomUUID().toString();
-        }
+        String correlationId = resolveCorrelationId(request);
 
         MDC.put(CORRELATION_ID_MDC_KEY, correlationId);
         response.setHeader(CORRELATION_ID_HEADER, correlationId);
@@ -32,6 +33,26 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } finally {
             MDC.remove(CORRELATION_ID_MDC_KEY);
+        }
+    }
+
+    private String resolveCorrelationId(HttpServletRequest request) {
+        String correlationId = request.getHeader(CORRELATION_ID_HEADER);
+
+        if (correlationId == null || correlationId.isBlank()) {
+            return UUID.randomUUID().toString();
+        }
+
+        try {
+            UUID uuid = UUID.fromString(correlationId);
+
+            if (!uuid.toString().equalsIgnoreCase(correlationId)) {
+                return UUID.randomUUID().toString();
+            }
+
+            return uuid.toString();
+        } catch (IllegalArgumentException exception) {
+            return UUID.randomUUID().toString();
         }
     }
 }

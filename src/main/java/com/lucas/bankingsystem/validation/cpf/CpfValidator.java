@@ -1,4 +1,4 @@
-package com.lucas.bankingsystem.validation;
+package com.lucas.bankingsystem.validation.cpf;
 
 public class CpfValidator {
     public boolean isValid(String cpf) {

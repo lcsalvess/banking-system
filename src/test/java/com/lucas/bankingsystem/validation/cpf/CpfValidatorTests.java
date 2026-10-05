@@ -1,4 +1,4 @@
-package com.lucas.bankingsystem.validation;
+package com.lucas.bankingsystem.validation.cpf;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

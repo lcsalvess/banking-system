@@ -1,6 +1,6 @@
 package com.lucas.bankingsystem.dto.request;
 
-import com.lucas.bankingsystem.validation.ValidCpf;
+import com.lucas.bankingsystem.validation.cpf.ValidCpf;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 

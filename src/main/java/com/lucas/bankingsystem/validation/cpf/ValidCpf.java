@@ -1,4 +1,4 @@
-package com.lucas.bankingsystem.validation;
+package com.lucas.bankingsystem.validation.cpf;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;

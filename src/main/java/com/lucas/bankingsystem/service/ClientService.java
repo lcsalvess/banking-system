@@ -95,9 +95,6 @@ public class ClientService {
     }
 
     public ClientResponseDTO update(Long id, ClientUpdateRequestDTO dto) {
-        if (!clientRepository.existsById(id)) {
-            throw new ClientNotFoundException();
-        }
 
         AddressUpdateData address = null;
 

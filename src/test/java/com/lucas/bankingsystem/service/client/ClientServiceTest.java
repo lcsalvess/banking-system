@@ -365,7 +365,6 @@ public class ClientServiceTest {
                     new AddressUpdateData(addressData, "456", "Apto 22")
             );
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(addressService.findAddressByPostalCode(
                     request.address().postalCode()
             )).thenReturn(addressData);
@@ -379,13 +378,11 @@ public class ClientServiceTest {
             assertEquals(client.getId(), result.id());
 
             InOrder inOrder = inOrder(
-                    clientRepository,
                     addressService,
                     currentUserService,
                     clientPersistenceService
             );
 
-            inOrder.verify(clientRepository).existsById(CLIENT_ID);
             inOrder.verify(addressService).findAddressByPostalCode(
                     request.address().postalCode()
             );
@@ -411,7 +408,6 @@ public class ClientServiceTest {
         ) {
             Client client = client();
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.update(CLIENT_ID, expectedData, USERNAME))
                     .thenReturn(client);
@@ -421,7 +417,6 @@ public class ClientServiceTest {
             assertNotNull(result);
             assertEquals(client.getId(), result.id());
 
-            verify(clientRepository).existsById(CLIENT_ID);
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).update(
                     CLIENT_ID,
@@ -464,7 +459,6 @@ public class ClientServiceTest {
                     )
             );
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
             when(addressService.findAddressByPostalCode(addressRequest.postalCode()))
                     .thenReturn(addressData);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
@@ -476,7 +470,6 @@ public class ClientServiceTest {
             assertNotNull(result);
             assertEquals(client.getId(), result.id());
 
-            verify(clientRepository).existsById(CLIENT_ID);
             verify(addressService).findAddressByPostalCode(addressRequest.postalCode());
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).update(CLIENT_ID, expectedData, USERNAME);
@@ -493,8 +486,6 @@ public class ClientServiceTest {
         ) {
             ClientUpdateRequestDTO request = fullUpdateRequest();
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
-
             when(addressService.findAddressByPostalCode(
                     request.address().postalCode()
             )).thenThrow(exception);
@@ -507,11 +498,9 @@ public class ClientServiceTest {
             assertSame(exception, thrown);
 
             InOrder inOrder = inOrder(
-                    clientRepository,
                     addressService
             );
 
-            inOrder.verify(clientRepository).existsById(CLIENT_ID);
             inOrder.verify(addressService).findAddressByPostalCode(
                     request.address().postalCode()
             );
@@ -535,8 +524,6 @@ public class ClientServiceTest {
             ClientNotFoundException exception =
                     new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE);
 
-            when(clientRepository.existsById(CLIENT_ID)).thenReturn(true);
-
             when(addressService.findAddressByPostalCode(
                     request.address().postalCode()
             )).thenReturn(addressData);
@@ -554,13 +541,11 @@ public class ClientServiceTest {
             assertSame(exception, thrown);
 
             InOrder inOrder = inOrder(
-                    clientRepository,
                     addressService,
                     currentUserService,
                     clientPersistenceService
             );
 
-            inOrder.verify(clientRepository).existsById(CLIENT_ID);
             inOrder.verify(addressService).findAddressByPostalCode(
                     request.address().postalCode()
             );

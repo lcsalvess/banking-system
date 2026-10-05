@@ -81,13 +81,40 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleDataIntegrityViolation(DataIntegrityViolationException exception) {
-        if (exception.getMessage() != null && exception.getMessage().contains(DUPLICATE_YIELD_CONSTRAINT)) {
+    public ErrorResponse handleDataIntegrityViolation(
+            DataIntegrityViolationException exception) {
+
+        if (isDuplicateDailyYield(exception)) {
             log.warn("Daily yield already applied");
-            return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "O rendimento já foi aplicado para esta conta hoje.");
+
+            return new ErrorResponse(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "O rendimento já foi aplicado para esta conta hoje."
+            );
         }
+
         log.warn("Data integrity violation", exception);
-        return new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Erro de integridade de dados no banco.");
+
+        return new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Erro de integridade de dados no banco."
+        );
+    }
+
+    private boolean isDuplicateDailyYield(DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
+                return DUPLICATE_YIELD_CONSTRAINT.equals(
+                        violation.getConstraintName()
+                );
+            }
+
+            cause = cause.getCause();
+        }
+
+        return false;
     }
 
     @Override

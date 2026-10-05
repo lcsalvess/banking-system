@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
-    List<Transaction> findByAccountId(Long accountId);
+    List<Transaction> findByAccountIdOrderByCreatedAtDescIdDesc(Long accountId);
 
     Optional<Transaction> findByTransactionCode(UUID transactionCode);
 

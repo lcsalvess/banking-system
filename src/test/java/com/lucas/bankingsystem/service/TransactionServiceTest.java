@@ -454,14 +454,14 @@ public class TransactionServiceTest {
             Transaction withdrawal = new Transaction(TransactionType.WITHDRAWAL, new BigDecimal("5.00"), CREATED_AT, account);
 
             stubAccountLookup(account);
-            when(transactionRepository.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(deposit, withdrawal));
+            when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of(deposit, withdrawal));
 
             List<TransactionResponseDTO> result = transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
 
             assertEquals(List.of(response(deposit), response(withdrawal)), result);
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findByAccountId(ACCOUNT_ID);
+            verify(transactionRepository).findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -471,14 +471,14 @@ public class TransactionServiceTest {
             CheckingAccount account = account();
 
             stubAccountLookup(account);
-            when(transactionRepository.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+            when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of());
 
             List<TransactionResponseDTO> result = transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
 
             assertEquals(List.of(), result);
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findByAccountId(ACCOUNT_ID);
+            verify(transactionRepository).findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID);
             verifyNoMoreInteractionsOnMocks();
         }
 

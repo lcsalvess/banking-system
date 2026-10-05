@@ -61,7 +61,10 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public List<TransactionResponseDTO> findByAccountNumber(String accountNumber, String accountDigit) {
         Account account = accountService.findEntityByAccountNumber(accountNumber, accountDigit);
-        return transactionRepository.findByAccountId(account.getId()).stream().map(TransactionResponseDTO::fromEntity).toList();
+
+        return transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(account.getId()).stream()
+                .map(TransactionResponseDTO::fromEntity)
+                .toList();
     }
 
     @Transactional(readOnly = true)

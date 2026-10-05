@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 
 public record TransferRequestDTO(
         @NotBlank(message = "O número da conta de origem é obrigatório.")
-        @ValidAccountNumber(message = "O número da conta de origem deve conter exatamente 5 dígitos.")
+        @ValidAccountNumber(message = "O número da conta de origem deve conter entre 5 e 20 dígitos.")
         String fromAccountNumber,
 
         @NotBlank(message = "O dígito da conta de origem é obrigatório.")
@@ -16,7 +16,7 @@ public record TransferRequestDTO(
         String fromAccountDigit,
 
         @NotBlank(message = "O número da conta de destino é obrigatório.")
-        @ValidAccountNumber(message = "O número da conta de destino deve conter exatamente 5 dígitos.")
+        @ValidAccountNumber(message = "O número da conta de destino deve conter entre 5 e 20 dígitos.")
         String toAccountNumber,
 
         @NotBlank(message = "O dígito da conta de destino é obrigatório.")

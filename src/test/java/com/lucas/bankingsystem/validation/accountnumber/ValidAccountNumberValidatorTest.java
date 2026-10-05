@@ -33,6 +33,8 @@ class ValidAccountNumberValidatorTest {
         static Stream<Arguments> validAccountNumbers() {
             return Stream.of(
                     Arguments.of("five digits", "12345"),
+                    Arguments.of("six digits", "123456"),
+                    Arguments.of("twenty digits", "12345678901234567890"),
                     Arguments.of("five zeros", "00000"),
                     Arguments.of("leading zeros", "00001")
             );
@@ -71,7 +73,7 @@ class ValidAccountNumberValidatorTest {
                     Arguments.of("empty value", ""),
                     Arguments.of("blank value", "   "),
                     Arguments.of("less than five digits", "1234"),
-                    Arguments.of("more than five digits", "123456"),
+                    Arguments.of("more than twenty digits", "123456789012345678901"),
                     Arguments.of("contains letters", "1234A"),
                     Arguments.of("contains special characters", "123-5")
             );

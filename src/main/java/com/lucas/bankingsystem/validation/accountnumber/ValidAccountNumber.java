@@ -22,7 +22,7 @@ import java.lang.annotation.*;
 // Isso permite que o Bean Validation consiga encontrá-la em runtime.
 public @interface ValidAccountNumber {
 
-    String message() default "O número da conta deve conter 5 dígitos.";
+    String message() default "O número da conta deve conter entre 5 e 20 dígitos.";
 
     Class<?>[] groups() default {};
 

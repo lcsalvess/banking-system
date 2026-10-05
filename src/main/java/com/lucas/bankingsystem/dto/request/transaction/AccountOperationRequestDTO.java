@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 
 public record AccountOperationRequestDTO(
         @NotBlank(message = "O número da conta é obrigatório.")
-        @ValidAccountNumber(message = "O número da conta deve conter exatamente 5 dígitos.")
+        @ValidAccountNumber
         String accountNumber,
 
         @NotBlank(message = "O dígito da conta é obrigatório.")

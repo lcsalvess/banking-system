@@ -22,7 +22,7 @@ public abstract class Account {
     @JoinColumn(name = "client_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_accounts_client"))
     private Client client;
-    @Column(name = "account_number", nullable = false, length = 5)
+    @Column(name = "account_number", nullable = false, length = 20)
     private String accountNumber;
     @Column(name = "account_digit", nullable = false, length = 1)
     private String digit;

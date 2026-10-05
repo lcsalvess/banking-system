@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 public class ValidAccountNumberValidator implements ConstraintValidator<ValidAccountNumber, String> {
 
-    private static final Pattern ACCOUNT_NUMBER_PATTERN = Pattern.compile("\\d{5}");
+    private static final Pattern ACCOUNT_NUMBER_PATTERN = Pattern.compile("\\d{5,20}");
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {

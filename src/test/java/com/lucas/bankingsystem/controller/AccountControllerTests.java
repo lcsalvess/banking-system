@@ -50,7 +50,7 @@ public class AccountControllerTests {
     private static final String INVALID_BODY_MESSAGE = "Dados da requisição inválidos.";
     private static final String VALIDATION_MESSAGE = "Erro de validação.";
     private static final String MISSING_PARAM_MESSAGE = "Parâmetro de requisição obrigatório ausente.";
-    private static final String INVALID_ACCOUNT_NUMBER_MESSAGE = "O número da conta deve conter 5 dígitos.";
+    private static final String INVALID_ACCOUNT_NUMBER_MESSAGE = "O número da conta deve conter entre 5 e 20 dígitos.";
     private static final String INVALID_ACCOUNT_DIGIT_MESSAGE = "O dígito da conta deve conter 1 dígito.";
 
     @Autowired
@@ -519,7 +519,7 @@ public class AccountControllerTests {
     static Stream<Arguments> invalidAccountNumbers() {
         return Stream.of(
                 Arguments.of("account number is too short", "1234"),
-                Arguments.of("account number is too long", "123456"),
+                Arguments.of("account number exceeds maximum length", "123456789012345678901"),
                 Arguments.of("account number contains letters", "1234A"),
                 Arguments.of("account number contains special characters", "123-5")
         );

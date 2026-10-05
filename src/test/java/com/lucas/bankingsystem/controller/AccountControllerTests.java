@@ -50,6 +50,8 @@ public class AccountControllerTests {
     private static final String INVALID_BODY_MESSAGE = "Dados da requisição inválidos.";
     private static final String VALIDATION_MESSAGE = "Erro de validação.";
     private static final String MISSING_PARAM_MESSAGE = "Parâmetro de requisição obrigatório ausente.";
+    private static final String INVALID_ACCOUNT_NUMBER_MESSAGE = "O número da conta deve conter 5 dígitos.";
+    private static final String INVALID_ACCOUNT_DIGIT_MESSAGE = "O dígito da conta deve conter 1 dígito.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -206,6 +208,44 @@ public class AccountControllerTests {
             );
 
             performErrorResponse(result, status, message);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "invalidAccountNumbers")
+        @DisplayName("Should return 400 when account number is invalid")
+        void shouldReturnBadRequestWhenAccountNumberIsInvalid(
+                String scenario,
+                String accountNumber
+        ) throws Exception {
+            mockMvc.perform(get(URL, accountNumber)
+                            .param("digit", "5"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.errors.accountNumber")
+                            .value(INVALID_ACCOUNT_NUMBER_MESSAGE));
+
+            verifyNoInteractions(accountService);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "invalidAccountDigits")
+        @DisplayName("Should return 400 when account digit has invalid format")
+        void shouldReturnBadRequestWhenAccountDigitHasInvalidFormat(
+                String scenario,
+                String digit
+        ) throws Exception {
+            mockMvc.perform(get(URL, "99999")
+                            .param("digit", digit))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.errors.digit")
+                            .value(INVALID_ACCOUNT_DIGIT_MESSAGE));
+
+            verifyNoInteractions(accountService);
         }
     }
 
@@ -407,6 +447,44 @@ public class AccountControllerTests {
             verifyNoInteractions(accountService);
         }
 
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "invalidAccountNumbers")
+        @DisplayName("Should return 400 when account number is invalid")
+        void shouldReturnBadRequestWhenAccountNumberIsInvalid(
+                String scenario,
+                String accountNumber
+        ) throws Exception {
+            mockMvc.perform(patch(URL, accountNumber)
+                            .param("digit", "5"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.errors.accountNumber")
+                            .value(INVALID_ACCOUNT_NUMBER_MESSAGE));
+
+            verifyNoInteractions(accountService);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "invalidAccountDigits")
+        @DisplayName("Should return 400 when account digit has invalid format")
+        void shouldReturnBadRequestWhenAccountDigitHasInvalidFormat(
+                String scenario,
+                String digit
+        ) throws Exception {
+            mockMvc.perform(patch(URL, "99999")
+                            .param("digit", digit))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.errors.digit")
+                            .value(INVALID_ACCOUNT_DIGIT_MESSAGE));
+
+            verifyNoInteractions(accountService);
+        }
+
         private void performCancel(String digit, int status, String message) throws Exception {
             ResultActions result = mockMvc.perform(
                     patch(URL, "99999")
@@ -434,6 +512,26 @@ public class AccountControllerTests {
                 Arguments.of("account type is null",
                         new AccountRequestDTO(1L, null),
                         "type", "O tipo de conta é obrigatório.")
+        );
+    }
+
+    @SuppressWarnings("unused")
+    static Stream<Arguments> invalidAccountNumbers() {
+        return Stream.of(
+                Arguments.of("account number is too short", "1234"),
+                Arguments.of("account number is too long", "123456"),
+                Arguments.of("account number contains letters", "1234A"),
+                Arguments.of("account number contains special characters", "123-5")
+        );
+    }
+
+    @SuppressWarnings("unused")
+    static Stream<Arguments> invalidAccountDigits() {
+        return Stream.of(
+                Arguments.of("account digit is empty", ""),
+                Arguments.of("account digit contains multiple digits", "12"),
+                Arguments.of("account digit contains letters", "A"),
+                Arguments.of("account digit contains special characters", "-")
         );
     }
 

@@ -2,8 +2,8 @@ package com.lucas.bankingsystem.controller;
 
 import com.lucas.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lucas.bankingsystem.dto.request.transaction.TransferRequestDTO;
-import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.TransactionResponseDTO;
+import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -12,12 +12,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+@Validated
 @RestController
 @RequestMapping("/api/v1/transactions")
 public class TransactionController {
@@ -88,7 +91,7 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid account digit",
+                    description = "Invalid account number or check digit",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class)
@@ -104,7 +107,12 @@ public class TransactionController {
             )
     })
     @GetMapping("/accounts/{accountNumber}")
-    public List<TransactionResponseDTO> findByAccountNumber(@PathVariable String accountNumber, @RequestParam String digit) {
+    public List<TransactionResponseDTO> findByAccountNumber(
+            @Pattern(regexp = "\\d{5}", message = "O número da conta deve conter 5 dígitos.")
+            @PathVariable String accountNumber,
+            @Pattern(regexp = "\\d", message = "O dígito da conta deve conter 1 dígito.")
+            @RequestParam String digit
+    ) {
         return transactionService.findByAccountNumber(accountNumber, digit);
     }
 
@@ -141,7 +149,7 @@ public class TransactionController {
     @GetMapping("/code/{transactionCode}")
     public TransactionResponseDTO findByTransactionCode(
             @PathVariable UUID transactionCode
-            ) {
+    ) {
         return transactionService.findByTransactionCode(transactionCode);
     }
 
@@ -204,7 +212,7 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid transfer request or account digit",
+                    description = "Invalid transfer request or account identifier",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class)
@@ -248,7 +256,7 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid account digit",
+                    description = "Invalid account number or check digit",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class)
@@ -273,7 +281,12 @@ public class TransactionController {
     })
     @PostMapping("/yield/{accountNumber}")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO applyYield(@PathVariable String accountNumber, @RequestParam String digit) {
+    public TransactionResponseDTO applyYield(
+            @Pattern(regexp = "\\d{5}", message = "O número da conta deve conter 5 dígitos.")
+            @PathVariable String accountNumber,
+            @Pattern(regexp = "\\d", message = "O dígito da conta deve conter 1 dígito.")
+            @RequestParam String digit
+    ) {
         return transactionService.applyYield(accountNumber, digit);
     }
 }

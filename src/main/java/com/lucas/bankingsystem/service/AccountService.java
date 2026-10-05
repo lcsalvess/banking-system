@@ -151,7 +151,7 @@ public class AccountService {
 
         while (cause != null) {
             if (cause instanceof ConstraintViolationException violation) {
-                return "uk_account_client_type_active".equals(violation.getConstraintName());
+                return "uk_accounts_client_type_active".equals(violation.getConstraintName());
             }
             cause = cause.getCause();
         }

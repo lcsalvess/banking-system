@@ -31,7 +31,7 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
-    private static final String DUPLICATE_YIELD_CONSTRAINT = "uk_transaction_daily_yield";
+    private static final String DUPLICATE_YIELD_CONSTRAINT = "uk_transactions_daily_yield";
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)

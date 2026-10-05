@@ -376,7 +376,7 @@ public class AccountServiceTest {
             ConstraintViolationException cause = new ConstraintViolationException(
                     "Unique index violation",
                     null,
-                    "uk_account_client_type_active"
+                    "uk_accounts_client_type_active"
             );
 
             when(accountRepository.saveAndFlush(any(Account.class)))

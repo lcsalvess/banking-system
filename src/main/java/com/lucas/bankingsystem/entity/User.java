@@ -15,11 +15,11 @@ import java.util.List;
         name = "users",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_user_username",
+                        name = "uk_users_username",
                         columnNames = "username"
                 ),
                 @UniqueConstraint(
-                        name = "uk_user_email",
+                        name = "uk_users_email",
                         columnNames = "email"
                 )
         }
@@ -45,10 +45,10 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private boolean active = true;
 
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     @PrePersist

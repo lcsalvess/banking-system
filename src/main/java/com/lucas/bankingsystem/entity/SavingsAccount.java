@@ -9,10 +9,10 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 
 @Entity
-@Table(name= "savings_account")
+@Table(name= "savings_accounts")
 @PrimaryKeyJoinColumn(
         name = "id",
-        foreignKey = @ForeignKey(name = "fk_savings_account_account")
+        foreignKey = @ForeignKey(name = "fk_savings_accounts_account")
 )
 public class SavingsAccount extends Account {
     private static final BigDecimal YIELD_RATE = new BigDecimal("0.005");

@@ -11,10 +11,10 @@ import java.util.UUID;
 
 @Entity
 @Table(
-        name = "transaction",
+        name = "transactions",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_transaction_code",
+                        name = "uk_transactions_code",
                         columnNames = "transaction_code"
                 )
         }
@@ -40,7 +40,7 @@ public class Transaction {
     @NotNull
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false,
-    foreignKey = @ForeignKey(name = "fk_transaction_account"))
+    foreignKey = @ForeignKey(name = "fk_transactions_account"))
     private Account account;
 
     public Transaction() {}

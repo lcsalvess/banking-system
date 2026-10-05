@@ -3,10 +3,11 @@ package com.lucas.bankingsystem.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "client",
+@Table(name = "clients",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_client_cpf", columnNames = "cpf"),
-                @UniqueConstraint(name = "uk_client_address", columnNames = "address_id")
+                @UniqueConstraint(name = "uk_clients_cpf", columnNames = "cpf"),
+                @UniqueConstraint(name = "uk_clients_email", columnNames = "email"),
+                @UniqueConstraint(name = "uk_clients_address", columnNames = "address_id")
         })
 public class Client {
     @Id
@@ -18,11 +19,11 @@ public class Client {
     private String cpf;
     @Column(nullable = false)
     private String email;
-    @Column(nullable = false, length = 11)
+    @Column(name = "phone_number", nullable = false, length = 11)
     private String phoneNumber;
     @OneToOne(cascade = CascadeType.ALL, optional = false)
     @JoinColumn(name = "address_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_client_address"))
+            foreignKey = @ForeignKey(name = "fk_clients_address"))
     private Address address;
 
     public Client() {

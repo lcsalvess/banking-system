@@ -8,9 +8,9 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(
-        name = "account",
+        name = "accounts",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_account_account_number", columnNames = "account_number")
+                @UniqueConstraint(name = "uk_accounts_account_number", columnNames = "account_number")
         }
 )
 @Inheritance(strategy = InheritanceType.JOINED)
@@ -20,7 +20,7 @@ public abstract class Account {
     private Long id;
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_account_client"))
+            foreignKey = @ForeignKey(name = "fk_accounts_client"))
     private Client client;
     @Column(name = "account_number", nullable = false, length = 5)
     private String accountNumber;

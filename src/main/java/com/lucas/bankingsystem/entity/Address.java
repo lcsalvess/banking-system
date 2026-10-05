@@ -4,14 +4,14 @@ import com.lucas.bankingsystem.entity.enums.State;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "address")
+@Table(name = "addresses")
 public class Address {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false, length = 150)
+    @Column(name = "street_name", nullable = false, length = 150)
     private String streetName;
-    @Column(nullable = false, length = 10)
+    @Column(name = "street_number", nullable = false, length = 10)
     private String streetNumber;
     @Column(length = 100)
     private String complement;
@@ -22,7 +22,7 @@ public class Address {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 2)
     private State state;
-    @Column(nullable = false, length = 8)
+    @Column(name = "postal_code", nullable = false, length = 8)
     private String postalCode;
 
     public Address() {

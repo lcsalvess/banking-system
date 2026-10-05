@@ -7,10 +7,10 @@ import jakarta.persistence.PrimaryKeyJoinColumn;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "checking_account")
+@Table(name = "checking_accounts")
 @PrimaryKeyJoinColumn(
         name = "id",
-        foreignKey = @ForeignKey(name = "fk_checking_account_account")
+        foreignKey = @ForeignKey(name = "fk_checking_accounts_account")
 )
 public class CheckingAccount extends Account {
     public CheckingAccount() {
@@ -18,4 +18,5 @@ public class CheckingAccount extends Account {
 
     public CheckingAccount(Client client, String accountNumber, String accountDigit) {
         super(client, accountNumber, accountDigit, AccountType.CHECKING);
-    }}
+    }
+}

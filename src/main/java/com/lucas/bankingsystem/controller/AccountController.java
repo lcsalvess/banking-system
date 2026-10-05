@@ -4,6 +4,8 @@ import com.lucas.bankingsystem.dto.request.AccountRequestDTO;
 import com.lucas.bankingsystem.dto.response.AccountResponseDTO;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.service.AccountService;
+import com.lucas.bankingsystem.validation.accountnumber.ValidAccountDigit;
+import com.lucas.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -12,7 +14,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -88,7 +89,7 @@ public class AccountController {
                     required = true
             )
             @PathVariable
-            @Pattern(regexp = "\\d{5}", message = "O número da conta deve conter 5 dígitos.")
+            @ValidAccountNumber
             String accountNumber,
             @Parameter(
                     description = "Account check digit",
@@ -96,7 +97,7 @@ public class AccountController {
                     required = true
             )
             @RequestParam
-            @Pattern(regexp = "\\d", message = "O dígito da conta deve conter 1 dígito.")
+            @ValidAccountDigit
             String digit
     ) {
         return accountService.findByAccountNumber(accountNumber, digit);
@@ -181,16 +182,15 @@ public class AccountController {
                     required = true
             )
             @PathVariable
-            @Pattern(regexp = "\\d{5}", message = "O número da conta deve conter 5 dígitos.")
+            @ValidAccountNumber
             String accountNumber,
             @Parameter(
                     description = "Account check digit",
                     example = "1",
                     required = true
             )
-            @RequestParam
-            @Pattern(regexp = "\\d", message = "O dígito da conta deve conter 1 dígito.")
-            String digit
+            @ValidAccountDigit
+            @RequestParam String digit
     ) {
         accountService.cancel(accountNumber, digit);
     }

@@ -5,14 +5,16 @@ import com.lucas.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lucas.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.service.TransactionService;
+import com.lucas.bankingsystem.validation.accountnumber.ValidAccountDigit;
+import com.lucas.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -108,9 +110,19 @@ public class TransactionController {
     })
     @GetMapping("/accounts/{accountNumber}")
     public List<TransactionResponseDTO> findByAccountNumber(
-            @Pattern(regexp = "\\d{5}", message = "O número da conta deve conter 5 dígitos.")
+            @Parameter(
+                    description = "Account number",
+                    example = "12345",
+                    required = true
+            )
+            @ValidAccountNumber
             @PathVariable String accountNumber,
-            @Pattern(regexp = "\\d", message = "O dígito da conta deve conter 1 dígito.")
+            @Parameter(
+                    description = "Account check digit",
+                    example = "1",
+                    required = true
+            )
+            @ValidAccountDigit
             @RequestParam String digit
     ) {
         return transactionService.findByAccountNumber(accountNumber, digit);
@@ -282,9 +294,19 @@ public class TransactionController {
     @PostMapping("/yield/{accountNumber}")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO applyYield(
-            @Pattern(regexp = "\\d{5}", message = "O número da conta deve conter 5 dígitos.")
+            @Parameter(
+                    description = "Account number",
+                    example = "12345",
+                    required = true
+            )
+            @ValidAccountNumber
             @PathVariable String accountNumber,
-            @Pattern(regexp = "\\d", message = "O dígito da conta deve conter 1 dígito.")
+            @Parameter(
+                    description = "Account check digit",
+                    example = "1",
+                    required = true
+            )
+            @ValidAccountDigit
             @RequestParam String digit
     ) {
         return transactionService.applyYield(accountNumber, digit);

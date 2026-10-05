@@ -2,22 +2,13 @@ package com.lucas.bankingsystem.service;
 
 import com.lucas.bankingsystem.dto.request.AccountRequestDTO;
 import com.lucas.bankingsystem.dto.response.AccountResponseDTO;
-import com.lucas.bankingsystem.entity.Account;
-import com.lucas.bankingsystem.entity.Address;
-import com.lucas.bankingsystem.entity.CheckingAccount;
-import com.lucas.bankingsystem.entity.Client;
-import com.lucas.bankingsystem.entity.SavingsAccount;
+import com.lucas.bankingsystem.entity.*;
 import com.lucas.bankingsystem.entity.enums.AccountStatus;
 import com.lucas.bankingsystem.entity.enums.AccountType;
 import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.event.account.AccountOperationEvent;
 import com.lucas.bankingsystem.event.account.AccountOperationType;
-import com.lucas.bankingsystem.exception.account.AccountAlreadyExistsException;
-import com.lucas.bankingsystem.exception.account.AccountHasBalanceException;
-import com.lucas.bankingsystem.exception.account.AccountIsNotActiveException;
-import com.lucas.bankingsystem.exception.account.AccountNotFoundException;
-import com.lucas.bankingsystem.exception.account.InvalidAccountDigitException;
-import com.lucas.bankingsystem.exception.account.InvalidAccountTypeException;
+import com.lucas.bankingsystem.exception.account.*;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.repository.AccountRepository;
 import com.lucas.bankingsystem.repository.CheckingAccountRepository;
@@ -50,11 +41,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -80,7 +67,6 @@ public class AccountServiceTest {
     private static final String CLIENT_NOT_FOUND_MESSAGE = "Cliente não encontrado.";
     private static final String CHECKING_ALREADY_EXISTS_MESSAGE = "O cliente já possui uma conta corrente.";
     private static final String SAVINGS_ALREADY_EXISTS_MESSAGE = "O cliente já possui uma conta poupança.";
-    private static final String INVALID_ACCOUNT_TYPE_MESSAGE = "Tipo de conta inválido.";
     private static final String ACCOUNT_HAS_BALANCE_MESSAGE = "Não é possível cancelar uma conta com saldo.";
     private static final String ACCOUNT_NOT_ACTIVE_MESSAGE = "Não é possível cancelar uma conta que não está ativa.";
 
@@ -331,23 +317,6 @@ public class AccountServiceTest {
             assertThrowsWithMessage(
                     ClientNotFoundException.class,
                     CLIENT_NOT_FOUND_MESSAGE,
-                    () -> accountService.create(request)
-            );
-
-            verify(clientService).findEntityById(CLIENT_ID);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when account type is null")
-        void shouldThrowWhenAccountTypeIsNull() {
-            AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, null);
-
-            when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
-
-            assertThrowsWithMessage(
-                    InvalidAccountTypeException.class,
-                    INVALID_ACCOUNT_TYPE_MESSAGE,
                     () -> accountService.create(request)
             );
 

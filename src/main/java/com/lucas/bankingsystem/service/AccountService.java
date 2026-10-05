@@ -124,11 +124,6 @@ public class AccountService {
                 savingsAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)) {
             throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança.");
         }
-
-        if (dto.type() != AccountType.CHECKING &&
-                dto.type() != AccountType.SAVINGS) {
-            throw new InvalidAccountTypeException("Tipo de conta inválido.");
-        }
     }
 
     private Account createAccount(AccountRequestDTO dto, Client client, GeneratedAccountNumber accountNumber) {

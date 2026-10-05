@@ -31,7 +31,10 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
-    private static final String DUPLICATE_YIELD_CONSTRAINT = "uk_transactions_daily_yield";
+
+    private static final String CLIENT_CPF_UNIQUE_CONSTRAINT = "uk_clients_cpf";
+    private static final String CLIENT_EMAIL_UNIQUE_CONSTRAINT = "uk_clients_email";
+    private static final String DAILY_YIELD_UNIQUE_CONSTRAINT = "uk_transactions_daily_yield";
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
@@ -80,35 +83,55 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleDataIntegrityViolation(
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
             DataIntegrityViolationException exception) {
 
-        if (isDuplicateDailyYield(exception)) {
-            log.warn("Daily yield already applied");
+        if (hasConstraint(exception, CLIENT_EMAIL_UNIQUE_CONSTRAINT)) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(new ErrorResponse(
+                            HttpStatus.CONFLICT.value(),
+                            "Já existe um cliente cadastrado com este e-mail."
+                    ));
+        }
 
-            return new ErrorResponse(
-                    HttpStatus.BAD_REQUEST.value(),
-                    "O rendimento já foi aplicado para esta conta hoje."
-            );
+        if (hasConstraint(exception, CLIENT_CPF_UNIQUE_CONSTRAINT)) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(new ErrorResponse(
+                            HttpStatus.CONFLICT.value(),
+                            "Já existe um cliente cadastrado com este CPF."
+                    ));
+        }
+
+        if (hasConstraint(exception, DAILY_YIELD_UNIQUE_CONSTRAINT)) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse(
+                            HttpStatus.BAD_REQUEST.value(),
+                            "O rendimento já foi aplicado para esta conta hoje."
+                    ));
         }
 
         log.warn("Data integrity violation", exception);
 
-        return new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                "Erro de integridade de dados no banco."
-        );
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(
+                        HttpStatus.BAD_REQUEST.value(),
+                        "Erro de integridade de dados no banco."
+                ));
     }
 
-    private boolean isDuplicateDailyYield(DataIntegrityViolationException exception) {
+    private boolean hasConstraint(
+            DataIntegrityViolationException exception,
+            String constraintName
+    ) {
         Throwable cause = exception;
 
         while (cause != null) {
             if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
-                return DUPLICATE_YIELD_CONSTRAINT.equals(
-                        violation.getConstraintName()
-                );
+                return constraintName.equals(violation.getConstraintName());
             }
 
             cause = cause.getCause();

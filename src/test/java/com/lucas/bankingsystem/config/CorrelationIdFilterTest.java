@@ -48,7 +48,10 @@ class CorrelationIdFilterTest {
 
         @ParameterizedTest(name = "{0}")
         @MethodSource("invalidOrMissingHeaders")
-        void shouldGenerateCorrelationIdWhenHeaderIsMissingOrBlank(String scenario, String header) throws ServletException, IOException {
+        void shouldGenerateCorrelationIdWhenHeaderIsMissingOrBlank(
+                String scenario,
+                String header
+        ) throws ServletException, IOException {
 
             when(request.getHeader(CORRELATION_ID_HEADER)).thenReturn(header);
 
@@ -64,7 +67,8 @@ class CorrelationIdFilterTest {
             return Stream.of(
                     Arguments.of("header is absent", null),
                     Arguments.of("header is empty", ""),
-                    Arguments.of("header is blank", "   "));
+                    Arguments.of("header is blank", "   ")
+            );
         }
     }
 
@@ -83,6 +87,23 @@ class CorrelationIdFilterTest {
 
             verify(response).setHeader(CORRELATION_ID_HEADER, correlationId);
         }
+
+        @Test
+        void shouldNormalizeUppercaseCorrelationId() throws ServletException, IOException {
+            String correlationId = "550E8400-E29B-41D4-A716-446655440000";
+            String expectedCorrelationId = correlationId.toLowerCase();
+
+            when(request.getHeader(CORRELATION_ID_HEADER)).thenReturn(correlationId);
+
+            String actualCorrelationId = captureMdcCorrelationId();
+
+            assertEquals(expectedCorrelationId, actualCorrelationId);
+
+            verify(response).setHeader(
+                    CORRELATION_ID_HEADER,
+                    expectedCorrelationId
+            );
+        }
     }
 
     @Nested
@@ -90,7 +111,10 @@ class CorrelationIdFilterTest {
 
         @ParameterizedTest(name = "{0}")
         @MethodSource("invalidCorrelationIds")
-        void shouldGenerateNewCorrelationIdWhenHeaderIsInvalid(String scenario, String invalidCorrelationId) throws ServletException, IOException {
+        void shouldGenerateNewCorrelationIdWhenHeaderIsInvalid(
+                String scenario,
+                String invalidCorrelationId
+        ) throws ServletException, IOException {
 
             when(request.getHeader(CORRELATION_ID_HEADER)).thenReturn(invalidCorrelationId);
 
@@ -106,8 +130,19 @@ class CorrelationIdFilterTest {
         static Stream<Arguments> invalidCorrelationIds() {
             return Stream.of(
                     Arguments.of("random text", "abc"),
-                    Arguments.of("invalid UUID", "550e8400-e29b-41d4-a716-446655440000-invalid"),
-                    Arguments.of("malformed UUID", "550e8400-e29b-41d4-a716"));
+                    Arguments.of(
+                            "invalid UUID",
+                            "550e8400-e29b-41d4-a716-446655440000-invalid"
+                    ),
+                    Arguments.of(
+                            "malformed UUID",
+                            "550e8400-e29b-41d4-a716"
+                    ),
+                    Arguments.of(
+                            "non-canonical UUID",
+                            "1-1-1-1-1"
+                    )
+            );
         }
     }
 
@@ -115,14 +150,18 @@ class CorrelationIdFilterTest {
     class MdcCleanup {
 
         @Test
-        void shouldRemoveCorrelationIdFromMdcAfterRequest() throws ServletException, IOException {
+        void shouldRemoveCorrelationIdFromMdcAfterRequest()
+                throws ServletException, IOException {
 
             String correlationId = UUID.randomUUID().toString();
 
             when(request.getHeader(CORRELATION_ID_HEADER)).thenReturn(correlationId);
 
             doAnswer(invocation -> {
-                assertEquals(correlationId, MDC.get(CORRELATION_ID_MDC_KEY));
+                assertEquals(
+                        correlationId,
+                        MDC.get(CORRELATION_ID_MDC_KEY)
+                );
                 return null;
             }).when(filterChain).doFilter(request, response);
 
@@ -132,7 +171,9 @@ class CorrelationIdFilterTest {
         }
     }
 
-    private String captureMdcCorrelationId() throws ServletException, IOException {
+    private String captureMdcCorrelationId()
+            throws ServletException, IOException {
+
         final String[] correlationId = new String[1];
 
         doAnswer(invocation -> {

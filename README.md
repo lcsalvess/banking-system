@@ -42,7 +42,7 @@ The application follows a modular layered architecture, separating responsibilit
 ### Package Structure
 
 ```text
-src/main/java/com/lucas/bankingsystem
+src/main/java/com/lcsalvess/bankingsystem
 ├── bootstrap/       # Application startup and initialization
 ├── config/          # Spring application configuration (Jackson, OpenAPI, security)
 ├── controller/      # REST API endpoints
@@ -363,7 +363,7 @@ Operations are logged through Spring application events:
 - Services publish an event after creating or changing data: client `CREATED`/`UPDATED`, account `CREATED`/`CANCELLED`, user `CREATED`, and transactions (deposit, withdrawal, transfer, and yield).
 - Listeners use `@TransactionalEventListener` in the `AFTER_COMMIT` phase, so an operation is only logged as successful after its database transaction is committed.
 - The global exception handler logs business errors, authentication and authorization failures, data integrity violations, address provider failures, and unexpected errors.
-- The log level is controlled by `logging.level.com.lucas.bankingsystem` (`INFO` by default), and SQL logging is disabled.
+- The log level is controlled by `logging.level.com.lcsalvess.bankingsystem` (`INFO` by default), and SQL logging is disabled.
 
 ### Correlation ID
 

@@ -1,0 +1,204 @@
+package com.lcsalvess.bankingsystem.service.transaction;
+
+import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.entity.Account;
+import com.lcsalvess.bankingsystem.entity.SavingsAccount;
+import com.lcsalvess.bankingsystem.entity.Transaction;
+import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
+import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
+import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
+import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
+import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
+import com.lcsalvess.bankingsystem.exception.account.AccountIsNotSavingsException;
+import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
+import com.lcsalvess.bankingsystem.exception.transaction.*;
+import com.lcsalvess.bankingsystem.repository.TransactionRepository;
+import com.lcsalvess.bankingsystem.service.account.AccountService;
+import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class TransactionService {
+    private final TransactionRepository transactionRepository;
+    private final AccountService accountService;
+    private final CurrentUserService currentUserService;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public TransactionService(TransactionRepository transactionRepository, AccountService accountService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher) {
+        this.transactionRepository = transactionRepository;
+        this.accountService = accountService;
+        this.currentUserService = currentUserService;
+        this.eventPublisher = eventPublisher;
+    }
+
+    @Transactional
+    public TransactionResponseDTO deposit(AccountOperationRequestDTO dto) {
+        Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.digit());
+
+        validateActiveAccount(account);
+        validateAmount(dto.amount());
+
+        String username = getCurrentUsername();
+
+        account.credit(dto.amount());
+
+        Transaction transaction = registerTransaction(TransactionType.DEPOSIT, dto.amount(), account);
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount(), username));
+
+        return TransactionResponseDTO.fromEntity(transaction);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TransactionResponseDTO> findByAccountNumber(String accountNumber, String accountDigit) {
+        Account account = accountService.findEntityByAccountNumber(accountNumber, accountDigit);
+
+        return transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(account.getId()).stream()
+                .map(TransactionResponseDTO::fromEntity)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionResponseDTO findByTransactionCode(UUID transactionCode) {
+        Transaction transaction = transactionRepository.findByTransactionCode(transactionCode)
+                .orElseThrow(() -> new TransactionNotFoundException(
+                        "Transação não encontrada."
+                ));
+
+        return TransactionResponseDTO.fromEntity(transaction);
+    }
+
+    @Transactional
+    public TransactionResponseDTO withdraw(AccountOperationRequestDTO dto) {
+        Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.digit());
+
+        validateActiveAccount(account);
+        validateAmount(dto.amount());
+        validateBalance(account, dto.amount());
+
+        String username = getCurrentUsername();
+
+        account.debit(dto.amount());
+
+        Transaction transaction = registerTransaction(TransactionType.WITHDRAWAL, dto.amount(), account);
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.WITHDRAWAL, account.getAccountNumber(), dto.amount(), username));
+
+        return TransactionResponseDTO.fromEntity(transaction);
+    }
+
+    @Transactional
+    public TransactionResponseDTO transfer(TransferRequestDTO dto) {
+        validateDistinctAccounts(dto.fromAccountNumber(), dto.toAccountNumber());
+
+        Account fromAccount = accountService.findEntityByAccountNumber(dto.fromAccountNumber(), dto.fromAccountDigit());
+        Account toAccount = accountService.findEntityByAccountNumber(dto.toAccountNumber(), dto.toAccountDigit());
+
+        validateActiveAccount(fromAccount);
+        validateActiveAccount(toAccount);
+        validateAmount(dto.amount());
+        validateBalance(fromAccount, dto.amount());
+
+        String username = getCurrentUsername();
+
+        fromAccount.debit(dto.amount());
+        toAccount.credit(dto.amount());
+
+        Transaction sentTransaction = registerTransaction(TransactionType.TRANSFER_SENT, dto.amount(), fromAccount);
+        registerTransaction(TransactionType.TRANSFER_RECEIVED, dto.amount(), toAccount);
+
+        eventPublisher.publishEvent(new TransactionTransferEvent(TransactionType.TRANSFER_SENT, fromAccount.getAccountNumber(), toAccount.getAccountNumber(), dto.amount(), username));
+
+        return TransactionResponseDTO.fromEntity(sentTransaction);
+    }
+
+    @Transactional
+    public TransactionResponseDTO applyYield(String accountNumber, String accountDigit) {
+        Account account = accountService.findEntityByAccountNumber(accountNumber, accountDigit);
+
+        SavingsAccount savingsAccount = validateAndGetSavingsAccount(account);
+
+        validateActiveAccount(savingsAccount);
+        validateYieldAlreadyApplied(savingsAccount.getId());
+
+        BigDecimal yieldAmount = savingsAccount.calculateYield();
+        validateYieldAvailable(savingsAccount, yieldAmount);
+
+        String username = getCurrentUsername();
+
+        savingsAccount.credit(yieldAmount);
+        savingsAccount.updateLastYieldDate();
+
+        Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount);
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.YIELD, savingsAccount.getAccountNumber(), yieldAmount, username));
+
+        return TransactionResponseDTO.fromEntity(transaction);
+    }
+
+    private void validateActiveAccount(Account account) {
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            throw new AccountIsNotActiveException("A conta informada não está ativa.");
+        }
+    }
+
+    private void validateAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidAmountException("O valor deve ser maior que zero.");
+        }
+    }
+
+    private void validateBalance(Account account, BigDecimal amount) {
+        if (account.getBalance().compareTo(amount) < 0) {
+            throw new InsufficientBalanceException("O valor informado é maior do que o saldo.");
+        }
+    }
+
+    private void validateDistinctAccounts(String fromAccountNumber, String toAccountNumber) {
+        if (fromAccountNumber.equals(toAccountNumber)) {
+            throw new AccountsAreSameException("A conta de origem não pode ser igual à conta de destino.");
+        }
+    }
+
+    private SavingsAccount validateAndGetSavingsAccount(Account account) {
+        if (!(account instanceof SavingsAccount savingsAccount)) {
+            throw new AccountIsNotSavingsException("A conta informada não é poupança.");
+        }
+        return savingsAccount;
+    }
+
+    private void validateYieldAvailable(SavingsAccount savingsAccount, BigDecimal yieldAmount) {
+        if (!savingsAccount.isEligibleForYield()) {
+            throw new YieldNotAvailableException("A conta ainda não está disponível para receber rendimento.");
+        }
+        if (yieldAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new YieldNotAvailableException("Não há rendimento disponível para esta conta.");
+        }
+    }
+
+    private void validateYieldAlreadyApplied(Long accountId) {
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
+        boolean alreadyApplied = transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(accountId, TransactionType.YIELD, startOfDay, endOfDay);
+        if (alreadyApplied) {
+            throw new YieldAlreadyAppliedException("O rendimento já foi aplicado para a conta hoje.");
+        }
+    }
+
+    private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account) {
+        Transaction transaction = new Transaction(type, amount, LocalDateTime.now(), account);
+        return transactionRepository.save(transaction);
+    }
+
+    private String getCurrentUsername() {
+        return currentUserService.getUsername();
+    }
+}

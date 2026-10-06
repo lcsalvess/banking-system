@@ -8,6 +8,7 @@ import com.lucas.bankingsystem.entity.enums.AccountType;
 import com.lucas.bankingsystem.entity.enums.State;
 import com.lucas.bankingsystem.event.account.AccountOperationEvent;
 import com.lucas.bankingsystem.event.account.AccountOperationType;
+import com.lucas.bankingsystem.exception.database.DatabaseConstraint;
 import com.lucas.bankingsystem.exception.account.*;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.repository.AccountRepository;
@@ -345,7 +346,7 @@ public class AccountServiceTest {
             ConstraintViolationException cause = new ConstraintViolationException(
                     "Unique index violation",
                     null,
-                    "uk_accounts_client_type_active"
+                    DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE.getConstraintName()
             );
 
             when(accountRepository.saveAndFlush(any(Account.class)))

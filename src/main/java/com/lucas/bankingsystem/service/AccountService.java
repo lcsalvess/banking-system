@@ -10,6 +10,7 @@ import com.lucas.bankingsystem.entity.enums.AccountStatus;
 import com.lucas.bankingsystem.entity.enums.AccountType;
 import com.lucas.bankingsystem.event.account.AccountOperationEvent;
 import com.lucas.bankingsystem.event.account.AccountOperationType;
+import com.lucas.bankingsystem.exception.database.DatabaseConstraint;
 import com.lucas.bankingsystem.exception.account.*;
 import com.lucas.bankingsystem.repository.AccountRepository;
 import com.lucas.bankingsystem.repository.CheckingAccountRepository;
@@ -17,7 +18,6 @@ import com.lucas.bankingsystem.repository.SavingsAccountRepository;
 import com.lucas.bankingsystem.service.account.AccountNumberGenerator;
 import com.lucas.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lucas.bankingsystem.service.security.CurrentUserService;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -65,9 +65,9 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public AccountResponseDTO findByAccountNumber(String accountNumber, String accountDigit) {
-       validateDigit(accountNumber, accountDigit);
-       Account account = accountRepository.findByAccountNumberWithClient(accountNumber)
-               .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
+        validateDigit(accountNumber, accountDigit);
+        Account account = accountRepository.findByAccountNumberWithClient(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
         return AccountResponseDTO.fromEntity(account);
     }
 
@@ -141,18 +141,6 @@ public class AccountService {
         );
     }
 
-    private boolean isDuplicateActiveAccount(DataIntegrityViolationException exception) {
-        Throwable cause = exception;
-
-        while (cause != null) {
-            if (cause instanceof ConstraintViolationException violation) {
-                return "uk_accounts_client_type_active".equals(violation.getConstraintName());
-            }
-            cause = cause.getCause();
-        }
-        return false;
-    }
-
     private String getDuplicateAccountMessage(AccountType type) {
         return switch (type) {
             case CHECKING -> "O cliente já possui uma conta corrente.";
@@ -164,7 +152,7 @@ public class AccountService {
         try {
             return accountRepository.saveAndFlush(account);
         } catch (DataIntegrityViolationException exception) {
-            if (isDuplicateActiveAccount(exception)) {
+            if (DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE.isViolatedBy(exception)) {
                 throw new AccountAlreadyExistsException(
                         getDuplicateAccountMessage(account.getType())
                 );

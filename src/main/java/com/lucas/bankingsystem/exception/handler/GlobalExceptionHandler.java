@@ -3,6 +3,7 @@ package com.lucas.bankingsystem.exception.handler;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lucas.bankingsystem.dto.response.exception.ValidationErrorResponse;
 import com.lucas.bankingsystem.exception.BusinessException;
+import com.lucas.bankingsystem.exception.database.DatabaseConstraint;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import jakarta.validation.ConstraintViolationException;
 import org.jspecify.annotations.NonNull;
@@ -32,9 +33,6 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private static final String CLIENT_CPF_UNIQUE_CONSTRAINT = "uk_clients_cpf";
-    private static final String CLIENT_EMAIL_UNIQUE_CONSTRAINT = "uk_clients_email";
-    private static final String DAILY_YIELD_UNIQUE_CONSTRAINT = "uk_transactions_daily_yield";
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
@@ -86,7 +84,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
             DataIntegrityViolationException exception) {
 
-        if (hasConstraint(exception, CLIENT_EMAIL_UNIQUE_CONSTRAINT)) {
+        if (DatabaseConstraint.CLIENT_EMAIL_UNIQUE.isViolatedBy(exception)) {
             return ResponseEntity
                     .status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(
@@ -95,7 +93,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     ));
         }
 
-        if (hasConstraint(exception, CLIENT_CPF_UNIQUE_CONSTRAINT)) {
+        if (DatabaseConstraint.CLIENT_CPF_UNIQUE.isViolatedBy(exception)) {
             return ResponseEntity
                     .status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(
@@ -104,7 +102,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     ));
         }
 
-        if (hasConstraint(exception, DAILY_YIELD_UNIQUE_CONSTRAINT)) {
+        if (DatabaseConstraint.TRANSACTION_DAILY_YIELD_UNIQUE.isViolatedBy(exception)) {
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
                     .body(new ErrorResponse(
@@ -121,23 +119,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                         HttpStatus.BAD_REQUEST.value(),
                         "Erro de integridade de dados no banco."
                 ));
-    }
-
-    private boolean hasConstraint(
-            DataIntegrityViolationException exception,
-            String constraintName
-    ) {
-        Throwable cause = exception;
-
-        while (cause != null) {
-            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
-                return constraintName.equals(violation.getConstraintName());
-            }
-
-            cause = cause.getCause();
-        }
-
-        return false;
     }
 
     @Override

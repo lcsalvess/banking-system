@@ -10,7 +10,7 @@ import com.lucas.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lucas.bankingsystem.exception.account.AccountNotFoundException;
 import com.lucas.bankingsystem.exception.account.InvalidAccountDigitException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
-import com.lucas.bankingsystem.service.AccountService;
+import com.lucas.bankingsystem.service.account.AccountService;
 import com.lucas.bankingsystem.service.security.CustomUserDetailsService;
 import com.lucas.bankingsystem.service.security.JwtService;
 import org.junit.jupiter.api.DisplayName;

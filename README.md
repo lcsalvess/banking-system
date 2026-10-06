@@ -43,23 +43,37 @@ The application follows a modular layered architecture, separating responsibilit
 
 ```text
 src/main/java/com/lucas/bankingsystem
-├── config/          # Application, security, and web filter configuration (JWT, correlation ID)
+├── bootstrap/       # Application startup and initialization
+├── config/          # Spring application configuration (Jackson, OpenAPI, security)
 ├── controller/      # REST API endpoints
+│   ├── address/     # Address lookup endpoint
+│   └── security/    # Authentication endpoint
 ├── dto/             # Request and response DTOs
 ├── entity/          # Domain entities and enums
 ├── event/           # Application events and event listeners
-├── exception/       # Business exceptions, database constraint names, and the global exception handler
+├── exception/       # Business exceptions, database constraints, and global exception handling
+├── filter/          # HTTP filters (correlation ID)
 ├── integration/
-│   └── address/     # External address providers, lookup orchestration, and lookup endpoint
+│   └── address/     # External address providers and lookup orchestration
+│       ├── brasilapi/
+│       ├── config/
+│       ├── dto/
+│       ├── exception/
+│       ├── validation/
+│       └── viacep/
 ├── repository/      # Database access through Spring Data JPA
+├── security/        # JWT authentication filter
+├── serialization/   # Custom JSON serialization
 ├── service/         # Business rules and application logic
-│   ├── account/     # Account number generation
-│   ├── address/     # Address data resolved from a postal code
-│   ├── client/      # Client persistence (transaction boundary) and update data
-│   └── security/    # JWT, authentication, and current user
+│   ├── account/     # Account operations and account number generation
+│   ├── address/     # Address-related application logic
+│   ├── client/      # Client operations and persistence responsibilities
+│   ├── security/    # Authentication, JWT, and current user
+│   ├── transaction/ # Transaction operations
+│   └── user/        # User operations
 └── validation/      # Custom constraints and validators
-    ├── cpf/         # CPF
-    └── accountnumber/  # Account number and check digit format
+    ├── accountnumber/ # Account number and check digit validation
+    └── cpf/           # CPF validation
 ```
 
 ### Request Flow

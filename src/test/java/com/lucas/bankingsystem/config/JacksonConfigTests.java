@@ -4,7 +4,7 @@ import com.lucas.bankingsystem.controller.TransactionController;
 import com.lucas.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lucas.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lucas.bankingsystem.entity.enums.TransactionType;
-import com.lucas.bankingsystem.service.TransactionService;
+import com.lucas.bankingsystem.service.transaction.TransactionService;
 import com.lucas.bankingsystem.service.security.CustomUserDetailsService;
 import com.lucas.bankingsystem.service.security.JwtService;
 import org.junit.jupiter.api.DisplayName;

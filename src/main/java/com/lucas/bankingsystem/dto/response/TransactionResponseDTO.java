@@ -1,6 +1,6 @@
 package com.lucas.bankingsystem.dto.response;
 
-import com.lucas.bankingsystem.config.MoneySerializer;
+import com.lucas.bankingsystem.serialization.MoneySerializer;
 import com.lucas.bankingsystem.entity.Transaction;
 import com.lucas.bankingsystem.entity.enums.TransactionType;
 import tools.jackson.databind.annotation.JsonSerialize;

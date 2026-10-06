@@ -9,7 +9,7 @@ import com.lucas.bankingsystem.exception.transaction.InsufficientBalanceExceptio
 import com.lucas.bankingsystem.exception.transaction.TransactionNotFoundException;
 import com.lucas.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
 import com.lucas.bankingsystem.exception.transaction.YieldNotAvailableException;
-import com.lucas.bankingsystem.service.TransactionService;
+import com.lucas.bankingsystem.service.transaction.TransactionService;
 import com.lucas.bankingsystem.service.security.CustomUserDetailsService;
 import com.lucas.bankingsystem.service.security.JwtService;
 import org.junit.jupiter.api.DisplayName;

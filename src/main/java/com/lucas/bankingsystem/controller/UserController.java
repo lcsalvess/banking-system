@@ -2,7 +2,7 @@ package com.lucas.bankingsystem.controller;
 
 import com.lucas.bankingsystem.dto.request.UserRequestDTO;
 import com.lucas.bankingsystem.dto.response.UserResponseDTO;
-import com.lucas.bankingsystem.service.UserService;
+import com.lucas.bankingsystem.service.user.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;

@@ -1,6 +1,6 @@
 package com.lucas.bankingsystem.dto.response;
 
-import com.lucas.bankingsystem.config.MoneySerializer;
+import com.lucas.bankingsystem.serialization.MoneySerializer;
 import com.lucas.bankingsystem.entity.Account;
 import com.lucas.bankingsystem.entity.enums.AccountStatus;
 import com.lucas.bankingsystem.entity.enums.AccountType;

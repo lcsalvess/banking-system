@@ -4,7 +4,7 @@ import com.lucas.bankingsystem.dto.request.transaction.AccountOperationRequestDT
 import com.lucas.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lucas.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lucas.bankingsystem.dto.response.exception.ErrorResponse;
-import com.lucas.bankingsystem.service.TransactionService;
+import com.lucas.bankingsystem.service.transaction.TransactionService;
 import com.lucas.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lucas.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;

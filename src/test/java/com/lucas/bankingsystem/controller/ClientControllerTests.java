@@ -13,7 +13,7 @@ import com.lucas.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lucas.bankingsystem.exception.client.ClientNotFoundException;
 import com.lucas.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lucas.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
-import com.lucas.bankingsystem.service.ClientService;
+import com.lucas.bankingsystem.service.client.ClientService;
 import com.lucas.bankingsystem.service.security.CustomUserDetailsService;
 import com.lucas.bankingsystem.service.security.JwtService;
 import org.junit.jupiter.api.DisplayName;

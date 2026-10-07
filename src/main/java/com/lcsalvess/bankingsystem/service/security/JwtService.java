@@ -17,13 +17,16 @@ public class JwtService {
 
     private final SecretKey signingKey;
     private final long expirationInSeconds;
+    private final String issuer;
 
     public JwtService(
             @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration}") long expirationInSeconds
+            @Value("${jwt.expiration}") long expirationInSeconds,
+            @Value("${jwt.issuer}") String issuer
     ) {
         this.signingKey = createSigningKey(secret);
         this.expirationInSeconds = expirationInSeconds;
+        this.issuer = issuer;
     }
 
     private SecretKey createSigningKey(String secret) {
@@ -47,6 +50,7 @@ public class JwtService {
 
         return Jwts.builder()
                 .subject(user.getUsername())
+                .issuer(issuer)
                 .issuedAt(issuedAt)
                 .expiration(expiration)
                 .signWith(signingKey)
@@ -56,6 +60,7 @@ public class JwtService {
     public String extractUsername(String jwt) {
         return Jwts.parser()
                 .verifyWith(signingKey)
+                .requireIssuer(issuer)
                 .build()
                 .parseSignedClaims(jwt)
                 .getPayload()

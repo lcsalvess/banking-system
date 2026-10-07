@@ -3,6 +3,7 @@ package com.lcsalvess.bankingsystem.unit.service.security;
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import io.jsonwebtoken.IncorrectClaimException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,13 +27,19 @@ public class JwtServiceTests {
 
     private static final long EXPIRATION_IN_SECONDS = 3600;
 
+    private static final String ISSUER = "banking-system";
+
     private JwtService jwtService;
     private User user;
     private SecretKey signingKey;
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService(SECRET, EXPIRATION_IN_SECONDS);
+        jwtService = new JwtService(
+                SECRET,
+                EXPIRATION_IN_SECONDS,
+                ISSUER
+        );
 
         signingKey = Keys.hmacShaKeyFor(
                 Base64.getDecoder().decode(SECRET)
@@ -72,6 +79,20 @@ public class JwtServiceTests {
 
             assertEquals(EXPIRATION_IN_SECONDS, expirationInSeconds);
         }
+
+        @Test
+        @DisplayName("Deve definir o issuer conforme configurado")
+        void shouldSetIssuerAccordingToConfiguration() {
+            String token = jwtService.generateToken(user);
+
+            var claims = Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            assertEquals(ISSUER, claims.getIssuer());
+        }
     }
 
     @Nested
@@ -87,6 +108,23 @@ public class JwtServiceTests {
 
             assertEquals(user.getUsername(), username);
         }
+
+        @Test
+        @DisplayName("Deve rejeitar token com issuer inválido")
+        void shouldRejectTokenWithInvalidIssuer() {
+            String token = Jwts.builder()
+                    .subject(user.getUsername())
+                    .issuer("outro-sistema")
+                    .issuedAt(new Date())
+                    .expiration(new Date(System.currentTimeMillis() + 3600_000))
+                    .signWith(signingKey)
+                    .compact();
+
+            assertThrows(
+                    IncorrectClaimException.class,
+                    () -> jwtService.extractUsername(token)
+            );
+        }
     }
 
     @Nested
@@ -98,7 +136,11 @@ public class JwtServiceTests {
         void shouldRejectNullSecret() {
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> new JwtService(null, EXPIRATION_IN_SECONDS)
+                    () -> new JwtService(
+                            null,
+                            EXPIRATION_IN_SECONDS,
+                            ISSUER
+                    )
             );
 
             assertEquals(
@@ -112,7 +154,11 @@ public class JwtServiceTests {
         void shouldRejectBlankSecret() {
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> new JwtService(" ", EXPIRATION_IN_SECONDS)
+                    () -> new JwtService(
+                            " ",
+                            EXPIRATION_IN_SECONDS,
+                            ISSUER
+                    )
             );
 
             assertEquals(
@@ -126,7 +172,11 @@ public class JwtServiceTests {
         void shouldRejectInvalidBase64Secret() {
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> new JwtService("!!!", EXPIRATION_IN_SECONDS)
+                    () -> new JwtService(
+                            "!!!",
+                            EXPIRATION_IN_SECONDS,
+                            ISSUER
+                    )
             );
 
             assertEquals(
@@ -145,7 +195,11 @@ public class JwtServiceTests {
 
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> new JwtService(weakSecret, EXPIRATION_IN_SECONDS)
+                    () -> new JwtService(
+                            weakSecret,
+                            EXPIRATION_IN_SECONDS,
+                            ISSUER
+                    )
             );
 
             assertEquals(

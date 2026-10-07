@@ -12,6 +12,7 @@ import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class JwtServiceTests {
 
@@ -52,6 +53,74 @@ public class JwtServiceTests {
             String username = jwtService.extractUsername(token);
 
             assertEquals(user.getUsername(), username);
+        }
+    }
+
+    @Nested
+    @DisplayName("Ao inicializar o serviço JWT")
+    class InitializationTests {
+
+        @Test
+        @DisplayName("Deve rejeitar segredo nulo")
+        void shouldRejectNullSecret() {
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> new JwtService(null)
+            );
+
+            assertEquals(
+                    "O segredo JWT não pode ser nulo ou vazio.",
+                    exception.getMessage()
+            );
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar segredo vazio")
+        void shouldRejectBlankSecret() {
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> new JwtService(" ")
+            );
+
+            assertEquals(
+                    "O segredo JWT não pode ser nulo ou vazio.",
+                    exception.getMessage()
+            );
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar segredo com Base64 inválido")
+        void shouldRejectInvalidBase64Secret() {
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> new JwtService("!!!")
+            );
+
+            assertEquals(
+                    "Configuração do segredo JWT inválida.",
+                    exception.getMessage()
+            );
+
+            assertNotNull(exception.getCause());
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar chave com tamanho insuficiente")
+        void shouldRejectWeakSecret() {
+            String weakSecret = Base64.getEncoder()
+                    .encodeToString("chave-curta".getBytes());
+
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> new JwtService(weakSecret)
+            );
+
+            assertEquals(
+                    "Configuração do segredo JWT inválida.",
+                    exception.getMessage()
+            );
+
+            assertNotNull(exception.getCause());
         }
     }
 

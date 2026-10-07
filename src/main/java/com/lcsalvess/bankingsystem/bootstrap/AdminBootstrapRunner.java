@@ -33,15 +33,15 @@ public class AdminBootstrapRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (userRepository.existsByRole(Role.ADMIN)) {
-            log.info("Usuário ADMIN já existe. Bootstrap ignorado.");
+            log.info("Usuário administrador já existe. Bootstrap ignorado.");
             return;
         }
         if (adminUsername.isBlank() || adminEmail.isBlank() || adminPassword.isBlank()) {
-            log.warn("Nenhum ADMIN encontrado e ADMIN_USERNAME/ADMIN_EMAIL/ADMIN_PASSWORD não foram definidos. Bootstrap ignorado.");
+            log.warn("Nenhum usuário administrador encontrado e as credenciais iniciais não foram definidas. Bootstrap ignorado.");
             return;
         }
         User admin = new User(adminUsername, adminEmail, passwordEncoder.encode(adminPassword), Role.ADMIN);
         userRepository.save(admin);
-        log.info("Usuário ADMIN inicial criado: {}", adminUsername);
+        log.info("Usuário administrador inicial criado: {}", adminUsername);
     }
 }

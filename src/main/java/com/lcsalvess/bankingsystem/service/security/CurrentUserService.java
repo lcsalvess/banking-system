@@ -17,7 +17,10 @@ public class CurrentUserService {
         if(auth == null
                 || !auth.isAuthenticated()
                 || auth instanceof AnonymousAuthenticationToken) {
-            throw new AuthenticationCredentialsNotFoundException("No authenticated user found.");
+
+            throw new AuthenticationCredentialsNotFoundException(
+                    "Nenhum usuário autenticado encontrado."
+            );
         }
 
         return auth.getName();

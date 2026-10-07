@@ -14,7 +14,12 @@ import java.util.Optional;
 public interface AccountRepository extends JpaRepository<Account, Long> {
 
     @EntityGraph(attributePaths = "client")
-    @Query("SELECT a FROM Account a JOIN FETCH a.client")
+    @Query("""
+    SELECT a
+    FROM Account a
+    JOIN FETCH a.client
+    ORDER BY a.accountNumber ASC
+    """)
     List<Account> findAllWithClient();
 
     Optional<Account> findByAccountNumber(String accountNumber);

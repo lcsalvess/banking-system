@@ -16,9 +16,14 @@ import java.util.Date;
 public class JwtService {
 
     private final SecretKey signingKey;
+    private final long expirationInSeconds;
 
-    public JwtService(@Value("${jwt.secret}") String secret) {
+    public JwtService(
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.expiration}") long expirationInSeconds
+    ) {
         this.signingKey = createSigningKey(secret);
+        this.expirationInSeconds = expirationInSeconds;
     }
 
     private SecretKey createSigningKey(String secret) {
@@ -38,7 +43,7 @@ public class JwtService {
 
     public String generateToken(User user) {
         Date issuedAt = new Date();
-        Date expiration = new Date(issuedAt.getTime() + 1000 * 60 * 60);
+        Date expiration = new Date(issuedAt.getTime() + expirationInSeconds * 1000);
 
         return Jwts.builder()
                 .subject(user.getUsername())

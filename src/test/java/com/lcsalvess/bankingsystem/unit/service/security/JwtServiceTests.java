@@ -3,12 +3,16 @@ package com.lcsalvess.bankingsystem.unit.service.security;
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import javax.crypto.SecretKey;
 import java.util.Base64;
+import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -16,15 +20,24 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class JwtServiceTests {
 
+    private static final String SECRET =
+            Base64.getEncoder()
+                    .encodeToString("uma-chave-secreta-com-pelo-menos-32-bytes".getBytes());
+
+    private static final long EXPIRATION_IN_SECONDS = 3600;
+
     private JwtService jwtService;
     private User user;
+    private SecretKey signingKey;
 
     @BeforeEach
     void setUp() {
-        String secret = Base64.getEncoder()
-                .encodeToString("uma-chave-secreta-com-pelo-menos-32-bytes".getBytes());
+        jwtService = new JwtService(SECRET, EXPIRATION_IN_SECONDS);
 
-        jwtService = new JwtService(secret);
+        signingKey = Keys.hmacShaKeyFor(
+                Base64.getDecoder().decode(SECRET)
+        );
+
         user = createEntityUser();
     }
 
@@ -38,6 +51,26 @@ public class JwtServiceTests {
             String token = jwtService.generateToken(user);
 
             assertNotNull(token);
+        }
+
+        @Test
+        @DisplayName("Deve definir a expiração conforme configurado")
+        void shouldSetExpirationAccordingToConfiguration() {
+            String token = jwtService.generateToken(user);
+
+            var claims = Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            Date issuedAt = claims.getIssuedAt();
+            Date expiration = claims.getExpiration();
+
+            long expirationInSeconds =
+                    (expiration.getTime() - issuedAt.getTime()) / 1000;
+
+            assertEquals(EXPIRATION_IN_SECONDS, expirationInSeconds);
         }
     }
 
@@ -65,7 +98,7 @@ public class JwtServiceTests {
         void shouldRejectNullSecret() {
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> new JwtService(null)
+                    () -> new JwtService(null, EXPIRATION_IN_SECONDS)
             );
 
             assertEquals(
@@ -79,7 +112,7 @@ public class JwtServiceTests {
         void shouldRejectBlankSecret() {
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> new JwtService(" ")
+                    () -> new JwtService(" ", EXPIRATION_IN_SECONDS)
             );
 
             assertEquals(
@@ -93,7 +126,7 @@ public class JwtServiceTests {
         void shouldRejectInvalidBase64Secret() {
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> new JwtService("!!!")
+                    () -> new JwtService("!!!", EXPIRATION_IN_SECONDS)
             );
 
             assertEquals(
@@ -112,7 +145,7 @@ public class JwtServiceTests {
 
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> new JwtService(weakSecret)
+                    () -> new JwtService(weakSecret, EXPIRATION_IN_SECONDS)
             );
 
             assertEquals(

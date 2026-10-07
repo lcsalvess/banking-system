@@ -49,10 +49,13 @@ public class AuthControllerTest {
     @Nested
     @DisplayName("Ao tentar autenticar")
     class AuthTest {
+
+        private static final String URL = "/api/v1/auth/login";
+
         @Test
         @DisplayName("Deve autenticar com credenciais válidas")
         void shouldAuthenticateWithValidCredentials() throws Exception {
-            mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
                         "username": "usuario.teste",
                         "password": "Senha123"
@@ -63,7 +66,7 @@ public class AuthControllerTest {
         @Test
         @DisplayName("Deve rejeitar senha inválida")
         void shouldRejectInvalidPassword() throws Exception {
-            mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
                         "username": "usuario.teste",
                         "password": "SenhaErrada123"
@@ -74,7 +77,7 @@ public class AuthControllerTest {
         @Test
         @DisplayName("Deve rejeitar usuário inexistente")
         void shouldRejectNonexistentUser() throws Exception {
-            mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
                         "username": "usuario.inexistente",
                         "password": "Senha123"
@@ -85,7 +88,7 @@ public class AuthControllerTest {
         @Test
         @DisplayName("Deve rejeitar username em branco")
         void shouldRejectBlankUsername() throws Exception {
-            mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
                         "username": "",
                         "password": "Senha123"
@@ -96,7 +99,7 @@ public class AuthControllerTest {
         @Test
         @DisplayName("Deve rejeitar senha em branco")
         void shouldRejectBlankPassword() throws Exception {
-            mockMvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
                         "username": "usuario.teste",
                         "password": ""

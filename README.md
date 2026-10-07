@@ -217,20 +217,20 @@ Shows the full request/response cycle, including authentication and authorizatio
 
 ## Authentication and Authorization
 
-The API is stateless. Clients authenticate through `POST /auth/login` and send the returned token in every request:
+The API is stateless. Clients authenticate through `POST /api/v1/auth/login` and send the returned token in every request:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-| Aspect             | Behavior                                                                 |
-|--------------------|--------------------------------------------------------------------------|
-| Token              | JWT signed with HMAC, valid for 1 hour                                   |
-| Public routes      | `/auth/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**`      |
-| Protected routes   | Everything else requires a valid token, including `/actuator/**`         |
-| Admin-only routes  | `POST /users` (`@PreAuthorize("hasRole('ADMIN')")`)                      |
-| Invalid token      | `401 Unauthorized`                                                       |
-| Insufficient role  | `403 Forbidden`                                                          |
+| Aspect             | Behavior                                                                   |
+|--------------------|----------------------------------------------------------------------------|
+| Token              | JWT signed with HMAC, valid for 1 hour                                     |
+| Public routes      | `/api/v1/auth/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**` |
+| Protected routes   | Everything else requires a valid token, including `/actuator/**`           |
+| Admin-only routes  | `POST /api/v1/users` (`@PreAuthorize("hasRole('ADMIN')")`)                 |
+| Invalid token      | `401 Unauthorized`                                                         |
+| Insufficient role  | `403 Forbidden`                                                            |
 
 ---
 
@@ -240,8 +240,8 @@ Full request and response schemas are available in Swagger UI.
 
 | Method | Endpoint                                               | Description                          | Access        |
 |--------|--------------------------------------------------------|--------------------------------------|---------------|
-| POST   | `/auth/login`                                          | Authenticate and receive a JWT       | Public        |
-| POST   | `/users`                                               | Create a user                        | `ADMIN`       |
+| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT       | Public        |
+| POST   | `/api/v1/users`                                        | Create a user                        | `ADMIN`       |
 | POST   | `/api/v1/clients`                                      | Register a client                    | Authenticated |
 | GET    | `/api/v1/clients`                                      | List clients                         | Authenticated |
 | GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                   | Authenticated |
@@ -283,7 +283,7 @@ Possible responses: `200` (address found), `400` (postal code is not 8 digits), 
 
 ```bash
 # 1. Log in
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}'
 
@@ -352,7 +352,7 @@ Validation errors also include the invalid fields. The same structure is used fo
 | Address providers unavailable                                                      | `503 Service Unavailable`   |
 | Unexpected error                                                                   | `500 Internal Server Error` |
 
-Database integrity violations are translated by constraint name through the `DatabaseConstraint` enum: a client CPF or e-mail conflict returns `409 Conflict`, a second yield on the same day returns `400 Bad Request`, and any other violation returns `400 Bad Request` with a generic message. The constraint is identified by the name reported by the database, never by the exception message.
+Database integrity violations are translated by constraint name through the `DatabaseConstraint` enum: a client CPF or e-mail conflict returns `409 Conflict`, a second yield on the same day returns `409 Conflict`, and any other violation returns `400 Bad Request` with a generic message. The constraint is identified by the name reported by the database, never by the exception message.
 
 ---
 
@@ -462,7 +462,7 @@ With the application running, open Swagger UI at:
 http://localhost:8080/swagger-ui/index.html
 ```
 
-Use the **Authorize** button and paste the JWT returned by `/auth/login` to call protected endpoints.
+Use the **Authorize** button and paste the JWT returned by `/api/v1/auth/login` to call protected endpoints.
 
 To disable the documentation (for example, in production), set `SWAGGER_ENABLED=false`.
 

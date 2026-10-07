@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -45,6 +46,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return new ErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
                 "Usuário ou senha inválidos."
+        );
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleAuthenticationException(
+            AuthenticationException exception) {
+
+        log.warn(
+                "Authentication failed: {}",
+                exception.getClass().getSimpleName()
+                );
+
+        return new ErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                "Não foi possível autenticar o usuário."
         );
     }
 

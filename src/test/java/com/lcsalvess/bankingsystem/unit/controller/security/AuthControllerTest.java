@@ -106,6 +106,29 @@ public class AuthControllerTest {
                     }
                     """)).andExpect(status().isBadRequest());
         }
+
+        @Test
+        @DisplayName("Deve rejeitar usuário inativo")
+        void shouldRejectDisabledUser() throws Exception {
+            User user = userRepository.findByUsername("usuario.teste")
+                    .orElseThrow();
+
+            user.setActive(false);
+            userRepository.save(user);
+
+            mockMvc.perform(post(URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                    {
+                        "username": "usuario.teste",
+                        "password": "Senha123"
+                    }
+                    """))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.message")
+                            .value("Não foi possível autenticar o usuário."));
+        }
     }
 }
 

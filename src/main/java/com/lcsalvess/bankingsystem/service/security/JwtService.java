@@ -1,12 +1,12 @@
 package com.lcsalvess.bankingsystem.service.security;
 
+import com.lcsalvess.bankingsystem.config.JwtProperties;
 import com.lcsalvess.bankingsystem.entity.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.io.DecodingException;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.WeakKeyException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -19,14 +19,10 @@ public class JwtService {
     private final long expirationInSeconds;
     private final String issuer;
 
-    public JwtService(
-            @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration}") long expirationInSeconds,
-            @Value("${jwt.issuer}") String issuer
-    ) {
-        this.signingKey = createSigningKey(secret);
-        this.expirationInSeconds = expirationInSeconds;
-        this.issuer = issuer;
+    public JwtService(JwtProperties jwtProperties) {
+        this.signingKey = createSigningKey(jwtProperties.secret());
+        this.expirationInSeconds = jwtProperties.expiration();
+        this.issuer = jwtProperties.issuer();
     }
 
     private SecretKey createSigningKey(String secret) {

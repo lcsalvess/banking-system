@@ -13,28 +13,28 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret}")
-    private String secret;
+    private final SecretKey signingKey;
 
-    private SecretKey getSigningKey() {
+    public JwtService(@Value("${jwt.secret}") String secret) {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
-        return Keys.hmacShaKeyFor(keyBytes);
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(User user) {
         Date issuedAt = new Date();
         Date expiration = new Date(issuedAt.getTime() + 1000 * 60 * 60);
+
         return Jwts.builder()
                 .subject(user.getUsername())
                 .issuedAt(issuedAt)
                 .expiration(expiration)
-                .signWith(getSigningKey())
+                .signWith(signingKey)
                 .compact();
     }
 
     public String extractUsername(String jwt) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(jwt)
                 .getPayload()

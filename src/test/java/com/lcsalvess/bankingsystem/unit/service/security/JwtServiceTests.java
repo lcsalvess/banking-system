@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Base64;
 
@@ -15,24 +14,28 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class JwtServiceTests {
+
     private JwtService jwtService;
     private User user;
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService();
-        String secret = Base64.getEncoder().encodeToString("uma-chave-secreta-com-pelo-menos-32-bytes".getBytes());
-        ReflectionTestUtils.setField(jwtService, "secret", secret);
+        String secret = Base64.getEncoder()
+                .encodeToString("uma-chave-secreta-com-pelo-menos-32-bytes".getBytes());
+
+        jwtService = new JwtService(secret);
         user = createEntityUser();
     }
 
     @Nested
     @DisplayName("Ao gerar um token JWT")
     class GenerateTokenTests {
+
         @Test
         @DisplayName("Deve gerar token para usuário")
         void shouldGenerateTokenSuccessfully() {
             String token = jwtService.generateToken(user);
+
             assertNotNull(token);
         }
     }
@@ -40,11 +43,14 @@ public class JwtServiceTests {
     @Nested
     @DisplayName("Ao extrair o username de um token JWT")
     class ExtractUsernameTests {
+
         @Test
         @DisplayName("Deve extrair username do token")
         void shouldExtractUsernameSuccessfully() {
             String token = jwtService.generateToken(user);
+
             String username = jwtService.extractUsername(token);
+
             assertEquals(user.getUsername(), username);
         }
     }

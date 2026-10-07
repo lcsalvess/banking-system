@@ -44,7 +44,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO deposit(AccountOperationRequestDTO dto) {
-        Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.digit());
+        Account account = accountService.findEntityByAccountNumberForUpdate(dto.accountNumber(), dto.digit());
 
         validateActiveAccount(account);
         validateAmount(dto.amount());
@@ -80,7 +80,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO withdraw(AccountOperationRequestDTO dto) {
-        Account account = accountService.findEntityByAccountNumber(dto.accountNumber(), dto.digit());
+        Account account = accountService.findEntityByAccountNumberForUpdate(dto.accountNumber(), dto.digit());
 
         validateActiveAccount(account);
         validateAmount(dto.amount());

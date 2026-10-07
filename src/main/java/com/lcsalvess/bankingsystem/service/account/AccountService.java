@@ -70,6 +70,13 @@ public class AccountService {
         return AccountResponseDTO.fromEntity(account);
     }
 
+    public Account findEntityByAccountNumberForUpdate(String accountNumber, String accountDigit) {
+        validateDigit(accountNumber, accountDigit);
+
+        return accountRepository.findByAccountNumberForUpdate(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
+    }
+
     @Transactional
     public AccountResponseDTO create(AccountRequestDTO dto) {
         Client client = clientService.findEntityById(dto.clientId());

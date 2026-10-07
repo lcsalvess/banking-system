@@ -35,50 +35,55 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
-        ErrorResponse error = new ErrorResponse(exception.getStatus().value(), exception.getMessage());
-        log.warn("Business exception: status={}, message={}",
-                exception.getStatus().value(),
-                exception.getMessage());
-        return ResponseEntity.status(exception.getStatus()).body(error);
-    }
+    //-------------- AUTENTICAÇÃO ---------
 
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleBadCredentials() {
         log.warn("Authentication failed: invalid username or password");
-        return new ErrorResponse(HttpStatus.UNAUTHORIZED.value(), "Usuário ou senha inválidos.");
-    }
 
-    @ExceptionHandler(ConstraintViolationException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ValidationErrorResponse handleConstraintViolation(
-            ConstraintViolationException exception) {
-
-        Map<String, String> errors = new HashMap<>();
-
-        exception.getConstraintViolations().forEach(violation -> {
-            String field = violation.getPropertyPath()
-                    .toString()
-                    .substring(violation.getPropertyPath().toString().lastIndexOf('.') + 1);
-
-            errors.put(field, violation.getMessage());
-        });
-
-        return new ValidationErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                "Erro de validação.",
-                errors
+        return new ErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                "Usuário ou senha inválidos."
         );
     }
+
+    //-------------- AUTORIZAÇÃO ---------
 
     @ExceptionHandler(AuthorizationDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleAuthorizationDenied() {
         log.warn("Authorization denied: access forbidden");
-        return new ErrorResponse(HttpStatus.FORBIDDEN.value(), "Acesso negado.");
+
+        return new ErrorResponse(
+                HttpStatus.FORBIDDEN.value(),
+                "Acesso negado."
+        );
     }
+
+    //-------------- REGRAS DE NEGÓCIO ---------
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(
+            BusinessException exception) {
+
+        ErrorResponse error = new ErrorResponse(
+                exception.getStatus().value(),
+                exception.getMessage()
+        );
+
+        log.warn(
+                "Business exception: status={}, message={}",
+                exception.getStatus().value(),
+                exception.getMessage()
+        );
+
+        return ResponseEntity
+                .status(exception.getStatus())
+                .body(error);
+    }
+
+    //-------------- INTEGRIDADE DE DADOS ---------
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
@@ -121,6 +126,32 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 ));
     }
 
+    //-------------- VALIDAÇÃO / REQUISIÇÃO ---------
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ValidationErrorResponse handleConstraintViolation(
+            ConstraintViolationException exception) {
+
+        Map<String, String> errors = new HashMap<>();
+
+        exception.getConstraintViolations().forEach(violation -> {
+            String field = violation.getPropertyPath()
+                    .toString()
+                    .substring(
+                            violation.getPropertyPath().toString().lastIndexOf('.') + 1
+                    );
+
+            errors.put(field, violation.getMessage());
+        });
+
+        return new ValidationErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Erro de validação.",
+                errors
+        );
+    }
+
     @Override
     protected @Nullable ResponseEntity<Object> handleHttpMessageNotReadable(
             @NonNull HttpMessageNotReadableException ex,
@@ -128,9 +159,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             @NonNull WebRequest request) {
 
-        ErrorResponse error = new ErrorResponse(status.value(), "Dados da requisição inválidos.");
+        ErrorResponse error = new ErrorResponse(
+                status.value(),
+                "Dados da requisição inválidos."
+        );
 
-        return handleExceptionInternal(ex, error, headers, status, request);
+        return handleExceptionInternal(
+                ex,
+                error,
+                headers,
+                status,
+                request
+        );
     }
 
     @Override
@@ -142,9 +182,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         Map<String, String> errors = new HashMap<>();
 
-        ex.getBindingResult().getFieldErrors().forEach(error ->
-                errors.put(error.getField(), error.getDefaultMessage())
-        );
+        ex.getBindingResult()
+                .getFieldErrors()
+                .forEach(error ->
+                        errors.put(
+                                error.getField(),
+                                error.getDefaultMessage()
+                        )
+                );
 
         ValidationErrorResponse response = new ValidationErrorResponse(
                 status.value(),
@@ -152,7 +197,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 errors
         );
 
-        return handleExceptionInternal(ex, response, headers, status, request);
+        return handleExceptionInternal(
+                ex,
+                response,
+                headers,
+                status,
+                request
+        );
     }
 
     @Override
@@ -167,7 +218,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "Parâmetro de requisição obrigatório ausente."
         );
 
-        return handleExceptionInternal(ex, error, headers, status, request);
+        return handleExceptionInternal(
+                ex,
+                error,
+                headers,
+                status,
+                request
+        );
     }
 
     @Override
@@ -182,28 +239,42 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "Parâmetro de requisição inválido."
         );
 
-        return handleExceptionInternal(ex, error, headers, status, request);
-    }
-
-    @ExceptionHandler(RuntimeException.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ErrorResponse handleUnexpectedRuntimeException(RuntimeException exception) {
-        log.error("Unexpected error occurred", exception);
-
-        return new ErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Ocorreu um erro interno no servidor."
+        return handleExceptionInternal(
+                ex,
+                error,
+                headers,
+                status,
+                request
         );
     }
 
+    //-------------- INFRAESTRUTURA ---------
+
     @ExceptionHandler(AddressProviderUnavailableException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public ErrorResponse handleAddressProviderUnavailable(AddressProviderUnavailableException ex) {
+    public ErrorResponse handleAddressProviderUnavailable(
+            AddressProviderUnavailableException ex) {
+
         log.error("Address provider unavailable", ex);
 
         return new ErrorResponse(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 "O serviço de consulta de endereços está temporariamente indisponível."
+        );
+    }
+
+    //-------------- EXCEÇÕES INESPERADAS ---------
+
+    @ExceptionHandler(RuntimeException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleUnexpectedRuntimeException(
+            RuntimeException exception) {
+
+        log.error("Unexpected error occurred", exception);
+
+        return new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Ocorreu um erro interno no servidor."
         );
     }
 }

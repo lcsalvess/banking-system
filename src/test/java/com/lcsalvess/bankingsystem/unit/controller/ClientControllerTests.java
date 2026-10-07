@@ -15,8 +15,7 @@ import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
-import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
-import com.lcsalvess.bankingsystem.service.security.JwtService;
+import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,6 +25,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -45,6 +45,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ClientController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(
+        WebMvcTestSecurityConfig.class
+)
 public class ClientControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.ClientControllerTests#";
@@ -97,12 +100,6 @@ public class ClientControllerTests {
 
     @MockitoBean
     private ClientService clientService;
-
-    @MockitoBean
-    private JwtService jwtService;
-
-    @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
 
     @Nested
     @DisplayName("GET /api/v1/clients")

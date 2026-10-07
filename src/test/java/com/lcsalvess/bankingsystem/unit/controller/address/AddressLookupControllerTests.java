@@ -5,8 +5,7 @@ import com.lcsalvess.bankingsystem.integration.address.AddressLookupService;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
-import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
-import com.lcsalvess.bankingsystem.service.security.JwtService;
+import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -16,6 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,6 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AddressLookupController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(
+        WebMvcTestSecurityConfig.class
+)
 class AddressLookupControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.address.AddressLookupControllerTests#";
@@ -44,12 +47,6 @@ class AddressLookupControllerTests {
 
     @MockitoBean
     private AddressLookupService addressLookupService;
-
-    @MockitoBean
-    private JwtService jwtService;
-
-    @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
 
     @Nested
     @DisplayName("GET /api/v1/addresses/lookup/{postalCode}")

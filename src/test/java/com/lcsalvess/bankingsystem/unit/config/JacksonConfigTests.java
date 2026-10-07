@@ -6,8 +6,6 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
-import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
-import com.lcsalvess.bankingsystem.service.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -38,23 +36,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(TransactionController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(JacksonConfig.class)
+@Import({
+        JacksonConfig.class,
+        WebMvcTestSecurityConfig.class
+})
 class JacksonConfigTests {
 
-    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.config.JacksonConfigTests#";
-    private static final String INVALID_BODY_MESSAGE = "Dados da requisição inválidos.";
+    private static final String PROVIDER =
+            "com.lcsalvess.bankingsystem.unit.config.JacksonConfigTests#";
+
+    private static final String INVALID_BODY_MESSAGE =
+            "Dados da requisição inválidos.";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
     private TransactionService transactionService;
-
-    @MockitoBean
-    private JwtService jwtService;
-
-    @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
 
     @Nested
     @DisplayName("POST /api/v1/transactions/deposit")

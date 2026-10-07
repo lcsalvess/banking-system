@@ -5,15 +5,10 @@ import com.lcsalvess.bankingsystem.dto.request.AccountRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.AccountResponseDTO;
 import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.enums.AccountType;
-import com.lcsalvess.bankingsystem.exception.account.AccountAlreadyExistsException;
-import com.lcsalvess.bankingsystem.exception.account.AccountHasBalanceException;
-import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
-import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
-import com.lcsalvess.bankingsystem.exception.account.InvalidAccountDigitException;
+import com.lcsalvess.bankingsystem.exception.account.*;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
-import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
-import com.lcsalvess.bankingsystem.service.security.JwtService;
+import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,6 +18,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,13 +33,14 @@ import java.util.stream.Stream;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AccountController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(
+        WebMvcTestSecurityConfig.class
+)
 public class AccountControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.AccountControllerTests#";
@@ -62,13 +59,6 @@ public class AccountControllerTests {
 
     @MockitoBean
     private AccountService accountService;
-
-    @MockitoBean
-    private JwtService jwtService;
-
-    @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
-
 
     @Nested
     @DisplayName("GET /api/v1/accounts")

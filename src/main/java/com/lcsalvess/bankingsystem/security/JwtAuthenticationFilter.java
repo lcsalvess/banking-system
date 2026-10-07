@@ -7,6 +7,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,13 +23,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final RestAuthenticationEntryPoint authenticationEntryPoint;
 
     public JwtAuthenticationFilter(
             JwtService jwtService,
-            CustomUserDetailsService userDetailsService
+            CustomUserDetailsService userDetailsService,
+            RestAuthenticationEntryPoint authenticationEntryPoint
     ) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
     @Override
@@ -53,7 +58,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     userDetailsService.loadUserByUsername(username);
 
             if (!userDetails.isEnabled()) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                authenticationEntryPoint.commence(
+                        request,
+                        response,
+                        new DisabledException("User is disabled")
+                );
                 return;
             }
 
@@ -67,7 +76,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
         } catch (JwtException | UsernameNotFoundException exception) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            authenticationEntryPoint.commence(
+                    request,
+                    response,
+                    new BadCredentialsException("Invalid authentication")
+            );
             return;
         }
 

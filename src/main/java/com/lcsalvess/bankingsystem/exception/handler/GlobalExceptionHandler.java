@@ -104,9 +104,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         if (DatabaseConstraint.TRANSACTION_DAILY_YIELD_UNIQUE.isViolatedBy(exception)) {
             return ResponseEntity
-                    .status(HttpStatus.BAD_REQUEST)
+                    .status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(
-                            HttpStatus.BAD_REQUEST.value(),
+                            HttpStatus.CONFLICT.value(),
                             "O rendimento já foi aplicado para esta conta hoje."
                     ));
         }

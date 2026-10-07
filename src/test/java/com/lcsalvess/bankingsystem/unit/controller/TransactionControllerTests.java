@@ -445,7 +445,7 @@ public class TransactionControllerTests {
         }
 
         @Test
-        @DisplayName("Should return 409 when accounts are the same")
+        @DisplayName("Should return 400 when accounts are the same")
         void shouldReturnConflictWhenAccountsAreSame() throws Exception {
             TransferRequestDTO request = transferRequest();
 
@@ -454,7 +454,7 @@ public class TransactionControllerTests {
                             new AccountsAreSameException(ACCOUNTS_ARE_SAME_MESSAGE)
                     );
 
-            performPost(URL, request, 409, ACCOUNTS_ARE_SAME_MESSAGE);
+            performPost(URL, request, 400, ACCOUNTS_ARE_SAME_MESSAGE);
 
             verify(transactionService).transfer(request);
             verifyNoMoreInteractions(transactionService);

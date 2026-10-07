@@ -10,11 +10,9 @@ import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.enums.AccountType;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
-import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.account.*;
+import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
-import com.lcsalvess.bankingsystem.repository.CheckingAccountRepository;
-import com.lcsalvess.bankingsystem.repository.SavingsAccountRepository;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.springframework.context.ApplicationEventPublisher;
@@ -29,10 +27,6 @@ import java.util.List;
 public class AccountService {
     private final AccountRepository accountRepository;
 
-    private final CheckingAccountRepository checkingAccountRepository;
-
-    private final SavingsAccountRepository savingsAccountRepository;
-
     private final AccountNumberGenerator accountNumberGenerator;
 
     private final ClientService clientService;
@@ -41,10 +35,8 @@ public class AccountService {
 
     private final ApplicationEventPublisher eventPublisher;
 
-    public AccountService(AccountRepository accountRepository, CheckingAccountRepository checkingAccountRepository, SavingsAccountRepository savingsAccountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher) {
+    public AccountService(AccountRepository accountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher) {
         this.accountRepository = accountRepository;
-        this.checkingAccountRepository = checkingAccountRepository;
-        this.savingsAccountRepository = savingsAccountRepository;
         this.accountNumberGenerator = accountNumberGenerator;
         this.clientService = clientService;
         this.currentUserService = currentUserService;
@@ -81,8 +73,6 @@ public class AccountService {
     public AccountResponseDTO create(AccountRequestDTO dto) {
         Client client = clientService.findEntityById(dto.clientId());
 
-        validateAccountTypeAndAvailability(dto);
-
         String username = getCurrentUsername();
 
         GeneratedAccountNumber accountNumber = accountNumberGenerator.generate();
@@ -117,18 +107,6 @@ public class AccountService {
     private void validateDigit(String accountNumber, String accountDigit) {
         if (!accountNumberGenerator.isValid(accountNumber, accountDigit)) {
             throw new InvalidAccountDigitException("Dígito da conta inválido.");
-        }
-    }
-
-    private void validateAccountTypeAndAvailability(AccountRequestDTO dto) {
-        if (dto.type() == AccountType.CHECKING &&
-                checkingAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)) {
-            throw new AccountAlreadyExistsException("O cliente já possui uma conta corrente.");
-        }
-
-        if (dto.type() == AccountType.SAVINGS &&
-                savingsAccountRepository.existsByClientIdAndStatus(dto.clientId(), AccountStatus.ACTIVE)) {
-            throw new AccountAlreadyExistsException("O cliente já possui uma conta poupança.");
         }
     }
 

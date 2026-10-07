@@ -8,12 +8,10 @@ import com.lcsalvess.bankingsystem.entity.enums.AccountType;
 import com.lcsalvess.bankingsystem.entity.enums.State;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
-import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.account.*;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
+import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
-import com.lcsalvess.bankingsystem.repository.CheckingAccountRepository;
-import com.lcsalvess.bankingsystem.repository.SavingsAccountRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
@@ -75,12 +73,6 @@ public class AccountServiceTests {
 
     @Mock
     private AccountRepository accountRepository;
-
-    @Mock
-    private CheckingAccountRepository checkingAccountRepository;
-
-    @Mock
-    private SavingsAccountRepository savingsAccountRepository;
 
     @Mock
     private ClientService clientService;
@@ -256,7 +248,6 @@ public class AccountServiceTests {
             Client client = client();
 
             when(clientService.findEntityById(CLIENT_ID)).thenReturn(client);
-            stubActiveAccountExists(type, false);
             when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber(number, digit));
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer(invocation -> {
@@ -272,7 +263,6 @@ public class AccountServiceTests {
             ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
 
             verify(clientService).findEntityById(CLIENT_ID);
-            verifyActiveAccountChecked(type);
             verify(accountNumberGenerator).generate();
             verify(currentUserService).getUsername();
             verify(accountRepository).saveAndFlush(accountCaptor.capture());
@@ -283,30 +273,6 @@ public class AccountServiceTests {
 
             assertInstanceOf(expectedClass, accountCaptor.getValue());
             assertSame(client, accountCaptor.getValue().getClient());
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "duplicateAccountScenarios")
-        @DisplayName("Should throw when client already has an active account of the same type")
-        void shouldThrowWhenClientAlreadyHasActiveAccountOfSameType(
-                String scenario,
-                AccountType type,
-                String message
-        ) {
-            AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, type);
-
-            when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
-            stubActiveAccountExists(type, true);
-
-            assertThrowsWithMessage(
-                    AccountAlreadyExistsException.class,
-                    message,
-                    () -> accountService.create(request)
-            );
-
-            verify(clientService).findEntityById(CLIENT_ID);
-            verifyActiveAccountChecked(type);
-            verifyNoMoreInteractionsOnMocks();
         }
 
         @Test
@@ -340,7 +306,6 @@ public class AccountServiceTests {
             AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, type);
 
             when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
-            stubActiveAccountExists(type, false);
             when(accountNumberGenerator.generate())
                     .thenReturn(new GeneratedAccountNumber(number, digit));
             when(currentUserService.getUsername()).thenReturn(USERNAME);
@@ -364,7 +329,6 @@ public class AccountServiceTests {
             );
 
             verify(clientService).findEntityById(CLIENT_ID);
-            verifyActiveAccountChecked(type);
             verify(accountNumberGenerator).generate();
             verify(currentUserService).getUsername();
             verify(accountRepository).saveAndFlush(any(Account.class));
@@ -383,7 +347,6 @@ public class AccountServiceTests {
                     new AccountRequestDTO(CLIENT_ID, AccountType.CHECKING);
 
             when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
-            stubActiveAccountExists(AccountType.CHECKING, false);
             when(accountNumberGenerator.generate())
                     .thenReturn(new GeneratedAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT));
             when(currentUserService.getUsername()).thenReturn(USERNAME);
@@ -398,7 +361,6 @@ public class AccountServiceTests {
             assertSame(exception, thrown);
 
             verify(clientService).findEntityById(CLIENT_ID);
-            verifyActiveAccountChecked(AccountType.CHECKING);
             verify(accountNumberGenerator).generate();
             verify(currentUserService).getUsername();
             verify(accountRepository).saveAndFlush(any(Account.class));
@@ -535,16 +497,6 @@ public class AccountServiceTests {
     }
 
     @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
-    static Stream<Arguments> duplicateAccountScenarios() {
-        return Stream.of(
-                Arguments.of("client already has a checking account",
-                        AccountType.CHECKING, CHECKING_ALREADY_EXISTS_MESSAGE),
-                Arguments.of("client already has a savings account",
-                        AccountType.SAVINGS, SAVINGS_ALREADY_EXISTS_MESSAGE)
-        );
-    }
-
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
     static Stream<Arguments> databaseDuplicateScenarios() {
         return Stream.of(
                 Arguments.of("database rejects duplicate checking account", AccountType.CHECKING,
@@ -634,37 +586,9 @@ public class AccountServiceTests {
         verify(accountRepository).findByAccountNumber(NON_EXISTENT_NUMBER);
     }
 
-    private void stubActiveAccountExists(AccountType type, boolean exists) {
-        switch (type) {
-            case CHECKING ->
-                    when(checkingAccountRepository.existsByClientIdAndStatus(
-                            CLIENT_ID, AccountStatus.ACTIVE
-                    )).thenReturn(exists);
-
-            case SAVINGS ->
-                    when(savingsAccountRepository.existsByClientIdAndStatus(
-                            CLIENT_ID, AccountStatus.ACTIVE
-                    )).thenReturn(exists);
-        }
-    }
-
-    private void verifyActiveAccountChecked(AccountType type) {
-        switch (type) {
-            case CHECKING ->
-                    verify(checkingAccountRepository)
-                            .existsByClientIdAndStatus(CLIENT_ID, AccountStatus.ACTIVE);
-
-            case SAVINGS ->
-                    verify(savingsAccountRepository)
-                            .existsByClientIdAndStatus(CLIENT_ID, AccountStatus.ACTIVE);
-        }
-    }
-
     private void verifyNoMoreInteractionsOnMocks() {
         verifyNoMoreInteractions(
                 accountRepository,
-                checkingAccountRepository,
-                savingsAccountRepository,
                 clientService,
                 accountNumberGenerator,
                 currentUserService,

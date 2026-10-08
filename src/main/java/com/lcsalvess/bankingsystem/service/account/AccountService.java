@@ -18,6 +18,7 @@ import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -62,6 +63,7 @@ public class AccountService {
         return AccountResponseDTO.fromEntity(account);
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
     public Account findEntityByAccountNumberForUpdate(String accountNumber, String accountDigit) {
         validateDigit(accountNumber, accountDigit);
 
@@ -143,6 +145,39 @@ public class AccountService {
             }
             throw exception;
         }
+    }
+
+    private Account lockAccount(
+            String accountNumber,
+            String accountDigit
+    ) {
+        validateDigit(accountNumber, accountDigit);
+
+        return accountRepository.findByAccountNumberForUpdate(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
+    }
+
+    public LockedAccounts lockAccountsForTransfer(
+            String fromAccountNumber,
+            String fromAccountDigit,
+            String toAccountNumber,
+            String toAccountDigit
+    ) {
+        boolean fromFirst = fromAccountNumber.compareTo(toAccountNumber) < 0;
+
+        Account first = lockAccount(
+                fromFirst ? fromAccountNumber : toAccountNumber,
+                fromFirst ? fromAccountDigit : toAccountDigit
+        );
+
+        Account second = lockAccount(
+                fromFirst ? toAccountNumber : fromAccountNumber,
+                fromFirst ? toAccountDigit : fromAccountDigit
+        );
+
+        return fromFirst
+                ? new LockedAccounts(first, second)
+                : new LockedAccounts(second, first);
     }
 
     private void validateAccountHasNoBalance(Account account) {

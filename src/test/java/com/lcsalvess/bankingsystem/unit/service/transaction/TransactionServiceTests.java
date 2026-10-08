@@ -14,13 +14,10 @@ import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
 import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
-import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
-import com.lcsalvess.bankingsystem.exception.transaction.InvalidAmountException;
-import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
-import com.lcsalvess.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
-import com.lcsalvess.bankingsystem.exception.transaction.YieldNotAvailableException;
+import com.lcsalvess.bankingsystem.exception.transaction.*;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
+import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import org.junit.jupiter.api.DisplayName;
@@ -47,10 +44,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -281,8 +275,7 @@ public class TransactionServiceTests {
             CheckingAccount source = account();
             CheckingAccount destination = destinationAccount();
 
-            stubAccountLookup(source);
-            stubAccountLookup(destination);
+            stubTransferAccountLookup(source, destination);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             stubSaveReturningArgument();
 
@@ -293,8 +286,7 @@ public class TransactionServiceTests {
 
             ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
 
-            verifyAccountLookup(source);
-            verifyAccountLookup(destination);
+            verifyTransferAccountLookup(source, destination);
             verify(currentUserService).getUsername();
             verify(transactionRepository, times(2)).save(transactionCaptor.capture());
             verify(eventPublisher).publishEvent(new TransactionTransferEvent(
@@ -332,8 +324,7 @@ public class TransactionServiceTests {
             CheckingAccount destination = destinationAccount();
             source.cancel();
 
-            stubAccountLookup(source);
-            stubAccountLookup(destination);
+            stubTransferAccountLookup(source, destination);
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
@@ -344,8 +335,7 @@ public class TransactionServiceTests {
             assertBalance("100.00", source);
             assertBalance("50.00", destination);
 
-            verifyAccountLookup(source);
-            verifyAccountLookup(destination);
+            verifyTransferAccountLookup(source, destination);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -356,8 +346,7 @@ public class TransactionServiceTests {
             CheckingAccount destination = destinationAccount();
             destination.cancel();
 
-            stubAccountLookup(source);
-            stubAccountLookup(destination);
+            stubTransferAccountLookup(source, destination);
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
@@ -368,8 +357,7 @@ public class TransactionServiceTests {
             assertBalance("100.00", source);
             assertBalance("50.00", destination);
 
-            verifyAccountLookup(source);
-            verifyAccountLookup(destination);
+            verifyTransferAccountLookup(source, destination);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -380,8 +368,7 @@ public class TransactionServiceTests {
             CheckingAccount source = account();
             CheckingAccount destination = destinationAccount();
 
-            stubAccountLookup(source);
-            stubAccountLookup(destination);
+            stubTransferAccountLookup(source, destination);
 
             assertThrowsWithMessage(
                     InvalidAmountException.class,
@@ -392,8 +379,7 @@ public class TransactionServiceTests {
             assertBalance("100.00", source);
             assertBalance("50.00", destination);
 
-            verifyAccountLookup(source);
-            verifyAccountLookup(destination);
+            verifyTransferAccountLookup(source, destination);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -404,8 +390,7 @@ public class TransactionServiceTests {
             CheckingAccount source = account();
             CheckingAccount destination = destinationAccount();
 
-            stubAccountLookup(source);
-            stubAccountLookup(destination);
+            stubTransferAccountLookup(source, destination);
 
             assertThrowsWithMessage(
                     InsufficientBalanceException.class,
@@ -416,8 +401,7 @@ public class TransactionServiceTests {
             assertBalance("100.00", source);
             assertBalance("50.00", destination);
 
-            verifyAccountLookup(source);
-            verifyAccountLookup(destination);
+            verifyTransferAccountLookup(source, destination);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -426,9 +410,14 @@ public class TransactionServiceTests {
         void shouldNotChangeBalancesWhenDestinationAccountDoesNotExist() {
             CheckingAccount source = account();
 
-            stubAccountLookup(source);
-            when(accountService.findEntityByAccountNumber(DESTINATION_NUMBER, DESTINATION_DIGIT))
-                    .thenThrow(new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE));
+            when(accountService.lockAccountsForTransfer(
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT,
+                    DESTINATION_NUMBER,
+                    DESTINATION_DIGIT
+            )).thenThrow(
+                    new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE)
+            );
 
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
@@ -438,8 +427,13 @@ public class TransactionServiceTests {
 
             assertBalance("100.00", source);
 
-            verifyAccountLookup(source);
-            verify(accountService).findEntityByAccountNumber(DESTINATION_NUMBER, DESTINATION_DIGIT);
+            verify(accountService).lockAccountsForTransfer(
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT,
+                    DESTINATION_NUMBER,
+                    DESTINATION_DIGIT
+            );
+
             verifyNoMoreInteractionsOnMocks();
         }
     }
@@ -762,12 +756,38 @@ public class TransactionServiceTests {
                 .thenReturn(account);
     }
 
+    private void stubTransferAccountLookup(
+            Account source,
+            Account destination
+    ) {
+        when(accountService.lockAccountsForTransfer(
+                source.getAccountNumber(),
+                source.getDigit(),
+                destination.getAccountNumber(),
+                destination.getDigit()
+        )).thenReturn(
+                new LockedAccounts(source, destination)
+        );
+    }
+
     private void verifyAccountOperationLookup(Account account) {
         verify(accountService).findEntityByAccountNumberForUpdate(account.getAccountNumber(), account.getDigit());
     }
 
     private void verifyAccountLookup(Account account) {
         verify(accountService).findEntityByAccountNumber(account.getAccountNumber(), account.getDigit());
+    }
+
+    private void verifyTransferAccountLookup(
+            Account source,
+            Account destination
+    ) {
+        verify(accountService).lockAccountsForTransfer(
+                source.getAccountNumber(),
+                source.getDigit(),
+                destination.getAccountNumber(),
+                destination.getDigit()
+        );
     }
 
     private void stubSaveReturningArgument() {

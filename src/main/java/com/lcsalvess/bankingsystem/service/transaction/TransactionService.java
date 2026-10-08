@@ -16,10 +16,11 @@ import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
 import com.lcsalvess.bankingsystem.exception.transaction.*;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
+import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -98,10 +99,21 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO transfer(TransferRequestDTO dto) {
-        validateDistinctAccounts(dto.fromAccountNumber(), dto.toAccountNumber());
+        validateDistinctAccounts(
+                dto.fromAccountNumber(),
+                dto.toAccountNumber()
+        );
 
-        Account fromAccount = accountService.findEntityByAccountNumber(dto.fromAccountNumber(), dto.fromAccountDigit());
-        Account toAccount = accountService.findEntityByAccountNumber(dto.toAccountNumber(), dto.toAccountDigit());
+        LockedAccounts lockedAccounts =
+                accountService.lockAccountsForTransfer(
+                        dto.fromAccountNumber(),
+                        dto.fromAccountDigit(),
+                        dto.toAccountNumber(),
+                        dto.toAccountDigit()
+                );
+
+        Account fromAccount = lockedAccounts.fromAccount();
+        Account toAccount = lockedAccounts.toAccount();
 
         validateActiveAccount(fromAccount);
         validateActiveAccount(toAccount);
@@ -113,10 +125,28 @@ public class TransactionService {
         fromAccount.debit(dto.amount());
         toAccount.credit(dto.amount());
 
-        Transaction sentTransaction = registerTransaction(TransactionType.TRANSFER_SENT, dto.amount(), fromAccount);
-        registerTransaction(TransactionType.TRANSFER_RECEIVED, dto.amount(), toAccount);
+        Transaction sentTransaction =
+                registerTransaction(
+                        TransactionType.TRANSFER_SENT,
+                        dto.amount(),
+                        fromAccount
+                );
 
-        eventPublisher.publishEvent(new TransactionTransferEvent(TransactionType.TRANSFER_SENT, fromAccount.getAccountNumber(), toAccount.getAccountNumber(), dto.amount(), username));
+        registerTransaction(
+                TransactionType.TRANSFER_RECEIVED,
+                dto.amount(),
+                toAccount
+        );
+
+        eventPublisher.publishEvent(
+                new TransactionTransferEvent(
+                        TransactionType.TRANSFER_SENT,
+                        fromAccount.getAccountNumber(),
+                        toAccount.getAccountNumber(),
+                        dto.amount(),
+                        username
+                )
+        );
 
         return TransactionResponseDTO.fromEntity(sentTransaction);
     }
@@ -197,6 +227,7 @@ public class TransactionService {
         Transaction transaction = new Transaction(type, amount, LocalDateTime.now(), account);
         return transactionRepository.save(transaction);
     }
+
 
     private String getCurrentUsername() {
         return currentUserService.getUsername();

@@ -157,7 +157,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO applyYield(String accountNumber, String accountDigit) {
-        Account account = accountService.findEntityByAccountNumber(accountNumber, accountDigit);
+        Account account = accountService.findEntityByAccountNumberForUpdate(accountNumber, accountDigit);
 
         SavingsAccount savingsAccount = validateAndGetSavingsAccount(account);
 

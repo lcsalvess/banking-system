@@ -2,13 +2,11 @@ package com.lcsalvess.bankingsystem.integration.transaction;
 
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
-import com.lcsalvess.bankingsystem.entity.Account;
-import com.lcsalvess.bankingsystem.entity.Address;
-import com.lcsalvess.bankingsystem.entity.CheckingAccount;
-import com.lcsalvess.bankingsystem.entity.Client;
+import com.lcsalvess.bankingsystem.entity.*;
 import com.lcsalvess.bankingsystem.entity.enums.State;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
+import com.lcsalvess.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
 import com.lcsalvess.bankingsystem.repository.AddressRepository;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
@@ -17,16 +15,19 @@ import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -62,6 +63,12 @@ class TransactionConcurrencyTests {
 
     @Autowired
     private AccountNumberGenerator accountNumberGenerator;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @MockitoBean
     private CurrentUserService currentUserService;
@@ -242,6 +249,31 @@ class TransactionConcurrencyTests {
         }
     }
 
+    @Nested
+    @DisplayName("Concurrent yields")
+    class ConcurrentYields {
+
+        @Test
+        @DisplayName("Should apply yield only once when requests are concurrent")
+        void shouldApplyYieldOnlyOnceWhenRequestsAreConcurrent() throws Exception {
+            SavingsAccount account = createSavingsAccount("1000.00");
+
+            List<Boolean> results = runConcurrently(List.of(
+                    applyYield(account),
+                    applyYield(account)
+            ));
+
+            assertEquals(1, countSucceeded(results));
+
+            assertBalance("1005.00", account);
+
+            assertEquals(
+                    1,
+                    countTransactions(account, TransactionType.YIELD)
+            );
+        }
+    }
+
     // ---------------------------------------------------------------------
     // Tasks
     // ---------------------------------------------------------------------
@@ -283,6 +315,22 @@ class TransactionConcurrencyTests {
 
                 return true;
             } catch (InsufficientBalanceException ex) {
+                return false;
+            }
+        };
+    }
+
+    private Callable<Boolean> applyYield(SavingsAccount account) {
+        return () -> {
+            try {
+                transactionService.applyYield(
+                        account.getAccountNumber(),
+                        account.getDigit()
+                );
+
+                return true;
+
+            } catch (YieldAlreadyAppliedException e) {
                 return false;
             }
         };
@@ -352,6 +400,33 @@ class TransactionConcurrencyTests {
         account.credit(new BigDecimal(initialBalance));
 
         return accountRepository.saveAndFlush(account);
+    }
+
+    private SavingsAccount createSavingsAccount(String initialBalance) {
+        Client client = createClient();
+        GeneratedAccountNumber generated = accountNumberGenerator.generate();
+
+        SavingsAccount account =
+                new SavingsAccount(
+                        client,
+                        generated.number(),
+                        generated.digit()
+                );
+
+        account.credit(new BigDecimal(initialBalance));
+
+        SavingsAccount saved = accountRepository.saveAndFlush(account);
+
+        jdbcTemplate.update(
+                "UPDATE savings_accounts SET last_yield_date = ? WHERE id = ?",
+                LocalDate.now().minusMonths(1),
+                saved.getId()
+        );
+
+        entityManager.clear();
+
+        return (SavingsAccount) accountRepository.findById(saved.getId())
+                .orElseThrow();
     }
 
     private Client createClient() {

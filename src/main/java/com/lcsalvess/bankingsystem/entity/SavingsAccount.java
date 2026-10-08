@@ -37,7 +37,7 @@ public class SavingsAccount extends Account {
     }
 
     public void updateLastYieldDate() {
-        this.lastYieldDate = LocalDate.now();
+        this.lastYieldDate = this.lastYieldDate.plusMonths(1);
     }
 
     public boolean isEligibleForYield() {

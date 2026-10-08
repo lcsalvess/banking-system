@@ -296,9 +296,18 @@ public class TransactionServiceTests {
 
             List<Transaction> saved = transactionCaptor.getAllValues();
 
-            assertTransaction(saved.get(0), TransactionType.TRANSFER_SENT, amount, source);
-            assertTransaction(saved.get(1), TransactionType.TRANSFER_RECEIVED, amount, destination);
-            assertEquals(response(saved.get(0)), result);
+            Transaction sent = saved.get(0);
+            Transaction received = saved.get(1);
+
+            assertTransaction(sent, TransactionType.TRANSFER_SENT, amount, source);
+            assertTransaction(received, TransactionType.TRANSFER_RECEIVED, amount, destination);
+
+            assertNotNull(sent.getTransferCode());
+            assertEquals(sent.getTransferCode(), received.getTransferCode());
+
+            assertNotEquals(sent.getTransactionCode(), received.getTransactionCode());
+
+            assertEquals(response(sent), result);
         }
 
         @Test
@@ -832,6 +841,7 @@ public class TransactionServiceTests {
     private static TransactionResponseDTO response(Transaction transaction) {
         return new TransactionResponseDTO(
                 transaction.getTransactionCode(),
+                transaction.getTransferCode(),
                 transaction.getType(),
                 transaction.getAmount(),
                 transaction.getCreatedAt()

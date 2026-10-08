@@ -26,6 +26,8 @@ public class Transaction {
     @NotNull
     @Column(name = "transaction_code", nullable = false, updatable = false)
     private UUID transactionCode;
+    @Column(name = "transfer_code", updatable = false)
+    private UUID transferCode;
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false, length = 30)
@@ -40,13 +42,23 @@ public class Transaction {
     @NotNull
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false,
-    foreignKey = @ForeignKey(name = "fk_transactions_account"))
+            foreignKey = @ForeignKey(name = "fk_transactions_account"))
     private Account account;
 
-    public Transaction() {}
+    public Transaction() {
+    }
 
     public Transaction(TransactionType type, BigDecimal amount, LocalDateTime createdAt, Account account) {
         this.transactionCode = UUID.randomUUID();
+        this.type = type;
+        this.amount = amount;
+        this.createdAt = createdAt;
+        this.account = account;
+    }
+
+    public Transaction(TransactionType type, BigDecimal amount, LocalDateTime createdAt, Account account, UUID transferCode) {
+        this.transactionCode = UUID.randomUUID();
+        this.transferCode = transferCode;
         this.type = type;
         this.amount = amount;
         this.createdAt = createdAt;
@@ -57,7 +69,13 @@ public class Transaction {
         return id;
     }
 
-    public UUID getTransactionCode() { return transactionCode; }
+    public UUID getTransactionCode() {
+        return transactionCode;
+    }
+
+    public UUID getTransferCode() {
+        return transferCode;
+    }
 
     public TransactionType getType() {
         return type;

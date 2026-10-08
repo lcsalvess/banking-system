@@ -66,9 +66,11 @@ class JacksonConfigTests {
             when(transactionService.deposit(any(AccountOperationRequestDTO.class)))
                     .thenReturn(new TransactionResponseDTO(
                             UUID.randomUUID(),
+                            null,
                             TransactionType.DEPOSIT,
                             new BigDecimal("100.00"),
-                            LocalDateTime.of(2026, 1, 15, 10, 30, 45)));
+                            LocalDateTime.of(2026, 1, 15, 10, 30, 45)
+                    ));
 
             mockMvc.perform(post(URL)
                             .contentType(MediaType.APPLICATION_JSON)

@@ -880,6 +880,7 @@ public class TransactionControllerTests {
 
             TransactionResponseDTO expected = new TransactionResponseDTO(
                     transactionCode,
+                    null,
                     TransactionType.DEPOSIT,
                     new BigDecimal("100.00"),
                     LocalDateTime.of(2026, 1, 15, 10, 30, 45)
@@ -898,6 +899,7 @@ public class TransactionControllerTests {
                             )
                             .andExpect(jsonPath("$.type").value("DEPOSIT"))
                             .andExpect(jsonPath("$.amount").value(100.00))
+                            .andExpect(jsonPath("$.transferCode").doesNotExist())
                             .andReturn();
 
             assertTransactionEquals(expected, readTransaction(result));
@@ -1234,6 +1236,7 @@ public class TransactionControllerTests {
             TransactionResponseDTO actual
     ) {
         assertEquals(expected.transactionCode(), actual.transactionCode());
+        assertEquals(expected.transferCode(), actual.transferCode());
         assertEquals(expected.type(), actual.type());
         assertEquals(
                 0,
@@ -1265,6 +1268,9 @@ public class TransactionControllerTests {
     ) {
         return new TransactionResponseDTO(
                 UUID.randomUUID(),
+                type == TransactionType.TRANSFER_SENT
+                        ? UUID.randomUUID()
+                        : null,
                 type,
                 new BigDecimal("100.00"),
                 LocalDateTime.of(2026, 1, 15, 10, 30, 45)

@@ -43,23 +43,6 @@ public class TransactionService {
         this.eventPublisher = eventPublisher;
     }
 
-    @Transactional
-    public TransactionResponseDTO deposit(AccountOperationRequestDTO dto) {
-        Account account = accountService.findEntityByAccountNumberForUpdate(dto.accountNumber(), dto.digit());
-
-        validateActiveAccount(account);
-        validateAmount(dto.amount());
-
-        String username = getCurrentUsername();
-
-        account.credit(dto.amount());
-
-        Transaction transaction = registerTransaction(TransactionType.DEPOSIT, dto.amount(), account);
-        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount(), username));
-
-        return TransactionResponseDTO.fromEntity(transaction);
-    }
-
     @Transactional(readOnly = true)
     public List<TransactionResponseDTO> findByAccountNumber(String accountNumber, String accountDigit) {
         Account account = accountService.findEntityByAccountNumber(accountNumber, accountDigit);
@@ -75,6 +58,23 @@ public class TransactionService {
                 .orElseThrow(() -> new TransactionNotFoundException(
                         "Transação não encontrada."
                 ));
+
+        return TransactionResponseDTO.fromEntity(transaction);
+    }
+
+    @Transactional
+    public TransactionResponseDTO deposit(AccountOperationRequestDTO dto) {
+        Account account = accountService.findEntityByAccountNumberForUpdate(dto.accountNumber(), dto.digit());
+
+        validateActiveAccount(account);
+        validateAmount(dto.amount());
+
+        String username = getCurrentUsername();
+
+        account.credit(dto.amount());
+
+        Transaction transaction = registerTransaction(TransactionType.DEPOSIT, dto.amount(), account);
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount(), username));
 
         return TransactionResponseDTO.fromEntity(transaction);
     }
@@ -125,17 +125,21 @@ public class TransactionService {
         fromAccount.debit(dto.amount());
         toAccount.credit(dto.amount());
 
+        UUID transferCode = UUID.randomUUID();
+
         Transaction sentTransaction =
-                registerTransaction(
+                registerTransferTransaction(
                         TransactionType.TRANSFER_SENT,
                         dto.amount(),
-                        fromAccount
+                        fromAccount,
+                        transferCode
                 );
 
-        registerTransaction(
+        registerTransferTransaction(
                 TransactionType.TRANSFER_RECEIVED,
                 dto.amount(),
-                toAccount
+                toAccount,
+                transferCode
         );
 
         eventPublisher.publishEvent(
@@ -225,6 +229,24 @@ public class TransactionService {
 
     private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account) {
         Transaction transaction = new Transaction(type, amount, LocalDateTime.now(), account);
+        return transactionRepository.save(transaction);
+    }
+
+    private Transaction registerTransferTransaction(
+            TransactionType type,
+            BigDecimal amount,
+            Account account,
+            UUID transferCode
+    ) {
+        Transaction transaction =
+                new Transaction(
+                        type,
+                        amount,
+                        LocalDateTime.now(),
+                        account,
+                        transferCode
+                );
+
         return transactionRepository.save(transaction);
     }
 

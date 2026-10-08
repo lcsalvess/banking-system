@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.controller.address;
 
 import com.lcsalvess.bankingsystem.controller.address.AddressLookupController;
-import com.lcsalvess.bankingsystem.integration.address.AddressLookupService;
-import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
+import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
+import com.lcsalvess.bankingsystem.service.address.AddressService;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
@@ -46,7 +46,7 @@ class AddressLookupControllerTests {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private AddressLookupService addressLookupService;
+    private AddressService addressService;
 
     @Nested
     @DisplayName("GET /api/v1/addresses/lookup/{postalCode}")
@@ -57,7 +57,7 @@ class AddressLookupControllerTests {
         @Test
         @DisplayName("Should return the address successfully")
         void shouldReturnTheAddressSuccessfully() throws Exception {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE)).thenReturn(lookupResponse());
+            when(addressService.lookupByPostalCode(POSTAL_CODE)).thenReturn(lookupResponse());
 
             mockMvc.perform(get(URL, POSTAL_CODE))
                     .andExpect(status().isOk())
@@ -68,8 +68,8 @@ class AddressLookupControllerTests {
                     .andExpect(jsonPath("$.state").value("SP"))
                     .andExpect(jsonPath("$.postalCode").value(POSTAL_CODE));
 
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
+            verify(addressService).lookupByPostalCode(POSTAL_CODE);
+            verifyNoMoreInteractions(addressService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -83,44 +83,44 @@ class AddressLookupControllerTests {
                     .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
                     .andExpect(jsonPath("$.errors.postalCode").value(INVALID_POSTAL_CODE_MESSAGE));
 
-            verifyNoInteractions(addressLookupService);
+            verifyNoInteractions(addressService);
         }
 
         @Test
         @DisplayName("Should return 404 when postal code is not found")
         void shouldReturnNotFoundWhenPostalCodeIsNotFound() throws Exception {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
+            when(addressService.lookupByPostalCode(POSTAL_CODE))
                     .thenThrow(new PostalCodeNotFoundException(POSTAL_CODE_NOT_FOUND_MESSAGE));
 
             performErrorResponse(performGet(), 404, POSTAL_CODE_NOT_FOUND_MESSAGE);
 
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
+            verify(addressService).lookupByPostalCode(POSTAL_CODE);
+            verifyNoMoreInteractions(addressService);
         }
 
         @Test
         @DisplayName("Should return 503 when address providers are unavailable")
         void shouldReturnServiceUnavailableWhenAddressProvidersAreUnavailable() throws Exception {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
+            when(addressService.lookupByPostalCode(POSTAL_CODE))
                     .thenThrow(new AddressProviderUnavailableException(
                             "Serviços de CEP indisponíveis no momento. Não foi possível validar o CEP: " + POSTAL_CODE));
 
             performErrorResponse(performGet(), 503, PROVIDER_UNAVAILABLE_MESSAGE);
 
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
+            verify(addressService).lookupByPostalCode(POSTAL_CODE);
+            verifyNoMoreInteractions(addressService);
         }
 
         @Test
         @DisplayName("Should return 500 when an unexpected error occurs")
         void shouldReturnInternalServerErrorWhenAnUnexpectedErrorOccurs() throws Exception {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
+            when(addressService.lookupByPostalCode(POSTAL_CODE))
                     .thenThrow(new RuntimeException("Unexpected failure"));
 
             performErrorResponse(performGet(), 500, INTERNAL_ERROR_MESSAGE);
 
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
+            verify(addressService).lookupByPostalCode(POSTAL_CODE);
+            verifyNoMoreInteractions(addressService);
         }
 
         private ResultActions performGet() throws Exception {
@@ -145,7 +145,7 @@ class AddressLookupControllerTests {
                 .andExpect(jsonPath("$.message").value(message));
     }
 
-    private static AddressLookupResponse lookupResponse() {
-        return new AddressLookupResponse("Praça da Sé", "Sé", "São Paulo", "SP", POSTAL_CODE);
+    private static AddressLookupResponseDTO lookupResponse() {
+        return new AddressLookupResponseDTO("Praça da Sé", "Sé", "São Paulo", "SP", POSTAL_CODE);
     }
 }

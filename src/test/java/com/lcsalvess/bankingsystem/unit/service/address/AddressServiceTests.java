@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.service.address;
 
 import com.lcsalvess.bankingsystem.dto.request.AddressRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
 import com.lcsalvess.bankingsystem.entity.Address;
 import com.lcsalvess.bankingsystem.entity.enums.State;
 import com.lcsalvess.bankingsystem.integration.address.AddressLookupService;
@@ -102,6 +103,33 @@ class AddressServiceTests {
                     () -> addressService.createFromPostalCode(dto));
 
             assertEquals("Serviços de CEP indisponíveis no momento.", exception.getMessage());
+
+            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
+            verifyNoMoreInteractions(addressLookupService);
+        }
+    }
+
+    @Nested
+    @DisplayName("When looking up an address for the API")
+    class LookupByPostalCode {
+
+        @Test
+        @DisplayName("Should return an API response DTO without exposing the integration DTO")
+        void shouldReturnApiResponseDtoWithoutExposingIntegrationDto() {
+            when(addressLookupService.findByPostalCode(POSTAL_CODE)).thenReturn(lookupResponse());
+
+            AddressLookupResponseDTO result = addressService.lookupByPostalCode(POSTAL_CODE);
+
+            assertEquals(
+                    new AddressLookupResponseDTO(
+                            "Praça da Sé",
+                            "Sé",
+                            "São Paulo",
+                            "SP",
+                            POSTAL_CODE
+                    ),
+                    result
+            );
 
             verify(addressLookupService).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressLookupService);

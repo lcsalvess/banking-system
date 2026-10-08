@@ -1,9 +1,9 @@
 package com.lcsalvess.bankingsystem.controller.address;
 
+import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lcsalvess.bankingsystem.dto.response.exception.ValidationErrorResponse;
-import com.lcsalvess.bankingsystem.integration.address.AddressLookupService;
-import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
+import com.lcsalvess.bankingsystem.service.address.AddressService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -22,10 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 public class AddressLookupController {
 
-    private final AddressLookupService addressLookupService;
+    private final AddressService addressService;
 
-    public AddressLookupController(AddressLookupService addressLookupService) {
-        this.addressLookupService = addressLookupService;
+    public AddressLookupController(AddressService addressService) {
+        this.addressService = addressService;
     }
 
     @Operation(
@@ -39,7 +39,7 @@ public class AddressLookupController {
                     description = "Address found successfully.",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = AddressLookupResponse.class)
+                            schema = @Schema(implementation = AddressLookupResponseDTO.class)
                     )
             ),
             @ApiResponse(
@@ -60,7 +60,7 @@ public class AddressLookupController {
             )
     })
     @GetMapping("/lookup/{postalCode}")
-    public AddressLookupResponse findByPostalCode(
+    public AddressLookupResponseDTO findByPostalCode(
             @Parameter(
                     name = "postalCode",
                     description = "Postal code containing exactly 8 digits, without a hyphen.",
@@ -72,6 +72,6 @@ public class AddressLookupController {
                     regexp = "^\\d{8}$",
                     message = "O CEP deve conter exatamente 8 dígitos.")
             String postalCode) {
-        return addressLookupService.findByPostalCode(postalCode);
+        return addressService.lookupByPostalCode(postalCode);
     }
 }

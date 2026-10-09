@@ -23,6 +23,26 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AddressLookupServiceTests {
 
+    private static final String POSTAL_CODE = "01001000";
+
+    private static final String UNAVAILABLE_MESSAGE =
+            "O serviço de consulta de endereços está temporariamente indisponível.";
+
+    private static final String POSTAL_CODE_NOT_FOUND_MESSAGE =
+            "CEP não encontrado em nenhum provedor.";
+
+    private static final String VIACEP_POSTAL_CODE_NOT_FOUND_MESSAGE =
+            "CEP não encontrado no ViaCEP.";
+
+    private static final String BRASIL_API_POSTAL_CODE_NOT_FOUND_MESSAGE =
+            "CEP não encontrado na Brasil API.";
+
+    private static final String VIACEP_UNAVAILABLE_MESSAGE =
+            "ViaCEP indisponível.";
+
+    private static final String BRASIL_API_UNAVAILABLE_MESSAGE =
+            "Brasil API indisponível.";
+
     @Mock
     private AddressProvider viaCepClient;
 
@@ -31,13 +51,12 @@ class AddressLookupServiceTests {
 
     private AddressLookupService addressLookupService;
 
-    private static final String POSTAL_CODE = "01001000";
-
-    private static final String UNAVAILABLE_MESSAGE = "Serviços de CEP indisponíveis no momento. Não foi possível validar o CEP: " + POSTAL_CODE;
-
     @BeforeEach
     void setUp() {
-        addressLookupService = new AddressLookupService(List.of(viaCepClient, brasilApiClient), new SimpleMeterRegistry());
+        addressLookupService = new AddressLookupService(
+                List.of(viaCepClient, brasilApiClient),
+                new SimpleMeterRegistry()
+        );
     }
 
     @Nested
@@ -49,9 +68,11 @@ class AddressLookupServiceTests {
         void shouldReturnAddressWithoutCallingBrasilApi() {
             AddressLookupResponse expected = expectedAddressResponse();
 
-            when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenReturn(expected);
+            when(viaCepClient.findByPostalCode(POSTAL_CODE))
+                    .thenReturn(expected);
 
-            AddressLookupResponse result = addressLookupService.findByPostalCode(POSTAL_CODE);
+            AddressLookupResponse result =
+                    addressLookupService.findByPostalCode(POSTAL_CODE);
 
             assertEquals(expected, result);
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
@@ -69,11 +90,16 @@ class AddressLookupServiceTests {
         void shouldReturnAddressFromBrasilApi() {
             AddressLookupResponse expected = expectedAddressResponse();
 
-            when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenThrow(new PostalCodeNotFoundException("CEP não encontrado no ViaCEP."));
+            when(viaCepClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new PostalCodeNotFoundException(
+                            VIACEP_POSTAL_CODE_NOT_FOUND_MESSAGE
+                    ));
 
-            when(brasilApiClient.findByPostalCode(POSTAL_CODE)).thenReturn(expected);
+            when(brasilApiClient.findByPostalCode(POSTAL_CODE))
+                    .thenReturn(expected);
 
-            AddressLookupResponse result = addressLookupService.findByPostalCode(POSTAL_CODE);
+            AddressLookupResponse result =
+                    addressLookupService.findByPostalCode(POSTAL_CODE);
 
             assertEquals(expected, result);
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
@@ -91,11 +117,16 @@ class AddressLookupServiceTests {
         void shouldReturnAddressFromBrasilApi() {
             AddressLookupResponse expected = expectedAddressResponse();
 
-            when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenThrow(new AddressProviderUnavailableException("Via CEP indisponível."));
+            when(viaCepClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new AddressProviderUnavailableException(
+                            VIACEP_UNAVAILABLE_MESSAGE
+                    ));
 
-            when(brasilApiClient.findByPostalCode(POSTAL_CODE)).thenReturn(expected);
+            when(brasilApiClient.findByPostalCode(POSTAL_CODE))
+                    .thenReturn(expected);
 
-            AddressLookupResponse result = addressLookupService.findByPostalCode(POSTAL_CODE);
+            AddressLookupResponse result =
+                    addressLookupService.findByPostalCode(POSTAL_CODE);
 
             assertEquals(expected, result);
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
@@ -111,13 +142,22 @@ class AddressLookupServiceTests {
         @Test
         @DisplayName("Should throw PostalCodeNotFoundException")
         void shouldThrowPostalCodeNotFoundException() {
-            when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenThrow(new PostalCodeNotFoundException("CEP não encontrado no ViaCEP."));
+            when(viaCepClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new PostalCodeNotFoundException(
+                            VIACEP_POSTAL_CODE_NOT_FOUND_MESSAGE
+                    ));
 
-            when(brasilApiClient.findByPostalCode(POSTAL_CODE)).thenThrow(new PostalCodeNotFoundException("CEP não encontrado na Brasil API"));
+            when(brasilApiClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new PostalCodeNotFoundException(
+                            BRASIL_API_POSTAL_CODE_NOT_FOUND_MESSAGE
+                    ));
 
-            PostalCodeNotFoundException exception = assertThrows(PostalCodeNotFoundException.class, () -> addressLookupService.findByPostalCode(POSTAL_CODE));
+            PostalCodeNotFoundException exception = assertThrows(
+                    PostalCodeNotFoundException.class,
+                    () -> addressLookupService.findByPostalCode(POSTAL_CODE)
+            );
 
-            assertEquals("CEP " + POSTAL_CODE + " não encontrado em nenhum provedor.", exception.getMessage());
+            assertEquals(POSTAL_CODE_NOT_FOUND_MESSAGE, exception.getMessage());
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
             verify(brasilApiClient).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(viaCepClient, brasilApiClient);
@@ -131,11 +171,20 @@ class AddressLookupServiceTests {
         @Test
         @DisplayName("Should throw AddressProviderUnavailableException")
         void shouldThrowAddressProviderUnavailableException() {
-            when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenThrow(new AddressProviderUnavailableException("Via CEP indisponível."));
+            when(viaCepClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new AddressProviderUnavailableException(
+                            VIACEP_UNAVAILABLE_MESSAGE
+                    ));
 
-            when(brasilApiClient.findByPostalCode(POSTAL_CODE)).thenThrow(new AddressProviderUnavailableException("BrasilAPI indisponível."));
+            when(brasilApiClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new AddressProviderUnavailableException(
+                            BRASIL_API_UNAVAILABLE_MESSAGE
+                    ));
 
-            AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class, () -> addressLookupService.findByPostalCode(POSTAL_CODE));
+            AddressProviderUnavailableException exception = assertThrows(
+                    AddressProviderUnavailableException.class,
+                    () -> addressLookupService.findByPostalCode(POSTAL_CODE)
+            );
 
             assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
@@ -145,17 +194,28 @@ class AddressLookupServiceTests {
     }
 
     @Nested
-    @DisplayName("When one provider does not find postal code and the other one is unavailable")
+    @DisplayName(
+            "When one provider does not find postal code and the other is unavailable"
+    )
     class WhenOneProviderDoesNotFindPostalCodeAndTheOtherIsUnavailable {
 
         @Test
         @DisplayName("Should throw AddressProviderUnavailableException")
         void shouldThrowAddressProviderUnavailableException() {
-            when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenThrow(new PostalCodeNotFoundException("CEP não encontrado no ViaCEP."));
+            when(viaCepClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new PostalCodeNotFoundException(
+                            VIACEP_POSTAL_CODE_NOT_FOUND_MESSAGE
+                    ));
 
-            when(brasilApiClient.findByPostalCode(POSTAL_CODE)).thenThrow(new AddressProviderUnavailableException("BrasilAPI indisponível."));
+            when(brasilApiClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new AddressProviderUnavailableException(
+                            BRASIL_API_UNAVAILABLE_MESSAGE
+                    ));
 
-            AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class, () -> addressLookupService.findByPostalCode(POSTAL_CODE));
+            AddressProviderUnavailableException exception = assertThrows(
+                    AddressProviderUnavailableException.class,
+                    () -> addressLookupService.findByPostalCode(POSTAL_CODE)
+            );
 
             assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
@@ -165,17 +225,28 @@ class AddressLookupServiceTests {
     }
 
     @Nested
-    @DisplayName("When ViaCEP is unavailable and Brasil API does not find postal code")
+    @DisplayName(
+            "When ViaCEP is unavailable and Brasil API does not find postal code"
+    )
     class WhenViaCepIsUnavailableAndBrasilApiDoesNotFindPostalCode {
 
         @Test
         @DisplayName("Should throw AddressProviderUnavailableException")
         void shouldThrowAddressProviderUnavailableException() {
-            when(viaCepClient.findByPostalCode(POSTAL_CODE)).thenThrow(new AddressProviderUnavailableException("ViaCEP indisponível."));
+            when(viaCepClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new AddressProviderUnavailableException(
+                            VIACEP_UNAVAILABLE_MESSAGE
+                    ));
 
-            when(brasilApiClient.findByPostalCode(POSTAL_CODE)).thenThrow(new PostalCodeNotFoundException("CEP não encontrado na Brasil API"));
+            when(brasilApiClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new PostalCodeNotFoundException(
+                            BRASIL_API_POSTAL_CODE_NOT_FOUND_MESSAGE
+                    ));
 
-            AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class, () -> addressLookupService.findByPostalCode(POSTAL_CODE));
+            AddressProviderUnavailableException exception = assertThrows(
+                    AddressProviderUnavailableException.class,
+                    () -> addressLookupService.findByPostalCode(POSTAL_CODE)
+            );
 
             assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
@@ -185,6 +256,12 @@ class AddressLookupServiceTests {
     }
 
     private static AddressLookupResponse expectedAddressResponse() {
-        return new AddressLookupResponse("Praça da Sé", "Sé", "São Paulo", "SP", AddressLookupServiceTests.POSTAL_CODE);
+        return new AddressLookupResponse(
+                "Praça da Sé",
+                "Sé",
+                "São Paulo",
+                "SP",
+                POSTAL_CODE
+        );
     }
 }

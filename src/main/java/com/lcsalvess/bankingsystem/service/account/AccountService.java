@@ -12,6 +12,7 @@ import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
 import com.lcsalvess.bankingsystem.exception.account.*;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
@@ -52,14 +53,14 @@ public class AccountService {
     @Transactional(readOnly = true)
     public Account findEntityByAccountNumber(String accountNumber, String accountDigit) {
         validateDigit(accountNumber, accountDigit);
-        return accountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
+        return accountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
     }
 
     @Transactional(readOnly = true)
     public AccountResponseDTO findByAccountNumber(String accountNumber, String accountDigit) {
         validateDigit(accountNumber, accountDigit);
         Account account = accountRepository.findByAccountNumberWithClient(accountNumber)
-                .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
+                .orElseThrow(() -> new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
         return AccountResponseDTO.fromEntity(account);
     }
 
@@ -68,7 +69,7 @@ public class AccountService {
         validateDigit(accountNumber, accountDigit);
 
         return accountRepository.findByAccountNumberForUpdate(accountNumber)
-                .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
+                .orElseThrow(() -> new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
     }
 
     @Transactional
@@ -108,7 +109,7 @@ public class AccountService {
 
     private void validateDigit(String accountNumber, String accountDigit) {
         if (!accountNumberGenerator.isValid(accountNumber, accountDigit)) {
-            throw new InvalidAccountDigitException("Dígito da conta inválido.");
+            throw new InvalidAccountDigitException(ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
         }
     }
 
@@ -129,8 +130,8 @@ public class AccountService {
 
     private String getDuplicateAccountMessage(AccountType type) {
         return switch (type) {
-            case CHECKING -> "O cliente já possui uma conta corrente.";
-            case SAVINGS -> "O cliente já possui uma conta poupança.";
+            case CHECKING -> ApiErrorMessages.CHECKING_ACCOUNT_ALREADY_EXISTS;
+            case SAVINGS -> ApiErrorMessages.SAVINGS_ACCOUNT_ALREADY_EXISTS;
         };
     }
 
@@ -154,7 +155,7 @@ public class AccountService {
         validateDigit(accountNumber, accountDigit);
 
         return accountRepository.findByAccountNumberForUpdate(accountNumber)
-                .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
+                .orElseThrow(() -> new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -183,13 +184,13 @@ public class AccountService {
 
     private void validateAccountHasNoBalance(Account account) {
         if (account.getBalance().compareTo(BigDecimal.ZERO) != 0) {
-            throw new AccountHasBalanceException("Não é possível cancelar uma conta com saldo.");
+            throw new AccountHasBalanceException(ApiErrorMessages.ACCOUNT_HAS_BALANCE);
         }
     }
 
     private void validateActiveAccount(Account account) {
         if (account.getStatus() != AccountStatus.ACTIVE) {
-            throw new AccountIsNotActiveException("Não é possível cancelar uma conta que não está ativa.");
+            throw new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.address.viacep;
 
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.AddressProvider;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
@@ -42,13 +43,13 @@ public class ViaCepClient implements AddressProvider {
 
             if (response == null) {
                 throw new AddressProviderUnavailableException(
-                        "A ViaCEP retornou uma resposta vazia."
+                        ApiErrorMessages.ADDRESS_PROVIDER_EMPTY_RESPONSE
                 );
             }
 
             if (Boolean.TRUE.equals(response.erro())) {
                 throw new PostalCodeNotFoundException(
-                        "CEP não encontrado: " + postalCode
+                        ApiErrorMessages.POSTAL_CODE_NOT_FOUND
                 );
             }
 
@@ -64,7 +65,7 @@ public class ViaCepClient implements AddressProvider {
 
         } catch (RestClientException ex) {
             throw new AddressProviderUnavailableException(
-                    "Não foi possível consultar a ViaCEP.",
+                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
                     ex
             );
         }

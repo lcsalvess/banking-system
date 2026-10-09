@@ -1,13 +1,13 @@
 package com.lcsalvess.bankingsystem.exception.client;
 
 import com.lcsalvess.bankingsystem.exception.BusinessException;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import org.springframework.http.HttpStatus;
 
 public class ClientNotFoundException extends BusinessException {
-    private static final String DEFAULT_MESSAGE = "Cliente não encontrado.";
 
     public ClientNotFoundException() {
-        super(DEFAULT_MESSAGE, HttpStatus.NOT_FOUND);
+        super(ApiErrorMessages.CLIENT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
     public ClientNotFoundException(String message) {

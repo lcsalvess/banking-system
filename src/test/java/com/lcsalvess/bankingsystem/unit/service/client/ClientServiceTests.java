@@ -12,6 +12,7 @@ import com.lcsalvess.bankingsystem.entity.Client;
 import com.lcsalvess.bankingsystem.entity.enums.State;
 import com.lcsalvess.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
@@ -65,9 +66,6 @@ public class ClientServiceTests {
     private static final String UPDATED_NAME = "Cliente Atualizado";
     private static final String UPDATED_EMAIL = "atualizado@email.com";
     private static final String UPDATED_PHONE = "11888888888";
-
-    private static final String CPF_ALREADY_EXISTS_MESSAGE = "Já existe um cliente cadastrado com este CPF.";
-    private static final String CLIENT_NOT_FOUND_MESSAGE = "Cliente não encontrado.";
 
     @Mock
     private ClientRepository clientRepository;
@@ -162,7 +160,7 @@ public class ClientServiceTests {
 
             assertThrowsWithMessage(
                     ClientNotFoundException.class,
-                    CLIENT_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.CLIENT_NOT_FOUND,
                     () -> clientService.findEntityById(CLIENT_ID)
             );
 
@@ -195,7 +193,7 @@ public class ClientServiceTests {
 
             assertThrowsWithMessage(
                     ClientNotFoundException.class,
-                    CLIENT_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.CLIENT_NOT_FOUND,
                     () -> clientService.findById(CLIENT_ID)
             );
 
@@ -259,7 +257,7 @@ public class ClientServiceTests {
 
             assertThrowsWithMessage(
                     ClientCpfAlreadyExistsException.class,
-                    CPF_ALREADY_EXISTS_MESSAGE,
+                    ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS,
                     () -> clientService.create(request)
             );
 
@@ -337,7 +335,7 @@ public class ClientServiceTests {
 
             assertThrowsWithMessage(
                     ClientCpfAlreadyExistsException.class,
-                    CPF_ALREADY_EXISTS_MESSAGE,
+                    ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS,
                     () -> clientService.create(request)
             );
 
@@ -524,7 +522,7 @@ public class ClientServiceTests {
             );
 
             ClientNotFoundException exception =
-                    new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE);
+                    new ClientNotFoundException(ApiErrorMessages.CLIENT_NOT_FOUND);
 
             when(addressService.findAddressByPostalCode(
                     request.address().postalCode()

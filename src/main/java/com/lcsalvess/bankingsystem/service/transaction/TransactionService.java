@@ -13,6 +13,7 @@ import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.*;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
@@ -56,7 +57,7 @@ public class TransactionService {
     public TransactionResponseDTO findByTransactionCode(UUID transactionCode) {
         Transaction transaction = transactionRepository.findByTransactionCode(transactionCode)
                 .orElseThrow(() -> new TransactionNotFoundException(
-                        "Transação não encontrada."
+                        ApiErrorMessages.TRANSACTION_NOT_FOUND
                 ));
 
         return TransactionResponseDTO.fromEntity(transaction);
@@ -180,41 +181,41 @@ public class TransactionService {
 
     private void validateActiveAccount(Account account) {
         if (account.getStatus() != AccountStatus.ACTIVE) {
-            throw new AccountIsNotActiveException("A conta informada não está ativa.");
+            throw new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_NOT_ACTIVE);
         }
     }
 
     private void validateAmount(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidAmountException("O valor deve ser maior que zero.");
+            throw new InvalidAmountException(ApiErrorMessages.INVALID_AMOUNT);
         }
     }
 
     private void validateBalance(Account account, BigDecimal amount) {
         if (account.getBalance().compareTo(amount) < 0) {
-            throw new InsufficientBalanceException("O valor informado é maior do que o saldo.");
+            throw new InsufficientBalanceException(ApiErrorMessages.INSUFFICIENT_BALANCE);
         }
     }
 
     private void validateDistinctAccounts(String fromAccountNumber, String toAccountNumber) {
         if (fromAccountNumber.equals(toAccountNumber)) {
-            throw new AccountsAreSameException("A conta de origem não pode ser igual à conta de destino.");
+            throw new AccountsAreSameException(ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT);
         }
     }
 
     private SavingsAccount validateAndGetSavingsAccount(Account account) {
         if (!(account instanceof SavingsAccount savingsAccount)) {
-            throw new AccountIsNotSavingsException("A conta informada não é poupança.");
+            throw new AccountIsNotSavingsException(ApiErrorMessages.ACCOUNT_NOT_SAVINGS);
         }
         return savingsAccount;
     }
 
     private void validateYieldAvailable(SavingsAccount savingsAccount, BigDecimal yieldAmount) {
         if (!savingsAccount.isEligibleForYield()) {
-            throw new YieldNotAvailableException("A conta ainda não está disponível para receber rendimento.");
+            throw new YieldNotAvailableException(ApiErrorMessages.YIELD_NOT_AVAILABLE);
         }
         if (yieldAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new YieldNotAvailableException("Não há rendimento disponível para esta conta.");
+            throw new YieldNotAvailableException(ApiErrorMessages.NO_YIELD_AVAILABLE);
         }
     }
 
@@ -223,7 +224,7 @@ public class TransactionService {
         LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
         boolean alreadyApplied = transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(accountId, TransactionType.YIELD, startOfDay, endOfDay);
         if (alreadyApplied) {
-            throw new YieldAlreadyAppliedException("O rendimento já foi aplicado para a conta hoje.");
+            throw new YieldAlreadyAppliedException(ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED);
         }
     }
 

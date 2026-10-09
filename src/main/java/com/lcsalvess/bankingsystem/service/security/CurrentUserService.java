@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.service.security;
 
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
@@ -19,7 +20,7 @@ public class CurrentUserService {
                 || auth instanceof AnonymousAuthenticationToken) {
 
             throw new AuthenticationCredentialsNotFoundException(
-                    "Nenhum usuário autenticado encontrado."
+                    ApiErrorMessages.AUTHENTICATED_USER_NOT_FOUND
             );
         }
 

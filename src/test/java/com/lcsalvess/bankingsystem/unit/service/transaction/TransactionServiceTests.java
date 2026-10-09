@@ -14,6 +14,7 @@ import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
 import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.*;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
@@ -66,17 +67,6 @@ public class TransactionServiceTests {
 
     private static final BigDecimal OPERATION_AMOUNT = new BigDecimal("10.00");
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 1, 15, 10, 30, 45);
-
-    private static final String ACCOUNT_NOT_FOUND_MESSAGE = "Conta não encontrada.";
-    private static final String ACCOUNT_NOT_ACTIVE_MESSAGE = "A conta informada não está ativa.";
-    private static final String INVALID_AMOUNT_MESSAGE = "O valor deve ser maior que zero.";
-    private static final String INSUFFICIENT_BALANCE_MESSAGE = "O valor informado é maior do que o saldo.";
-    private static final String ACCOUNTS_ARE_SAME_MESSAGE = "A conta de origem não pode ser igual à conta de destino.";
-    private static final String NOT_SAVINGS_MESSAGE = "A conta informada não é poupança.";
-    private static final String YIELD_ALREADY_APPLIED_MESSAGE = "O rendimento já foi aplicado para a conta hoje.";
-    private static final String YIELD_NOT_ELIGIBLE_MESSAGE = "A conta ainda não está disponível para receber rendimento.";
-    private static final String YIELD_NOT_AVAILABLE_MESSAGE = "Não há rendimento disponível para esta conta.";
-    private static final String TRANSACTION_NOT_FOUND_MESSAGE = "Transação não encontrada.";
 
     @Mock
     private TransactionRepository transactionRepository;
@@ -137,11 +127,11 @@ public class TransactionServiceTests {
         @DisplayName("Should throw when account does not exist")
         void shouldThrowWhenAccountDoesNotExist() {
             when(accountService.findEntityByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT))
-                    .thenThrow(new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE));
+                    .thenThrow(new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
 
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
-                    ACCOUNT_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
                     () -> transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT)
             );
 
@@ -179,7 +169,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     TransactionNotFoundException.class,
-                    TRANSACTION_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.TRANSACTION_NOT_FOUND,
                     () -> transactionService.findByTransactionCode(transactionCode)
             );
 
@@ -230,7 +220,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     InvalidAmountException.class,
-                    INVALID_AMOUNT_MESSAGE,
+                    ApiErrorMessages.INVALID_AMOUNT,
                     () -> transactionService.deposit(operationRequest(amount))
             );
 
@@ -250,7 +240,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
-                    ACCOUNT_NOT_ACTIVE_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_ACTIVE,
                     () -> transactionService.deposit(operationRequest(OPERATION_AMOUNT))
             );
 
@@ -303,7 +293,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     InvalidAmountException.class,
-                    INVALID_AMOUNT_MESSAGE,
+                    ApiErrorMessages.INVALID_AMOUNT,
                     () -> transactionService.withdraw(operationRequest(amount))
             );
 
@@ -323,7 +313,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     InsufficientBalanceException.class,
-                    INSUFFICIENT_BALANCE_MESSAGE,
+                    ApiErrorMessages.INSUFFICIENT_BALANCE,
                     () -> transactionService.withdraw(operationRequest(amount))
             );
 
@@ -343,7 +333,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
-                    ACCOUNT_NOT_ACTIVE_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_ACTIVE,
                     () -> transactionService.withdraw(operationRequest(OPERATION_AMOUNT))
             );
 
@@ -414,7 +404,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     AccountsAreSameException.class,
-                    ACCOUNTS_ARE_SAME_MESSAGE,
+                    ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT,
                     () -> transactionService.transfer(request)
             );
 
@@ -432,7 +422,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
-                    ACCOUNT_NOT_ACTIVE_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_ACTIVE,
                     () -> transactionService.transfer(transferRequest(OPERATION_AMOUNT))
             );
 
@@ -454,7 +444,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
-                    ACCOUNT_NOT_ACTIVE_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_ACTIVE,
                     () -> transactionService.transfer(transferRequest(OPERATION_AMOUNT))
             );
 
@@ -476,7 +466,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     InvalidAmountException.class,
-                    INVALID_AMOUNT_MESSAGE,
+                    ApiErrorMessages.INVALID_AMOUNT,
                     () -> transactionService.transfer(transferRequest(amount))
             );
 
@@ -498,7 +488,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     InsufficientBalanceException.class,
-                    INSUFFICIENT_BALANCE_MESSAGE,
+                    ApiErrorMessages.INSUFFICIENT_BALANCE,
                     () -> transactionService.transfer(transferRequest(amount))
             );
 
@@ -520,12 +510,12 @@ public class TransactionServiceTests {
                     DESTINATION_NUMBER,
                     DESTINATION_DIGIT
             )).thenThrow(
-                    new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE)
+                    new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
             );
 
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
-                    ACCOUNT_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
                     () -> transactionService.transfer(transferRequest(OPERATION_AMOUNT))
             );
 
@@ -598,7 +588,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     AccountIsNotSavingsException.class,
-                    NOT_SAVINGS_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_SAVINGS,
                     () -> transactionService.applyYield(ACCOUNT_NUMBER, ACCOUNT_DIGIT)
             );
 
@@ -616,7 +606,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
-                    ACCOUNT_NOT_ACTIVE_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_ACTIVE,
                     () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
             );
 
@@ -639,7 +629,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     YieldAlreadyAppliedException.class,
-                    YIELD_ALREADY_APPLIED_MESSAGE,
+                    ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED,
                     () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
             );
 
@@ -661,7 +651,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     YieldNotAvailableException.class,
-                    YIELD_NOT_ELIGIBLE_MESSAGE,
+                    ApiErrorMessages.YIELD_NOT_AVAILABLE,
                     () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
             );
 
@@ -683,7 +673,7 @@ public class TransactionServiceTests {
 
             assertThrowsWithMessage(
                     YieldNotAvailableException.class,
-                    YIELD_NOT_AVAILABLE_MESSAGE,
+                    ApiErrorMessages.NO_YIELD_AVAILABLE,
                     () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
             );
 

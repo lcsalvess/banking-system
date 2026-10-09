@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.address.validation;
 
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import jakarta.validation.ConstraintViolation;
@@ -28,7 +29,7 @@ public class AddressLookupResponseValidator {
                     .collect(Collectors.joining("; "));
 
             throw new AddressProviderUnavailableException(
-                    "O provedor retornou um endereço inválido: " + errors
+                    ApiErrorMessages.ADDRESS_PROVIDER_INVALID_RESPONSE + errors
             );
         }
 

@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.address.brasilapi;
 
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.AddressProvider;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
@@ -42,7 +43,7 @@ public class BrasilApiClient implements AddressProvider {
                     .body(BrasilApiResponse.class);
 
             if (response == null) {
-                throw new AddressProviderUnavailableException("A Brasil API retornou uma resposta vazia.");
+                throw new AddressProviderUnavailableException(ApiErrorMessages.ADDRESS_PROVIDER_EMPTY_RESPONSE);
             }
 
             AddressLookupResponse address = new AddressLookupResponse(
@@ -56,11 +57,11 @@ public class BrasilApiClient implements AddressProvider {
             return responseValidator.validate(address);
         } catch (HttpClientErrorException.NotFound ex) {
             throw new PostalCodeNotFoundException(
-                    "CEP não encontrado: " + postalCode
+                    ApiErrorMessages.POSTAL_CODE_NOT_FOUND
             );
         } catch (RestClientException ex) {
             throw new AddressProviderUnavailableException(
-                    "Não foi possível consultar a Brasil API.",
+                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
                     ex
             );
         }

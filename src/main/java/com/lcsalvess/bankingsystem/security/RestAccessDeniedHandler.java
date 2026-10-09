@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.security;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -58,7 +59,7 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpServletResponse.SC_FORBIDDEN,
-                "Você não tem permissão para acessar este recurso."
+                ApiErrorMessages.ACCESS_DENIED_RESOURCE
         );
 
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);

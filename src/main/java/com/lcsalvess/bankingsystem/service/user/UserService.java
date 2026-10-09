@@ -5,6 +5,7 @@ import com.lcsalvess.bankingsystem.dto.response.UserResponseDTO;
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
@@ -30,10 +31,10 @@ public class UserService {
     @Transactional
     public UserResponseDTO create(UserRequestDTO dto) {
         if (userRepository.existsByUsername(dto.username())) {
-            throw new UsernameAlreadyExistsException("Nome de usuário já cadastrado: " + dto.username());
+            throw new UsernameAlreadyExistsException(ApiErrorMessages.USERNAME_ALREADY_EXISTS);
         }
         if (userRepository.existsByEmail(dto.email())) {
-            throw new UserEmailAlreadyExistsException("E-mail já cadastrado: " + dto.email());
+            throw new UserEmailAlreadyExistsException(ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS);
         }
         User user = new User(dto.username(),
                 dto.email(),

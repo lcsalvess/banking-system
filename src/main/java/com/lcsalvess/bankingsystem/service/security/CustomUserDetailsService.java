@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.service.security;
 
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -17,6 +18,6 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário ou senha inválidos."));
+                .orElseThrow(() -> new UsernameNotFoundException(ApiErrorMessages.INVALID_CREDENTIALS));
     }
 }

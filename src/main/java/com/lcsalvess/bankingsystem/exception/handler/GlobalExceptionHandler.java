@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
 import com.lcsalvess.bankingsystem.dto.response.exception.ValidationErrorResponse;
 import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import jakarta.validation.ConstraintViolationException;
 import org.jspecify.annotations.NonNull;
@@ -41,11 +42,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleBadCredentials() {
-        log.warn("Authentication failed: invalid username or password");
+        log.warn("Authentication failed: invalid credentials.");
 
         return new ErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
-                "Usuário ou senha inválidos."
+                ApiErrorMessages.INVALID_CREDENTIALS
         );
     }
 
@@ -55,13 +56,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             AuthenticationException exception) {
 
         log.warn(
-                "Authentication failed: {}",
+                "Authentication failed: exceptionType={}",
                 exception.getClass().getSimpleName()
                 );
 
         return new ErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
-                "Não foi possível autenticar o usuário."
+                ApiErrorMessages.AUTHENTICATION_FAILED
         );
     }
 
@@ -70,11 +71,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AuthorizationDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleAuthorizationDenied() {
-        log.warn("Authorization denied: access forbidden");
+        log.warn("Access denied: user is not authorized to perform the operation.");
 
         return new ErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
-                "Acesso negado."
+                ApiErrorMessages.ACCESS_DENIED_RESOURCE
         );
     }
 
@@ -90,9 +91,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         );
 
         log.warn(
-                "Business exception: status={}, message={}",
+                "Business exception: status={}, exceptionType={}",
                 exception.getStatus().value(),
-                exception.getMessage()
+                exception.getClass().getSimpleName()
         );
 
         return ResponseEntity
@@ -111,7 +112,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     .status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(
                             HttpStatus.CONFLICT.value(),
-                            "Já existe um cliente cadastrado com este e-mail."
+                            ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS
                     ));
         }
 
@@ -120,7 +121,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     .status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(
                             HttpStatus.CONFLICT.value(),
-                            "Já existe um cliente cadastrado com este CPF."
+                            ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS
                     ));
         }
 
@@ -129,17 +130,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     .status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(
                             HttpStatus.CONFLICT.value(),
-                            "O rendimento já foi aplicado para esta conta hoje."
+                            ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED
                     ));
         }
 
-        log.warn("Data integrity violation", exception);
+        log.warn("Data integrity violation.", exception);
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(
                         HttpStatus.BAD_REQUEST.value(),
-                        "Erro de integridade de dados no banco."
+                        ApiErrorMessages.DATABASE_INTEGRITY_ERROR
                 ));
     }
 
@@ -164,7 +165,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         return new ValidationErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
-                "Erro de validação.",
+                ApiErrorMessages.VALIDATION_ERROR,
                 errors
         );
     }
@@ -178,7 +179,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         ErrorResponse error = new ErrorResponse(
                 status.value(),
-                "Dados da requisição inválidos."
+                ApiErrorMessages.INVALID_REQUEST_DATA
         );
 
         return handleExceptionInternal(
@@ -210,7 +211,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         ValidationErrorResponse response = new ValidationErrorResponse(
                 status.value(),
-                "Erro de validação.",
+                ApiErrorMessages.VALIDATION_ERROR,
                 errors
         );
 
@@ -232,7 +233,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         ErrorResponse error = new ErrorResponse(
                 status.value(),
-                "Parâmetro de requisição obrigatório ausente."
+                ApiErrorMessages.MISSING_REQUIRED_PARAMETER
         );
 
         return handleExceptionInternal(
@@ -253,7 +254,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         ErrorResponse error = new ErrorResponse(
                 status.value(),
-                "Parâmetro de requisição inválido."
+                ApiErrorMessages.INVALID_REQUEST_PARAMETER
         );
 
         return handleExceptionInternal(
@@ -272,11 +273,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ErrorResponse handleAddressProviderUnavailable(
             AddressProviderUnavailableException ex) {
 
-        log.error("Address provider unavailable", ex);
+        log.error("Address lookup provider unavailable.", ex);
 
         return new ErrorResponse(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
-                "O serviço de consulta de endereços está temporariamente indisponível."
+                ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
         );
     }
 
@@ -287,11 +288,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ErrorResponse handleUnexpectedRuntimeException(
             RuntimeException exception) {
 
-        log.error("Unexpected error occurred", exception);
+        log.error("Unexpected error while processing request.", exception);
 
         return new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Ocorreu um erro interno no servidor."
+                ApiErrorMessages.INTERNAL_SERVER_ERROR
         );
     }
 }

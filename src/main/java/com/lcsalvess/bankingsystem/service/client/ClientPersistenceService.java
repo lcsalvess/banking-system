@@ -28,10 +28,10 @@ public class ClientPersistenceService {
         this.clientRepository = clientRepository;
         this.eventPublisher = eventPublisher;
         this.createTimer = Timer.builder("client.persistence.create")
-                .description("Tempo da persistência de um cliente dentro da transação (exclui o commit)")
+                .description("Time spent persisting a client within the transaction (excluding commit time)")
                 .register(meterRegistry);
         this.updateTimer = Timer.builder("client.persistence.update")
-                .description("Tempo da atualização de um cliente dentro da transação (exclui o commit)")
+                .description("Time spent updating a client within the transaction (excluding commit time)")
                 .register(meterRegistry);
     }
 

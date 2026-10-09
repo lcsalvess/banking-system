@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.address;
 
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
@@ -31,14 +32,14 @@ public class AddressLookupService {
         this.providers = providers;
 
         this.addressLookupTimer = Timer.builder("address.lookup")
-                .description("Tempo total da busca de endereço")
+                .description("Total address lookup duration")
                 .register(meterRegistry);
 
         this.providerTimers = providers.stream()
                 .collect(Collectors.toMap(
                         Function.identity(),
                         provider -> Timer.builder("address.provider.lookup")
-                                .description("Tempo de consulta de cada provedor de endereço")
+                                .description("Address lookup duration by provider")
                                 .tag("provider", provider.getClass().getSimpleName())
                                 .register(meterRegistry)
                 ));
@@ -78,13 +79,13 @@ public class AddressLookupService {
 
         if (lastFailureCause != null) {
             throw new AddressProviderUnavailableException(
-                    "Serviços de CEP indisponíveis no momento. Não foi possível validar o CEP: " + postalCode,
+                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
                     lastFailureCause
             );
         }
 
         throw new PostalCodeNotFoundException(
-                "CEP " + postalCode + " não encontrado em nenhum provedor."
+                ApiErrorMessages.POSTAL_CODE_NOT_FOUND
         );
     }
 }

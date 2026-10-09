@@ -11,6 +11,7 @@ import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
 import com.lcsalvess.bankingsystem.exception.account.*;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
@@ -62,14 +63,6 @@ public class AccountServiceTests {
     private static final String INVALID_DIGIT = "8";
     private static final String NON_EXISTENT_NUMBER = "99999";
     private static final String NON_EXISTENT_DIGIT = "7";
-
-    private static final String ACCOUNT_NOT_FOUND_MESSAGE = "Conta não encontrada.";
-    private static final String INVALID_DIGIT_MESSAGE = "Dígito da conta inválido.";
-    private static final String CLIENT_NOT_FOUND_MESSAGE = "Cliente não encontrado.";
-    private static final String CHECKING_ALREADY_EXISTS_MESSAGE = "O cliente já possui uma conta corrente.";
-    private static final String SAVINGS_ALREADY_EXISTS_MESSAGE = "O cliente já possui uma conta poupança.";
-    private static final String ACCOUNT_HAS_BALANCE_MESSAGE = "Não é possível cancelar uma conta com saldo.";
-    private static final String ACCOUNT_NOT_ACTIVE_MESSAGE = "Não é possível cancelar uma conta que não está ativa.";
 
     @Mock
     private AccountRepository accountRepository;
@@ -152,7 +145,7 @@ public class AccountServiceTests {
 
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
-                    ACCOUNT_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
                     () -> accountService.findEntityByAccountNumber(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
             );
 
@@ -167,7 +160,7 @@ public class AccountServiceTests {
 
             assertThrowsWithMessage(
                     InvalidAccountDigitException.class,
-                    INVALID_DIGIT_MESSAGE,
+                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
                     () -> accountService.findEntityByAccountNumber(CHECKING_NUMBER, INVALID_DIGIT)
             );
 
@@ -205,7 +198,7 @@ public class AccountServiceTests {
 
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
-                    ACCOUNT_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
                     () -> accountService.findByAccountNumber(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
             );
 
@@ -221,7 +214,7 @@ public class AccountServiceTests {
 
             assertThrowsWithMessage(
                     InvalidAccountDigitException.class,
-                    INVALID_DIGIT_MESSAGE,
+                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
                     () -> accountService.findByAccountNumber(SAVINGS_NUMBER, INVALID_DIGIT)
             );
 
@@ -281,11 +274,11 @@ public class AccountServiceTests {
             AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, AccountType.CHECKING);
 
             when(clientService.findEntityById(CLIENT_ID))
-                    .thenThrow(new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE));
+                    .thenThrow(new ClientNotFoundException());
 
             assertThrowsWithMessage(
                     ClientNotFoundException.class,
-                    CLIENT_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.CLIENT_NOT_FOUND,
                     () -> accountService.create(request)
             );
 
@@ -402,7 +395,7 @@ public class AccountServiceTests {
 
             assertThrowsWithMessage(
                     AccountHasBalanceException.class,
-                    ACCOUNT_HAS_BALANCE_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_HAS_BALANCE,
                     () -> accountService.cancel(account.getAccountNumber(), account.getDigit())
             );
 
@@ -423,7 +416,7 @@ public class AccountServiceTests {
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
-                    ACCOUNT_NOT_ACTIVE_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE,
                     () -> accountService.cancel(account.getAccountNumber(), account.getDigit())
             );
 
@@ -438,7 +431,7 @@ public class AccountServiceTests {
 
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
-                    ACCOUNT_NOT_FOUND_MESSAGE,
+                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
                     () -> accountService.cancel(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
             );
 
@@ -453,7 +446,7 @@ public class AccountServiceTests {
 
             assertThrowsWithMessage(
                     InvalidAccountDigitException.class,
-                    INVALID_DIGIT_MESSAGE,
+                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
                     () -> accountService.cancel(CHECKING_NUMBER, INVALID_DIGIT)
             );
 
@@ -500,9 +493,9 @@ public class AccountServiceTests {
     static Stream<Arguments> databaseDuplicateScenarios() {
         return Stream.of(
                 Arguments.of("database rejects duplicate checking account", AccountType.CHECKING,
-                        CHECKING_NUMBER, CHECKING_DIGIT, CHECKING_ALREADY_EXISTS_MESSAGE),
+                        CHECKING_NUMBER, CHECKING_DIGIT, ApiErrorMessages.CHECKING_ACCOUNT_ALREADY_EXISTS),
                 Arguments.of("database rejects duplicate savings account", AccountType.SAVINGS,
-                        SAVINGS_NUMBER, SAVINGS_DIGIT, SAVINGS_ALREADY_EXISTS_MESSAGE)
+                        SAVINGS_NUMBER, SAVINGS_DIGIT, ApiErrorMessages.SAVINGS_ACCOUNT_ALREADY_EXISTS)
         );
     }
 

@@ -8,6 +8,7 @@ import com.lcsalvess.bankingsystem.entity.Address;
 import com.lcsalvess.bankingsystem.entity.Client;
 import com.lcsalvess.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
 import com.lcsalvess.bankingsystem.service.address.AddressData;
 import com.lcsalvess.bankingsystem.service.address.AddressService;
@@ -21,8 +22,6 @@ import java.util.List;
 
 @Service
 public class ClientService {
-
-    private static final String CPF_ALREADY_EXISTS_MESSAGE = "Já existe um cliente cadastrado com este CPF.";
 
     private final ClientRepository clientRepository;
 
@@ -42,7 +41,7 @@ public class ClientService {
     public ClientResponseDTO create(ClientRequestDTO dto) {
         if (clientRepository.existsByCpf(dto.cpf())) {
             throw new ClientCpfAlreadyExistsException(
-                    CPF_ALREADY_EXISTS_MESSAGE
+                    ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS
             );
         }
 
@@ -69,7 +68,7 @@ public class ClientService {
             // Só traduz se o CPF realmente já existe.
             if (clientRepository.existsByCpf(dto.cpf())) {
                 throw new ClientCpfAlreadyExistsException(
-                        CPF_ALREADY_EXISTS_MESSAGE,
+                        ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS,
                         exception
                 );
             }

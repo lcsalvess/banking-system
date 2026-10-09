@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.address.brasilapi;
 
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.brasilapi.BrasilApiClient;
 import com.lcsalvess.bankingsystem.unit.address.FakeAddressServer;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
@@ -34,10 +35,6 @@ class BrasilApiClientTests {
     private static final String POSTAL_CODE = "01001000";
 
     private static final String EXPECTED_REQUEST = "GET /api/cep/v1/01001000";
-
-    private static final String UNAVAILABLE_MESSAGE = "Não foi possível consultar a Brasil API.";
-
-    private static final String INVALID_ADDRESS_MESSAGE = "O provedor retornou um endereço inválido: ";
 
     private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
 
@@ -140,7 +137,7 @@ class BrasilApiClientTests {
             PostalCodeNotFoundException exception = assertThrows(PostalCodeNotFoundException.class,
                     () -> brasilApiClient.findByPostalCode(POSTAL_CODE));
 
-            assertEquals("CEP não encontrado: " + POSTAL_CODE, exception.getMessage());
+            assertEquals(ApiErrorMessages.POSTAL_CODE_NOT_FOUND, exception.getMessage());
             assertEquals(List.of(EXPECTED_REQUEST), server.requests());
         }
     }
@@ -157,7 +154,7 @@ class BrasilApiClientTests {
             AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class,
                     () -> brasilApiClient.findByPostalCode(POSTAL_CODE));
 
-            assertEquals("A Brasil API retornou uma resposta vazia.", exception.getMessage());
+            assertEquals(ApiErrorMessages.ADDRESS_PROVIDER_EMPTY_RESPONSE, exception.getMessage());
             assertEquals(List.of(EXPECTED_REQUEST), server.requests());
         }
     }
@@ -175,7 +172,7 @@ class BrasilApiClientTests {
             AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class,
                     () -> brasilApiClient.findByPostalCode(POSTAL_CODE));
 
-            assertEquals(INVALID_ADDRESS_MESSAGE + expectedError, exception.getMessage());
+            assertEquals(ApiErrorMessages.ADDRESS_PROVIDER_INVALID_RESPONSE + expectedError, exception.getMessage());
             assertEquals(List.of(EXPECTED_REQUEST), server.requests());
         }
 
@@ -219,7 +216,7 @@ class BrasilApiClientTests {
             AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class,
                     () -> brasilApiClient.findByPostalCode(POSTAL_CODE));
 
-            assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
+            assertEquals(ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE, exception.getMessage());
             assertInstanceOf(RestClientException.class, exception.getCause());
             assertEquals(List.of(EXPECTED_REQUEST), server.requests());
         }
@@ -237,7 +234,7 @@ class BrasilApiClientTests {
             AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class,
                     () -> brasilApiClient.findByPostalCode(POSTAL_CODE));
 
-            assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
+            assertEquals(ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE, exception.getMessage());
             assertInstanceOf(RestClientException.class, exception.getCause());
             assertEquals(List.of(EXPECTED_REQUEST), server.requests());
         }
@@ -256,7 +253,7 @@ class BrasilApiClientTests {
             AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class,
                     () -> slowResponseClient.findByPostalCode(POSTAL_CODE));
 
-            assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
+            assertEquals(ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE, exception.getMessage());
             assertInstanceOf(ResourceAccessException.class, exception.getCause());
             assertEquals(List.of(EXPECTED_REQUEST), server.requests());
         }
@@ -274,7 +271,7 @@ class BrasilApiClientTests {
             AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class,
                     () -> unreachableClient.findByPostalCode(POSTAL_CODE));
 
-            assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
+            assertEquals(ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE, exception.getMessage());
             assertInstanceOf(ResourceAccessException.class, exception.getCause());
             assertTrue(server.requests().isEmpty());
         }

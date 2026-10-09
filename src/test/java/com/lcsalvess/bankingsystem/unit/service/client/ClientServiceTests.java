@@ -15,8 +15,8 @@ import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
-import com.lcsalvess.bankingsystem.service.address.AddressService;
 import com.lcsalvess.bankingsystem.service.address.AddressData;
+import com.lcsalvess.bankingsystem.service.address.AddressService;
 import com.lcsalvess.bankingsystem.service.client.ClientPersistenceService;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData;
@@ -83,6 +83,126 @@ public class ClientServiceTests {
 
     @InjectMocks
     private ClientService clientService;
+
+    @Nested
+    @DisplayName("findAll()")
+    class FindAll {
+
+        @Test
+        @DisplayName("Should return all clients successfully")
+        void shouldReturnAllClientsSuccessfully() {
+            Client client1 = client();
+            Client client2 = client(
+                    2L,
+                    "Maria Silva",
+                    "91741354064",
+                    "maria@email.com",
+                    "11988888888"
+            );
+
+            when(clientRepository.findAll()).thenReturn(List.of(client1, client2));
+
+            List<ClientSummaryResponseDTO> result = clientService.findAll();
+
+            assertEquals(
+                    List.of(
+                            clientSummaryResponse(),
+                            new ClientSummaryResponseDTO(
+                                    2L,
+                                    "Maria Silva",
+                                    "***.***.***-64",
+                                    "maria@email.com",
+                                    "11988888888"
+                            )
+                    ),
+                    result
+            );
+
+            verify(clientRepository).findAll();
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should return empty list when there are no clients")
+        void shouldReturnEmptyListWhenThereAreNoClients() {
+            when(clientRepository.findAll()).thenReturn(List.of());
+
+            List<ClientSummaryResponseDTO> result = clientService.findAll();
+
+            assertEquals(List.of(), result);
+
+            verify(clientRepository).findAll();
+            verifyNoMoreInteractionsOnMocks();
+        }
+    }
+
+    @Nested
+    @DisplayName("findEntityById(Long)")
+    class FindEntityById {
+
+        @Test
+        @DisplayName("Should return the client entity when ID exists")
+        void shouldReturnClientEntityWhenIdExists() {
+            Client client = client();
+
+            stubClientLookup(client);
+
+            Client result = clientService.findEntityById(CLIENT_ID);
+
+            assertSame(client, result);
+
+            verify(clientRepository).findById(CLIENT_ID);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should throw when client does not exist")
+        void shouldThrowWhenClientDoesNotExist() {
+            when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.empty());
+
+            assertThrowsWithMessage(
+                    ClientNotFoundException.class,
+                    CLIENT_NOT_FOUND_MESSAGE,
+                    () -> clientService.findEntityById(CLIENT_ID)
+            );
+
+            verify(clientRepository).findById(CLIENT_ID);
+            verifyNoMoreInteractionsOnMocks();
+        }
+    }
+
+    @Nested
+    @DisplayName("findById(Long)")
+    class FindById {
+
+        @Test
+        @DisplayName("Should return the client response when ID exists")
+        void shouldReturnClientResponseWhenIdExists() {
+            stubClientLookup(client());
+
+            ClientResponseDTO result = clientService.findById(CLIENT_ID);
+
+            assertEquals(clientResponse(), result);
+
+            verify(clientRepository).findById(CLIENT_ID);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should throw when client does not exist")
+        void shouldThrowWhenClientDoesNotExist() {
+            when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.empty());
+
+            assertThrowsWithMessage(
+                    ClientNotFoundException.class,
+                    CLIENT_NOT_FOUND_MESSAGE,
+                    () -> clientService.findById(CLIENT_ID)
+            );
+
+            verify(clientRepository).findById(CLIENT_ID);
+            verifyNoMoreInteractionsOnMocks();
+        }
+    }
 
     @Nested
     @DisplayName("create(ClientRequestDTO)")
@@ -225,126 +345,6 @@ public class ClientServiceTests {
             verify(addressService).createFromPostalCode(request.address());
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).create(any(Client.class), eq(USERNAME));
-            verifyNoMoreInteractionsOnMocks();
-        }
-    }
-
-    @Nested
-    @DisplayName("findAll()")
-    class FindAll {
-
-        @Test
-        @DisplayName("Should return all clients successfully")
-        void shouldReturnAllClientsSuccessfully() {
-            Client client1 = client();
-            Client client2 = client(
-                    2L,
-                    "Maria Silva",
-                    "91741354064",
-                    "maria@email.com",
-                    "11988888888"
-            );
-
-            when(clientRepository.findAll()).thenReturn(List.of(client1, client2));
-
-            List<ClientSummaryResponseDTO> result = clientService.findAll();
-
-            assertEquals(
-                    List.of(
-                            clientSummaryResponse(),
-                            new ClientSummaryResponseDTO(
-                                    2L,
-                                    "Maria Silva",
-                                    "91741354064",
-                                    "maria@email.com",
-                                    "11988888888"
-                            )
-                    ),
-                    result
-            );
-
-            verify(clientRepository).findAll();
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should return empty list when there are no clients")
-        void shouldReturnEmptyListWhenThereAreNoClients() {
-            when(clientRepository.findAll()).thenReturn(List.of());
-
-            List<ClientSummaryResponseDTO> result = clientService.findAll();
-
-            assertEquals(List.of(), result);
-
-            verify(clientRepository).findAll();
-            verifyNoMoreInteractionsOnMocks();
-        }
-    }
-
-    @Nested
-    @DisplayName("findEntityById(Long)")
-    class FindEntityById {
-
-        @Test
-        @DisplayName("Should return the client entity when ID exists")
-        void shouldReturnClientEntityWhenIdExists() {
-            Client client = client();
-
-            stubClientLookup(client);
-
-            Client result = clientService.findEntityById(CLIENT_ID);
-
-            assertSame(client, result);
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when client does not exist")
-        void shouldThrowWhenClientDoesNotExist() {
-            when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.empty());
-
-            assertThrowsWithMessage(
-                    ClientNotFoundException.class,
-                    CLIENT_NOT_FOUND_MESSAGE,
-                    () -> clientService.findEntityById(CLIENT_ID)
-            );
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verifyNoMoreInteractionsOnMocks();
-        }
-    }
-
-    @Nested
-    @DisplayName("findById(Long)")
-    class FindById {
-
-        @Test
-        @DisplayName("Should return the client response when ID exists")
-        void shouldReturnClientResponseWhenIdExists() {
-            stubClientLookup(client());
-
-            ClientResponseDTO result = clientService.findById(CLIENT_ID);
-
-            assertEquals(clientResponse(), result);
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when client does not exist")
-        void shouldThrowWhenClientDoesNotExist() {
-            when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.empty());
-
-            assertThrowsWithMessage(
-                    ClientNotFoundException.class,
-                    CLIENT_NOT_FOUND_MESSAGE,
-                    () -> clientService.findById(CLIENT_ID)
-            );
-
-            verify(clientRepository).findById(CLIENT_ID);
             verifyNoMoreInteractionsOnMocks();
         }
     }
@@ -737,7 +737,7 @@ public class ClientServiceTests {
         return new ClientSummaryResponseDTO(
                 CLIENT_ID,
                 NAME,
-                CPF,
+                "***.***.***-25",
                 EMAIL,
                 PHONE
         );
@@ -747,7 +747,7 @@ public class ClientServiceTests {
         return new ClientResponseDTO(
                 CLIENT_ID,
                 NAME,
-                CPF,
+                "***.***.***-25",
                 EMAIL,
                 PHONE,
                 AddressResponseDTO.fromEntity(address())

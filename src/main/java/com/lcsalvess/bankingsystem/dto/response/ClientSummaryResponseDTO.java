@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.dto.response;
 
 import com.lcsalvess.bankingsystem.entity.Client;
+import com.lcsalvess.bankingsystem.util.CpfMasker;
 
 public record ClientSummaryResponseDTO(
         Long id,
@@ -13,7 +14,7 @@ public record ClientSummaryResponseDTO(
         return new ClientSummaryResponseDTO(
                 client.getId(),
                 client.getName(),
-                client.getCpf(),
+                CpfMasker.mask(client.getCpf()),
                 client.getEmail(),
                 client.getPhoneNumber()
         );

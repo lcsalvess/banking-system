@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,50 +31,6 @@ public class TransactionController {
 
     public TransactionController(TransactionService transactionService) {
         this.transactionService = transactionService;
-    }
-
-    @Operation(
-            summary = "Deposit funds into an account",
-            description = "Deposits the specified amount into an active account and records the deposit transaction"
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "201",
-                    description = "Deposit completed successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = TransactionResponseDTO.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid deposit amount",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Account not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Account is not active",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
-                    )
-            )
-    })
-    @PostMapping("/deposit")
-    @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO deposit(@Valid @RequestBody AccountOperationRequestDTO dto) {
-        return transactionService.deposit(dto);
     }
 
     @Operation(
@@ -108,6 +65,7 @@ public class TransactionController {
                     )
             )
     })
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN')")
     @GetMapping("/accounts/{accountNumber}")
     public List<TransactionResponseDTO> findByAccountNumber(
             @Parameter(
@@ -158,11 +116,57 @@ public class TransactionController {
                     )
             )
     })
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN')")
     @GetMapping("/code/{transactionCode}")
     public TransactionResponseDTO findByTransactionCode(
             @PathVariable UUID transactionCode
     ) {
         return transactionService.findByTransactionCode(transactionCode);
+    }
+
+    @Operation(
+            summary = "Deposit funds into an account",
+            description = "Deposits the specified amount into an active account and records the deposit transaction"
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "201",
+                    description = "Deposit completed successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = TransactionResponseDTO.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid deposit amount",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Account not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Account is not active",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            )
+    })
+    @PreAuthorize("hasRole('EMPLOYEE')")
+    @PostMapping("/deposit")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TransactionResponseDTO deposit(@Valid @RequestBody AccountOperationRequestDTO dto) {
+        return transactionService.deposit(dto);
     }
 
     @Operation(
@@ -203,6 +207,7 @@ public class TransactionController {
                     )
             )
     })
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @PostMapping("/withdraw")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO withdraw(@Valid @RequestBody AccountOperationRequestDTO dto) {
@@ -247,6 +252,7 @@ public class TransactionController {
                     )
             )
     })
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @PostMapping("/transfer")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO transfer(@Valid @RequestBody TransferRequestDTO dto) {
@@ -291,6 +297,7 @@ public class TransactionController {
                     )
             )
     })
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @PostMapping("/yield/{accountNumber}")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO applyYield(

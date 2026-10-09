@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.dto.request.security;
 
+import com.lcsalvess.bankingsystem.validation.passwordbytelength.PasswordByteLength;
 import jakarta.validation.constraints.NotBlank;
 
 public record LoginRequestDTO(
@@ -7,6 +8,7 @@ public record LoginRequestDTO(
         String username,
 
         @NotBlank(message = "A senha é obrigatória.")
+        @PasswordByteLength
         String password
 ) {
 }

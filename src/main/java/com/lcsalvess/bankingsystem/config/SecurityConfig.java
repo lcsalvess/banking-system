@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.config;
 
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.security.JwtAuthenticationFilter;
+import com.lcsalvess.bankingsystem.security.RestAccessDeniedHandler;
 import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -24,15 +25,18 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CorrelationIdFilter correlationIdFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    private final RestAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             CorrelationIdFilter correlationIdFilter,
-            RestAuthenticationEntryPoint authenticationEntryPoint
+            RestAuthenticationEntryPoint authenticationEntryPoint,
+            RestAccessDeniedHandler accessDeniedHandler
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.correlationIdFilter = correlationIdFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
     }
 
     @Bean
@@ -41,16 +45,30 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // Endpoints públicos de autenticação.
                         .requestMatchers("/api/v1/auth/**").permitAll()
+
+                        // Documentação OpenAPI.
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
                         ).permitAll()
+
+                        // Actuator: acesso de leitura para ambos os perfis.
+                        .requestMatchers("/actuator/health", "/actuator/info")
+                        .hasAnyRole("EMPLOYEE", "ADMIN")
+
+                        // Métricas: acesso exclusivo ao administrador.
+                        .requestMatchers("/actuator/metrics", "/actuator/metrics/**")
+                        .hasRole("ADMIN")
+
+                        // Demais endpoints exigem autenticação.
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(exceptionHandling ->
-                        exceptionHandling.authenticationEntryPoint(authenticationEntryPoint)
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                 )
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

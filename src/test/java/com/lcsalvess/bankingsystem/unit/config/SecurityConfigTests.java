@@ -5,6 +5,7 @@ import com.lcsalvess.bankingsystem.config.SecurityConfig;
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
+import com.lcsalvess.bankingsystem.security.RestAccessDeniedHandler;
 import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
@@ -23,14 +24,14 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
@@ -51,9 +52,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Testa a {@link SecurityConfig} com a cadeia de filtros real: {@code CorrelationIdFilter},
@@ -78,6 +77,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         SecurityConfig.class,
         RestAuthenticationEntryPoint.class,
+        RestAccessDeniedHandler.class,
         JwtService.class
 })
 @TestPropertySource(properties = {
@@ -104,6 +104,7 @@ class SecurityConfigTests {
     private static final String PUBLIC_URL = "/api/v1/auth/probe";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
     private static final String UNAUTHORIZED_MESSAGE = "Não foi possível autenticar o usuário.";
+    private static final String FORBIDDEN_MESSAGE = "Você não tem permissão para acessar este recurso.";
 
     @Autowired
     private WebApplicationContext context;
@@ -359,6 +360,30 @@ class SecurityConfigTests {
         @DisplayName("Deve responder 401, e não 403, para anônimo em rota restrita a administradores")
         void shouldReturn401ForAnonymousOnAdminRoute() throws Exception {
             expectUnauthorized(mockMvc.perform(get(ADMIN_URL)));
+        }
+    }
+
+    @Nested
+    @DisplayName("Autorização do Actuator")
+    class ActuatorAuthorizationTests {
+
+        @Test
+        @DisplayName("Deve responder 403 em JSON para EMPLOYEE nas métricas")
+        void shouldReturn403JsonForEmployeeOnActuatorMetrics() throws Exception {
+            User employee = createUser(Role.EMPLOYEE);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(employee);
+
+            mockMvc.perform(get("/actuator/metrics")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(403))
+                    .andExpect(jsonPath("$.message").value(FORBIDDEN_MESSAGE))
+                    .andExpect(jsonPath("$.timestamp").exists());
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
         }
     }
 

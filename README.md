@@ -44,7 +44,7 @@ The application follows a modular layered architecture, separating responsibilit
 ```text
 src/main/java/com/lcsalvess/bankingsystem
 ├── bootstrap/       # Application startup and initialization
-├── config/          # Spring application configuration (Jackson, OpenAPI, security)
+├── config/          # Spring application configuration (Jackson, JWT properties, OpenAPI, security)
 ├── controller/      # REST API endpoints
 │   ├── address/     # Address lookup endpoint
 │   └── security/    # Authentication endpoint
@@ -65,7 +65,7 @@ src/main/java/com/lcsalvess/bankingsystem
 ├── security/        # JWT authentication filter
 ├── serialization/   # Custom JSON serialization
 ├── service/         # Business rules and application logic
-│   ├── account/     # Account operations and account number generation
+│   ├── account/     # Account operations, row locking, and account number generation
 │   ├── address/     # Address-related application logic
 │   ├── client/      # Client operations and persistence responsibilities
 │   ├── security/    # Authentication, JWT, and current user
@@ -147,8 +147,10 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Account management**: checking and savings accounts, with generated account numbers and check digits
 - **Transactions**: deposit, withdrawal, transfer between accounts, transaction history per account, and lookup by public identifier
 - **Public transaction identifier**: every transaction has a UUID (`transactionCode`) exposed in responses, while the internal database ID is never returned
+- **Transfer traceability**: the two transactions of a transfer share a `transferCode`, so both legs can be correlated
+- **Concurrency control**: pessimistic row locking (`SELECT ... FOR UPDATE`) on every operation that changes a balance or an account status, with a fixed lock order in transfers to avoid deadlocks
 - **Savings yield**: monthly yield applied to savings accounts
-- **Account cancellation** with balance and status validation
+- **Account cancellation** with balance and status validation, safe against concurrent deposits
 - **Input validation** using Bean Validation, with custom constraints for CPF, account number, and check digit
 - **Strict JSON input types**: text fields reject numbers and booleans, and monetary amounts reject strings
 - **Global exception handling** with a consistent error response
@@ -180,12 +182,15 @@ Shows the full request/response cycle, including authentication and authorizatio
 - The account number must contain between 5 and 20 digits and the check digit exactly 1 digit. Otherwise, the request is rejected with `400 Bad Request` before reaching the service.
 - The check digit is then validated against the account number before the account lookup, and a mismatch also returns `400 Bad Request`.
 - An account can only be canceled if it is active and has a zero balance.
+- Cancellation takes the same row lock as deposits, withdrawals, transfers, and yield. A deposit that runs at the same time cannot be lost: the operations are serialized, and the cancellation is rejected if the deposit commits first.
 
 ### Transactions
 - Deposits, withdrawals, and transfers require an active account and a positive amount.
 - Amounts accept at most 17 integer digits and 2 decimal places.
 - Withdrawals and transfers require sufficient balance.
-- A transfer requires distinct and active source and destination accounts, and records one `TRANSFER_SENT` and one `TRANSFER_RECEIVED` transaction.
+- A transfer requires distinct and active source and destination accounts, and records one `TRANSFER_SENT` and one `TRANSFER_RECEIVED` transaction. Both share the same `transferCode` (UUID), which is returned only for transfer transactions.
+- Every operation that changes a balance locks the account row with a pessimistic write lock (`PESSIMISTIC_WRITE`) before validating it, so the balance check and the update cannot interleave with another request on the same account. Concurrent withdrawals therefore never overdraw an account, and concurrent deposits are never lost.
+- A transfer locks both accounts in ascending account number order, regardless of the transfer direction. Two opposite transfers (A to B and B to A) cannot deadlock.
 - All operations that change balances run inside a database transaction, so balance changes and transaction records are saved together or not at all.
 - Every transaction receives a random UUID (`transactionCode`) when it is created. It is unique, immutable, and is the only identifier exposed by the API; the internal numeric ID is not part of the response.
 - A transaction can be retrieved by its `transactionCode`: `404 Not Found` if it does not exist and `400 Bad Request` if the value is not a valid UUID.
@@ -194,7 +199,9 @@ Shows the full request/response cycle, including authentication and authorizatio
 ### Savings Yield
 - Yield is calculated as 0.5% of the current balance, rounded to 2 decimal places.
 - An account becomes eligible one month after its creation or last yield date.
+- Each applied yield moves the last yield date forward by one month.
 - Yield can be applied only once per day per account, enforced by the service and by a partial unique index in the database.
+- Concurrent yield requests for the same account are serialized by the row lock: one is applied and the others are rejected with `409 Conflict`.
 
 ### Users
 - Only `ADMIN` users can create new users.
@@ -223,14 +230,17 @@ The API is stateless. Clients authenticate through `POST /api/v1/auth/login` and
 Authorization: Bearer <token>
 ```
 
-| Aspect             | Behavior                                                                   |
-|--------------------|----------------------------------------------------------------------------|
-| Token              | JWT signed with HMAC, valid for 1 hour                                     |
-| Public routes      | `/api/v1/auth/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**` |
-| Protected routes   | Everything else requires a valid token, including `/actuator/**`           |
-| Admin-only routes  | `POST /api/v1/users` (`@PreAuthorize("hasRole('ADMIN')")`)                 |
-| Invalid token      | `401 Unauthorized`                                                         |
-| Insufficient role  | `403 Forbidden`                                                            |
+| Aspect             | Behavior                                                                                                      |
+|--------------------|---------------------------------------------------------------------------------------------------------------|
+| Token              | JWT signed with HMAC (key of at least 256 bits), valid for 1 hour by default                                  |
+| Token validation   | Signature, expiration, and issuer (`jwt.issuer`) are verified on every request                                |
+| User status        | The user is loaded from the database on every request; a deactivated user is rejected with `401 Unauthorized` |
+| Startup check      | The application does not start if `JWT_SECRET` is missing, is not valid Base64, or is too short               |
+| Public routes      | `/api/v1/auth/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**`                                    |
+| Protected routes   | Everything else requires a valid token, including `/actuator/**`                                              |
+| Admin-only routes  | `POST /api/v1/users` (`@PreAuthorize("hasRole('ADMIN')")`)                                                    |
+| Invalid token      | `401 Unauthorized`                                                                                            |
+| Insufficient role  | `403 Forbidden`                                                                                               |
 
 ---
 
@@ -317,6 +327,18 @@ Transactions are returned with their public identifier, and the internal ID is n
 
 `type` is one of `DEPOSIT`, `WITHDRAWAL`, `TRANSFER_SENT`, `TRANSFER_RECEIVED`, or `YIELD`.
 
+Transfer transactions also include the `transferCode` shared by both legs of the transfer. The field is omitted for other types:
+
+```json
+{
+  "transactionCode": "7b0e4a91-5c2d-4f38-8d16-a3c9e1f20b64",
+  "transferCode": "c4d8f2a6-19b3-4e57-a0d2-6f81b5e3c790",
+  "type": "TRANSFER_SENT",
+  "amount": 100.00,
+  "createdAt": "2026-10-09T14:20:45"
+}
+```
+
 ---
 
 ## Error Handling
@@ -390,8 +412,8 @@ Operations are logged through Spring application events:
 ## Database
 
 - PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
-- `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters.
-- Schema changes must be added as new versioned migrations (`V3__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
+- `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters. `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`.
+- Schema changes must be added as new versioned migrations (`V4__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
 - Tables use plural snake_case names: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, and `transactions`.
 - Constraints follow a naming pattern: `uk_<table>_<column>` for unique constraints, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
 - `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`, `checking_accounts`, and `savings_accounts` tables.
@@ -399,6 +421,8 @@ Operations are logged through Spring application events:
 - Two partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type per client) and `uk_transactions_daily_yield` (one yield per account per day).
 - The constraints and indexes that the application translates into business errors are listed in the `DatabaseConstraint` enum, which is the only place in the code that holds their names. `DatabaseConstraintTest` checks that every name is declared in a migration, so renaming a constraint without updating the enum fails the test suite.
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).
+- `Transaction` also has a `transfer_code` column (UUID, nullable, not updatable). It is filled only for `TRANSFER_SENT` and `TRANSFER_RECEIVED` and holds the same value in both rows of a transfer.
+- Concurrency is handled with pessimistic locking: `AccountRepository.findByAccountNumberForUpdate` uses `LockModeType.PESSIMISTIC_WRITE`. The locking methods of `AccountService` require an existing transaction (`Propagation.MANDATORY`), so a lock can never be taken and released outside the operation that needs it.
 - `Transaction` has a `transaction_code` column (UUID, not null, not updatable) with the `uk_transactions_code` unique constraint, used as its public identifier.
 - Open Session in View is disabled (`spring.jpa.open-in-view=false`). Account queries that need the client use `JOIN FETCH` to avoid lazy loading outside a transaction.
 - Read operations in the services run with `@Transactional(readOnly = true)`, while operations that change data use regular transactions.
@@ -442,6 +466,8 @@ The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*`
 openssl rand -base64 32
 ```
 
+The token lifetime (`jwt.expiration`, in seconds) and the token issuer (`jwt.issuer`) are defined in `application.properties`.
+
 The base URLs of the address providers are defined in `application.properties` (`integration.address.viacep.base-url` and `integration.address.brasilapi.base-url`).
 
 ### Running
@@ -476,7 +502,9 @@ To disable the documentation (for example, in production), set `SWAGGER_ENABLED=
 
 The test suite covers:
 
-- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, yield), users, JWT, authentication, user details loading, address data resolution, and address lookup provider orchestration.
+- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, yield, and the lock acquisition of each), users, JWT, authentication, user details loading, address data resolution, and address lookup provider orchestration.
+- **Concurrency integration tests** (`TransactionConcurrencyTests`) against PostgreSQL, running operations on parallel threads released at the same instant: concurrent withdrawals that must not overdraw an account, deposits that must not be lost, mixed deposits and withdrawals, opposite transfers without deadlock, several transfers into the same account, transfers limited by the available balance, a yield requested twice at once, and an account cancellation racing with deposits.
+- **Security tests** for JWT generation and validation (secret, issuer, expiration), the security filter chain configuration, and the authentication entry point.
 - **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), address lookup, and authentication.
 - **Provider client tests** for ViaCEP and Brasil API against a local HTTP server: response mapping, postal code not found, invalid responses, error statuses, timeouts, and unreachable providers.
 - **Exception handler tests** for every response of `GlobalExceptionHandler`, including the translation of each database constraint into its status and message.
@@ -485,6 +513,8 @@ The test suite covers:
 - **Validation tests** for CPF, account number, and account digit.
 - **Filter tests** for the correlation ID: generation, reuse, lowercase normalization, rejection of non-canonical values, and MDC cleanup.
 - **Context test** to verify the application starts.
+
+The suite has more than 300 test methods, many of them parameterized.
 
 Tests run with the `test` profile against the `banking_system_test` database. Its schema is created by the same Flyway migrations used in the application and validated by Hibernate (`validate`).
 
@@ -495,7 +525,7 @@ Tests run with the `test` profile against the `banking_system_test` database. It
 - [x] Migration management with Flyway
 - [x] Integration tests for external address providers (`ViaCepClient` and `BrasilApiClient`)
 - [x] Tests for `AddressService` and `AddressLookupController`
-- [ ] Integration tests with PostgreSQL for transaction and concurrency scenarios
+- [x] Integration tests with PostgreSQL for transaction and concurrency scenarios
 - [ ] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
 - [ ] Pagination and filtering on list endpoints
 - [ ] Docker Compose for the application and database

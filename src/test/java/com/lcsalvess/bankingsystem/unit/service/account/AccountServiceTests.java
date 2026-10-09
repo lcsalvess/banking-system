@@ -377,14 +377,14 @@ public class AccountServiceTests {
         @MethodSource(PROVIDER + "cancellableAccounts")
         @DisplayName("Should cancel account successfully")
         void shouldCancelAccountSuccessfully(String scenario, Account account) {
-            stubAccountLookup(account);
+            stubAccountLookupForUpdate(account);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
 
             accountService.cancel(account.getAccountNumber(), account.getDigit());
 
             assertEquals(AccountStatus.CANCELLED, account.getStatus());
 
-            verifyAccountLookup(account);
+            verifyAccountLookupForUpdate(account);
             verify(currentUserService).getUsername();
             verify(eventPublisher).publishEvent(
                     new AccountOperationEvent(account.getId(), AccountOperationType.CANCELLED, USERNAME)
@@ -398,7 +398,7 @@ public class AccountServiceTests {
         void shouldThrowWhenAccountHasBalance(String scenario, BigDecimal balance) {
             Account account = checkingAccount();
             account.credit(balance);
-            stubAccountLookup(account);
+            stubAccountLookupForUpdate(account);
 
             assertThrowsWithMessage(
                     AccountHasBalanceException.class,
@@ -406,7 +406,7 @@ public class AccountServiceTests {
                     () -> accountService.cancel(account.getAccountNumber(), account.getDigit())
             );
 
-            verifyAccountLookup(account);
+            verifyAccountLookupForUpdate(account);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -419,7 +419,7 @@ public class AccountServiceTests {
             Account account = checkingAccount();
             account.credit(balance);
             account.cancel();
-            stubAccountLookup(account);
+            stubAccountLookupForUpdate(account);
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
@@ -427,14 +427,14 @@ public class AccountServiceTests {
                     () -> accountService.cancel(account.getAccountNumber(), account.getDigit())
             );
 
-            verifyAccountLookup(account);
+            verifyAccountLookupForUpdate(account);
             verifyNoMoreInteractionsOnMocks();
         }
 
         @Test
         @DisplayName("Should throw when account does not exist")
         void shouldThrowWhenAccountDoesNotExist() {
-            stubAccountNotFound();
+            stubAccountNotFoundForUpdate();
 
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
@@ -442,7 +442,7 @@ public class AccountServiceTests {
                     () -> accountService.cancel(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
             );
 
-            verifyAccountNotFoundLookup();
+            verifyAccountNotFoundLookupForUpdate();
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -567,23 +567,61 @@ public class AccountServiceTests {
     }
 
     private void stubAccountLookup(Account account) {
-        when(accountNumberGenerator.isValid(account.getAccountNumber(), account.getDigit())).thenReturn(true);
-        when(accountRepository.findByAccountNumber(account.getAccountNumber())).thenReturn(Optional.of(account));
+        when(accountNumberGenerator.isValid(account.getAccountNumber(), account.getDigit()))
+                .thenReturn(true);
+        when(accountRepository.findByAccountNumber(account.getAccountNumber()))
+                .thenReturn(Optional.of(account));
+    }
+
+    private void stubAccountLookupForUpdate(Account account) {
+        when(accountNumberGenerator.isValid(account.getAccountNumber(), account.getDigit()))
+                .thenReturn(true);
+        when(accountRepository.findByAccountNumberForUpdate(account.getAccountNumber()))
+                .thenReturn(Optional.of(account));
     }
 
     private void verifyAccountLookup(Account account) {
-        verify(accountNumberGenerator).isValid(account.getAccountNumber(), account.getDigit());
-        verify(accountRepository).findByAccountNumber(account.getAccountNumber());
+        verify(accountNumberGenerator)
+                .isValid(account.getAccountNumber(), account.getDigit());
+        verify(accountRepository)
+                .findByAccountNumber(account.getAccountNumber());
+    }
+
+    private void verifyAccountLookupForUpdate(Account account) {
+        verify(accountNumberGenerator)
+                .isValid(account.getAccountNumber(), account.getDigit());
+        verify(accountRepository)
+                .findByAccountNumberForUpdate(account.getAccountNumber());
     }
 
     private void stubAccountNotFound() {
-        when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)).thenReturn(true);
-        when(accountRepository.findByAccountNumber(NON_EXISTENT_NUMBER)).thenReturn(Optional.empty());
+        when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT))
+                .thenReturn(true);
+        when(accountRepository.findByAccountNumber(NON_EXISTENT_NUMBER))
+                .thenReturn(Optional.empty());
+    }
+
+    private void stubAccountNotFoundForUpdate() {
+        when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT))
+                .thenReturn(true);
+        when(accountRepository.findByAccountNumberForUpdate(NON_EXISTENT_NUMBER))
+                .thenReturn(Optional.empty());
     }
 
     private void verifyAccountNotFoundLookup() {
         verify(accountNumberGenerator).isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT);
         verify(accountRepository).findByAccountNumber(NON_EXISTENT_NUMBER);
+    }
+
+    private void verifyAccountNotFoundLookupForUpdate() {
+        verify(accountNumberGenerator).isValid(
+                NON_EXISTENT_NUMBER,
+                NON_EXISTENT_DIGIT
+        );
+
+        verify(accountRepository).findByAccountNumberForUpdate(
+                NON_EXISTENT_NUMBER
+        );
     }
 
     private void verifyNoMoreInteractionsOnMocks() {

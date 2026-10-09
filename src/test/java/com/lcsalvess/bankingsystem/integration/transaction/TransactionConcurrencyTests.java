@@ -3,8 +3,11 @@ package com.lcsalvess.bankingsystem.integration.transaction;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.entity.*;
+import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.enums.State;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
+import com.lcsalvess.bankingsystem.exception.account.AccountHasBalanceException;
+import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
@@ -12,6 +15,7 @@ import com.lcsalvess.bankingsystem.repository.AddressRepository;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
+import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
@@ -63,6 +67,9 @@ class TransactionConcurrencyTests {
 
     @Autowired
     private AccountNumberGenerator accountNumberGenerator;
+
+    @Autowired
+    private AccountService accountService;
 
     @Autowired
     private EntityManager entityManager;
@@ -274,14 +281,56 @@ class TransactionConcurrencyTests {
         }
     }
 
+
+    @Nested
+    @DisplayName("Concurrent account cancellation and deposits")
+    class ConcurrentCancellationAndDeposits {
+
+        @Test
+        @DisplayName("Should preserve account state when cancellation races with deposit")
+        void shouldPreserveAccountStateWhenCancellationRacesWithDeposit()
+                throws Exception {
+            CheckingAccount account = createCheckingAccount("0.00");
+
+            List<Boolean> results = runConcurrently(List.of(
+                    deposit(account, "100.00"),
+                    cancel(account)
+            ));
+
+            assertEquals(1, countSucceeded(results));
+
+            Account persisted = accountRepository.findById(account.getId())
+                    .orElseThrow();
+
+            if (persisted.getStatus() == AccountStatus.CANCELLED) {
+                assertEquals(
+                        0,
+                        BigDecimal.ZERO.compareTo(persisted.getBalance())
+                );
+                assertEquals(0, countTransactions(account, TransactionType.DEPOSIT));
+            } else {
+                assertEquals(
+                        0,
+                        new BigDecimal("100.00").compareTo(persisted.getBalance())
+                );
+                assertEquals(1, countTransactions(account, TransactionType.DEPOSIT));
+            }
+        }
+    }
+
+
     // ---------------------------------------------------------------------
     // Tasks
     // ---------------------------------------------------------------------
 
     private Callable<Boolean> deposit(Account account, String amount) {
         return () -> {
-            transactionService.deposit(operation(account, amount));
-            return true;
+            try {
+                transactionService.deposit(operation(account, amount));
+                return true;
+            } catch (AccountIsNotActiveException ex) {
+                return false;
+            }
         };
     }
 
@@ -331,6 +380,21 @@ class TransactionConcurrencyTests {
                 return true;
 
             } catch (YieldAlreadyAppliedException e) {
+                return false;
+            }
+        };
+    }
+
+    private Callable<Boolean> cancel(Account account) {
+        return () -> {
+            try {
+                accountService.cancel(
+                        account.getAccountNumber(),
+                        account.getDigit()
+                );
+
+                return true;
+            } catch (AccountHasBalanceException ex) {
                 return false;
             }
         };

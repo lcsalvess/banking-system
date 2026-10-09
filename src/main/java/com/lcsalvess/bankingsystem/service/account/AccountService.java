@@ -92,7 +92,7 @@ public class AccountService {
 
     @Transactional
     public void cancel(String accountNumber, String accountDigit) {
-        Account account = findEntityByAccountNumber(accountNumber, accountDigit);
+        Account account = findEntityByAccountNumberForUpdate(accountNumber, accountDigit);
 
         validateActiveAccount(account);
         validateAccountHasNoBalance(account);
@@ -157,6 +157,7 @@ public class AccountService {
                 .orElseThrow(() -> new AccountNotFoundException("Conta não encontrada."));
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
     public LockedAccounts lockAccountsForTransfer(
             String fromAccountNumber,
             String fromAccountDigit,

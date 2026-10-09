@@ -94,6 +94,101 @@ public class TransactionServiceTests {
     private TransactionService transactionService;
 
     @Nested
+    @DisplayName("findByAccountNumber(String, String)")
+    class FindByAccountNumber {
+
+        @Test
+        @DisplayName("Should return the account transactions")
+        void shouldReturnTheAccountTransactions() {
+            CheckingAccount account = account();
+            Transaction deposit = new Transaction(TransactionType.DEPOSIT, new BigDecimal("10.00"), CREATED_AT, account);
+            Transaction withdrawal = new Transaction(TransactionType.WITHDRAWAL, new BigDecimal("5.00"), CREATED_AT, account);
+
+            stubAccountLookup(account);
+            when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of(deposit, withdrawal));
+
+            List<TransactionResponseDTO> result = transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
+
+            assertEquals(List.of(response(deposit), response(withdrawal)), result);
+
+            verifyAccountLookup(account);
+            verify(transactionRepository).findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should return empty list when the account has no transactions")
+        void shouldReturnEmptyListWhenAccountHasNoTransactions() {
+            CheckingAccount account = account();
+
+            stubAccountLookup(account);
+            when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of());
+
+            List<TransactionResponseDTO> result = transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
+
+            assertEquals(List.of(), result);
+
+            verifyAccountLookup(account);
+            verify(transactionRepository).findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should throw when account does not exist")
+        void shouldThrowWhenAccountDoesNotExist() {
+            when(accountService.findEntityByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT))
+                    .thenThrow(new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE));
+
+            assertThrowsWithMessage(
+                    AccountNotFoundException.class,
+                    ACCOUNT_NOT_FOUND_MESSAGE,
+                    () -> transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT)
+            );
+
+            verify(accountService).findEntityByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
+            verifyNoMoreInteractionsOnMocks();
+        }
+    }
+
+    @Nested
+    @DisplayName("findByTransactionCode(UUID)")
+    class FindByTransactionCode {
+
+        @Test
+        @DisplayName("Should return the transaction when code exists")
+        void shouldReturnTheTransactionWhenCodeExists() {
+            Transaction transaction = new Transaction(TransactionType.DEPOSIT, OPERATION_AMOUNT, CREATED_AT, account());
+
+            when(transactionRepository.findByTransactionCode(transaction.getTransactionCode()))
+                    .thenReturn(Optional.of(transaction));
+
+            TransactionResponseDTO result = transactionService.findByTransactionCode(transaction.getTransactionCode());
+
+            assertEquals(response(transaction), result);
+
+            verify(transactionRepository).findByTransactionCode(transaction.getTransactionCode());
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should throw when transaction does not exist")
+        void shouldThrowWhenTransactionDoesNotExist() {
+            UUID transactionCode = UUID.randomUUID();
+
+            when(transactionRepository.findByTransactionCode(transactionCode)).thenReturn(Optional.empty());
+
+            assertThrowsWithMessage(
+                    TransactionNotFoundException.class,
+                    TRANSACTION_NOT_FOUND_MESSAGE,
+                    () -> transactionService.findByTransactionCode(transactionCode)
+            );
+
+            verify(transactionRepository).findByTransactionCode(transactionCode);
+            verifyNoMoreInteractionsOnMocks();
+        }
+    }
+
+    @Nested
     @DisplayName("deposit(AccountOperationRequestDTO)")
     class Deposit {
 
@@ -448,101 +543,6 @@ public class TransactionServiceTests {
     }
 
     @Nested
-    @DisplayName("findByAccountNumber(String, String)")
-    class FindByAccountNumber {
-
-        @Test
-        @DisplayName("Should return the account transactions")
-        void shouldReturnTheAccountTransactions() {
-            CheckingAccount account = account();
-            Transaction deposit = new Transaction(TransactionType.DEPOSIT, new BigDecimal("10.00"), CREATED_AT, account);
-            Transaction withdrawal = new Transaction(TransactionType.WITHDRAWAL, new BigDecimal("5.00"), CREATED_AT, account);
-
-            stubAccountLookup(account);
-            when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of(deposit, withdrawal));
-
-            List<TransactionResponseDTO> result = transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
-
-            assertEquals(List.of(response(deposit), response(withdrawal)), result);
-
-            verifyAccountLookup(account);
-            verify(transactionRepository).findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should return empty list when the account has no transactions")
-        void shouldReturnEmptyListWhenAccountHasNoTransactions() {
-            CheckingAccount account = account();
-
-            stubAccountLookup(account);
-            when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of());
-
-            List<TransactionResponseDTO> result = transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
-
-            assertEquals(List.of(), result);
-
-            verifyAccountLookup(account);
-            verify(transactionRepository).findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when account does not exist")
-        void shouldThrowWhenAccountDoesNotExist() {
-            when(accountService.findEntityByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT))
-                    .thenThrow(new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE));
-
-            assertThrowsWithMessage(
-                    AccountNotFoundException.class,
-                    ACCOUNT_NOT_FOUND_MESSAGE,
-                    () -> transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT)
-            );
-
-            verify(accountService).findEntityByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
-            verifyNoMoreInteractionsOnMocks();
-        }
-    }
-
-    @Nested
-    @DisplayName("findByTransactionCode(UUID)")
-    class FindByTransactionCode {
-
-        @Test
-        @DisplayName("Should return the transaction when code exists")
-        void shouldReturnTheTransactionWhenCodeExists() {
-            Transaction transaction = new Transaction(TransactionType.DEPOSIT, OPERATION_AMOUNT, CREATED_AT, account());
-
-            when(transactionRepository.findByTransactionCode(transaction.getTransactionCode()))
-                    .thenReturn(Optional.of(transaction));
-
-            TransactionResponseDTO result = transactionService.findByTransactionCode(transaction.getTransactionCode());
-
-            assertEquals(response(transaction), result);
-
-            verify(transactionRepository).findByTransactionCode(transaction.getTransactionCode());
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when transaction does not exist")
-        void shouldThrowWhenTransactionDoesNotExist() {
-            UUID transactionCode = UUID.randomUUID();
-
-            when(transactionRepository.findByTransactionCode(transactionCode)).thenReturn(Optional.empty());
-
-            assertThrowsWithMessage(
-                    TransactionNotFoundException.class,
-                    TRANSACTION_NOT_FOUND_MESSAGE,
-                    () -> transactionService.findByTransactionCode(transactionCode)
-            );
-
-            verify(transactionRepository).findByTransactionCode(transactionCode);
-            verifyNoMoreInteractionsOnMocks();
-        }
-    }
-
-    @Nested
     @DisplayName("applyYield(String, String)")
     class ApplyYield {
 
@@ -559,7 +559,7 @@ public class TransactionServiceTests {
             SavingsAccount account = eligibleSavingsAccount(balance);
             LocalDate today = LocalDate.now();
 
-            stubAccountLookup(account);
+            stubAccountOperationLookup(account);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             stubSaveReturningArgument();
 
@@ -572,7 +572,7 @@ public class TransactionServiceTests {
             ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
             ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
 
-            verifyAccountLookup(account);
+            verifyAccountOperationLookup(account);
             verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtBetween(
                     eq(SAVINGS_ID), eq(TransactionType.YIELD), startCaptor.capture(), endCaptor.capture()
             );
@@ -594,7 +594,7 @@ public class TransactionServiceTests {
         void shouldThrowWhenAccountIsNotSavings() {
             CheckingAccount account = account();
 
-            stubAccountLookup(account);
+            stubAccountOperationLookup(account);
 
             assertThrowsWithMessage(
                     AccountIsNotSavingsException.class,
@@ -602,7 +602,7 @@ public class TransactionServiceTests {
                     () -> transactionService.applyYield(ACCOUNT_NUMBER, ACCOUNT_DIGIT)
             );
 
-            verifyAccountLookup(account);
+            verifyAccountOperationLookup(account);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -612,7 +612,7 @@ public class TransactionServiceTests {
             SavingsAccount account = eligibleSavingsAccount("1000.00");
             account.cancel();
 
-            stubAccountLookup(account);
+            stubAccountOperationLookup(account);
 
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
@@ -622,7 +622,7 @@ public class TransactionServiceTests {
 
             assertBalance("1000.00", account);
 
-            verifyAccountLookup(account);
+            verifyAccountOperationLookup(account);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -632,7 +632,7 @@ public class TransactionServiceTests {
             LocalDate lastYieldDate = LocalDate.now().minusMonths(1);
             SavingsAccount account = savingsAccount("1000.00", lastYieldDate);
 
-            stubAccountLookup(account);
+            stubAccountOperationLookup(account);
             when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(
                     eq(SAVINGS_ID), eq(TransactionType.YIELD), any(), any()
             )).thenReturn(true);
@@ -646,7 +646,7 @@ public class TransactionServiceTests {
             assertBalance("1000.00", account);
             assertEquals(lastYieldDate, account.getLastYieldDate());
 
-            verifyAccountLookup(account);
+            verifyAccountOperationLookup(account);
             verifyYieldChecked();
             verifyNoMoreInteractionsOnMocks();
         }
@@ -657,7 +657,7 @@ public class TransactionServiceTests {
         void shouldThrowWhenAccountIsNotEligibleForYield(String scenario, LocalDate lastYieldDate) {
             SavingsAccount account = savingsAccount("1000.00", lastYieldDate);
 
-            stubAccountLookup(account);
+            stubAccountOperationLookup(account);
 
             assertThrowsWithMessage(
                     YieldNotAvailableException.class,
@@ -668,7 +668,7 @@ public class TransactionServiceTests {
             assertBalance("1000.00", account);
             assertEquals(lastYieldDate, account.getLastYieldDate());
 
-            verifyAccountLookup(account);
+            verifyAccountOperationLookup(account);
             verifyYieldChecked();
             verifyNoMoreInteractionsOnMocks();
         }
@@ -679,7 +679,7 @@ public class TransactionServiceTests {
         void shouldThrowWhenThereIsNoYieldAvailable(String scenario, String balance) {
             SavingsAccount account = eligibleSavingsAccount(balance);
 
-            stubAccountLookup(account);
+            stubAccountOperationLookup(account);
 
             assertThrowsWithMessage(
                     YieldNotAvailableException.class,
@@ -689,7 +689,7 @@ public class TransactionServiceTests {
 
             assertBalance(balance, account);
 
-            verifyAccountLookup(account);
+            verifyAccountOperationLookup(account);
             verifyYieldChecked();
             verifyNoMoreInteractionsOnMocks();
         }

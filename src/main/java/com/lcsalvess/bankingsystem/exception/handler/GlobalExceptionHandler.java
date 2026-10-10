@@ -134,12 +134,30 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     ));
         }
 
+        if (DatabaseConstraint.USER_USERNAME_UNIQUE.isViolatedBy(exception)) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(new ErrorResponse(
+                            HttpStatus.CONFLICT.value(),
+                            ApiErrorMessages.USERNAME_ALREADY_EXISTS
+                    ));
+        }
+
+        if (DatabaseConstraint.USER_EMAIL_UNIQUE.isViolatedBy(exception)) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(new ErrorResponse(
+                            HttpStatus.CONFLICT.value(),
+                            ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
+                    ));
+        }
+
         log.warn("Data integrity violation.", exception);
 
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
+                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
                         ApiErrorMessages.DATABASE_INTEGRITY_ERROR
                 ));
     }

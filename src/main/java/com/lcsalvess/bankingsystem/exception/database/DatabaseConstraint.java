@@ -10,6 +10,8 @@ import org.hibernate.exception.ConstraintViolationException;
  */
 public enum DatabaseConstraint {
 
+    USER_USERNAME_UNIQUE("uk_users_username"),
+    USER_EMAIL_UNIQUE("uk_users_email"),
     CLIENT_CPF_UNIQUE("uk_clients_cpf"),
     CLIENT_EMAIL_UNIQUE("uk_clients_email"),
     ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE("uk_accounts_client_type_active"),

@@ -7,7 +7,9 @@ import com.lcsalvess.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lcsalvess.bankingsystem.entity.Address;
 import com.lcsalvess.bankingsystem.entity.Client;
 import com.lcsalvess.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.client.ClientEmailAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
+import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
 import com.lcsalvess.bankingsystem.service.address.AddressData;
@@ -63,12 +65,16 @@ public class ClientService {
 
             return ClientResponseDTO.fromEntity(savedClient);
         } catch (DataIntegrityViolationException exception) {
-            // Corrida no CPF: o existsByCpf passou,
-            // mas outra requisição gravou antes.
-            // Só traduz se o CPF realmente já existe.
-            if (clientRepository.existsByCpf(dto.cpf())) {
+            if (DatabaseConstraint.CLIENT_CPF_UNIQUE.isViolatedBy(exception)) {
                 throw new ClientCpfAlreadyExistsException(
                         ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS,
+                        exception
+                );
+            }
+
+            if (DatabaseConstraint.CLIENT_EMAIL_UNIQUE.isViolatedBy(exception)) {
+                throw new ClientEmailAlreadyExistsException(
+                        ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS,
                         exception
                 );
             }

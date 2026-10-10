@@ -23,6 +23,7 @@ import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData.AddressUpdateData;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -311,7 +312,7 @@ public class ClientServiceTests {
 
             assertSame(exception, thrown);
 
-            verify(clientRepository, times(2)).existsByCpf(CPF);
+            verify(clientRepository).existsByCpf(CPF);
             verify(addressService).createFromPostalCode(request.address());
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).create(any(Client.class), eq(USERNAME));
@@ -324,8 +325,19 @@ public class ClientServiceTests {
         void shouldTranslateViolationWhenCpfWasTakenConcurrently() {
             ClientRequestDTO request = clientRequest();
             Address address = address();
+
+            ConstraintViolationException cause =
+                    new ConstraintViolationException(
+                            "Unique constraint violation",
+                            null,
+                            "uk_clients_cpf"
+                    );
+
             DataIntegrityViolationException exception =
-                    new DataIntegrityViolationException("uk_client_cpf");
+                    new DataIntegrityViolationException(
+                            "Could not persist client",
+                            cause
+                    );
 
             when(clientRepository.existsByCpf(CPF)).thenReturn(false, true);
             when(addressService.createFromPostalCode(request.address())).thenReturn(address);
@@ -339,7 +351,7 @@ public class ClientServiceTests {
                     () -> clientService.create(request)
             );
 
-            verify(clientRepository, times(2)).existsByCpf(CPF);
+            verify(clientRepository).existsByCpf(CPF);
             verify(addressService).createFromPostalCode(request.address());
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).create(any(Client.class), eq(USERNAME));

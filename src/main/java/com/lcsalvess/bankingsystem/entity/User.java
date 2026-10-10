@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.entity;
 
 import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.util.EmailNormalizer;
 import jakarta.persistence.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -17,10 +18,6 @@ import java.util.List;
                 @UniqueConstraint(
                         name = "uk_users_username",
                         columnNames = "username"
-                ),
-                @UniqueConstraint(
-                        name = "uk_users_email",
-                        columnNames = "email"
                 )
         }
 )
@@ -68,7 +65,7 @@ public class User implements UserDetails {
 
     public User(String username, String email, String password, Role role) {
         this.username = username;
-        this.email = email;
+        this.email = EmailNormalizer.normalize(email);
         this.password = password;
         this.role = role;
     }
@@ -122,7 +119,7 @@ public class User implements UserDetails {
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.email = EmailNormalizer.normalize(email);
     }
 
     public void setPassword(String password) {

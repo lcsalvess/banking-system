@@ -1,12 +1,12 @@
 package com.lcsalvess.bankingsystem.entity;
 
+import com.lcsalvess.bankingsystem.util.EmailNormalizer;
 import jakarta.persistence.*;
 
 @Entity
 @Table(name = "clients",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_clients_cpf", columnNames = "cpf"),
-                @UniqueConstraint(name = "uk_clients_email", columnNames = "email"),
                 @UniqueConstraint(name = "uk_clients_address", columnNames = "address_id")
         })
 public class Client {
@@ -32,7 +32,7 @@ public class Client {
     public Client(String name, String cpf, String email, String phoneNumber, Address address) {
         this.name = name;
         this.cpf = cpf;
-        this.email = email;
+        this.email = EmailNormalizer.normalize(email);
         this.phoneNumber = phoneNumber;
         this.address = address;
     }
@@ -40,7 +40,7 @@ public class Client {
     public void update(String name, String email, String phoneNumber) {
         if (name != null) {this.name = name;}
 
-        if (email != null) {this.email = email;}
+        if (email != null) {this.email = EmailNormalizer.normalize(email);}
 
         if (phoneNumber != null) {this.phoneNumber = phoneNumber;}
     }

@@ -4,16 +4,14 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.entity.*;
 import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
+import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.entity.enums.State;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.exception.account.AccountHasBalanceException;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
-import com.lcsalvess.bankingsystem.repository.AccountRepository;
-import com.lcsalvess.bankingsystem.repository.AddressRepository;
-import com.lcsalvess.bankingsystem.repository.ClientRepository;
-import com.lcsalvess.bankingsystem.repository.TransactionRepository;
+import com.lcsalvess.bankingsystem.repository.*;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
@@ -77,6 +75,9 @@ class TransactionConcurrencyTests {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @MockitoBean
     private CurrentUserService currentUserService;
 
@@ -88,10 +89,21 @@ class TransactionConcurrencyTests {
         accountRepository.deleteAll();
         clientRepository.deleteAll();
         addressRepository.deleteAll();
+        userRepository.deleteAll();
 
         clientSequence = 0;
 
-        when(currentUserService.getUsername()).thenReturn("test-user");
+        User testUser = userRepository.saveAndFlush(
+                new User(
+                        "test-user",
+                        "test-user@test.com",
+                        "test-password",
+                        Role.EMPLOYEE
+                )
+        );
+
+        when(currentUserService.getCurrentUser()).thenReturn(testUser);
+        when(currentUserService.getUsername()).thenReturn(testUser.getUsername());
     }
 
     @Nested

@@ -3,10 +3,8 @@ package com.lcsalvess.bankingsystem.unit.service.transaction;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
-import com.lcsalvess.bankingsystem.entity.Account;
-import com.lcsalvess.bankingsystem.entity.CheckingAccount;
-import com.lcsalvess.bankingsystem.entity.SavingsAccount;
-import com.lcsalvess.bankingsystem.entity.Transaction;
+import com.lcsalvess.bankingsystem.entity.*;
+import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
@@ -54,6 +52,12 @@ public class TransactionServiceTests {
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.service.transaction.TransactionServiceTests#";
 
     private static final String USERNAME = "usuario.teste";
+    private static final User TEST_USER = new User(
+            USERNAME,
+            "usuario.teste@test.com",
+            "test-password",
+            Role.EMPLOYEE
+    );
 
     private static final String ACCOUNT_NUMBER = "00001";
     private static final String ACCOUNT_DIGIT = "9";
@@ -91,8 +95,8 @@ public class TransactionServiceTests {
         @DisplayName("Should return the account transactions")
         void shouldReturnTheAccountTransactions() {
             CheckingAccount account = account();
-            Transaction deposit = new Transaction(TransactionType.DEPOSIT, new BigDecimal("10.00"), CREATED_AT, account);
-            Transaction withdrawal = new Transaction(TransactionType.WITHDRAWAL, new BigDecimal("5.00"), CREATED_AT, account);
+            Transaction deposit = new Transaction(TransactionType.DEPOSIT, new BigDecimal("10.00"), CREATED_AT, account, TEST_USER);
+            Transaction withdrawal = new Transaction(TransactionType.WITHDRAWAL, new BigDecimal("5.00"), CREATED_AT, account, TEST_USER);
 
             stubAccountLookup(account);
             when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of(deposit, withdrawal));
@@ -147,7 +151,7 @@ public class TransactionServiceTests {
         @Test
         @DisplayName("Should return the transaction when code exists")
         void shouldReturnTheTransactionWhenCodeExists() {
-            Transaction transaction = new Transaction(TransactionType.DEPOSIT, OPERATION_AMOUNT, CREATED_AT, account());
+            Transaction transaction = new Transaction(TransactionType.DEPOSIT, OPERATION_AMOUNT, CREATED_AT, account(), TEST_USER);
 
             when(transactionRepository.findByTransactionCode(transaction.getTransactionCode()))
                     .thenReturn(Optional.of(transaction));
@@ -189,7 +193,7 @@ public class TransactionServiceTests {
             AccountOperationRequestDTO request = operationRequest(OPERATION_AMOUNT);
 
             stubAccountOperationLookup(account);
-            when(currentUserService.getUsername()).thenReturn(USERNAME);
+            when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
             TransactionResponseDTO result = transactionService.deposit(request);
@@ -199,7 +203,7 @@ public class TransactionServiceTests {
             ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
 
             verifyAccountOperationLookup(account);
-            verify(currentUserService).getUsername();
+            verify(currentUserService).getCurrentUser();
             verify(transactionRepository).save(transactionCaptor.capture());
             verify(eventPublisher).publishEvent(
                     new TransactionOperationEvent(TransactionType.DEPOSIT, ACCOUNT_NUMBER, OPERATION_AMOUNT, USERNAME)
@@ -262,7 +266,7 @@ public class TransactionServiceTests {
             CheckingAccount account = account();
 
             stubAccountOperationLookup(account);
-            when(currentUserService.getUsername()).thenReturn(USERNAME);
+            when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
             TransactionResponseDTO result = transactionService.withdraw(operationRequest(amount));
@@ -272,7 +276,7 @@ public class TransactionServiceTests {
             ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
 
             verifyAccountOperationLookup(account);
-            verify(currentUserService).getUsername();
+            verify(currentUserService).getCurrentUser();
             verify(transactionRepository).save(transactionCaptor.capture());
             verify(eventPublisher).publishEvent(
                     new TransactionOperationEvent(TransactionType.WITHDRAWAL, ACCOUNT_NUMBER, amount, USERNAME)
@@ -361,7 +365,7 @@ public class TransactionServiceTests {
             CheckingAccount destination = destinationAccount();
 
             stubTransferAccountLookup(source, destination);
-            when(currentUserService.getUsername()).thenReturn(USERNAME);
+            when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
             TransactionResponseDTO result = transactionService.transfer(transferRequest(amount));
@@ -372,7 +376,7 @@ public class TransactionServiceTests {
             ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
 
             verifyTransferAccountLookup(source, destination);
-            verify(currentUserService).getUsername();
+            verify(currentUserService).getCurrentUser();
             verify(transactionRepository, times(2)).save(transactionCaptor.capture());
             verify(eventPublisher).publishEvent(new TransactionTransferEvent(
                     TransactionType.TRANSFER_SENT, ACCOUNT_NUMBER, DESTINATION_NUMBER, amount, USERNAME
@@ -550,7 +554,7 @@ public class TransactionServiceTests {
             LocalDate today = LocalDate.now();
 
             stubAccountOperationLookup(account);
-            when(currentUserService.getUsername()).thenReturn(USERNAME);
+            when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
             TransactionResponseDTO result = transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT);
@@ -566,7 +570,7 @@ public class TransactionServiceTests {
             verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtBetween(
                     eq(SAVINGS_ID), eq(TransactionType.YIELD), startCaptor.capture(), endCaptor.capture()
             );
-            verify(currentUserService).getUsername();
+            verify(currentUserService).getCurrentUser();
             verify(transactionRepository).save(transactionCaptor.capture());
             verify(eventPublisher).publishEvent(new TransactionOperationEvent(
                     TransactionType.YIELD, SAVINGS_NUMBER, new BigDecimal(expectedYield), USERNAME
@@ -826,6 +830,7 @@ public class TransactionServiceTests {
         assertEquals(type, transaction.getType());
         assertEquals(0, amount.compareTo(transaction.getAmount()));
         assertSame(account, transaction.getAccount());
+        assertSame(TEST_USER, transaction.getPerformedBy());
     }
 
     private static TransactionResponseDTO response(Transaction transaction) {

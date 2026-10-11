@@ -44,25 +44,47 @@ public class Transaction {
     @JoinColumn(name = "account_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_transactions_account"))
     private Account account;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "performed_by_user_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_transactions_performed_by_user")
+    )
+    private User performedBy;
 
     public Transaction() {
     }
 
-    public Transaction(TransactionType type, BigDecimal amount, LocalDateTime createdAt, Account account) {
+    public Transaction(
+            TransactionType type,
+            BigDecimal amount,
+            LocalDateTime createdAt,
+            Account account,
+            User performedBy
+    ) {
         this.transactionCode = UUID.randomUUID();
         this.type = type;
         this.amount = amount;
         this.createdAt = createdAt;
         this.account = account;
+        this.performedBy = performedBy;
     }
 
-    public Transaction(TransactionType type, BigDecimal amount, LocalDateTime createdAt, Account account, UUID transferCode) {
+    public Transaction(
+            TransactionType type,
+            BigDecimal amount,
+            LocalDateTime createdAt,
+            Account account,
+            UUID transferCode,
+            User performedBy
+    ) {
         this.transactionCode = UUID.randomUUID();
         this.transferCode = transferCode;
         this.type = type;
         this.amount = amount;
         this.createdAt = createdAt;
         this.account = account;
+        this.performedBy = performedBy;
     }
 
     public Long getId() {
@@ -91,5 +113,9 @@ public class Transaction {
 
     public Account getAccount() {
         return account;
+    }
+
+    public User getPerformedBy() {
+        return performedBy;
     }
 }

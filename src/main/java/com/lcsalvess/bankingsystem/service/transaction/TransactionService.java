@@ -6,6 +6,7 @@ import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.Account;
 import com.lcsalvess.bankingsystem.entity.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.Transaction;
+import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
@@ -70,11 +71,17 @@ public class TransactionService {
         validateActiveAccount(account);
         validateAmount(dto.amount());
 
-        String username = getCurrentUsername();
+        User performedBy = currentUserService.getCurrentUser();
+        String username = performedBy.getUsername();
 
         account.credit(dto.amount());
 
-        Transaction transaction = registerTransaction(TransactionType.DEPOSIT, dto.amount(), account);
+        Transaction transaction = registerTransaction(
+                TransactionType.DEPOSIT,
+                dto.amount(),
+                account,
+                performedBy
+        );
         eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount(), username));
 
         return TransactionResponseDTO.fromEntity(transaction);
@@ -88,11 +95,17 @@ public class TransactionService {
         validateAmount(dto.amount());
         validateBalance(account, dto.amount());
 
-        String username = getCurrentUsername();
+        User performedBy = currentUserService.getCurrentUser();
+        String username = performedBy.getUsername();
 
         account.debit(dto.amount());
 
-        Transaction transaction = registerTransaction(TransactionType.WITHDRAWAL, dto.amount(), account);
+        Transaction transaction = registerTransaction(
+                TransactionType.WITHDRAWAL,
+                dto.amount(),
+                account,
+                performedBy
+        );
         eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.WITHDRAWAL, account.getAccountNumber(), dto.amount(), username));
 
         return TransactionResponseDTO.fromEntity(transaction);
@@ -121,7 +134,8 @@ public class TransactionService {
         validateAmount(dto.amount());
         validateBalance(fromAccount, dto.amount());
 
-        String username = getCurrentUsername();
+        User performedBy = currentUserService.getCurrentUser();
+        String username = performedBy.getUsername();
 
         fromAccount.debit(dto.amount());
         toAccount.credit(dto.amount());
@@ -133,14 +147,16 @@ public class TransactionService {
                         TransactionType.TRANSFER_SENT,
                         dto.amount(),
                         fromAccount,
-                        transferCode
+                        transferCode,
+                        performedBy
                 );
 
         registerTransferTransaction(
                 TransactionType.TRANSFER_RECEIVED,
                 dto.amount(),
                 toAccount,
-                transferCode
+                transferCode,
+                performedBy
         );
 
         eventPublisher.publishEvent(
@@ -168,12 +184,13 @@ public class TransactionService {
         BigDecimal yieldAmount = savingsAccount.calculateYield();
         validateYieldAvailable(savingsAccount, yieldAmount);
 
-        String username = getCurrentUsername();
+        User performedBy = currentUserService.getCurrentUser();
+        String username = performedBy.getUsername();
 
         savingsAccount.credit(yieldAmount);
         savingsAccount.updateLastYieldDate();
 
-        Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount);
+        Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount, performedBy);
         eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.YIELD, savingsAccount.getAccountNumber(), yieldAmount, username));
 
         return TransactionResponseDTO.fromEntity(transaction);
@@ -228,8 +245,8 @@ public class TransactionService {
         }
     }
 
-    private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account) {
-        Transaction transaction = new Transaction(type, amount, LocalDateTime.now(), account);
+    private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account, User performedBy) {
+        Transaction transaction = new Transaction(type, amount, LocalDateTime.now(), account, performedBy);
         return transactionRepository.save(transaction);
     }
 
@@ -237,7 +254,8 @@ public class TransactionService {
             TransactionType type,
             BigDecimal amount,
             Account account,
-            UUID transferCode
+            UUID transferCode,
+            User performedBy
     ) {
         Transaction transaction =
                 new Transaction(
@@ -245,14 +263,10 @@ public class TransactionService {
                         amount,
                         LocalDateTime.now(),
                         account,
-                        transferCode
+                        transferCode,
+                        performedBy
                 );
 
         return transactionRepository.save(transaction);
-    }
-
-
-    private String getCurrentUsername() {
-        return currentUserService.getUsername();
     }
 }

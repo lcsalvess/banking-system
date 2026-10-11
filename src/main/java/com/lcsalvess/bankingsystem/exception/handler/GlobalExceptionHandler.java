@@ -1,7 +1,6 @@
 package com.lcsalvess.bankingsystem.exception.handler;
 
-import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
-import com.lcsalvess.bankingsystem.dto.response.exception.ValidationErrorResponse;
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
@@ -13,14 +12,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -28,9 +30,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
@@ -41,10 +46,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public ErrorResponse handleBadCredentials() {
+    public ApiErrorResponse handleBadCredentials() {
         log.warn("Authentication failed: invalid credentials.");
 
-        return new ErrorResponse(
+        return new ApiErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
                 ApiErrorMessages.INVALID_CREDENTIALS
         );
@@ -52,15 +57,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(AuthenticationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public ErrorResponse handleAuthenticationException(
+    public ApiErrorResponse handleAuthenticationException(
             AuthenticationException exception) {
 
         log.warn(
                 "Authentication failed: exceptionType={}",
                 exception.getClass().getSimpleName()
-                );
+        );
 
-        return new ErrorResponse(
+        return new ApiErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
                 ApiErrorMessages.AUTHENTICATION_FAILED
         );
@@ -68,12 +73,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     //-------------- AUTORIZAÇÃO ---------
 
-    @ExceptionHandler(AuthorizationDeniedException.class)
+    @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
-    public ErrorResponse handleAuthorizationDenied() {
+    public ApiErrorResponse handleAuthorizationDenied() {
         log.warn("Access denied: user is not authorized to perform the operation.");
 
-        return new ErrorResponse(
+        return new ApiErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
                 ApiErrorMessages.ACCESS_DENIED_RESOURCE
         );
@@ -82,10 +87,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     //-------------- REGRAS DE NEGÓCIO ---------
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(
+    public ResponseEntity<ApiErrorResponse> handleBusinessException(
             BusinessException exception) {
 
-        ErrorResponse error = new ErrorResponse(
+        ApiErrorResponse error = new ApiErrorResponse(
                 exception.getStatus().value(),
                 exception.getMessage()
         );
@@ -104,84 +109,67 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     //-------------- INTEGRIDADE DE DADOS ---------
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
             DataIntegrityViolationException exception) {
 
-        if (DatabaseConstraint.CLIENT_EMAIL_UNIQUE.isViolatedBy(exception)) {
-            return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
-                    .body(new ErrorResponse(
-                            HttpStatus.CONFLICT.value(),
-                            ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS
-                    ));
-        }
+        for (Map.Entry<DatabaseConstraint, String> entry
+                : CONSTRAINT_ERROR_MESSAGES.entrySet()) {
 
-        if (DatabaseConstraint.CLIENT_CPF_UNIQUE.isViolatedBy(exception)) {
-            return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
-                    .body(new ErrorResponse(
-                            HttpStatus.CONFLICT.value(),
-                            ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS
-                    ));
-        }
-
-        if (DatabaseConstraint.TRANSACTION_DAILY_YIELD_UNIQUE.isViolatedBy(exception)) {
-            return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
-                    .body(new ErrorResponse(
-                            HttpStatus.CONFLICT.value(),
-                            ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED
-                    ));
-        }
-
-        if (DatabaseConstraint.USER_USERNAME_UNIQUE.isViolatedBy(exception)) {
-            return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
-                    .body(new ErrorResponse(
-                            HttpStatus.CONFLICT.value(),
-                            ApiErrorMessages.USERNAME_ALREADY_EXISTS
-                    ));
-        }
-
-        if (DatabaseConstraint.USER_EMAIL_UNIQUE.isViolatedBy(exception)) {
-            return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
-                    .body(new ErrorResponse(
-                            HttpStatus.CONFLICT.value(),
-                            ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
-                    ));
+            if (entry.getKey().isViolatedBy(exception)) {
+                return ResponseEntity
+                        .status(HttpStatus.CONFLICT)
+                        .body(new ApiErrorResponse(
+                                HttpStatus.CONFLICT.value(),
+                                entry.getValue()
+                        ));
+            }
         }
 
         log.warn("Data integrity violation.", exception);
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse(
+                .body(new ApiErrorResponse(
                         HttpStatus.INTERNAL_SERVER_ERROR.value(),
                         ApiErrorMessages.DATABASE_INTEGRITY_ERROR
                 ));
     }
 
+
     //-------------- VALIDAÇÃO / REQUISIÇÃO ---------
+
 
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ValidationErrorResponse handleConstraintViolation(
+    public ApiErrorResponse handleConstraintViolation(
             ConstraintViolationException exception) {
 
-        Map<String, String> errors = new HashMap<>();
+        Map<String, String> errors = new LinkedHashMap<>();
+        Set<String> requiredFields = new HashSet<>();
 
         exception.getConstraintViolations().forEach(violation -> {
-            String field = violation.getPropertyPath()
-                    .toString()
-                    .substring(
-                            violation.getPropertyPath().toString().lastIndexOf('.') + 1
-                    );
+            String propertyPath = violation.getPropertyPath().toString();
 
-            errors.put(field, violation.getMessage());
+            String field = propertyPath.substring(
+                    propertyPath.lastIndexOf('.') + 1
+            );
+
+            String code = violation.getConstraintDescriptor()
+                    .getAnnotation()
+                    .annotationType()
+                    .getSimpleName();
+
+            String message = violation.getMessage();
+
+            if (isRequiredValidation(code)) {
+                errors.put(field, message);
+                requiredFields.add(field);
+            } else if (!requiredFields.contains(field)) {
+                addValidationError(errors, field, message);
+            }
         });
 
-        return new ValidationErrorResponse(
+        return new ApiErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 ApiErrorMessages.VALIDATION_ERROR,
                 errors
@@ -192,42 +180,55 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected @Nullable ResponseEntity<Object> handleHttpMessageNotReadable(
             @NonNull HttpMessageNotReadableException ex,
             @NonNull HttpHeaders headers,
-            HttpStatusCode status,
+            @NonNull HttpStatusCode status,
             @NonNull WebRequest request) {
 
-        ErrorResponse error = new ErrorResponse(
-                status.value(),
-                ApiErrorMessages.INVALID_REQUEST_DATA
-        );
-
-        return handleExceptionInternal(
+        return buildErrorResponse(
                 ex,
-                error,
                 headers,
                 status,
-                request
+                request,
+                ApiErrorMessages.INVALID_REQUEST_DATA
         );
     }
 
+
     @Override
-    protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex,
             @NonNull HttpHeaders headers,
             HttpStatusCode status,
-            @NonNull WebRequest request) {
+            @NonNull WebRequest request
+    ) {
+        Map<String, String> errors = new LinkedHashMap<>();
 
-        Map<String, String> errors = new HashMap<>();
+        Set<String> requiredFields = new HashSet<>();
 
-        ex.getBindingResult()
-                .getFieldErrors()
-                .forEach(error ->
-                        errors.put(
-                                error.getField(),
-                                error.getDefaultMessage()
-                        )
-                );
+        ex.getBindingResult().getFieldErrors().forEach(error -> {
+            String field = error.getField();
+            String message = error.getDefaultMessage() != null
+                    ? error.getDefaultMessage()
+                    : "Valor inválido";
 
-        ValidationErrorResponse response = new ValidationErrorResponse(
+            if (isRequiredValidation(error.getCode())) {
+                errors.put(field, message);
+                requiredFields.add(field);
+            } else if (!requiredFields.contains(field)) {
+                addValidationError(errors, field, message);
+            }
+        });
+
+        ex.getBindingResult().getGlobalErrors().forEach(error ->
+                addValidationError(
+                        errors,
+                        error.getObjectName(),
+                        error.getDefaultMessage() != null
+                                ? error.getDefaultMessage()
+                                : "Objeto inválido"
+                )
+        );
+
+        ApiErrorResponse body = new ApiErrorResponse(
                 status.value(),
                 ApiErrorMessages.VALIDATION_ERROR,
                 errors
@@ -235,7 +236,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         return handleExceptionInternal(
                 ex,
-                response,
+                body,
                 headers,
                 status,
                 request
@@ -246,20 +247,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected @Nullable ResponseEntity<Object> handleMissingServletRequestParameter(
             @NonNull MissingServletRequestParameterException ex,
             @NonNull HttpHeaders headers,
-            HttpStatusCode status,
+            @NonNull HttpStatusCode status,
             @NonNull WebRequest request) {
 
-        ErrorResponse error = new ErrorResponse(
-                status.value(),
-                ApiErrorMessages.MISSING_REQUIRED_PARAMETER
-        );
-
-        return handleExceptionInternal(
+        return buildErrorResponse(
                 ex,
-                error,
                 headers,
                 status,
-                request
+                request,
+                ApiErrorMessages.MISSING_REQUIRED_PARAMETER
         );
     }
 
@@ -267,12 +263,123 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected @Nullable ResponseEntity<Object> handleTypeMismatch(
             @NonNull TypeMismatchException ex,
             @NonNull HttpHeaders headers,
-            HttpStatusCode status,
+            @NonNull HttpStatusCode status,
             @NonNull WebRequest request) {
 
-        ErrorResponse error = new ErrorResponse(
-                status.value(),
+        return buildErrorResponse(
+                ex,
+                headers,
+                status,
+                request,
                 ApiErrorMessages.INVALID_REQUEST_PARAMETER
+        );
+    }
+
+    @Override
+    protected @Nullable ResponseEntity<Object> handleNoResourceFoundException(
+            @NonNull NoResourceFoundException ex,
+            @NonNull HttpHeaders headers,
+            @NonNull HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        return buildErrorResponse(
+                ex,
+                headers,
+                status,
+                request,
+                ApiErrorMessages.RESOURCE_NOT_FOUND
+        );
+    }
+
+    @Override
+    protected @Nullable ResponseEntity<Object> handleHttpRequestMethodNotSupported(
+            @NonNull HttpRequestMethodNotSupportedException ex,
+            @NonNull HttpHeaders headers,
+            @NonNull HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        ApiErrorResponse error = new ApiErrorResponse(
+                status.value(),
+                ApiErrorMessages.METHOD_NOT_ALLOWED
+        );
+
+        return handleExceptionInternal(
+                ex, error, headers, status, request
+        );
+    }
+
+    @Override
+    protected @Nullable ResponseEntity<Object> handleHttpMediaTypeNotSupported(
+            @NonNull HttpMediaTypeNotSupportedException ex,
+            @NonNull HttpHeaders headers,
+            @NonNull HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        return buildErrorResponse(
+                ex,
+                headers,
+                status,
+                request,
+                ApiErrorMessages.UNSUPPORTED_MEDIA_TYPE
+        );
+    }
+
+    //-------------- INFRAESTRUTURA ---------
+
+    @ExceptionHandler(AddressProviderUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ApiErrorResponse handleAddressProviderUnavailable(
+            AddressProviderUnavailableException ex) {
+
+        log.error("Address lookup provider unavailable.", ex);
+
+        return new ApiErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
+        );
+    }
+
+
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ApiErrorResponse handlePessimisticLockingFailure(
+            PessimisticLockingFailureException exception) {
+
+        log.warn("Could not acquire database lock.", exception);
+
+        return new ApiErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE
+        );
+    }
+
+
+    //-------------- EXCEÇÕES INESPERADAS ---------
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiErrorResponse handleUnexpectedException(Exception exception) {
+
+        log.error("Unexpected error while processing request.", exception);
+
+        return new ApiErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                ApiErrorMessages.INTERNAL_SERVER_ERROR
+        );
+    }
+
+        //-------------- MÉTODOS AUXILIARES ---------
+
+    private @Nullable ResponseEntity<Object> buildErrorResponse(
+            Exception ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request,
+            String message) {
+
+        ApiErrorResponse error = new ApiErrorResponse(
+                status.value(),
+                message
         );
 
         return handleExceptionInternal(
@@ -284,33 +391,32 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         );
     }
 
-    //-------------- INFRAESTRUTURA ---------
+    private static final Map<DatabaseConstraint, String> CONSTRAINT_ERROR_MESSAGES = Map.of(
+            DatabaseConstraint.CLIENT_EMAIL_UNIQUE,
+            ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS,
 
-    @ExceptionHandler(AddressProviderUnavailableException.class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public ErrorResponse handleAddressProviderUnavailable(
-            AddressProviderUnavailableException ex) {
+            DatabaseConstraint.CLIENT_CPF_UNIQUE,
+            ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS,
 
-        log.error("Address lookup provider unavailable.", ex);
+            DatabaseConstraint.TRANSACTION_DAILY_YIELD_UNIQUE,
+            ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED,
 
-        return new ErrorResponse(
-                HttpStatus.SERVICE_UNAVAILABLE.value(),
-                ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
-        );
+            DatabaseConstraint.USER_USERNAME_UNIQUE,
+            ApiErrorMessages.USERNAME_ALREADY_EXISTS,
+
+            DatabaseConstraint.USER_EMAIL_UNIQUE,
+            ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
+    );
+
+    private void addValidationError(
+            Map<String, String> errors,
+            String field,
+            String message
+    ) {
+        errors.merge(field, message, (existing, next) -> existing + "; " + next);
     }
 
-    //-------------- EXCEÇÕES INESPERADAS ---------
-
-    @ExceptionHandler(RuntimeException.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ErrorResponse handleUnexpectedRuntimeException(
-            RuntimeException exception) {
-
-        log.error("Unexpected error while processing request.", exception);
-
-        return new ErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                ApiErrorMessages.INTERNAL_SERVER_ERROR
-        );
+    private boolean isRequiredValidation(String code) {
+        return Set.of("NotBlank", "NotNull", "NotEmpty").contains(code);
     }
 }

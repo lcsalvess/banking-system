@@ -4,8 +4,7 @@ import com.lcsalvess.bankingsystem.dto.request.ClientRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.ClientResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.ClientSummaryResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
-import com.lcsalvess.bankingsystem.dto.response.exception.ValidationErrorResponse;
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -50,10 +49,7 @@ public class ClientController {
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(
-                                    oneOf = {
-                                            ErrorResponse.class,
-                                            ValidationErrorResponse.class
-                                    }
+                                    implementation = ApiErrorResponse.class
                             )
                     )
             ),
@@ -62,7 +58,7 @@ public class ClientController {
                     description = "CPF already registered",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             )
     })
@@ -112,7 +108,7 @@ public class ClientController {
                     description = "Invalid client ID format",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -120,7 +116,7 @@ public class ClientController {
                     description = "Client not found",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             )
     })
@@ -154,10 +150,7 @@ public class ClientController {
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(
-                                    oneOf = {
-                                            ErrorResponse.class,
-                                            ValidationErrorResponse.class
-                                    }
+                                  implementation = ApiErrorResponse.class
                             )
                     )
             ),
@@ -166,7 +159,7 @@ public class ClientController {
                     description = "Client not found",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             )
     })

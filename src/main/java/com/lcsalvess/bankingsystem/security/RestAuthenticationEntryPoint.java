@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.security;
 
-import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,7 +29,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             AuthenticationException exception
     ) throws IOException {
 
-        ErrorResponse errorResponse = new ErrorResponse(
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
                 HttpServletResponse.SC_UNAUTHORIZED,
                 ApiErrorMessages.AUTHENTICATION_FAILED
         );

@@ -2,7 +2,7 @@ package com.lcsalvess.bankingsystem.controller;
 
 import com.lcsalvess.bankingsystem.dto.request.AccountRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.AccountResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
@@ -71,7 +71,7 @@ public class AccountController {
                     description =  "Invalid account number or check digit",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -79,7 +79,7 @@ public class AccountController {
                     description = "Account not found",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             )
     })
@@ -123,7 +123,7 @@ public class AccountController {
                     description = "Invalid account data or request format",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -131,7 +131,7 @@ public class AccountController {
                     description = "Account already exists",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             )
     })
@@ -155,7 +155,7 @@ public class AccountController {
                     description = "Invalid account number or check digit",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -163,7 +163,7 @@ public class AccountController {
                     description = "Account not found",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -171,7 +171,7 @@ public class AccountController {
                     description = "Account already cancelled",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             )
     })

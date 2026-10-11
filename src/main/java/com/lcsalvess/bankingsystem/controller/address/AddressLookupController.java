@@ -1,8 +1,7 @@
 package com.lcsalvess.bankingsystem.controller.address;
 
 import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
-import com.lcsalvess.bankingsystem.dto.response.exception.ValidationErrorResponse;
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.service.address.AddressService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -49,7 +48,7 @@ public class AddressLookupController {
                     description = "Invalid postal code. It must contain exactly 8 digits.",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ValidationErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -57,7 +56,7 @@ public class AddressLookupController {
                     description = "Address providers are unavailable.",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
+                            schema = @Schema(implementation = ApiErrorResponse.class)
                     )
             )
     })

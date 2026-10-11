@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.security;
 
-import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -57,7 +57,7 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
                 exception.getClass().getSimpleName()
         );
 
-        ErrorResponse errorResponse = new ErrorResponse(
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
                 HttpServletResponse.SC_FORBIDDEN,
                 ApiErrorMessages.ACCESS_DENIED_RESOURCE
         );

@@ -3,7 +3,9 @@ package com.lcsalvess.bankingsystem.config;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.media.*;
+import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.MediaType;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
@@ -12,7 +14,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 
 @Configuration
 public class OpenApiConfig {
@@ -46,11 +47,6 @@ public class OpenApiConfig {
                 openApi.getComponents().setSchemas(new LinkedHashMap<>());
             }
 
-            openApi.getComponents().addSchemas(
-                    "ProblemDetail",
-                    problemDetailSchema()
-            );
-
             openApi.getPaths().values().forEach(pathItem ->
                     pathItem.readOperations().forEach(operation -> {
                         addResponseIfAbsent(
@@ -71,21 +67,21 @@ public class OpenApiConfig {
                                 operation,
                                 "404",
                                 "Not Found - The requested resource was not found.",
-                                notFoundContent()
+                                errorContent()
                         );
 
                         addResponseIfAbsent(
                                 operation,
                                 "405",
                                 "Method Not Allowed - The HTTP method is not supported.",
-                                problemDetailContent()
+                                errorContent()
                         );
 
                         addResponseIfAbsent(
                                 operation,
                                 "415",
                                 "Unsupported Media Type - The request content type is not supported.",
-                                problemDetailContent()
+                                errorContent()
                         );
 
                         addResponseIfAbsent(
@@ -94,8 +90,12 @@ public class OpenApiConfig {
                                 "Unexpected internal server error.",
                                 errorContent()
                         );
+
                         operation.getResponses().get("401").setContent(errorContent());
                         operation.getResponses().get("403").setContent(errorContent());
+                        operation.getResponses().get("404").setContent(errorContent());
+                        operation.getResponses().get("405").setContent(errorContent());
+                        operation.getResponses().get("415").setContent(errorContent());
                         operation.getResponses().get("500").setContent(errorContent());
                     })
             );
@@ -125,51 +125,13 @@ public class OpenApiConfig {
         }
     }
 
-    private Schema<?> problemDetailSchema() {
-        return new Schema<>()
-                .type("object")
-                .addProperty("type", new StringSchema().format("uri"))
-                .addProperty("title", new StringSchema())
-                .addProperty("status", new IntegerSchema().format("int32"))
-                .addProperty("detail", new StringSchema())
-                .addProperty("instance", new StringSchema().format("uri"));
-    }
-
-    private Content notFoundContent() {
-        return new Content()
-                .addMediaType(
-                        "application/json",
-                        new MediaType()
-                                .schema(new Schema<>()
-                                        .oneOf(List.of(
-                                                new Schema<>().$ref(
-                                                        "#/components/schemas/ErrorResponse"
-                                                ),
-                                                new Schema<>().$ref(
-                                                        "#/components/schemas/ProblemDetail"
-                                                )
-                                        ))
-                                )
-                );
-    }
-
-    private Content problemDetailContent() {
-        return new Content()
-                .addMediaType(
-                        "application/problem+json",
-                        new MediaType()
-                                .schema(new Schema<>()
-                                        .$ref("#/components/schemas/ProblemDetail"))
-                );
-    }
-
     private Content errorContent() {
         return new Content()
                 .addMediaType(
                         "application/json",
                         new MediaType()
                                 .schema(new Schema<>()
-                                        .$ref("#/components/schemas/ErrorResponse"))
+                                        .$ref("#/components/schemas/ApiErrorResponse"))
                 );
     }
 }

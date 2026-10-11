@@ -38,7 +38,7 @@ public final class ApiErrorMessages {
     public static final String ADDRESS_PROVIDER_INVALID_RESPONSE =
             "O serviço de consulta de endereços retornou dados inválidos: ";
 
-    //Client
+    // Client
     public static final String CLIENT_NOT_FOUND =
             "Cliente não encontrado.";
 
@@ -112,7 +112,19 @@ public final class ApiErrorMessages {
     public static final String INVALID_REQUEST_PARAMETER =
             "Parâmetro de requisição inválido.";
 
+    public static final String RESOURCE_NOT_FOUND =
+            "Recurso não encontrado.";
+
+    public static final String METHOD_NOT_ALLOWED =
+            "Método HTTP não permitido para este recurso.";
+
+    public static final String UNSUPPORTED_MEDIA_TYPE =
+            "Tipo de conteúdo não suportado.";
+
     // Infrastructure
     public static final String INTERNAL_SERVER_ERROR =
             "Ocorreu um erro interno no servidor.";
+
+    public static final String DATABASE_TEMPORARILY_UNAVAILABLE =
+            "O serviço está temporariamente indisponível. Tente novamente.";
 }

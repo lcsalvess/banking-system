@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.security;
 
-import com.lcsalvess.bankingsystem.dto.response.exception.ErrorResponse;
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,7 +63,7 @@ class RestAuthenticationEntryPointTests {
                     new BadCredentialsException("Invalid credentials")
             );
 
-            ErrorResponse errorResponse = readErrorResponse();
+            ApiErrorResponse errorResponse = readErrorResponse();
 
             assertUnauthorizedResponse(errorResponse);
         }
@@ -82,7 +82,7 @@ class RestAuthenticationEntryPointTests {
                     exception
             );
 
-            ErrorResponse errorResponse = readErrorResponse();
+            ApiErrorResponse errorResponse = readErrorResponse();
 
             assertUnauthorizedResponse(errorResponse);
         }
@@ -192,7 +192,7 @@ class RestAuthenticationEntryPointTests {
         }
     }
 
-    private void assertUnauthorizedResponse(ErrorResponse errorResponse) {
+    private void assertUnauthorizedResponse(ApiErrorResponse errorResponse) {
         MediaType contentType = MediaType.parseMediaType(
                 response.getContentType()
         );
@@ -225,10 +225,10 @@ class RestAuthenticationEntryPointTests {
         );
     }
 
-    private ErrorResponse readErrorResponse() throws Exception {
+    private ApiErrorResponse readErrorResponse() throws Exception {
         return jsonMapper.readValue(
                 response.getContentAsString(StandardCharsets.UTF_8),
-                ErrorResponse.class
+                ApiErrorResponse.class
         );
     }
 }

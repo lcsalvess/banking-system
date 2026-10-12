@@ -2,6 +2,8 @@ package com.lcsalvess.bankingsystem.service.security;
 
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.util.UsernameNormalizer;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -16,8 +18,9 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByUsername(username)
+    public UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
+        String normalizedUsername = UsernameNormalizer.normalize(username);
+        return userRepository.findByUsername(normalizedUsername)
                 .orElseThrow(() -> new UsernameNotFoundException(ApiErrorMessages.INVALID_CREDENTIALS));
     }
 }

@@ -10,6 +10,7 @@ import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsExceptio
 import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.util.EmailNormalizer;
+import com.lcsalvess.bankingsystem.util.UsernameNormalizer;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -34,9 +35,10 @@ public class UserService {
 
     @Transactional
     public UserResponseDTO create(UserRequestDTO dto) {
+        String username = UsernameNormalizer.normalize(dto.username());
         String email = EmailNormalizer.normalize(dto.email());
 
-        if (userRepository.existsByUsername(dto.username())) {
+        if (userRepository.existsByUsername(username)) {
             throw new UsernameAlreadyExistsException(
                     ApiErrorMessages.USERNAME_ALREADY_EXISTS
             );
@@ -49,7 +51,7 @@ public class UserService {
         }
 
         User user = new User(
-                dto.username(),
+                username,
                 email,
                 passwordEncoder.encode(dto.password()),
                 dto.role()

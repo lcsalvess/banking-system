@@ -2,7 +2,9 @@ package com.lcsalvess.bankingsystem.entity;
 
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.util.EmailNormalizer;
+import com.lcsalvess.bankingsystem.util.UsernameNormalizer;
 import jakarta.persistence.*;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -60,14 +62,18 @@ public class User implements UserDetails {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public User() {
+    protected User() {
     }
 
     public User(String username, String email, String password, Role role) {
-        this.username = username;
+        this.username = UsernameNormalizer.normalize(username);
         this.email = EmailNormalizer.normalize(email);
         this.password = password;
         this.role = role;
+    }
+
+    public void deactivate() {
+        this.active = false;
     }
 
     public Long getId() {
@@ -75,6 +81,7 @@ public class User implements UserDetails {
     }
 
     @Override
+    @NonNull
     public String getUsername() {
         return username;
     }
@@ -89,6 +96,7 @@ public class User implements UserDetails {
     }
 
     @Override
+    @NonNull
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
@@ -112,25 +120,5 @@ public class User implements UserDetails {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public void setEmail(String email) {
-        this.email = EmailNormalizer.normalize(email);
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
     }
 }

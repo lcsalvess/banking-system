@@ -2,14 +2,15 @@ package com.lcsalvess.bankingsystem.dto.request;
 
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.validation.passwordbytelength.PasswordByteLength;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 public record UserRequestDTO(
         @NotBlank(message = "O nome de usuário é obrigatório.")
         @Size(max = 20, message = "O nome de usuário deve ter no máximo 20 caracteres.")
+        @Pattern(
+                regexp = "^[a-zA-Z0-9._-]+$",
+                message = "O nome de usuário pode conter apenas letras, números, ponto, hífen e underscore."
+        )
         String username,
 
         @NotBlank(message = "O e-mail é obrigatório.")

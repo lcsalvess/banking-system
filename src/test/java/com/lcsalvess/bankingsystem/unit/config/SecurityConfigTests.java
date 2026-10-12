@@ -262,7 +262,7 @@ class SecurityConfigTests {
         @DisplayName("Deve responder 401 quando o usuário do token está inativo")
         void shouldReturn401WhenTokenUserIsDisabled() throws Exception {
             User user = createUser(Role.EMPLOYEE);
-            user.setActive(false);
+            user.deactivate();
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
 
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
@@ -469,7 +469,7 @@ class SecurityConfigTests {
         @Test
         @DisplayName("Deve autenticar com credenciais válidas")
         void shouldAuthenticateWithValidCredentials() {
-            User user = createUserWithEncodedPassword(true);
+            User user = createUserWithEncodedPassword();
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
 
             Authentication result = authenticationManager.authenticate(
@@ -484,7 +484,7 @@ class SecurityConfigTests {
         @DisplayName("Deve rejeitar senha incorreta")
         void shouldRejectWrongPassword() {
             when(userDetailsService.loadUserByUsername(USERNAME))
-                    .thenReturn(createUserWithEncodedPassword(true));
+                    .thenReturn(createUserWithEncodedPassword());
 
             assertThrows(BadCredentialsException.class, () ->
                     authenticationManager.authenticate(
@@ -505,12 +505,22 @@ class SecurityConfigTests {
         @Test
         @DisplayName("Deve rejeitar usuário inativo mesmo com a senha correta")
         void shouldRejectDisabledUserEvenWithCorrectPassword() {
+            User user = createUserWithEncodedPassword();
+            user.deactivate();
+
+            assertFalse(user.isEnabled());
+
             when(userDetailsService.loadUserByUsername(USERNAME))
-                    .thenReturn(createUserWithEncodedPassword(false));
+                    .thenReturn(user);
+
+            assertSame(user, userDetailsService.loadUserByUsername(USERNAME));
 
             assertThrows(DisabledException.class, () ->
                     authenticationManager.authenticate(
-                            UsernamePasswordAuthenticationToken.unauthenticated(USERNAME, PASSWORD)));
+                            UsernamePasswordAuthenticationToken.unauthenticated(
+                                    USERNAME, PASSWORD
+                            )
+                    ));
         }
     }
 
@@ -534,15 +544,13 @@ class SecurityConfigTests {
         return new User(USERNAME, "usuario.teste@email.com", "encoded-password", role);
     }
 
-    private User createUserWithEncodedPassword(boolean active) {
-        User user = new User(
+    private User createUserWithEncodedPassword() {
+        return new User(
                 USERNAME,
                 "usuario.teste@email.com",
                 passwordEncoder.encode(PASSWORD),
                 Role.EMPLOYEE
         );
-        user.setActive(active);
-        return user;
     }
 
     /**

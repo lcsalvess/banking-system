@@ -118,7 +118,7 @@ public class AuthControllerTest {
             User user = userRepository.findByUsername("usuario.teste")
                     .orElseThrow();
 
-            user.setActive(false);
+            user.deactivate();
             userRepository.save(user);
 
             mockMvc.perform(post(URL)

@@ -217,7 +217,9 @@ Shows the full request/response cycle, including authentication and authorizatio
 - E-mails can have up to 254 characters and are trimmed and stored in lowercase. Usernames and e-mails must be unique.
 - Passwords must have at least 8 characters and at most 72 bytes in UTF-8, the limit supported by BCrypt. The same limit is checked at login.
 - Passwords are stored as BCrypt hashes.
-- An initial `ADMIN` is created at startup from environment variables when no admin exists (see [Configuration](#configuration)).
+- An initial `ADMIN` is created at startup from environment variables when no admin exists (see [Configuration](#configuration)). In the `prod` profile the application refuses to start when no admin exists and the credentials are not configured.
+- Username uniqueness is case-insensitive and enforced by the database through a unique index on `LOWER(username)`.
+- `system_migration` is a reserved technical user created by migration `V6` and hardened by `V8` (BCrypt password hash and a non-routable `.invalid` e-mail). It is inactive, cannot authenticate, and owns the transactions that already existed when the audit trail was introduced.
 
 ### Address Lookup
 
@@ -442,8 +444,8 @@ Operations are logged through Spring application events:
 
 - PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
 - `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters. `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`. `V4__add_transaction_history_index.sql` creates the index `idx_transactions_account_created_id` on `transactions (account_id, created_at DESC, id DESC)`, which supports the transaction history query.
-- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` adds the mandatory `performed_by_user_id` column to `transactions`, with the foreign key `fk_transactions_performed_by_user`. The column is `NOT NULL` without a default, so the migration applies as is only to a database without transactions; an existing database with transactions needs a backfill first.
-- Schema changes must be added as new versioned migrations (`V7__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
+- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing transactions to that user, and then makes the column `NOT NULL` with the foreign key `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data. `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`). `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive.
+- Schema changes must be added as new versioned migrations (`V9__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
 - Tables use plural snake_case names: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, and `transactions`.
 - Constraints follow a naming pattern: `uk_<table>_<column>` for unique constraints, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
 - `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`, `checking_accounts`, and `savings_accounts` tables.
@@ -480,13 +482,13 @@ CREATE DATABASE banking_system_test;
 
 2. Choose the Spring profile with `SPRING_PROFILES_ACTIVE`:
 
-| Profile | Database                                                                    | Swagger UI / OpenAPI |
-|---------|-----------------------------------------------------------------------------|----------------------|
-| `local` | `DB_URL`, defaulting to `jdbc:postgresql://localhost:5432/banking_system`   | Enabled              |
-| `prod`  | `DB_URL` is required                                                        | Disabled             |
-| `test`  | `jdbc:postgresql://localhost:5432/banking_system_test` (used by the tests)  | Disabled             |
+| Profile | Database                                                                    | Swagger UI / OpenAPI | Admin bootstrap required |
+|---------|-----------------------------------------------------------------------------|----------------------|--------------------------|
+| `local` | `DB_URL`, defaulting to `jdbc:postgresql://localhost:5432/banking_system`   | Enabled              | No                       |
+| `prod`  | `DB_URL` is required                                                        | Disabled             | Yes                      |
+| `test`  | `jdbc:postgresql://localhost:5432/banking_system_test` (used by the tests)  | Disabled             | No                       |
 
-Without an active profile, `DB_URL` is required and the API documentation is disabled. Use `local` for development.
+Without an active profile, `DB_URL` is required, the API documentation is disabled, and the admin bootstrap is not required. Use `local` for development.
 
 3. Set the environment variables:
 
@@ -501,7 +503,7 @@ Without an active profile, `DB_URL` is required and the API documentation is dis
 | `ADMIN_EMAIL`            | No                                | E-mail of the initial admin                                     |
 | `ADMIN_PASSWORD`         | No                                | Password of the initial admin                                   |
 
-The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*` variables are set. The initial admin can only manage users: create an `EMPLOYEE` user to operate clients, accounts, and transactions (see [Example](#example)). To generate a suitable secret:
+The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*` variables are set. When no admin exists and the variables are missing, the application logs a warning and starts in `local` and `test`, but fails at startup in `prod` (`app.admin.bootstrap.required=true`), so a production deployment never runs without an administrator. The initial admin can only manage users: create an `EMPLOYEE` user to operate clients, accounts, and transactions (see [Example](#example)). To generate a suitable secret:
 
 ```bash
 openssl rand -base64 32

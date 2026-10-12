@@ -51,10 +51,10 @@ public class TransactionServiceTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.service.transaction.TransactionServiceTests#";
 
-    private static final String USERNAME = "usuario.teste";
+    private static final String USERNAME = "test-user";
     private static final User TEST_USER = new User(
             USERNAME,
-            "usuario.teste@test.com",
+            "test-user@test.com",
             "test-password",
             Role.EMPLOYEE
     );
@@ -218,20 +218,13 @@ public class TransactionServiceTests {
         @MethodSource(PROVIDER + "invalidAmounts")
         @DisplayName("Should throw when amount is invalid")
         void shouldThrowWhenAmountIsInvalid(String scenario, BigDecimal amount) {
-            CheckingAccount account = account();
-
-            stubAccountOperationLookup(account);
-
             assertThrowsWithMessage(
                     InvalidAmountException.class,
                     ApiErrorMessages.INVALID_AMOUNT,
                     () -> transactionService.deposit(operationRequest(amount))
             );
 
-            assertBalance("100.00", account);
-
-            verifyAccountOperationLookup(account);
-            verifyNoMoreInteractionsOnMocks();
+            verifyNoInteractionsOnMocks();
         }
 
         @Test
@@ -291,9 +284,6 @@ public class TransactionServiceTests {
         @MethodSource(PROVIDER + "invalidAmounts")
         @DisplayName("Should throw when amount is invalid")
         void shouldThrowWhenAmountIsInvalid(String scenario, BigDecimal amount) {
-            CheckingAccount account = account();
-
-            stubAccountOperationLookup(account);
 
             assertThrowsWithMessage(
                     InvalidAmountException.class,
@@ -301,10 +291,7 @@ public class TransactionServiceTests {
                     () -> transactionService.withdraw(operationRequest(amount))
             );
 
-            assertBalance("100.00", account);
-
-            verifyAccountOperationLookup(account);
-            verifyNoMoreInteractionsOnMocks();
+            verifyNoInteractionsOnMocks();
         }
 
         @ParameterizedTest(name = "{0}")
@@ -463,10 +450,6 @@ public class TransactionServiceTests {
         @MethodSource(PROVIDER + "invalidAmounts")
         @DisplayName("Should throw when amount is invalid")
         void shouldThrowWhenAmountIsInvalid(String scenario, BigDecimal amount) {
-            CheckingAccount source = account();
-            CheckingAccount destination = destinationAccount();
-
-            stubTransferAccountLookup(source, destination);
 
             assertThrowsWithMessage(
                     InvalidAmountException.class,
@@ -474,11 +457,7 @@ public class TransactionServiceTests {
                     () -> transactionService.transfer(transferRequest(amount))
             );
 
-            assertBalance("100.00", source);
-            assertBalance("50.00", destination);
-
-            verifyTransferAccountLookup(source, destination);
-            verifyNoMoreInteractionsOnMocks();
+            verifyNoInteractionsOnMocks();
         }
 
         @ParameterizedTest(name = "{0}")
@@ -802,6 +781,10 @@ public class TransactionServiceTests {
         verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtBetween(
                 eq(SAVINGS_ID), eq(TransactionType.YIELD), any(), any()
         );
+    }
+
+    private void verifyNoInteractionsOnMocks() {
+        verifyNoInteractions(transactionRepository, accountService, currentUserService, eventPublisher);
     }
 
     private void verifyNoMoreInteractionsOnMocks() {

@@ -66,10 +66,11 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO deposit(AccountOperationRequestDTO dto) {
+        validateAmount(dto.amount());
+
         Account account = accountService.findEntityByAccountNumberForUpdate(dto.accountNumber(), dto.digit());
 
         validateActiveAccount(account);
-        validateAmount(dto.amount());
 
         User performedBy = currentUserService.getCurrentUser();
         String username = performedBy.getUsername();
@@ -89,10 +90,11 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO withdraw(AccountOperationRequestDTO dto) {
+        validateAmount(dto.amount());
+
         Account account = accountService.findEntityByAccountNumberForUpdate(dto.accountNumber(), dto.digit());
 
         validateActiveAccount(account);
-        validateAmount(dto.amount());
         validateBalance(account, dto.amount());
 
         User performedBy = currentUserService.getCurrentUser();
@@ -117,6 +119,7 @@ public class TransactionService {
                 dto.fromAccountNumber(),
                 dto.toAccountNumber()
         );
+        validateAmount(dto.amount());
 
         LockedAccounts lockedAccounts =
                 accountService.lockAccountsForTransfer(
@@ -131,7 +134,6 @@ public class TransactionService {
 
         validateActiveAccount(fromAccount);
         validateActiveAccount(toAccount);
-        validateAmount(dto.amount());
         validateBalance(fromAccount, dto.amount());
 
         User performedBy = currentUserService.getCurrentUser();

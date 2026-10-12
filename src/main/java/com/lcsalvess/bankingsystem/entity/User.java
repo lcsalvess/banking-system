@@ -14,15 +14,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Entity
-@Table(
-        name = "users",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_users_username",
-                        columnNames = "username"
-                )
-        }
-)
+@Table(name = "users")
 public class User implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

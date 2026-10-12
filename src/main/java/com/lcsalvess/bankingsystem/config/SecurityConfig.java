@@ -7,6 +7,7 @@ import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -45,8 +46,11 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints públicos de autenticação.
-                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        // Permite acesso público somente ao endpoint de login.
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/auth/login"
+                        ).permitAll()
 
                         // Documentação OpenAPI.
                         .requestMatchers(
@@ -99,9 +103,24 @@ public class SecurityConfig {
     public FilterRegistrationBean<CorrelationIdFilter> correlationIdFilterRegistrationBean(
             CorrelationIdFilter filter
     ) {
-        FilterRegistrationBean<CorrelationIdFilter> registration = new FilterRegistrationBean<>();
-        registration.setFilter(filter);
+        FilterRegistrationBean<CorrelationIdFilter> registration =
+                new FilterRegistrationBean<>(filter);
+
         registration.setEnabled(false);
+
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter>
+    jwtAuthenticationFilterRegistrationBean(
+            JwtAuthenticationFilter filter
+    ) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration =
+                new FilterRegistrationBean<>(filter);
+
+        registration.setEnabled(false);
+
         return registration;
     }
 }

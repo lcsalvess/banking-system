@@ -101,7 +101,8 @@ class SecurityConfigTests {
     private static final String PASSWORD = "Senha123";
     private static final String PROTECTED_URL = "/api/v1/probe";
     private static final String ADMIN_URL = "/api/v1/probe/admin";
-    private static final String PUBLIC_URL = "/api/v1/auth/probe";
+    private static final String LOGIN_URL = "/api/v1/auth/login";
+    private static final String AUTH_PROBE_URL = "/api/v1/auth/probe";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
     private static final String UNAUTHORIZED_MESSAGE = "Não foi possível autenticar o usuário.";
     private static final String FORBIDDEN_MESSAGE = "Você não tem permissão para acessar este recurso.";
@@ -140,17 +141,6 @@ class SecurityConfigTests {
     @Nested
     @DisplayName("Rotas públicas")
     class PublicRoutesTests {
-
-        @Test
-        @DisplayName("Deve permitir /api/v1/auth/** sem token e sem CSRF")
-        void shouldAllowAuthRoutesWithoutTokenAndWithoutCsrf() throws Exception {
-            mockMvc.perform(post(PUBLIC_URL))
-                    .andExpect(status().isOk())
-                    .andExpect(content().string("public"));
-
-            verifyNoInteractions(userDetailsService);
-        }
-
         @ParameterizedTest(name = "GET {0}")
         @ValueSource(strings = {
                 "/swagger-ui/index.html",
@@ -165,6 +155,94 @@ class SecurityConfigTests {
             int statusCode = result.getResponse().getStatus();
             assertNotEquals(401, statusCode, "A rota deveria ser pública");
             assertNotEquals(403, statusCode, "A rota deveria ser pública");
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Deve permitir POST /api/v1/auth/login sem token e sem CSRF")
+        void shouldAllowLoginWithoutTokenAndWithoutCsrf() throws Exception {
+            MvcResult result = mockMvc.perform(post(LOGIN_URL))
+                    .andReturn();
+
+            assertNotEquals(401, result.getResponse().getStatus());
+            assertNotEquals(403, result.getResponse().getStatus());
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @ParameterizedTest(name = "Authorization: {0}")
+        @ValueSource(strings = {
+                "Bearer token-invalido",
+                "Bearer a.b.c",
+                "Bearer ",
+                "Bearer    "
+        })
+        @DisplayName("Deve permitir o login mesmo com um token inválido no header")
+        void shouldAllowLoginWithInvalidToken(String authorization) throws Exception {
+            MvcResult result = mockMvc.perform(post(LOGIN_URL)
+                            .header(HttpHeaders.AUTHORIZATION, authorization))
+                    .andReturn();
+
+            assertNotEquals(401, result.getResponse().getStatus());
+            assertNotEquals(403, result.getResponse().getStatus());
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Deve permitir o login com um token expirado no header")
+        void shouldAllowLoginWithExpiredToken() throws Exception {
+            String token = serviceOf(SECRET, -60, ISSUER)
+                    .generateToken(createUser(Role.EMPLOYEE));
+
+            MvcResult result = mockMvc.perform(post(LOGIN_URL)
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                    .andReturn();
+
+            assertNotEquals(401, result.getResponse().getStatus());
+            assertNotEquals(403, result.getResponse().getStatus());
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Não deve consultar o usuário no login mesmo com um token válido")
+        void shouldNotLoadUserOnLoginWithValidToken() throws Exception {
+            MvcResult result = mockMvc.perform(post(LOGIN_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(createUser(Role.EMPLOYEE))
+                            ))
+                    .andReturn();
+
+            assertNotEquals(401, result.getResponse().getStatus());
+            assertNotEquals(403, result.getResponse().getStatus());
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Deve proteger outros métodos HTTP no caminho do login")
+        void shouldProtectOnlyPostOnLogin() throws Exception {
+            expectUnauthorized(mockMvc.perform(get(LOGIN_URL)));
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Deve exigir autenticação em outras rotas de auth")
+        void shouldProtectOtherAuthRoutes() throws Exception {
+            expectUnauthorized(mockMvc.perform(post(AUTH_PROBE_URL)));
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar token inválido em outras rotas de auth")
+        void shouldRejectInvalidTokenOnOtherAuthRoutes() throws Exception {
+            expectUnauthorized(mockMvc.perform(post(AUTH_PROBE_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer token-invalido")));
 
             verifyNoInteractions(userDetailsService);
         }
@@ -204,6 +282,16 @@ class SecurityConfigTests {
         @ValueSource(strings = {"Bearer token-invalido", "Bearer a.b.c", "Bearer abc.def"})
         @DisplayName("Deve responder 401 em JSON para token malformado")
         void shouldReturn401ForMalformedToken(String authorization) throws Exception {
+            expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
+                    .header(HttpHeaders.AUTHORIZATION, authorization)));
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @ParameterizedTest(name = "Authorization: \"{0}\"")
+        @ValueSource(strings = {"Bearer ", "Bearer    "})
+        @DisplayName("Deve responder 401 em JSON quando o Bearer vem sem token")
+        void shouldReturn401WhenBearerHasNoToken(String authorization) throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
                     .header(HttpHeaders.AUTHORIZATION, authorization)));
 
@@ -270,16 +358,6 @@ class SecurityConfigTests {
 
             verify(userDetailsService).loadUserByUsername(USERNAME);
         }
-
-        @Test
-        @DisplayName("Deve rejeitar token inválido mesmo em rota pública (comportamento atual do filtro)")
-        void shouldRejectInvalidTokenEvenOnPublicRoute() throws Exception {
-            // O JwtAuthenticationFilter roda em todas as rotas: um cliente que reenvia um
-            // token expirado para /api/v1/auth/** recebe 401 em vez de poder autenticar.
-            // Se o filtro passar a ignorar rotas públicas, inverta esta asserção.
-            expectUnauthorized(mockMvc.perform(post(PUBLIC_URL)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer token-invalido")));
-        }
     }
 
     @Nested
@@ -299,6 +377,20 @@ class SecurityConfigTests {
 
             verify(userDetailsService).loadUserByUsername(USERNAME);
             verifyNoMoreInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Deve autenticar o usuário do token em outras rotas de auth")
+        void shouldAuthenticateTokenUserOnOtherAuthRoutes() throws Exception {
+            User user = createUser(Role.EMPLOYEE);
+            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
+
+            mockMvc.perform(post(AUTH_PROBE_URL)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(user)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("auth-probe"));
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
         }
 
         @Test
@@ -390,13 +482,15 @@ class SecurityConfigTests {
     @Nested
     @DisplayName("Correlation ID na cadeia de filtros")
     class CorrelationIdTests {
-
         @Test
         @DisplayName("Deve gerar o header quando a requisição não o envia")
         void shouldGenerateCorrelationIdWhenMissing() throws Exception {
-            MvcResult result = mockMvc.perform(post(PUBLIC_URL)).andReturn();
+            MvcResult result = mockMvc.perform(post(PROTECTED_URL))
+                    .andExpect(status().isUnauthorized())
+                    .andReturn();
 
-            String correlationId = result.getResponse().getHeader(CORRELATION_ID_HEADER);
+            String correlationId =
+                    result.getResponse().getHeader(CORRELATION_ID_HEADER);
 
             assertNotNull(correlationId);
             assertDoesNotThrow(() -> UUID.fromString(correlationId));
@@ -407,10 +501,15 @@ class SecurityConfigTests {
         void shouldEchoValidCorrelationId() throws Exception {
             String correlationId = UUID.randomUUID().toString();
 
-            MvcResult result = mockMvc.perform(post(PUBLIC_URL)
-                    .header(CORRELATION_ID_HEADER, correlationId)).andReturn();
+            MvcResult result = mockMvc.perform(post(PROTECTED_URL)
+                            .header(CORRELATION_ID_HEADER, correlationId))
+                    .andExpect(status().isUnauthorized())
+                    .andReturn();
 
-            assertEquals(correlationId, result.getResponse().getHeader(CORRELATION_ID_HEADER));
+            assertEquals(
+                    correlationId,
+                    result.getResponse().getHeader(CORRELATION_ID_HEADER)
+            );
         }
 
         @Test
@@ -559,12 +658,6 @@ class SecurityConfigTests {
      */
     @RestController
     public static class ProbeController {
-
-        @PostMapping("/api/v1/auth/probe")
-        public String publicRoute() {
-            return "public";
-        }
-
         @GetMapping("/api/v1/probe")
         public String whoAmI(Authentication authentication) {
             return authentication.getName();
@@ -579,6 +672,11 @@ class SecurityConfigTests {
         @GetMapping("/api/v1/probe/admin")
         public String adminOnly() {
             return "admin";
+        }
+
+        @PostMapping("/api/v1/auth/probe")
+        public String protectedAuthRoute() {
+            return "auth-probe";
         }
     }
 }

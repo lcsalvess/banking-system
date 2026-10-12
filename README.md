@@ -51,7 +51,7 @@ src/main/java/com/lcsalvess/bankingsystem
 ├── dto/             # Request and response DTOs
 ├── entity/          # Domain entities and enums
 ├── event/           # Application events and event listeners
-├── exception/       # Business exceptions, database constraints, and global exception handling
+├── exception/       # Business exceptions, database constraints, centralized error messages, and global exception handling
 ├── filter/          # HTTP filters (correlation ID)
 ├── integration/
 │   └── address/     # External address providers and lookup orchestration
@@ -62,8 +62,9 @@ src/main/java/com/lcsalvess/bankingsystem
 │       ├── validation/
 │       └── viacep/
 ├── repository/      # Database access through Spring Data JPA
-├── security/        # JWT authentication filter
+├── security/        # JWT authentication filter and JSON handlers for 401/403 responses
 ├── serialization/   # Custom JSON serialization
+├── util/            # Utility classes (CPF masking, e-mail and username normalization)
 ├── service/         # Business rules and application logic
 │   ├── account/     # Account operations, row locking, and account number generation
 │   ├── address/     # Address-related application logic
@@ -72,8 +73,9 @@ src/main/java/com/lcsalvess/bankingsystem
 │   ├── transaction/ # Transaction operations
 │   └── user/        # User operations
 └── validation/      # Custom constraints and validators
-    ├── accountnumber/ # Account number and check digit validation
-    └── cpf/           # CPF validation
+    ├── accountnumber/      # Account number and check digit validation
+    ├── cpf/                # CPF validation
+    └── passwordbytelength/ # Password size limit in bytes (BCrypt)
 ```
 
 ### Request Flow
@@ -138,9 +140,10 @@ Shows the full request/response cycle, including authentication and authorizatio
 
 ## Features
 
-- **Authentication and authorization** with JWT and role-based access (`ADMIN` and `EMPLOYEE`)
+- **Authentication and authorization** with JWT and role-based access: `ADMIN` manages users and metrics, `EMPLOYEE` operates clients, accounts, and transactions
 - **User management**: user creation with role assignment and secure password storage
 - **Client management**: registration, listing, lookup, and partial update (`PATCH`), including address data
+- **Sensitive data protection**: the CPF is masked in every client response
 - **Address lookup**: automatic address lookup by postal code using ViaCEP, with BrasilAPI as a fallback provider
 - **Provider response validation**: addresses returned by external providers are validated before being used
 - **Versioned database schema** managed by Flyway migrations and validated by Hibernate at startup
@@ -148,6 +151,8 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Transactions**: deposit, withdrawal, transfer between accounts, transaction history per account, and lookup by public identifier
 - **Public transaction identifier**: every transaction has a UUID (`transactionCode`) exposed in responses, while the internal database ID is never returned
 - **Transfer traceability**: the two transactions of a transfer share a `transferCode`, so both legs can be correlated
+- **Transaction audit trail**: every transaction records the authenticated user who performed it (`performed_by_user_id`), including both legs of a transfer
+- **Identity normalization**: usernames and e-mails are trimmed and lowercased, so `Admin` and `admin` are the same user and e-mail uniqueness is case-insensitive
 - **Concurrency control**: pessimistic row locking (`SELECT ... FOR UPDATE`) on every operation that changes a balance or an account status, with a fixed lock order in transfers to avoid deadlocks
 - **Savings yield**: monthly yield applied to savings accounts
 - **Account cancellation** with balance and status validation, safe against concurrent deposits
@@ -157,7 +162,8 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Decoupled operation logging** using Spring application events
 - **Request tracing** with a correlation ID present in the response header and in every log line
 - **Observability** with Spring Boot Actuator (health, info, metrics) and Micrometer timers
-- **Interactive API documentation** with Swagger UI, which can be disabled through configuration
+- **Environment profiles** (`local`, `prod`, and `test`) that separate database configuration and API documentation exposure
+- **Interactive API documentation** with Swagger UI, enabled only in the `local` profile
 
 ---
 
@@ -165,9 +171,10 @@ Shows the full request/response cycle, including authentication and authorizatio
 
 ### Clients
 - CPF must be unique and contain exactly 11 digits.
-- E-mail must be unique.
+- E-mail must be unique, ignoring case, and can have up to 254 characters. It is trimmed and stored in lowercase.
 - CPF validation includes format checks and verification digit calculation.
 - Phone number must contain 10 to 11 digits, including the area code.
+- The CPF is masked in responses, showing only the last two digits (`***.***.***-12`). The full value is stored in the database and is never returned by the API.
 - Every client requires an address with a postal code (CEP), a street number, and an optional complement.
 - Address details such as street name, neighborhood, city, and state are retrieved through external postal code providers.
 - Client updates are partial: only the fields sent in the request are changed, and omitted fields are left unchanged.
@@ -192,6 +199,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Every operation that changes a balance locks the account row with a pessimistic write lock (`PESSIMISTIC_WRITE`) before validating it, so the balance check and the update cannot interleave with another request on the same account. Concurrent withdrawals therefore never overdraw an account, and concurrent deposits are never lost.
 - A transfer locks both accounts in ascending account number order, regardless of the transfer direction. Two opposite transfers (A to B and B to A) cannot deadlock.
 - All operations that change balances run inside a database transaction, so balance changes and transaction records are saved together or not at all.
+- Every transaction stores the user who performed it, taken from the authenticated principal. The value is mandatory and is kept in the database for auditing; it is not part of the API responses.
 - Every transaction receives a random UUID (`transactionCode`) when it is created. It is unique, immutable, and is the only identifier exposed by the API; the internal numeric ID is not part of the response.
 - A transaction can be retrieved by its `transactionCode`: `404 Not Found` if it does not exist and `400 Bad Request` if the value is not a valid UUID.
 - The transaction history of an account is returned from the newest to the oldest transaction.
@@ -199,13 +207,15 @@ Shows the full request/response cycle, including authentication and authorizatio
 ### Savings Yield
 - Yield is calculated as 0.5% of the current balance, rounded to 2 decimal places.
 - An account becomes eligible one month after its creation or last yield date.
-- Each applied yield moves the last yield date forward by one month.
+- Each applied yield moves the last yield date forward by one month. An overdue account stays eligible on the following days, so missed months are credited one per day, each calculated on the balance at that moment.
 - Yield can be applied only once per day per account, enforced by the service and by a partial unique index in the database.
 - Concurrent yield requests for the same account are serialized by the row lock: one is applied and the others are rejected with `409 Conflict`.
 
 ### Users
 - Only `ADMIN` users can create new users.
-- Usernames and e-mails must be unique, and passwords must have at least 8 characters.
+- Usernames have up to 20 characters and may contain only letters, digits, dot, hyphen, and underscore. They are trimmed and converted to lowercase on creation and on login, so usernames are case-insensitive.
+- E-mails can have up to 254 characters and are trimmed and stored in lowercase. Usernames and e-mails must be unique.
+- Passwords must have at least 8 characters and at most 72 bytes in UTF-8, the limit supported by BCrypt. The same limit is checked at login.
 - Passwords are stored as BCrypt hashes.
 - An initial `ADMIN` is created at startup from environment variables when no admin exists (see [Configuration](#configuration)).
 
@@ -237,10 +247,18 @@ Authorization: Bearer <token>
 | User status        | The user is loaded from the database on every request; a deactivated user is rejected with `401 Unauthorized` |
 | Startup check      | The application does not start if `JWT_SECRET` is missing, is not valid Base64, or is too short               |
 | Public routes      | `/api/v1/auth/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**`                                    |
-| Protected routes   | Everything else requires a valid token, including `/actuator/**`                                              |
-| Admin-only routes  | `POST /api/v1/users` (`@PreAuthorize("hasRole('ADMIN')")`)                                                    |
+| Protected routes   | Everything else requires a valid token and the role required by the endpoint                                  |
 | Invalid token      | `401 Unauthorized`                                                                                            |
-| Insufficient role  | `403 Forbidden`                                                                                               |
+| Insufficient role  | `403 Forbidden`, returned as JSON by `RestAccessDeniedHandler`                                                |
+
+### Access by role
+
+| Role       | Allowed operations                                                                                                                                                                  |
+|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ADMIN`    | Create users, read the transaction history and look up transactions by code, `/actuator/health`, `/actuator/info`, and `/actuator/metrics`                                          |
+| `EMPLOYEE` | Clients, accounts, address lookup, deposit, withdrawal, transfer, and yield; read the transaction history and look up transactions by code; `/actuator/health` and `/actuator/info` |
+
+Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Business operations require an `EMPLOYEE` user, which an `ADMIN` creates through `POST /api/v1/users`. Endpoint access is enforced with `@PreAuthorize` on the controllers and with request rules in `SecurityConfig` for the actuator.
 
 ---
 
@@ -248,24 +266,24 @@ Authorization: Bearer <token>
 
 Full request and response schemas are available in Swagger UI.
 
-| Method | Endpoint                                               | Description                          | Access        |
-|--------|--------------------------------------------------------|--------------------------------------|---------------|
-| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT       | Public        |
-| POST   | `/api/v1/users`                                        | Create a user                        | `ADMIN`       |
-| POST   | `/api/v1/clients`                                      | Register a client                    | Authenticated |
-| GET    | `/api/v1/clients`                                      | List clients                         | Authenticated |
-| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                   | Authenticated |
-| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client            | Authenticated |
-| POST   | `/api/v1/accounts`                                     | Create a checking or savings account | Authenticated |
-| GET    | `/api/v1/accounts`                                     | List accounts                        | Authenticated |
-| GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                       | Authenticated |
-| PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                    | Authenticated |
-| POST   | `/api/v1/transactions/deposit`                         | Deposit                              | Authenticated |
-| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                             | Authenticated |
-| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts            | Authenticated |
-| GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account    | Authenticated |
-| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID | Authenticated |
-| POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account     | Authenticated |
+| Method | Endpoint                                               | Description                          | Access               |
+|--------|--------------------------------------------------------|--------------------------------------|----------------------|
+| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT       | Public               |
+| POST   | `/api/v1/users`                                        | Create a user                        | `ADMIN`              |
+| POST   | `/api/v1/clients`                                      | Register a client                    | `EMPLOYEE`           |
+| GET    | `/api/v1/clients`                                      | List clients                         | `EMPLOYEE`           |
+| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                   | `EMPLOYEE`           |
+| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client            | `EMPLOYEE`           |
+| POST   | `/api/v1/accounts`                                     | Create a checking or savings account | `EMPLOYEE`           |
+| GET    | `/api/v1/accounts`                                     | List accounts                        | `EMPLOYEE`           |
+| GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                       | `EMPLOYEE`           |
+| PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                    | `EMPLOYEE`           |
+| POST   | `/api/v1/transactions/deposit`                         | Deposit                              | `EMPLOYEE`           |
+| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                             | `EMPLOYEE`           |
+| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts            | `EMPLOYEE`           |
+| GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account    | `EMPLOYEE`, `ADMIN`  |
+| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID | `EMPLOYEE`, `ADMIN`  |
+| POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account     | `EMPLOYEE`           |
 
 `accountNumber` must have between 5 and 20 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
 
@@ -273,45 +291,56 @@ Request bodies are strict about JSON types: text fields reject numbers and boole
 
 ### Address Lookup Endpoint
 
-| Method | Endpoint                                | Description                       | Access        |
-| ------ | --------------------------------------- | --------------------------------- | ------------- |
-| GET    | `/api/v1/addresses/lookup/{postalCode}` | Look up an address by postal code | Authenticated |
+| Method | Endpoint                                | Description                       | Access               |
+| ------ | --------------------------------------- | --------------------------------- | -------------------- |
+| GET    | `/api/v1/addresses/lookup/{postalCode}` | Look up an address by postal code | `EMPLOYEE`           |
 
 Possible responses: `200` (address found), `400` (postal code is not 8 digits), `404` (postal code not found), and `503` (address providers unavailable).
 
 ### Actuator Endpoints
 
-| Method | Endpoint             | Description                          | Access        |
-| ------ | -------------------- | ------------------------------------ | ------------- |
-| GET    | `/actuator/health`   | Application health                   | Authenticated |
-| GET    | `/actuator/info`     | Application information              | Authenticated |
-| GET    | `/actuator/metrics`  | Micrometer metrics                   | Authenticated |
+| Method | Endpoint             | Description                          | Access               |
+| ------ | -------------------- | ------------------------------------ | -------------------- |
+| GET    | `/actuator/health`   | Application health                   | `EMPLOYEE`, `ADMIN`  |
+| GET    | `/actuator/info`     | Application information              | `EMPLOYEE`, `ADMIN`  |
+| GET    | `/actuator/metrics`  | Micrometer metrics                   | `ADMIN`              |
 
 ---
 
 ### Example
 
 ```bash
-# 1. Log in
+# 1. Log in as the initial admin
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "your-password"}'
 
-# 2. Deposit into an account
+# 2. Create an employee (ADMIN only)
+curl -X POST http://localhost:8080/api/v1/users \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "employee", "email": "employee@example.com", "password": "your-password", "role": "EMPLOYEE"}'
+
+# 3. Log in as the employee, who operates clients, accounts, and transactions
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "employee", "password": "your-password"}'
+
+# 4. Deposit into an account
 curl -X POST http://localhost:8080/api/v1/transactions/deposit \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer <employee-token>" \
   -H "Content-Type: application/json" \
   -d '{"accountNumber": "00001", "digit": "<account-digit>", "amount": 150.00}'
 
-# 3. Partially update a client (only the fields sent are changed)
+# 5. Partially update a client (only the fields sent are changed)
 curl -X PATCH http://localhost:8080/api/v1/clients/1 \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer <employee-token>" \
   -H "Content-Type: application/json" \
   -d '{"phoneNumber": "11987654321", "address": {"postalCode": "01001000", "streetNumber": "100"}}'
 
-# 4. Look up a transaction by its public code
+# 6. Look up a transaction by its public code
 curl http://localhost:8080/api/v1/transactions/code/<transaction-code> \
-  -H "Authorization: Bearer <token>"
+  -H "Authorization: Bearer <employee-token>"
 ```
 
 Transactions are returned with their public identifier, and the internal ID is not exposed:
@@ -343,7 +372,7 @@ Transfer transactions also include the `transferCode` shared by both legs of the
 
 ## Error Handling
 
-Errors are handled by a single global exception handler (`GlobalExceptionHandler`), and business rule violations extend a common `BusinessException`. Every error returns the same structure:
+Errors are handled by a single global exception handler (`GlobalExceptionHandler`), and business rule violations extend a common `BusinessException`. All error messages are centralized in `ApiErrorMessages`. Application errors return the same structure:
 
 ```json
 {
@@ -368,8 +397,8 @@ Validation errors also include the invalid fields. The same structure is used fo
 |------------------------------------------------------------------------------------|-----------------------------|
 | Business rule violation                                                            | Defined by each exception   |
 | Bean Validation failure, invalid parameters, malformed body, or wrong JSON type    | `400 Bad Request`           |
-| Invalid credentials                                                                | `401 Unauthorized`          |
-| Access denied                                                                      | `403 Forbidden`             |
+| Invalid credentials, invalid token, or deactivated user                            | `401 Unauthorized`          |
+| Access denied (role not allowed for the endpoint)                                  | `403 Forbidden`             |
 | CPF or e-mail already registered, including concurrent requests                    | `409 Conflict`              |
 | Address providers unavailable                                                      | `503 Service Unavailable`   |
 | Unexpected error                                                                   | `500 Internal Server Error` |
@@ -397,7 +426,7 @@ Operations are logged through Spring application events:
 
 ## Observability
 
-- Spring Boot Actuator exposes `health`, `info`, and `metrics`. These endpoints require authentication, and health details are shown only to authorized users.
+- Spring Boot Actuator exposes `health`, `info`, and `metrics`. `health` and `info` require an `EMPLOYEE` or `ADMIN` token, `metrics` requires `ADMIN`, and health details are shown only to authorized users.
 - Custom Micrometer timers:
 
 | Timer                       | Description                                                              |
@@ -412,14 +441,15 @@ Operations are logged through Spring application events:
 ## Database
 
 - PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
-- `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters. `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`.
-- Schema changes must be added as new versioned migrations (`V4__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
+- `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters. `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`. `V4__add_transaction_history_index.sql` creates the index `idx_transactions_account_created_id` on `transactions (account_id, created_at DESC, id DESC)`, which supports the transaction history query.
+- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` adds the mandatory `performed_by_user_id` column to `transactions`, with the foreign key `fk_transactions_performed_by_user`. The column is `NOT NULL` without a default, so the migration applies as is only to a database without transactions; an existing database with transactions needs a backfill first.
+- Schema changes must be added as new versioned migrations (`V7__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
 - Tables use plural snake_case names: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, and `transactions`.
 - Constraints follow a naming pattern: `uk_<table>_<column>` for unique constraints, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
 - `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`, `checking_accounts`, and `savings_accounts` tables.
 - Check constraints in the database enforce a non-negative account balance, a positive transaction amount, and the allowed values of state, role, account type, account status, and transaction type.
 - Two partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type per client) and `uk_transactions_daily_yield` (one yield per account per day).
-- The constraints and indexes that the application translates into business errors are listed in the `DatabaseConstraint` enum, which is the only place in the code that holds their names. `DatabaseConstraintTest` checks that every name is declared in a migration, so renaming a constraint without updating the enum fails the test suite.
+- The constraints and indexes that the application translates into business errors are listed in the `DatabaseConstraint` enum, which is the only place in the code that holds their names. Every name must match a constraint or index declared in the Flyway migrations.
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).
 - `Transaction` also has a `transfer_code` column (UUID, nullable, not updatable). It is filled only for `TRANSFER_SENT` and `TRANSFER_RECEIVED` and holds the same value in both rows of a transfer.
 - Concurrency is handled with pessimistic locking: `AccountRepository.findByAccountNumberForUpdate` uses `LockModeType.PESSIMISTIC_WRITE`. The locking methods of `AccountService` require an existing transaction (`Propagation.MANDATORY`), so a lock can never be taken and released outside the operation that needs it.
@@ -427,7 +457,7 @@ Operations are logged through Spring application events:
 - Open Session in View is disabled (`spring.jpa.open-in-view=false`). Account queries that need the client use `JOIN FETCH` to avoid lazy loading outside a transaction.
 - Read operations in the services run with `@Transactional(readOnly = true)`, while operations that change data use regular transactions.
 - For clients, the transaction boundary is in `ClientPersistenceService`: `ClientService` resolves the address first and only then calls it, so the transaction covers just the persistence work.
-- Most entities have no public setters: `Client` and `Address` change through domain methods such as `Client.update(...)` and `Address.updateFrom(...)`. `User` still exposes setters.
+- Most entities have no public setters: `Client` and `Address` change through domain methods such as `Client.update(...)` and `Address.updateFrom(...)`. `User` changes only through its constructor, which normalizes the username and e-mail, and through `deactivate()`.
 
 ---
 
@@ -448,19 +478,30 @@ CREATE DATABASE banking_system;
 CREATE DATABASE banking_system_test;
 ```
 
-2. Set the environment variables:
+2. Choose the Spring profile with `SPRING_PROFILES_ACTIVE`:
 
-| Variable          | Required | Description                                                     |
-|-------------------|----------|-----------------------------------------------------------------|
-| `DB_USERNAME`     | Yes      | PostgreSQL username                                             |
-| `DB_PASSWORD`     | Yes      | PostgreSQL password                                             |
-| `JWT_SECRET`      | Yes      | Base64-encoded secret used to sign tokens (at least 256 bits)   |
-| `ADMIN_USERNAME`  | No       | Username of the initial admin                                   |
-| `ADMIN_EMAIL`     | No       | E-mail of the initial admin                                     |
-| `ADMIN_PASSWORD`  | No       | Password of the initial admin                                   |
-| `SWAGGER_ENABLED` | No       | Enables the OpenAPI docs and Swagger UI (default: `true`)       |
+| Profile | Database                                                                    | Swagger UI / OpenAPI |
+|---------|-----------------------------------------------------------------------------|----------------------|
+| `local` | `DB_URL`, defaulting to `jdbc:postgresql://localhost:5432/banking_system`   | Enabled              |
+| `prod`  | `DB_URL` is required                                                        | Disabled             |
+| `test`  | `jdbc:postgresql://localhost:5432/banking_system_test` (used by the tests)  | Disabled             |
 
-The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*` variables are set. To generate a suitable secret:
+Without an active profile, `DB_URL` is required and the API documentation is disabled. Use `local` for development.
+
+3. Set the environment variables:
+
+| Variable                 | Required                          | Description                                                     |
+|--------------------------|-----------------------------------|-----------------------------------------------------------------|
+| `SPRING_PROFILES_ACTIVE` | No                                | Active profile (`local`, `prod`)                                |
+| `DB_URL`                 | Yes, except in `local` and `test` | JDBC URL of the PostgreSQL database                             |
+| `DB_USERNAME`            | Yes                               | PostgreSQL username                                             |
+| `DB_PASSWORD`            | Yes                               | PostgreSQL password                                             |
+| `JWT_SECRET`             | Yes                               | Base64-encoded secret used to sign tokens (at least 256 bits)   |
+| `ADMIN_USERNAME`         | No                                | Username of the initial admin                                   |
+| `ADMIN_EMAIL`            | No                                | E-mail of the initial admin                                     |
+| `ADMIN_PASSWORD`         | No                                | Password of the initial admin                                   |
+
+The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*` variables are set. The initial admin can only manage users: create an `EMPLOYEE` user to operate clients, accounts, and transactions (see [Example](#example)). To generate a suitable secret:
 
 ```bash
 openssl rand -base64 32
@@ -475,6 +516,12 @@ The base URLs of the address providers are defined in `application.properties` (
 ```bash
 git clone https://github.com/lcsalvess/banking-system.git
 cd banking-system
+
+# Linux / macOS
+SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run
+
+# Windows (PowerShell)
+$env:SPRING_PROFILES_ACTIVE = "local"
 ./mvnw spring-boot:run
 ```
 
@@ -482,15 +529,13 @@ The API will be available at `http://localhost:8080`.
 
 ### API Documentation
 
-With the application running, open Swagger UI at:
+With the application running in the `local` profile, open Swagger UI at:
 
 ```
 http://localhost:8080/swagger-ui/index.html
 ```
 
-Use the **Authorize** button and paste the JWT returned by `/api/v1/auth/login` to call protected endpoints.
-
-To disable the documentation (for example, in production), set `SWAGGER_ENABLED=false`.
+Use the **Authorize** button and paste the JWT returned by `/api/v1/auth/login` to call protected endpoints. In the `prod` profile, and when no profile is active, the OpenAPI documentation and Swagger UI are disabled.
 
 ---
 
@@ -504,19 +549,17 @@ The test suite covers:
 
 - **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, yield, and the lock acquisition of each), users, JWT, authentication, user details loading, address data resolution, and address lookup provider orchestration.
 - **Concurrency integration tests** (`TransactionConcurrencyTests`) against PostgreSQL, running operations on parallel threads released at the same instant: concurrent withdrawals that must not overdraw an account, deposits that must not be lost, mixed deposits and withdrawals, opposite transfers without deadlock, several transfers into the same account, transfers limited by the available balance, a yield requested twice at once, and an account cancellation racing with deposits.
-- **Security tests** for JWT generation and validation (secret, issuer, expiration), the security filter chain configuration, and the authentication entry point.
+- **Security tests** for JWT generation and validation (secret, issuer, expiration), the security filter chain (public routes, token validation, method security, actuator access, and correlation ID on error responses), and the authentication entry point.
 - **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), address lookup, and authentication.
 - **Provider client tests** for ViaCEP and Brasil API against a local HTTP server: response mapping, postal code not found, invalid responses, error statuses, timeouts, and unreachable providers.
-- **Exception handler tests** for every response of `GlobalExceptionHandler`, including the translation of each database constraint into its status and message.
-- **Constraint tests** for `DatabaseConstraint`: detection in the exception cause chain and consistency of every constraint name with the Flyway migrations.
 - **JSON coercion tests** that import `JacksonConfig` into a controller slice to check that wrongly typed fields are rejected.
-- **Validation tests** for CPF, account number, and account digit.
+- **Validation tests** for CPF, account number, account digit, and password size in bytes.
 - **Filter tests** for the correlation ID: generation, reuse, lowercase normalization, rejection of non-canonical values, and MDC cleanup.
 - **Context test** to verify the application starts.
 
 The suite has more than 300 test methods, many of them parameterized.
 
-Tests run with the `test` profile against the `banking_system_test` database. Its schema is created by the same Flyway migrations used in the application and validated by Hibernate (`validate`).
+Tests need a local PostgreSQL instance and the `DB_USERNAME`, `DB_PASSWORD`, and `JWT_SECRET` environment variables. They run with the `test` profile against the `banking_system_test` database. Its schema is created by the same Flyway migrations used in the application and validated by Hibernate (`validate`).
 
 ---
 
@@ -526,7 +569,8 @@ Tests run with the `test` profile against the `banking_system_test` database. It
 - [x] Integration tests for external address providers (`ViaCepClient` and `BrasilApiClient`)
 - [x] Tests for `AddressService` and `AddressLookupController`
 - [x] Integration tests with PostgreSQL for transaction and concurrency scenarios
-- [ ] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
+- [x] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
+- [x] Separate `local`, `prod`, and `test` profiles
 - [ ] Pagination and filtering on list endpoints
 - [ ] Docker Compose for the application and database
 - [ ] CI/CD pipeline with GitHub Actions

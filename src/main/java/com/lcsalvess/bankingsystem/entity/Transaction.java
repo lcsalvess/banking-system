@@ -44,7 +44,8 @@ public class Transaction {
     @JoinColumn(name = "account_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_transactions_account"))
     private Account account;
-    @ManyToOne(fetch = FetchType.LAZY)
+    @NotNull
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(
             name = "performed_by_user_id",
             nullable = false,

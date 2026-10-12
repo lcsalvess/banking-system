@@ -68,7 +68,7 @@ public class ClientControllerTests {
     private static final String NAME_TOO_LONG_MESSAGE = "O nome deve ter no máximo 125 caracteres.";
     private static final String EMAIL_BLANK_MESSAGE = "O e-mail não pode ser vazio.";
     private static final String EMAIL_INVALID_MESSAGE = "O formato do e-mail é inválido.";
-    private static final String EMAIL_TOO_LONG_MESSAGE = "O e-mail deve ter no máximo 150 caracteres.";
+    private static final String EMAIL_TOO_LONG_MESSAGE = "O e-mail deve ter no máximo 254 caracteres.";
     private static final String PHONE_INVALID_MESSAGE = "O telefone deve conter de 10 a 11 números, incluindo o DDD.";
     private static final String STREET_NUMBER_BLANK_MESSAGE = "O número é obrigatório.";
     private static final String STREET_NUMBER_TOO_LONG_MESSAGE = "O número deve ter no máximo 10 caracteres.";
@@ -87,10 +87,12 @@ public class ClientControllerTests {
     private static final String VALID_CREATION_POSTAL_CODE = "01001000";
     private static final String VALID_UPDATE_POSTAL_CODE = "08710000";
 
-    // Formato válido (parte local curta, rótulos de domínio <= 63), 188 caracteres:
-    // viola somente o @Size(max = 150).
+    // Viola somente o @Size(max = 254).
     private static final String EMAIL_ABOVE_LIMIT =
-            "a@" + "b".repeat(60) + "." + "b".repeat(60) + "." + "b".repeat(60) + ".com";
+            "a".repeat(64) + "@"
+                    + "b".repeat(63) + "."
+                    + "c".repeat(63) + "."
+                    + "d".repeat(60) + ".com";
 
     @Autowired
     private MockMvc mockMvc;
@@ -556,7 +558,7 @@ public class ClientControllerTests {
                 Arguments.of("email format is invalid",
                         new ClientUpdateRequestDTO(null, "email-invalido", null, null),
                         "email", EMAIL_INVALID_MESSAGE),
-                Arguments.of("email exceeds 150 characters",
+                Arguments.of("email exceeds 254 characters",
                         new ClientUpdateRequestDTO(null, EMAIL_ABOVE_LIMIT, null, null),
                         "email", EMAIL_TOO_LONG_MESSAGE),
                 Arguments.of("phone number is empty",

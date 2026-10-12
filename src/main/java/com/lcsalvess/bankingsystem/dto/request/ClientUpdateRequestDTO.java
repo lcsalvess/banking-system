@@ -10,7 +10,7 @@ public record ClientUpdateRequestDTO(
         @Pattern(regexp = "(?s).*\\S.*", message = "O nome não pode ser vazio.")
         String name,
         @Email(message = "O formato do e-mail é inválido.")
-        @Size(max = 150, message = "O e-mail deve ter no máximo 150 caracteres.")
+        @Size(max = 254, message = "O e-mail deve ter no máximo 254 caracteres.")
         @Pattern(regexp = "(?s).*\\S.*", message = "O e-mail não pode ser vazio.")
         String email,
         @Pattern(regexp = "^[0-9]{10,11}$", message = "O telefone deve conter de 10 a 11 números, incluindo o DDD.")

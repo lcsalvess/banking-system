@@ -1,8 +1,10 @@
+
 package com.lcsalvess.bankingsystem.bootstrap;
 
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +14,10 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class AdminBootstrapRunner implements CommandLineRunner {
-    private static final Logger log = LoggerFactory.getLogger(AdminBootstrapRunner.class);
+
+    private static final Logger log =
+            LoggerFactory.getLogger(AdminBootstrapRunner.class);
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -25,23 +30,55 @@ public class AdminBootstrapRunner implements CommandLineRunner {
     @Value("${app.admin.password:}")
     private String adminPassword;
 
-    public AdminBootstrapRunner(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    @Value("${app.admin.bootstrap.required:false}")
+    private boolean bootstrapRequired;
+
+    public AdminBootstrapRunner(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder
+    ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
-    public void run(String... args) {
+    public void run(String @NonNull ... args) {
         if (userRepository.existsByRole(Role.ADMIN)) {
             log.info("Usuário administrador já existe. Bootstrap ignorado.");
             return;
         }
-        if (adminUsername.isBlank() || adminEmail.isBlank() || adminPassword.isBlank()) {
-            log.warn("Nenhum usuário administrador encontrado e as credenciais iniciais não foram definidas. Bootstrap ignorado.");
+
+        if (!credentialsConfigured()) {
+            String message =
+                    "Nenhum administrador existe e as credenciais iniciais "
+                            + "não foram configuradas.";
+
+            if (bootstrapRequired) {
+                throw new IllegalStateException(
+                        message + " Configure ADMIN_USERNAME, ADMIN_EMAIL "
+                                + "e ADMIN_PASSWORD antes de iniciar a aplicação."
+                );
+            }
+
+            log.warn("{} Bootstrap ignorado neste ambiente.", message);
             return;
         }
-        User admin = new User(adminUsername, adminEmail, passwordEncoder.encode(adminPassword), Role.ADMIN);
+
+        User admin = new User(
+                adminUsername,
+                adminEmail,
+                passwordEncoder.encode(adminPassword),
+                Role.ADMIN
+        );
+
         userRepository.save(admin);
-        log.info("Usuário administrador inicial criado: {}", adminUsername);
+
+        log.info("Usuário administrador inicial criado com sucesso.");
+    }
+
+    private boolean credentialsConfigured() {
+        return adminUsername != null && !adminUsername.isBlank()
+                && adminEmail != null && !adminEmail.isBlank()
+                && adminPassword != null && !adminPassword.isBlank();
     }
 }

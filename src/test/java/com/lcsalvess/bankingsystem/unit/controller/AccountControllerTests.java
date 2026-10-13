@@ -7,8 +7,10 @@ import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.enums.AccountType;
 import com.lcsalvess.bankingsystem.exception.account.*;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -47,9 +49,6 @@ public class AccountControllerTests {
     private static final String INTERNAL_ERROR_MESSAGE = "Ocorreu um erro interno no servidor.";
     private static final String INVALID_BODY_MESSAGE = "Dados da requisição inválidos.";
     private static final String VALIDATION_MESSAGE = "Erro de validação.";
-    private static final String MISSING_PARAM_MESSAGE = "Parâmetro de requisição obrigatório ausente.";
-    private static final String INVALID_ACCOUNT_NUMBER_MESSAGE = "O número da conta deve conter entre 5 e 20 dígitos.";
-    private static final String INVALID_ACCOUNT_DIGIT_MESSAGE = "O dígito da conta deve conter 1 dígito.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -186,7 +185,7 @@ public class AccountControllerTests {
             performErrorResponse(
                     mockMvc.perform(get(URL, "99999")),
                     400,
-                    MISSING_PARAM_MESSAGE
+                    ApiErrorMessages.MISSING_REQUIRED_PARAMETER
             );
 
             verifyNoInteractions(accountService);
@@ -215,7 +214,7 @@ public class AccountControllerTests {
                     .andExpect(jsonPath("$.status").value(400))
                     .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
                     .andExpect(jsonPath("$.errors.accountNumber")
-                            .value(INVALID_ACCOUNT_NUMBER_MESSAGE));
+                            .value(ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH));
 
             verifyNoInteractions(accountService);
         }
@@ -234,7 +233,7 @@ public class AccountControllerTests {
                     .andExpect(jsonPath("$.status").value(400))
                     .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
                     .andExpect(jsonPath("$.errors.digit")
-                            .value(INVALID_ACCOUNT_DIGIT_MESSAGE));
+                            .value(ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH));
 
             verifyNoInteractions(accountService);
         }
@@ -432,7 +431,7 @@ public class AccountControllerTests {
             performErrorResponse(
                     mockMvc.perform(patch(URL, "99999")),
                     400,
-                    MISSING_PARAM_MESSAGE
+                    ApiErrorMessages.MISSING_REQUIRED_PARAMETER
             );
 
             verifyNoInteractions(accountService);
@@ -452,7 +451,7 @@ public class AccountControllerTests {
                     .andExpect(jsonPath("$.status").value(400))
                     .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
                     .andExpect(jsonPath("$.errors.accountNumber")
-                            .value(INVALID_ACCOUNT_NUMBER_MESSAGE));
+                            .value(ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH));
 
             verifyNoInteractions(accountService);
         }
@@ -471,7 +470,7 @@ public class AccountControllerTests {
                     .andExpect(jsonPath("$.status").value(400))
                     .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
                     .andExpect(jsonPath("$.errors.digit")
-                            .value(INVALID_ACCOUNT_DIGIT_MESSAGE));
+                            .value(ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH));
 
             verifyNoInteractions(accountService);
         }

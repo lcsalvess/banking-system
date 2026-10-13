@@ -6,12 +6,14 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.exception.account.*;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
 import com.lcsalvess.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
 import com.lcsalvess.bankingsystem.exception.transaction.YieldNotAvailableException;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -51,54 +53,6 @@ public class TransactionControllerTests {
 
     private static final String PROVIDER =
             "com.lcsalvess.bankingsystem.unit.controller.TransactionControllerTests#";
-
-    private static final String INTERNAL_ERROR_MESSAGE =
-            "Ocorreu um erro interno no servidor.";
-
-    private static final String INVALID_BODY_MESSAGE =
-            "Dados da requisição inválidos.";
-
-    private static final String VALIDATION_MESSAGE =
-            "Erro de validação.";
-
-    private static final String MISSING_PARAM_MESSAGE =
-            "Parâmetro de requisição obrigatório ausente.";
-
-    private static final String INVALID_REQUEST_PARAM_MESSAGE =
-            "Parâmetro de requisição inválido.";
-
-    private static final String INVALID_ACCOUNT_NUMBER_MESSAGE =
-            "O número da conta deve conter entre 5 e 20 dígitos.";
-
-    private static final String INVALID_ACCOUNT_DIGIT_MESSAGE =
-            "O dígito da conta deve conter 1 dígito.";
-
-    private static final String INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE =
-            "Dígito da conta inválido.";
-
-    private static final String ACCOUNT_NOT_FOUND_MESSAGE =
-            "Conta não encontrada.";
-
-    private static final String ACCOUNT_NOT_ACTIVE_MESSAGE =
-            "A conta informada não está ativa.";
-
-    private static final String INSUFFICIENT_BALANCE_MESSAGE =
-            "O valor informado é maior do que o saldo.";
-
-    private static final String ACCOUNTS_ARE_SAME_MESSAGE =
-            "A conta de origem não pode ser igual à conta de destino.";
-
-    private static final String ACCOUNT_NOT_SAVINGS_MESSAGE =
-            "A conta informada não é poupança.";
-
-    private static final String YIELD_NOT_AVAILABLE_MESSAGE =
-            "Não há rendimento disponível para esta conta.";
-
-    private static final String YIELD_ALREADY_APPLIED_MESSAGE =
-            "O rendimento já foi aplicado para a conta hoje.";
-
-    private static final String TRANSACTION_NOT_FOUND_MESSAGE =
-            "Transação não encontrada.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -167,11 +121,11 @@ public class TransactionControllerTests {
             when(transactionService.deposit(request))
                     .thenThrow(
                             new InvalidAccountDigitException(
-                                    INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE
+                                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT
                             )
                     );
 
-            performPost(URL, request, 400, INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE);
+            performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
             verify(transactionService).deposit(request);
             verifyNoMoreInteractions(transactionService);
@@ -184,10 +138,10 @@ public class TransactionControllerTests {
 
             when(transactionService.deposit(request))
                     .thenThrow(
-                            new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE)
+                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
                     );
 
-            performPost(URL, request, 404, ACCOUNT_NOT_FOUND_MESSAGE);
+            performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
             verify(transactionService).deposit(request);
             verifyNoMoreInteractions(transactionService);
@@ -200,10 +154,10 @@ public class TransactionControllerTests {
 
             when(transactionService.deposit(request))
                     .thenThrow(
-                            new AccountIsNotActiveException(ACCOUNT_NOT_ACTIVE_MESSAGE)
+                            new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE)
                     );
 
-            performPost(URL, request, 409, ACCOUNT_NOT_ACTIVE_MESSAGE);
+            performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
 
             verify(transactionService).deposit(request);
             verifyNoMoreInteractions(transactionService);
@@ -215,9 +169,9 @@ public class TransactionControllerTests {
             AccountOperationRequestDTO request = operationRequest();
 
             when(transactionService.deposit(request))
-                    .thenThrow(new RuntimeException("Unexpected exception"));
+                    .thenThrow(new RuntimeException());
 
-            performPost(URL, request, 500, INTERNAL_ERROR_MESSAGE);
+            performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(transactionService).deposit(request);
             verifyNoMoreInteractions(transactionService);
@@ -282,11 +236,11 @@ public class TransactionControllerTests {
             when(transactionService.withdraw(request))
                     .thenThrow(
                             new InvalidAccountDigitException(
-                                    INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE
+                                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT
                             )
                     );
 
-            performPost(URL, request, 400, INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE);
+            performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
             verify(transactionService).withdraw(request);
             verifyNoMoreInteractions(transactionService);
@@ -299,10 +253,10 @@ public class TransactionControllerTests {
 
             when(transactionService.withdraw(request))
                     .thenThrow(
-                            new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE)
+                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
                     );
 
-            performPost(URL, request, 404, ACCOUNT_NOT_FOUND_MESSAGE);
+            performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
             verify(transactionService).withdraw(request);
             verifyNoMoreInteractions(transactionService);
@@ -316,11 +270,11 @@ public class TransactionControllerTests {
             when(transactionService.withdraw(request))
                     .thenThrow(
                             new InsufficientBalanceException(
-                                    INSUFFICIENT_BALANCE_MESSAGE
+                                    ApiErrorMessages.INSUFFICIENT_BALANCE
                             )
                     );
 
-            performPost(URL, request, 409, INSUFFICIENT_BALANCE_MESSAGE);
+            performPost(URL, request, 409, ApiErrorMessages.INSUFFICIENT_BALANCE);
 
             verify(transactionService).withdraw(request);
             verifyNoMoreInteractions(transactionService);
@@ -333,10 +287,10 @@ public class TransactionControllerTests {
 
             when(transactionService.withdraw(request))
                     .thenThrow(
-                            new AccountIsNotActiveException(ACCOUNT_NOT_ACTIVE_MESSAGE)
+                            new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE)
                     );
 
-            performPost(URL, request, 409, ACCOUNT_NOT_ACTIVE_MESSAGE);
+            performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
 
             verify(transactionService).withdraw(request);
             verifyNoMoreInteractions(transactionService);
@@ -348,9 +302,9 @@ public class TransactionControllerTests {
             AccountOperationRequestDTO request = operationRequest();
 
             when(transactionService.withdraw(request))
-                    .thenThrow(new RuntimeException("Unexpected exception"));
+                    .thenThrow(new RuntimeException());
 
-            performPost(URL, request, 500, INTERNAL_ERROR_MESSAGE);
+            performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(transactionService).withdraw(request);
             verifyNoMoreInteractions(transactionService);
@@ -415,11 +369,11 @@ public class TransactionControllerTests {
             when(transactionService.transfer(request))
                     .thenThrow(
                             new InvalidAccountDigitException(
-                                    INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE
+                                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT
                             )
                     );
 
-            performPost(URL, request, 400, INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE);
+            performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
             verify(transactionService).transfer(request);
             verifyNoMoreInteractions(transactionService);
@@ -432,10 +386,10 @@ public class TransactionControllerTests {
 
             when(transactionService.transfer(request))
                     .thenThrow(
-                            new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE)
+                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
                     );
 
-            performPost(URL, request, 404, ACCOUNT_NOT_FOUND_MESSAGE);
+            performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
             verify(transactionService).transfer(request);
             verifyNoMoreInteractions(transactionService);
@@ -448,10 +402,10 @@ public class TransactionControllerTests {
 
             when(transactionService.transfer(request))
                     .thenThrow(
-                            new AccountsAreSameException(ACCOUNTS_ARE_SAME_MESSAGE)
+                            new AccountsAreSameException(ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT)
                     );
 
-            performPost(URL, request, 400, ACCOUNTS_ARE_SAME_MESSAGE);
+            performPost(URL, request, 400, ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT);
 
             verify(transactionService).transfer(request);
             verifyNoMoreInteractions(transactionService);
@@ -465,11 +419,11 @@ public class TransactionControllerTests {
             when(transactionService.transfer(request))
                     .thenThrow(
                             new InsufficientBalanceException(
-                                    INSUFFICIENT_BALANCE_MESSAGE
+                                    ApiErrorMessages.INSUFFICIENT_BALANCE
                             )
                     );
 
-            performPost(URL, request, 409, INSUFFICIENT_BALANCE_MESSAGE);
+            performPost(URL, request, 409, ApiErrorMessages.INSUFFICIENT_BALANCE);
 
             verify(transactionService).transfer(request);
             verifyNoMoreInteractions(transactionService);
@@ -482,10 +436,10 @@ public class TransactionControllerTests {
 
             when(transactionService.transfer(request))
                     .thenThrow(
-                            new AccountIsNotActiveException(ACCOUNT_NOT_ACTIVE_MESSAGE)
+                            new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE)
                     );
 
-            performPost(URL, request, 409, ACCOUNT_NOT_ACTIVE_MESSAGE);
+            performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
 
             verify(transactionService).transfer(request);
             verifyNoMoreInteractions(transactionService);
@@ -497,9 +451,9 @@ public class TransactionControllerTests {
             TransferRequestDTO request = transferRequest();
 
             when(transactionService.transfer(request))
-                    .thenThrow(new RuntimeException("Unexpected exception"));
+                    .thenThrow(new RuntimeException());
 
-            performPost(URL, request, 500, INTERNAL_ERROR_MESSAGE);
+            performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(transactionService).transfer(request);
             verifyNoMoreInteractions(transactionService);
@@ -539,11 +493,11 @@ public class TransactionControllerTests {
             when(transactionService.applyYield("99999", "3"))
                     .thenThrow(
                             new InvalidAccountDigitException(
-                                    INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE
+                                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT
                             )
                     );
 
-            performYield("3", 400, INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE);
+            performYield("3", 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
             verify(transactionService).applyYield("99999", "3");
             verifyNoMoreInteractions(transactionService);
@@ -554,10 +508,10 @@ public class TransactionControllerTests {
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
             when(transactionService.applyYield("99999", "5"))
                     .thenThrow(
-                            new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE)
+                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
                     );
 
-            performYield("5", 404, ACCOUNT_NOT_FOUND_MESSAGE);
+            performYield("5", 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
             verify(transactionService).applyYield("99999", "5");
             verifyNoMoreInteractions(transactionService);
@@ -568,10 +522,10 @@ public class TransactionControllerTests {
         void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
             when(transactionService.applyYield("99999", "5"))
                     .thenThrow(
-                            new AccountIsNotActiveException(ACCOUNT_NOT_ACTIVE_MESSAGE)
+                            new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE)
                     );
 
-            performYield("5", 409, ACCOUNT_NOT_ACTIVE_MESSAGE);
+            performYield("5", 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
 
             verify(transactionService).applyYield("99999", "5");
             verifyNoMoreInteractions(transactionService);
@@ -582,10 +536,10 @@ public class TransactionControllerTests {
         void shouldReturnConflictWhenAccountIsNotSavings() throws Exception {
             when(transactionService.applyYield("99999", "5"))
                     .thenThrow(
-                            new AccountIsNotSavingsException(ACCOUNT_NOT_SAVINGS_MESSAGE)
+                            new AccountIsNotSavingsException(ApiErrorMessages.ACCOUNT_NOT_SAVINGS)
                     );
 
-            performYield("5", 409, ACCOUNT_NOT_SAVINGS_MESSAGE);
+            performYield("5", 409, ApiErrorMessages.ACCOUNT_NOT_SAVINGS);
 
             verify(transactionService).applyYield("99999", "5");
             verifyNoMoreInteractions(transactionService);
@@ -597,11 +551,11 @@ public class TransactionControllerTests {
             when(transactionService.applyYield("99999", "5"))
                     .thenThrow(
                             new YieldNotAvailableException(
-                                    YIELD_NOT_AVAILABLE_MESSAGE
+                                    ApiErrorMessages.YIELD_NOT_AVAILABLE
                             )
                     );
 
-            performYield("5", 409, YIELD_NOT_AVAILABLE_MESSAGE);
+            performYield("5", 409, ApiErrorMessages.YIELD_NOT_AVAILABLE);
 
             verify(transactionService).applyYield("99999", "5");
             verifyNoMoreInteractions(transactionService);
@@ -613,11 +567,11 @@ public class TransactionControllerTests {
             when(transactionService.applyYield("99999", "5"))
                     .thenThrow(
                             new YieldAlreadyAppliedException(
-                                    YIELD_ALREADY_APPLIED_MESSAGE
+                                    ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED
                             )
                     );
 
-            performYield("5", 409, YIELD_ALREADY_APPLIED_MESSAGE);
+            performYield("5", 409, ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED);
 
             verify(transactionService).applyYield("99999", "5");
             verifyNoMoreInteractions(transactionService);
@@ -629,7 +583,7 @@ public class TransactionControllerTests {
             when(transactionService.applyYield("99999", "5"))
                     .thenThrow(new RuntimeException("Unexpected exception"));
 
-            performYield("5", 500, INTERNAL_ERROR_MESSAGE);
+            performYield("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(transactionService).applyYield("99999", "5");
             verifyNoMoreInteractions(transactionService);
@@ -642,7 +596,7 @@ public class TransactionControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(MISSING_PARAM_MESSAGE));
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
 
             verifyNoInteractions(transactionService);
         }
@@ -659,10 +613,10 @@ public class TransactionControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(
                             jsonPath("$.errors.accountNumber")
-                                    .value(INVALID_ACCOUNT_NUMBER_MESSAGE)
+                                    .value(ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH)
                     );
 
             verifyNoInteractions(transactionService);
@@ -679,10 +633,10 @@ public class TransactionControllerTests {
                             .param("digit", digit))
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(
                             jsonPath("$.errors.digit")
-                                    .value(INVALID_ACCOUNT_DIGIT_MESSAGE)
+                                    .value(ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH)
                     );
 
             verifyNoInteractions(transactionService);
@@ -762,11 +716,11 @@ public class TransactionControllerTests {
             when(transactionService.findByAccountNumber("99999", "3"))
                     .thenThrow(
                             new InvalidAccountDigitException(
-                                    INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE
+                                    ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
                             )
                     );
 
-            performGet("3", 400, INVALID_ACCOUNT_DIGIT_BUSINESS_MESSAGE);
+            performGet("3", 400, ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH);
 
             verify(transactionService).findByAccountNumber("99999", "3");
             verifyNoMoreInteractions(transactionService);
@@ -777,10 +731,10 @@ public class TransactionControllerTests {
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
             when(transactionService.findByAccountNumber("99999", "5"))
                     .thenThrow(
-                            new AccountNotFoundException(ACCOUNT_NOT_FOUND_MESSAGE)
+                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
                     );
 
-            performGet("5", 404, ACCOUNT_NOT_FOUND_MESSAGE);
+            performGet("5", 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
             verify(transactionService).findByAccountNumber("99999", "5");
             verifyNoMoreInteractions(transactionService);
@@ -792,7 +746,7 @@ public class TransactionControllerTests {
             when(transactionService.findByAccountNumber("99999", "5"))
                     .thenThrow(new RuntimeException("Unexpected exception"));
 
-            performGet("5", 500, INTERNAL_ERROR_MESSAGE);
+            performGet("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(transactionService).findByAccountNumber("99999", "5");
             verifyNoMoreInteractions(transactionService);
@@ -805,7 +759,7 @@ public class TransactionControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(MISSING_PARAM_MESSAGE));
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
 
             verifyNoInteractions(transactionService);
         }
@@ -822,10 +776,10 @@ public class TransactionControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(
                             jsonPath("$.errors.accountNumber")
-                                    .value(INVALID_ACCOUNT_NUMBER_MESSAGE)
+                                    .value(ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH)
                     );
 
             verifyNoInteractions(transactionService);
@@ -844,10 +798,10 @@ public class TransactionControllerTests {
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(
                             jsonPath("$.errors.digit")
-                                    .value(INVALID_ACCOUNT_DIGIT_MESSAGE)
+                                    .value(ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH)
                     );
 
             verifyNoInteractions(transactionService);
@@ -916,14 +870,14 @@ public class TransactionControllerTests {
             when(transactionService.findByTransactionCode(transactionCode))
                     .thenThrow(
                             new TransactionNotFoundException(
-                                    TRANSACTION_NOT_FOUND_MESSAGE
+                                    ApiErrorMessages.TRANSACTION_NOT_FOUND
                             )
                     );
 
             performErrorResponse(
                     performGetByTransactionCode(transactionCode.toString()),
                     404,
-                    TRANSACTION_NOT_FOUND_MESSAGE
+                    ApiErrorMessages.TRANSACTION_NOT_FOUND
             );
 
             verify(transactionService).findByTransactionCode(transactionCode);
@@ -936,7 +890,7 @@ public class TransactionControllerTests {
             performErrorResponse(
                     performGetByTransactionCode("invalid-uuid"),
                     400,
-                    INVALID_REQUEST_PARAM_MESSAGE
+                    ApiErrorMessages.INVALID_REQUEST_PARAMETER
             );
 
             verifyNoInteractions(transactionService);
@@ -958,31 +912,31 @@ public class TransactionControllerTests {
                         "account number is null",
                         new AccountOperationRequestDTO(null, "5", amount),
                         "accountNumber",
-                        "O número da conta é obrigatório."
+                        ValidationMessages.REQUIRED_ACCOUNT_NUMBER
                 ),
                 Arguments.of(
                         "account number is too short",
                         new AccountOperationRequestDTO("1234", "5", amount),
                         "accountNumber",
-                        "O número da conta deve conter entre 5 e 20 dígitos."
+                        ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
                 ),
                 Arguments.of(
                         "digit is null",
                         new AccountOperationRequestDTO("99999", null, amount),
                         "digit",
-                        "O dígito da conta é obrigatório."
+                        ValidationMessages.REQUIRED_ACCOUNT_DIGIT
                 ),
                 Arguments.of(
                         "digit does not have 1 digit",
                         new AccountOperationRequestDTO("99999", "12", amount),
                         "digit",
-                        "O dígito da conta deve conter exatamente 1 dígito."
+                        ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
                 ),
                 Arguments.of(
                         "amount is null",
                         new AccountOperationRequestDTO("99999", "5", null),
                         "amount",
-                        "O valor da operação é obrigatório."
+                        ValidationMessages.REQUIRED_OPERATION_AMOUNT
                 ),
                 Arguments.of(
                         "amount is zero",
@@ -992,7 +946,7 @@ public class TransactionControllerTests {
                                 BigDecimal.ZERO
                         ),
                         "amount",
-                        "O valor da operação deve ser maior que zero."
+                        ValidationMessages.POSITIVE_OPERATION_AMOUNT
                 ),
                 Arguments.of(
                         "amount is negative",
@@ -1002,7 +956,7 @@ public class TransactionControllerTests {
                                 new BigDecimal("-1.00")
                         ),
                         "amount",
-                        "O valor da operação deve ser maior que zero."
+                        ValidationMessages.POSITIVE_OPERATION_AMOUNT
                 )
         );
     }
@@ -1022,7 +976,7 @@ public class TransactionControllerTests {
                                 amount
                         ),
                         "fromAccountNumber",
-                        "O número da conta de origem é obrigatório."
+                        ValidationMessages.REQUIRED_SOURCE_ACCOUNT_NUMBER
                 ),
                 Arguments.of(
                         "origin account number is too short",
@@ -1034,7 +988,7 @@ public class TransactionControllerTests {
                                 amount
                         ),
                         "fromAccountNumber",
-                        "O número da conta de origem deve conter entre 5 e 20 dígitos."
+                        ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
                 ),
                 Arguments.of(
                         "origin digit is null",
@@ -1046,7 +1000,7 @@ public class TransactionControllerTests {
                                 amount
                         ),
                         "fromAccountDigit",
-                        "O dígito da conta de origem é obrigatório."
+                        ValidationMessages.REQUIRED_SOURCE_ACCOUNT_DIGIT
                 ),
                 Arguments.of(
                         "origin digit does not have 1 digit",
@@ -1058,7 +1012,7 @@ public class TransactionControllerTests {
                                 amount
                         ),
                         "fromAccountDigit",
-                        "O dígito da conta de origem deve conter exatamente 1 dígito."
+                        ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
                 ),
                 Arguments.of(
                         "destination account number is null",
@@ -1070,7 +1024,7 @@ public class TransactionControllerTests {
                                 amount
                         ),
                         "toAccountNumber",
-                        "O número da conta de destino é obrigatório."
+                        ValidationMessages.REQUIRED_DESTINATION_ACCOUNT_NUMBER
                 ),
                 Arguments.of(
                         "destination account number is too short",
@@ -1082,7 +1036,7 @@ public class TransactionControllerTests {
                                 amount
                         ),
                         "toAccountNumber",
-                        "O número da conta de destino deve conter entre 5 e 20 dígitos."
+                        ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
                 ),
                 Arguments.of(
                         "destination digit is null",
@@ -1094,7 +1048,7 @@ public class TransactionControllerTests {
                                 amount
                         ),
                         "toAccountDigit",
-                        "O dígito da conta de destino é obrigatório."
+                        ValidationMessages.REQUIRED_DESTINATION_ACCOUNT_DIGIT
                 ),
                 Arguments.of(
                         "destination digit does not have 1 digit",
@@ -1106,7 +1060,7 @@ public class TransactionControllerTests {
                                 amount
                         ),
                         "toAccountDigit",
-                        "O dígito da conta de destino deve conter exatamente 1 dígito."
+                        ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
                 ),
                 Arguments.of(
                         "amount is null",
@@ -1118,7 +1072,7 @@ public class TransactionControllerTests {
                                 null
                         ),
                         "amount",
-                        "O valor da transferência é obrigatório."
+                        ValidationMessages.REQUIRED_TRANSFER_AMOUNT
                 ),
                 Arguments.of(
                         "amount is zero",
@@ -1130,7 +1084,7 @@ public class TransactionControllerTests {
                                 BigDecimal.ZERO
                         ),
                         "amount",
-                        "O valor da transferência deve ser maior que zero."
+                        ValidationMessages.POSITIVE_TRANSFER_AMOUNT
                 ),
                 Arguments.of(
                         "amount is negative",
@@ -1142,7 +1096,7 @@ public class TransactionControllerTests {
                                 new BigDecimal("-1.00")
                         ),
                         "amount",
-                        "O valor da transferência deve ser maior que zero."
+                        ValidationMessages.POSITIVE_TRANSFER_AMOUNT
                 )
         );
     }
@@ -1208,7 +1162,7 @@ public class TransactionControllerTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                 .andExpect(jsonPath("$.errors." + field).value(message));
     }
 
@@ -1220,7 +1174,7 @@ public class TransactionControllerTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(INVALID_BODY_MESSAGE));
+                .andExpect(jsonPath("$.message").value(ApiErrorMessages.INVALID_REQUEST_DATA));
     }
 
     private TransactionResponseDTO readTransaction(MvcResult result)

@@ -192,13 +192,13 @@ class BrasilApiClientTests {
                             """, "O estado é obrigatório."),
                     arguments("unknown state", """
                             { "cep": "01001000", "state": "XX", "city": "São Paulo", "neighborhood": "Sé", "street": "Praça da Sé" }
-                            """, "O Estado deve ser uma UF válida."),
+                            """, "A sigla do estado informada não corresponde a uma UF válida."),
                     arguments("missing postal code", """
                             { "state": "SP", "city": "São Paulo", "neighborhood": "Sé", "street": "Praça da Sé" }
                             """, "O CEP é obrigatório."),
                     arguments("postal code with less than 8 digits", """
                             { "cep": "0100100", "state": "SP", "city": "São Paulo", "neighborhood": "Sé", "street": "Praça da Sé" }
-                            """, "O CEP deve conter exatamente 8 dígitos.")
+                            """, "O CEP deve conter exatamente 8 números, sem traços ou espaços.")
             );
         }
     }

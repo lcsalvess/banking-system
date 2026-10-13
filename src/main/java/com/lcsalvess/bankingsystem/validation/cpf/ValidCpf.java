@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.validation.cpf;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
@@ -25,7 +26,7 @@ public @interface ValidCpf {
     /**
      * Mensagem exibida quando a validação falhar.
      */
-    String message() default "CPF inválido.";
+    String message() default ValidationMessages.INVALID_CPF;
 
     /**
      * Permite agrupar diferentes regras de validação.

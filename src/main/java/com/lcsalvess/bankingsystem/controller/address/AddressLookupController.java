@@ -3,6 +3,7 @@ package com.lcsalvess.bankingsystem.controller.address;
 import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.service.address.AddressService;
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -71,7 +72,7 @@ public class AddressLookupController {
             @PathVariable
             @Pattern(
                     regexp = "^\\d{8}$",
-                    message = "O CEP deve conter exatamente 8 dígitos.")
+                    message = ValidationMessages.INVALID_POSTAL_CODE_FORMAT)
             String postalCode) {
         return addressService.lookupByPostalCode(postalCode);
     }

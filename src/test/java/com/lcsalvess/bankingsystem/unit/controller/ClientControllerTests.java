@@ -12,10 +12,12 @@ import com.lcsalvess.bankingsystem.entity.Address;
 import com.lcsalvess.bankingsystem.entity.enums.State;
 import com.lcsalvess.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -53,29 +55,6 @@ public class ClientControllerTests {
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.ClientControllerTests#";
     private static final String CLIENTS_URL = "/api/v1/clients";
     private static final String CLIENT_URL = "/api/v1/clients/{id}";
-
-    private static final String INTERNAL_ERROR_MESSAGE = "Ocorreu um erro interno no servidor.";
-    private static final String INVALID_BODY_MESSAGE = "Dados da requisição inválidos.";
-    private static final String INVALID_PARAM_MESSAGE = "Parâmetro de requisição inválido.";
-    private static final String VALIDATION_MESSAGE = "Erro de validação.";
-    private static final String CLIENT_NOT_FOUND_MESSAGE = "Cliente não encontrado.";
-    private static final String CPF_ALREADY_EXISTS_MESSAGE = "Já existe um cliente cadastrado com este CPF.";
-    private static final String POSTAL_CODE_NOT_FOUND_MESSAGE = "CEP 01001000 não encontrado em nenhum provedor.";
-    private static final String ADDRESS_UNAVAILABLE_MESSAGE =
-            "O serviço de consulta de endereços está temporariamente indisponível.";
-
-    private static final String NAME_BLANK_MESSAGE = "O nome não pode ser vazio.";
-    private static final String NAME_TOO_LONG_MESSAGE = "O nome deve ter no máximo 125 caracteres.";
-    private static final String EMAIL_BLANK_MESSAGE = "O e-mail não pode ser vazio.";
-    private static final String EMAIL_INVALID_MESSAGE = "O formato do e-mail é inválido.";
-    private static final String EMAIL_TOO_LONG_MESSAGE = "O e-mail deve ter no máximo 254 caracteres.";
-    private static final String PHONE_INVALID_MESSAGE = "O telefone deve conter de 10 a 11 números, incluindo o DDD.";
-    private static final String STREET_NUMBER_BLANK_MESSAGE = "O número é obrigatório.";
-    private static final String STREET_NUMBER_TOO_LONG_MESSAGE = "O número deve ter no máximo 10 caracteres.";
-    private static final String COMPLEMENT_TOO_LONG_MESSAGE = "O complemento deve ter no máximo 100 caracteres.";
-    private static final String POSTAL_CODE_REQUIRED_MESSAGE = "O CEP é obrigatório.";
-    private static final String POSTAL_CODE_INVALID_MESSAGE =
-            "O CEP deve conter exatamente 8 números, sem traços ou espaços.";
 
     private static final String VALID_NAME = "Cliente Teste";
     private static final String VALID_CPF = "52998224725";
@@ -150,7 +129,7 @@ public class ClientControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             when(clientService.findAll()).thenThrow(new RuntimeException("Unexpected exception"));
 
-            performErrorResponse(mockMvc.perform(get(CLIENTS_URL)), 500, INTERNAL_ERROR_MESSAGE);
+            performErrorResponse(mockMvc.perform(get(CLIENTS_URL)), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(clientService).findAll();
             verifyNoMoreInteractions(clientService);
@@ -183,9 +162,9 @@ public class ClientControllerTests {
         @DisplayName("Should return 404 when client does not exist")
         void shouldReturnNotFoundWhenClientDoesNotExist() throws Exception {
             when(clientService.findById(1L))
-                    .thenThrow(new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE));
+                    .thenThrow(new ClientNotFoundException(ApiErrorMessages.CLIENT_NOT_FOUND));
 
-            performErrorResponse(mockMvc.perform(get(CLIENT_URL, 1L)), 404, CLIENT_NOT_FOUND_MESSAGE);
+            performErrorResponse(mockMvc.perform(get(CLIENT_URL, 1L)), 404, ApiErrorMessages.CLIENT_NOT_FOUND);
 
             verify(clientService).findById(1L);
             verifyNoMoreInteractions(clientService);
@@ -194,7 +173,7 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return 400 when ID is invalid")
         void shouldReturnBadRequestWhenIdIsInvalid() throws Exception {
-            performErrorResponse(mockMvc.perform(get(CLIENT_URL, "abc")), 400, INVALID_PARAM_MESSAGE);
+            performErrorResponse(mockMvc.perform(get(CLIENT_URL, "abc")), 400, ApiErrorMessages.INVALID_REQUEST_PARAMETER);
 
             verifyNoInteractions(clientService);
         }
@@ -204,7 +183,7 @@ public class ClientControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             when(clientService.findById(1L)).thenThrow(new RuntimeException("Unexpected exception"));
 
-            performErrorResponse(mockMvc.perform(get(CLIENT_URL, 1L)), 500, INTERNAL_ERROR_MESSAGE);
+            performErrorResponse(mockMvc.perform(get(CLIENT_URL, 1L)), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(clientService).findById(1L);
             verifyNoMoreInteractions(clientService);
@@ -262,9 +241,9 @@ public class ClientControllerTests {
             ClientRequestDTO request = validClientRequest();
 
             when(clientService.create(request))
-                    .thenThrow(new PostalCodeNotFoundException(POSTAL_CODE_NOT_FOUND_MESSAGE));
+                    .thenThrow(new PostalCodeNotFoundException(ApiErrorMessages.POSTAL_CODE_NOT_FOUND));
 
-            performErrorResponse(postClient(request), 404, POSTAL_CODE_NOT_FOUND_MESSAGE);
+            performErrorResponse(postClient(request), 404, ApiErrorMessages.POSTAL_CODE_NOT_FOUND);
 
             verify(clientService).create(request);
             verifyNoMoreInteractions(clientService);
@@ -276,9 +255,9 @@ public class ClientControllerTests {
             ClientRequestDTO request = validClientRequest();
 
             when(clientService.create(request))
-                    .thenThrow(new ClientCpfAlreadyExistsException(CPF_ALREADY_EXISTS_MESSAGE));
+                    .thenThrow(new ClientCpfAlreadyExistsException(ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS));
 
-            performErrorResponse(postClient(request), 409, CPF_ALREADY_EXISTS_MESSAGE);
+            performErrorResponse(postClient(request), 409, ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS);
 
             verify(clientService).create(request);
             verifyNoMoreInteractions(clientService);
@@ -292,7 +271,7 @@ public class ClientControllerTests {
             when(clientService.create(request))
                     .thenThrow(new AddressProviderUnavailableException("Serviços de CEP indisponíveis no momento."));
 
-            performErrorResponse(postClient(request), 503, ADDRESS_UNAVAILABLE_MESSAGE);
+            performErrorResponse(postClient(request), 503, ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE);
 
             verify(clientService).create(request);
             verifyNoMoreInteractions(clientService);
@@ -305,7 +284,7 @@ public class ClientControllerTests {
 
             when(clientService.create(request)).thenThrow(new RuntimeException("Unexpected exception"));
 
-            performErrorResponse(postClient(request), 500, INTERNAL_ERROR_MESSAGE);
+            performErrorResponse(postClient(request), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(clientService).create(request);
             verifyNoMoreInteractions(clientService);
@@ -399,7 +378,7 @@ public class ClientControllerTests {
             performErrorResponse(
                     patchClient("abc", validClientUpdateRequest()),
                     400,
-                    INVALID_PARAM_MESSAGE
+                    ApiErrorMessages.INVALID_REQUEST_PARAMETER
             );
 
             verifyNoInteractions(clientService);
@@ -411,9 +390,9 @@ public class ClientControllerTests {
             ClientUpdateRequestDTO request = validClientUpdateRequest();
 
             when(clientService.update(1L, request))
-                    .thenThrow(new ClientNotFoundException(CLIENT_NOT_FOUND_MESSAGE));
+                    .thenThrow(new ClientNotFoundException(ApiErrorMessages.CLIENT_NOT_FOUND));
 
-            performErrorResponse(patchClient(1L, request), 404, CLIENT_NOT_FOUND_MESSAGE);
+            performErrorResponse(patchClient(1L, request), 404, ApiErrorMessages.CLIENT_NOT_FOUND);
 
             verify(clientService).update(1L, request);
             verifyNoMoreInteractions(clientService);
@@ -425,9 +404,9 @@ public class ClientControllerTests {
             ClientUpdateRequestDTO request = validClientUpdateRequest();
 
             when(clientService.update(1L, request))
-                    .thenThrow(new PostalCodeNotFoundException(POSTAL_CODE_NOT_FOUND_MESSAGE));
+                    .thenThrow(new PostalCodeNotFoundException(ApiErrorMessages.POSTAL_CODE_NOT_FOUND));
 
-            performErrorResponse(patchClient(1L, request), 404, POSTAL_CODE_NOT_FOUND_MESSAGE);
+            performErrorResponse(patchClient(1L, request), 404, ApiErrorMessages.POSTAL_CODE_NOT_FOUND);
 
             verify(clientService).update(1L, request);
             verifyNoMoreInteractions(clientService);
@@ -439,9 +418,9 @@ public class ClientControllerTests {
             ClientUpdateRequestDTO request = validClientUpdateRequest();
 
             when(clientService.update(1L, request))
-                    .thenThrow(new AddressProviderUnavailableException("Serviços de CEP indisponíveis no momento."));
+                    .thenThrow(new AddressProviderUnavailableException(ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE));
 
-            performErrorResponse(patchClient(1L, request), 503, ADDRESS_UNAVAILABLE_MESSAGE);
+            performErrorResponse(patchClient(1L, request), 503, ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE);
 
             verify(clientService).update(1L, request);
             verifyNoMoreInteractions(clientService);
@@ -454,7 +433,7 @@ public class ClientControllerTests {
 
             when(clientService.update(1L, request)).thenThrow(new RuntimeException("Unexpected exception"));
 
-            performErrorResponse(patchClient(1L, request), 500, INTERNAL_ERROR_MESSAGE);
+            performErrorResponse(patchClient(1L, request), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(clientService).update(1L, request);
             verifyNoMoreInteractions(clientService);
@@ -470,137 +449,145 @@ public class ClientControllerTests {
         return Stream.of(
                 Arguments.of("name is null",
                         new ClientRequestDTO(null, VALID_CPF, VALID_EMAIL, VALID_PHONE, address),
-                        "name", "O nome é obrigatório."),
+                        "name", ValidationMessages.REQUIRED_CLIENT_NAME),
                 Arguments.of("name is blank",
                         new ClientRequestDTO("   ", VALID_CPF, VALID_EMAIL, VALID_PHONE, address),
-                        "name", "O nome é obrigatório."),
+                        "name", ValidationMessages.REQUIRED_CLIENT_NAME),
                 Arguments.of("name exceeds 125 characters",
                         new ClientRequestDTO("a".repeat(126), VALID_CPF, VALID_EMAIL, VALID_PHONE, address),
-                        "name", NAME_TOO_LONG_MESSAGE),
+                        "name", ValidationMessages.INVALID_CLIENT_NAME_LENGTH),
+
                 Arguments.of("cpf is null",
                         new ClientRequestDTO(VALID_NAME, null, VALID_EMAIL, VALID_PHONE, address),
-                        "cpf", "O CPF é obrigatório."),
+                        "cpf", ValidationMessages.REQUIRED_CPF),
                 Arguments.of("cpf does not have 11 digits",
                         new ClientRequestDTO(VALID_NAME, "1234", VALID_EMAIL, VALID_PHONE, address),
-                        "cpf", "O CPF deve conter exatamente 11 números."),
+                        "cpf", ValidationMessages.INVALID_CPF_LENGTH),
                 Arguments.of("cpf contains non-numeric characters",
                         new ClientRequestDTO(VALID_NAME, "5299822472a", VALID_EMAIL, VALID_PHONE, address),
-                        "cpf", "O CPF deve conter exatamente 11 números."),
+                        "cpf", ValidationMessages.INVALID_CPF_LENGTH),
                 Arguments.of("cpf has invalid check digits",
                         new ClientRequestDTO(VALID_NAME, "52998224724", VALID_EMAIL, VALID_PHONE, address),
-                        "cpf", "CPF inválido."),
+                        "cpf", ValidationMessages.INVALID_CPF),
+
                 Arguments.of("email is null",
                         new ClientRequestDTO(VALID_NAME, VALID_CPF, null, VALID_PHONE, address),
-                        "email", "O e-mail é obrigatório."),
+                        "email", ValidationMessages.REQUIRED_EMAIL),
                 Arguments.of("email is empty",
                         new ClientRequestDTO(VALID_NAME, VALID_CPF, "", VALID_PHONE, address),
-                        "email", "O e-mail é obrigatório."),
+                        "email", ValidationMessages.REQUIRED_EMAIL),
                 Arguments.of("email format is invalid",
                         new ClientRequestDTO(VALID_NAME, VALID_CPF, "email-invalido", VALID_PHONE, address),
-                        "email", EMAIL_INVALID_MESSAGE),
-                Arguments.of("email exceeds 150 characters",
+                        "email", ValidationMessages.INVALID_EMAIL),
+                Arguments.of("email exceeds 254 characters",
                         new ClientRequestDTO(VALID_NAME, VALID_CPF, EMAIL_ABOVE_LIMIT, VALID_PHONE, address),
-                        "email", EMAIL_TOO_LONG_MESSAGE),
+                        "email", ValidationMessages.INVALID_EMAIL_LENGTH),
+
                 Arguments.of("phone number is null",
                         new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, null, address),
-                        "phoneNumber", "O telefone é obrigatório."),
+                        "phoneNumber", ValidationMessages.REQUIRED_PHONE_NUMBER),
                 Arguments.of("phone number has fewer than 10 digits",
                         new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, "123", address),
-                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                        "phoneNumber", ValidationMessages.INVALID_PHONE_NUMBER_FORMAT),
                 Arguments.of("phone number has more than 11 digits",
                         new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, "119999999999", address),
-                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                        "phoneNumber", ValidationMessages.INVALID_PHONE_NUMBER_FORMAT),
                 Arguments.of("phone number contains non-numeric characters",
                         new ClientRequestDTO(VALID_NAME, VALID_CPF, VALID_EMAIL, "1199999999a", address),
-                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                        "phoneNumber", ValidationMessages.INVALID_PHONE_NUMBER_FORMAT),
+
                 Arguments.of("address is null",
                         clientRequest(null),
-                        "address", "Os dados de endereço são obrigatórios."),
+                        "address", ValidationMessages.REQUIRED_ADDRESS),
                 Arguments.of("address street number is null",
                         clientRequest(new AddressRequestDTO(null, null, "01001000")),
-                        "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
+                        "address.streetNumber", ValidationMessages.REQUIRED_STREET_NUMBER),
                 Arguments.of("address street number is empty",
                         clientRequest(new AddressRequestDTO("", null, "01001000")),
-                        "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
+                        "address.streetNumber", ValidationMessages.REQUIRED_STREET_NUMBER),
                 Arguments.of("address street number exceeds 10 characters",
                         clientRequest(new AddressRequestDTO("12345678901", null, "01001000")),
-                        "address.streetNumber", STREET_NUMBER_TOO_LONG_MESSAGE),
+                        "address.streetNumber", ValidationMessages.STREET_NUMBER_EXCEEDS_MAX_LENGTH),
                 Arguments.of("address complement exceeds 100 characters",
                         clientRequest(new AddressRequestDTO("123", "a".repeat(101), "01001000")),
-                        "address.complement", COMPLEMENT_TOO_LONG_MESSAGE),
+                        "address.complement", ValidationMessages.INVALID_COMPLEMENT_LENGTH),
                 Arguments.of("address postal code is null",
                         clientRequest(new AddressRequestDTO("123", null, null)),
-                        "address.postalCode", "O CEP é obrigatório."),
+                        "address.postalCode", ValidationMessages.REQUIRED_POSTAL_CODE),
                 Arguments.of("address postal code has fewer than 8 digits",
                         clientRequest(new AddressRequestDTO("123", null, "1234567")),
-                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE),
+                        "address.postalCode", ValidationMessages.INVALID_POSTAL_CODE_FORMAT),
                 Arguments.of("address postal code contains a dash",
                         clientRequest(new AddressRequestDTO("123", null, "01001-000")),
-                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE)
+                        "address.postalCode", ValidationMessages.INVALID_POSTAL_CODE_FORMAT)
         );
     }
 
     // Os campos do cliente são opcionais no PATCH.
-// Quando o objeto address é informado, streetNumber e postalCode são obrigatórios.
-// Cada cenário deve conter apenas uma violação de validação.
+    // Quando o objeto address é informado, streetNumber e postalCode são obrigatórios.
+    // Cada cenário deve conter apenas uma violação de validação.
     @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
     static Stream<Arguments> invalidClientUpdateRequests() {
         return Stream.of(
                 Arguments.of("name is empty",
                         new ClientUpdateRequestDTO("", null, null, null),
-                        "name", NAME_BLANK_MESSAGE),
+                        "name", ValidationMessages.INVALID_CLIENT_NAME_BLANK),
                 Arguments.of("name exceeds 125 characters",
                         new ClientUpdateRequestDTO("a".repeat(126), null, null, null),
-                        "name", NAME_TOO_LONG_MESSAGE),
+                        "name", ValidationMessages.INVALID_CLIENT_NAME_LENGTH),
+
                 Arguments.of("email is empty",
                         new ClientUpdateRequestDTO(null, "", null, null),
-                        "email", EMAIL_BLANK_MESSAGE),
+                        "email", ValidationMessages.INVALID_EMAIL_BLANK),
                 Arguments.of("email format is invalid",
                         new ClientUpdateRequestDTO(null, "email-invalido", null, null),
-                        "email", EMAIL_INVALID_MESSAGE),
+                        "email", ValidationMessages.INVALID_EMAIL),
                 Arguments.of("email exceeds 254 characters",
                         new ClientUpdateRequestDTO(null, EMAIL_ABOVE_LIMIT, null, null),
-                        "email", EMAIL_TOO_LONG_MESSAGE),
+                        "email", ValidationMessages.INVALID_EMAIL_LENGTH),
+
                 Arguments.of("phone number is empty",
                         new ClientUpdateRequestDTO(null, null, "", null),
-                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                        "phoneNumber", ValidationMessages.INVALID_PHONE_NUMBER_FORMAT),
                 Arguments.of("phone number has fewer than 10 digits",
                         new ClientUpdateRequestDTO(null, null, "123", null),
-                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                        "phoneNumber", ValidationMessages.INVALID_PHONE_NUMBER_FORMAT),
                 Arguments.of("phone number has more than 11 digits",
                         new ClientUpdateRequestDTO(null, null, "119999999999", null),
-                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                        "phoneNumber", ValidationMessages.INVALID_PHONE_NUMBER_FORMAT),
                 Arguments.of("phone number contains non-numeric characters",
                         new ClientUpdateRequestDTO(null, null, "1199999999a", null),
-                        "phoneNumber", PHONE_INVALID_MESSAGE),
+                        "phoneNumber", ValidationMessages.INVALID_PHONE_NUMBER_FORMAT),
+
                 Arguments.of("address street number is empty",
                         clientUpdateRequest(new AddressUpdateRequestDTO(
                                 "", null, VALID_UPDATE_POSTAL_CODE)),
-                        "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
+                        "address.streetNumber", ValidationMessages.REQUIRED_STREET_NUMBER),
                 Arguments.of("address street number exceeds 10 characters",
                         clientUpdateRequest(new AddressUpdateRequestDTO(
                                 "12345678901", null, VALID_UPDATE_POSTAL_CODE)),
-                        "address.streetNumber", STREET_NUMBER_TOO_LONG_MESSAGE),
+                        "address.streetNumber", ValidationMessages.STREET_NUMBER_EXCEEDS_MAX_LENGTH),
                 Arguments.of("address complement exceeds 100 characters",
                         clientUpdateRequest(new AddressUpdateRequestDTO(
                                 VALID_STREET_NUMBER, "a".repeat(101), VALID_UPDATE_POSTAL_CODE)),
-                        "address.complement", COMPLEMENT_TOO_LONG_MESSAGE),
+                        "address.complement", ValidationMessages.INVALID_COMPLEMENT_LENGTH),
+
                 Arguments.of("address postal code has fewer than 8 digits",
                         clientUpdateRequest(new AddressUpdateRequestDTO(
                                 VALID_STREET_NUMBER, null, "1234567")),
-                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE),
+                        "address.postalCode", ValidationMessages.INVALID_POSTAL_CODE_FORMAT),
                 Arguments.of("address postal code contains a dash",
                         clientUpdateRequest(new AddressUpdateRequestDTO(
                                 VALID_STREET_NUMBER, null, "01001-000")),
-                        "address.postalCode", POSTAL_CODE_INVALID_MESSAGE),
+                        "address.postalCode", ValidationMessages.INVALID_POSTAL_CODE_FORMAT),
                 Arguments.of("address street number is null",
                         clientUpdateRequest(new AddressUpdateRequestDTO(
                                 null, null, VALID_UPDATE_POSTAL_CODE)),
-                        "address.streetNumber", STREET_NUMBER_BLANK_MESSAGE),
+                        "address.streetNumber", ValidationMessages.REQUIRED_STREET_NUMBER),
                 Arguments.of("address postal code is null",
                         clientUpdateRequest(new AddressUpdateRequestDTO(
                                 VALID_STREET_NUMBER, null, null)),
-                        "address.postalCode", POSTAL_CODE_REQUIRED_MESSAGE)
+                        "address.postalCode", ValidationMessages.REQUIRED_POSTAL_CODE)
         );
     }
 
@@ -637,7 +624,7 @@ public class ClientControllerTests {
         result.andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                 .andExpect(jsonPath("$.errors['" + field + "']").value(message));
     }
 
@@ -645,7 +632,7 @@ public class ClientControllerTests {
         performErrorResponse(
                 mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON)),
                 400,
-                INVALID_BODY_MESSAGE
+                ApiErrorMessages.INVALID_REQUEST_DATA
         );
     }
 

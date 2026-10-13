@@ -175,13 +175,13 @@ class ViaCepClientTests {
                             """, "O estado é obrigatório."),
                     arguments("unknown state", """
                             { "cep": "01001-000", "logradouro": "Praça da Sé", "bairro": "Sé", "localidade": "São Paulo", "uf": "XX" }
-                            """, "O Estado deve ser uma UF válida."),
+                            """, "A sigla do estado informada não corresponde a uma UF válida."),
                     arguments("missing postal code", """
                             { "logradouro": "Praça da Sé", "bairro": "Sé", "localidade": "São Paulo", "uf": "SP" }
                             """, "O CEP é obrigatório."),
                     arguments("postal code with less than 8 digits", """
                             { "cep": "01001-00", "logradouro": "Praça da Sé", "bairro": "Sé", "localidade": "São Paulo", "uf": "SP" }
-                            """, "O CEP deve conter exatamente 8 dígitos.")
+                            """, "O CEP deve conter exatamente 8 números, sem traços ou espaços.")
             );
         }
     }

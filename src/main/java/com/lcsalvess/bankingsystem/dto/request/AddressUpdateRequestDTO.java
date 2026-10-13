@@ -1,19 +1,20 @@
 package com.lcsalvess.bankingsystem.dto.request;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record AddressUpdateRequestDTO(
 
-        @NotBlank(message = "O número é obrigatório.")
-        @Size(max = 10, message = "O número deve ter no máximo 10 caracteres.")
+        @NotBlank(message = ValidationMessages.REQUIRED_STREET_NUMBER)
+        @Size(max = 10, message = ValidationMessages.STREET_NUMBER_EXCEEDS_MAX_LENGTH)
         String streetNumber,
 
-        @Size(max = 100, message = "O complemento deve ter no máximo 100 caracteres.")
+        @Size(max = 100, message = ValidationMessages.INVALID_COMPLEMENT_LENGTH)
         String complement,
 
-        @NotBlank(message = "O CEP é obrigatório.")
-        @Pattern(regexp = "^[0-9]{8}$", message = "O CEP deve conter exatamente 8 números, sem traços ou espaços.")
+        @NotBlank(message = ValidationMessages.REQUIRED_POSTAL_CODE)
+        @Pattern(regexp = "^[0-9]{8}$", message = ValidationMessages.INVALID_POSTAL_CODE_FORMAT)
         String postalCode) {
 }

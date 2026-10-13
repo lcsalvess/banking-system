@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.dto.request.transaction;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import jakarta.validation.constraints.*;
@@ -7,28 +8,28 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
 public record TransferRequestDTO(
-        @NotBlank(message = "O número da conta de origem é obrigatório.")
-        @ValidAccountNumber(message = "O número da conta de origem deve conter entre 5 e 20 dígitos.")
+        @NotBlank(message = ValidationMessages.REQUIRED_SOURCE_ACCOUNT_NUMBER)
+        @ValidAccountNumber
         String fromAccountNumber,
 
-        @NotBlank(message = "O dígito da conta de origem é obrigatório.")
-        @ValidAccountDigit(message = "O dígito da conta de origem deve conter exatamente 1 dígito.")
+        @NotBlank(message = ValidationMessages.REQUIRED_SOURCE_ACCOUNT_DIGIT)
+        @ValidAccountDigit
         String fromAccountDigit,
 
-        @NotBlank(message = "O número da conta de destino é obrigatório.")
-        @ValidAccountNumber(message = "O número da conta de destino deve conter entre 5 e 20 dígitos.")
+        @NotBlank(message = ValidationMessages.REQUIRED_DESTINATION_ACCOUNT_NUMBER)
+        @ValidAccountNumber
         String toAccountNumber,
 
-        @NotBlank(message = "O dígito da conta de destino é obrigatório.")
-        @ValidAccountDigit(message = "O dígito da conta de destino deve conter exatamente 1 dígito.")
+        @NotBlank(message = ValidationMessages.REQUIRED_DESTINATION_ACCOUNT_DIGIT)
+        @ValidAccountDigit
         String toAccountDigit,
 
-        @NotNull(message = "O valor da transferência é obrigatório.")
-        @Positive(message = "O valor da transferência deve ser maior que zero.")
+        @NotNull(message = ValidationMessages.REQUIRED_TRANSFER_AMOUNT)
+        @Positive(message = ValidationMessages.POSITIVE_TRANSFER_AMOUNT)
         @Digits(
                 integer = 17,
                 fraction = 2,
-                message = "O valor deve ter no máximo 17 dígitos inteiros e 2 casas decimais."
+                message = ValidationMessages.INVALID_AMOUNT_PRECISION
         )
         BigDecimal amount
 ) {

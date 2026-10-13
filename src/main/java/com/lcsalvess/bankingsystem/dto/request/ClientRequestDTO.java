@@ -1,26 +1,27 @@
 package com.lcsalvess.bankingsystem.dto.request;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import com.lcsalvess.bankingsystem.validation.cpf.ValidCpf;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
 public record ClientRequestDTO(
-        @NotBlank(message = "O nome é obrigatório.")
-        @Size(max = 125, message = "O nome deve ter no máximo 125 caracteres.")
+        @NotBlank(message = ValidationMessages.REQUIRED_CLIENT_NAME)
+        @Size(max = 125, message = ValidationMessages.INVALID_CLIENT_NAME_LENGTH)
         String name,
-        @NotBlank(message = "O CPF é obrigatório.")
-        @Pattern(regexp = "^[0-9]{11}$", message = "O CPF deve conter exatamente 11 números.")
+        @NotBlank(message = ValidationMessages.REQUIRED_CPF)
+        @Pattern(regexp = "^[0-9]{11}$", message = ValidationMessages.INVALID_CPF_LENGTH)
         @ValidCpf
         String cpf,
-        @NotBlank(message = "O e-mail é obrigatório.")
-        @Email(message = "O formato do e-mail é inválido.")
-        @Size(max = 254, message = "O e-mail deve ter no máximo 254 caracteres.")
+        @NotBlank(message = ValidationMessages.REQUIRED_EMAIL)
+        @Email(message = ValidationMessages.INVALID_EMAIL)
+        @Size(max = 254, message = ValidationMessages.INVALID_EMAIL_LENGTH)
         String email,
-        @NotBlank(message = "O telefone é obrigatório.")
-        @Pattern(regexp = "^[0-9]{10,11}$", message = "O telefone deve conter de 10 a 11 números, incluindo o DDD.")
+        @NotBlank(message = ValidationMessages.REQUIRED_PHONE_NUMBER)
+        @Pattern(regexp = "^[0-9]{10,11}$", message = ValidationMessages.INVALID_PHONE_NUMBER_FORMAT)
         String phoneNumber,
-        @NotNull(message = "Os dados de endereço são obrigatórios.")
-        @Valid 
+        @NotNull(message = ValidationMessages.REQUIRED_ADDRESS)
+        @Valid
         AddressRequestDTO address
 ) {
 }

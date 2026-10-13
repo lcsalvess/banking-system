@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.validation.accountnumber;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
@@ -22,7 +23,7 @@ import java.lang.annotation.*;
 // Isso permite que o Bean Validation consiga encontrá-la em runtime.
 public @interface ValidAccountNumber {
 
-    String message() default "O número da conta deve conter entre 5 e 20 dígitos.";
+    String message() default ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH;
 
     Class<?>[] groups() default {};
 

@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.validation.passwordbytelength;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
@@ -15,7 +16,7 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface PasswordByteLength {
 
-    String message() default "A senha excede o limite de tamanho permitido.";
+    String message() default ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH;
 
     Class<?>[] groups() default {};
 

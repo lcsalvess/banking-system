@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.validation.accountnumber;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
@@ -22,7 +23,7 @@ import java.lang.annotation.*;
 // Isso permite que o Bean Validation consiga encontrá-la em runtime.
 public @interface ValidAccountDigit {
 
-    String message() default "O dígito da conta deve conter 1 dígito.";
+    String message() default ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH;
 
     Class<?>[] groups() default {};
 

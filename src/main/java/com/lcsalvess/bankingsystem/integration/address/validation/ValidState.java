@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.address.validation;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
@@ -11,7 +12,7 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ValidState {
 
-    String message() default "O Estado deve ser uma UF válida.";
+    String message() default ValidationMessages.INVALID_STATE;
 
     Class<?>[] groups() default {};
 

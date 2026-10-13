@@ -2,10 +2,12 @@ package com.lcsalvess.bankingsystem.unit.controller.address;
 
 import com.lcsalvess.bankingsystem.controller.address.AddressLookupController;
 import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.service.address.AddressService;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -36,11 +38,6 @@ class AddressLookupControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.address.AddressLookupControllerTests#";
     private static final String POSTAL_CODE = "01001000";
-    private static final String VALIDATION_MESSAGE = "Erro de validação.";
-    private static final String INVALID_POSTAL_CODE_MESSAGE = "O CEP deve conter exatamente 8 dígitos.";
-    private static final String POSTAL_CODE_NOT_FOUND_MESSAGE = "CEP " + POSTAL_CODE + " não encontrado em nenhum provedor.";
-    private static final String PROVIDER_UNAVAILABLE_MESSAGE = "O serviço de consulta de endereços está temporariamente indisponível.";
-    private static final String INTERNAL_ERROR_MESSAGE = "Ocorreu um erro interno no servidor.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -80,8 +77,8 @@ class AddressLookupControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
-                    .andExpect(jsonPath("$.errors.postalCode").value(INVALID_POSTAL_CODE_MESSAGE));
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
+                    .andExpect(jsonPath("$.errors.postalCode").value(ValidationMessages.INVALID_POSTAL_CODE_FORMAT));
 
             verifyNoInteractions(addressService);
         }
@@ -90,9 +87,9 @@ class AddressLookupControllerTests {
         @DisplayName("Should return 404 when postal code is not found")
         void shouldReturnNotFoundWhenPostalCodeIsNotFound() throws Exception {
             when(addressService.lookupByPostalCode(POSTAL_CODE))
-                    .thenThrow(new PostalCodeNotFoundException(POSTAL_CODE_NOT_FOUND_MESSAGE));
+                    .thenThrow(new PostalCodeNotFoundException(ApiErrorMessages.POSTAL_CODE_NOT_FOUND));
 
-            performErrorResponse(performGet(), 404, POSTAL_CODE_NOT_FOUND_MESSAGE);
+            performErrorResponse(performGet(), 404, ApiErrorMessages.POSTAL_CODE_NOT_FOUND);
 
             verify(addressService).lookupByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressService);
@@ -103,9 +100,9 @@ class AddressLookupControllerTests {
         void shouldReturnServiceUnavailableWhenAddressProvidersAreUnavailable() throws Exception {
             when(addressService.lookupByPostalCode(POSTAL_CODE))
                     .thenThrow(new AddressProviderUnavailableException(
-                            "Serviços de CEP indisponíveis no momento. Não foi possível validar o CEP: " + POSTAL_CODE));
+                            ApiErrorMessages.POSTAL_CODE_NOT_FOUND));
 
-            performErrorResponse(performGet(), 503, PROVIDER_UNAVAILABLE_MESSAGE);
+            performErrorResponse(performGet(), 503, ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE);
 
             verify(addressService).lookupByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressService);
@@ -117,7 +114,7 @@ class AddressLookupControllerTests {
             when(addressService.lookupByPostalCode(POSTAL_CODE))
                     .thenThrow(new RuntimeException("Unexpected failure"));
 
-            performErrorResponse(performGet(), 500, INTERNAL_ERROR_MESSAGE);
+            performErrorResponse(performGet(), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(addressService).lookupByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressService);

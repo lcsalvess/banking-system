@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.dto.request.transaction;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import jakarta.validation.constraints.*;
@@ -7,20 +8,20 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
 public record AccountOperationRequestDTO(
-        @NotBlank(message = "O número da conta é obrigatório.")
+        @NotBlank(message = ValidationMessages.REQUIRED_ACCOUNT_NUMBER)
         @ValidAccountNumber
         String accountNumber,
 
-        @NotBlank(message = "O dígito da conta é obrigatório.")
-        @ValidAccountDigit(message = "O dígito da conta deve conter exatamente 1 dígito.")
+        @NotBlank(message = ValidationMessages.REQUIRED_ACCOUNT_DIGIT)
+        @ValidAccountDigit
         String digit,
 
-        @NotNull(message = "O valor da operação é obrigatório.")
-        @Positive(message = "O valor da operação deve ser maior que zero.")
+        @NotNull(message = ValidationMessages.REQUIRED_OPERATION_AMOUNT)
+        @Positive(message = ValidationMessages.POSITIVE_OPERATION_AMOUNT)
         @Digits(
                 integer = 17,
                 fraction = 2,
-                message = "O valor deve ter no máximo 17 dígitos inteiros e 2 casas decimais."
+                message = ValidationMessages.INVALID_AMOUNT_PRECISION
         )
         BigDecimal amount
 ) {

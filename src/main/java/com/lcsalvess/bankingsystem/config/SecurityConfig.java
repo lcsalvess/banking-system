@@ -67,6 +67,10 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/metrics", "/actuator/metrics/**")
                         .hasRole("ADMIN")
 
+                        // Criação de usuários: acesso exclusivo ao administrador.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users")
+                        .hasRole("ADMIN")
+
                         // Demais endpoints exigem autenticação.
                         .anyRequest().authenticated()
                 )

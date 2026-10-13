@@ -8,17 +8,18 @@ import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @PreAuthorize("hasRole('EMPLOYEE')")
 @RestController
@@ -69,8 +70,8 @@ public class ClientController {
     }
 
     @Operation(
-            summary = "Get all clients",
-            description = "Retrieves all registered clients."
+            summary = "Get clients",
+            description = "Retrieves clients using pagination and an optional name filter."
     )
     @ApiResponses({
             @ApiResponse(
@@ -78,16 +79,21 @@ public class ClientController {
                     description = "Clients retrieved successfully",
                     content = @Content(
                             mediaType = "application/json",
-                            array = @ArraySchema(
-                                    schema = @Schema(implementation = ClientSummaryResponseDTO.class)
+                            schema = @Schema(
+                                    implementation = ClientSummaryResponseDTO.class
                             )
                     )
             )
     })
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<ClientSummaryResponseDTO> findAll() {
-        return clientService.findAll();
+    public Page<ClientSummaryResponseDTO> findAll(
+            @Parameter(description = "Filter clients by name", example = "Lucas")
+            @RequestParam(required = false) String name,
+            @ParameterObject
+            @PageableDefault(size = 10, sort = "id") Pageable pageable
+    ) {
+        return clientService.findAll(name, pageable);
     }
 
     @Operation(

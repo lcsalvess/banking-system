@@ -39,6 +39,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,12 +85,18 @@ public class ClientServiceTests {
     private ClientService clientService;
 
     @Nested
-    @DisplayName("findAll()")
+    @DisplayName("findAll(String, Pageable)")
     class FindAll {
 
+        private final Pageable pageable = PageRequest.of(
+                0,
+                10,
+                Sort.by("id").ascending()
+        );
+
         @Test
-        @DisplayName("Should return all clients successfully")
-        void shouldReturnAllClientsSuccessfully() {
+        @DisplayName("Should return a page of clients when no name filter is provided")
+        void shouldReturnPageOfClientsWithoutNameFilter() {
             Client client1 = client();
             Client client2 = client(
                     2L,
@@ -99,9 +106,16 @@ public class ClientServiceTests {
                     "11988888888"
             );
 
-            when(clientRepository.findAll()).thenReturn(List.of(client1, client2));
+            Page<Client> clients = new PageImpl<>(
+                    List.of(client1, client2),
+                    pageable,
+                    2
+            );
 
-            List<ClientSummaryResponseDTO> result = clientService.findAll();
+            when(clientRepository.findAll(pageable)).thenReturn(clients);
+
+            Page<ClientSummaryResponseDTO> result =
+                    clientService.findAll(null, pageable);
 
             assertEquals(
                     List.of(
@@ -114,23 +128,89 @@ public class ClientServiceTests {
                                     "11988888888"
                             )
                     ),
-                    result
+                    result.getContent()
             );
+            assertEquals(2, result.getTotalElements());
+            assertEquals(1, result.getTotalPages());
+            assertEquals(0, result.getNumber());
+            assertEquals(10, result.getSize());
 
-            verify(clientRepository).findAll();
+            verify(clientRepository).findAll(pageable);
             verifyNoMoreInteractionsOnMocks();
         }
 
         @Test
-        @DisplayName("Should return empty list when there are no clients")
-        void shouldReturnEmptyListWhenThereAreNoClients() {
-            when(clientRepository.findAll()).thenReturn(List.of());
+        @DisplayName("Should return an empty page when there are no clients")
+        void shouldReturnEmptyPageWhenThereAreNoClients() {
+            Page<Client> emptyPage = new PageImpl<>(
+                    List.of(),
+                    pageable,
+                    0
+            );
 
-            List<ClientSummaryResponseDTO> result = clientService.findAll();
+            when(clientRepository.findAll(pageable)).thenReturn(emptyPage);
 
-            assertEquals(List.of(), result);
+            Page<ClientSummaryResponseDTO> result =
+                    clientService.findAll(null, pageable);
 
-            verify(clientRepository).findAll();
+            assertTrue(result.isEmpty());
+            assertEquals(0, result.getTotalElements());
+            assertEquals(0, result.getTotalPages());
+
+            verify(clientRepository).findAll(pageable);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should filter clients by name ignoring case")
+        void shouldFilterClientsByNameIgnoringCase() {
+            Client client = client();
+
+            Page<Client> clients = new PageImpl<>(
+                    List.of(client),
+                    pageable,
+                    1
+            );
+
+            when(clientRepository.findByNameContainingIgnoreCase(
+                    "emily",
+                    pageable
+            )).thenReturn(clients);
+
+            Page<ClientSummaryResponseDTO> result =
+                    clientService.findAll("  emily  ", pageable);
+
+            assertEquals(
+                    List.of(clientSummaryResponse()),
+                    result.getContent()
+            );
+            assertEquals(1, result.getTotalElements());
+            assertEquals(1, result.getTotalPages());
+
+            verify(clientRepository).findByNameContainingIgnoreCase(
+                    "emily",
+                    pageable
+            );
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should list all clients when name filter is blank")
+        void shouldListAllClientsWhenNameIsBlank() {
+            Page<Client> clients = new PageImpl<>(
+                    List.of(client()),
+                    pageable,
+                    1
+            );
+
+            when(clientRepository.findAll(pageable)).thenReturn(clients);
+
+            Page<ClientSummaryResponseDTO> result =
+                    clientService.findAll("   ", pageable);
+
+            assertEquals(1, result.getTotalElements());
+
+            verify(clientRepository).findAll(pageable);
             verifyNoMoreInteractionsOnMocks();
         }
     }

@@ -17,10 +17,10 @@ import com.lcsalvess.bankingsystem.service.address.AddressService;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData.AddressUpdateData;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class ClientService {
@@ -84,8 +84,22 @@ public class ClientService {
     }
 
     @Transactional(readOnly = true)
-    public List<ClientSummaryResponseDTO> findAll() {
-        return clientRepository.findAll().stream().map(ClientSummaryResponseDTO::fromEntity).toList();
+    public Page<ClientSummaryResponseDTO> findAll(
+            String name,
+            Pageable pageable
+    ) {
+        Page<Client> clients;
+
+        if (name == null || name.isBlank()) {
+            clients = clientRepository.findAll(pageable);
+        } else {
+            clients = clientRepository.findByNameContainingIgnoreCase(
+                    name.trim(),
+                    pageable
+            );
+        }
+
+        return clients.map(ClientSummaryResponseDTO::fromEntity);
     }
 
     public Client findEntityById(Long id) {

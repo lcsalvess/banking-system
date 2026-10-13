@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.controller;
 
+import com.lcsalvess.bankingsystem.config.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.ClientController;
 import com.lcsalvess.bankingsystem.dto.request.AddressRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.AddressUpdateRequestDTO;
@@ -28,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.*;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,9 +49,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ClientController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(
-        WebMvcTestSecurityConfig.class
-)
+@Import({
+        WebMvcTestSecurityConfig.class,
+        PaginationConfig.class
+})
 public class ClientControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.ClientControllerTests#";
@@ -86,52 +89,114 @@ public class ClientControllerTests {
     @DisplayName("GET /api/v1/clients")
     class FindAll {
 
+        private final Pageable defaultPageable = PageRequest.of(
+                0,
+                10,
+                Sort.by("id").ascending()
+        );
+
         @Test
-        @DisplayName("Should return all clients successfully")
-        void shouldReturnAllClientsSuccessfully() throws Exception {
+        @DisplayName("Should return a page of clients successfully")
+        void shouldReturnPageOfClientsSuccessfully() throws Exception {
             ClientSummaryResponseDTO client1 = new ClientSummaryResponseDTO(
-                    1L, "Lucas Alves", "62934118037", "lucas@email.com", "11999999999"
+                    1L, "Lucas Alves", "62934118037",
+                    "lucas@email.com", "11999999999"
             );
             ClientSummaryResponseDTO client2 = new ClientSummaryResponseDTO(
-                    2L, "Maria Silva", "91741354064", "maria@email.com", "11988888888"
+                    2L, "Maria Silva", "91741354064",
+                    "maria@email.com", "11988888888"
             );
 
-            when(clientService.findAll()).thenReturn(List.of(client1, client2));
+            Page<ClientSummaryResponseDTO> clients = new PageImpl<>(
+                    List.of(client1, client2),
+                    defaultPageable,
+                    2
+            );
 
-            MvcResult result = mockMvc.perform(get(CLIENTS_URL))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$", hasSize(2)))
-                    .andReturn();
-
-            assertEquals(List.of(client1, client2), List.of(readClients(result)));
-
-            verify(clientService).findAll();
-            verifyNoMoreInteractions(clientService);
-        }
-
-        @Test
-        @DisplayName("Should return empty list when there are no clients")
-        void shouldReturnEmptyListWhenThereAreNoClients() throws Exception {
-            when(clientService.findAll()).thenReturn(List.of());
+            when(clientService.findAll(null, defaultPageable)).thenReturn(clients);
 
             mockMvc.perform(get(CLIENTS_URL))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.content[0].id").value(1))
+                    .andExpect(jsonPath("$.content[1].id").value(2))
+                    .andExpect(jsonPath("$.page.number").value(0))
+                    .andExpect(jsonPath("$.page.size").value(10))
+                    .andExpect(jsonPath("$.page.totalElements").value(2))
+                    .andExpect(jsonPath("$.page.totalPages").value(1));
 
-            verify(clientService).findAll();
+            verify(clientService).findAll(null, defaultPageable);
+            verifyNoMoreInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should return an empty page when there are no clients")
+        void shouldReturnEmptyPageWhenThereAreNoClients() throws Exception {
+            Page<ClientSummaryResponseDTO> emptyPage = new PageImpl<>(
+                    List.of(),
+                    defaultPageable,
+                    0
+            );
+
+            when(clientService.findAll(null, defaultPageable)).thenReturn(emptyPage);
+
+            mockMvc.perform(get(CLIENTS_URL))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.content", hasSize(0)))
+                    .andExpect(jsonPath("$.page.totalElements").value(0))
+                    .andExpect(jsonPath("$.page.totalPages").value(0));
+
+            verify(clientService).findAll(null, defaultPageable);
+            verifyNoMoreInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should apply pagination and name filter parameters")
+        void shouldApplyPaginationAndNameFilterParameters() throws Exception {
+            Pageable pageable = PageRequest.of(
+                    1,
+                    5,
+                    Sort.by("id").ascending()
+            );
+
+            Page<ClientSummaryResponseDTO> clients = new PageImpl<>(
+                    List.of(),
+                    pageable,
+                    0
+            );
+
+            when(clientService.findAll("Lucas", pageable)).thenReturn(clients);
+
+            mockMvc.perform(get(CLIENTS_URL)
+                            .param("name", "Lucas")
+                            .param("page", "1")
+                            .param("size", "5")
+                            .param("sort", "id,asc"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.content", hasSize(0)))
+                    .andExpect(jsonPath("$.page.number").value(1))
+                    .andExpect(jsonPath("$.page.size").value(5));
+
+            verify(clientService).findAll("Lucas", pageable);
             verifyNoMoreInteractions(clientService);
         }
 
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(clientService.findAll()).thenThrow(new RuntimeException());
+            when(clientService.findAll(null, defaultPageable))
+                    .thenThrow(new RuntimeException());
 
-            performErrorResponse(mockMvc.perform(get(CLIENTS_URL)), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
+            performErrorResponse(
+                    mockMvc.perform(get(CLIENTS_URL)),
+                    500,
+                    ApiErrorMessages.INTERNAL_SERVER_ERROR
+            );
 
-            verify(clientService).findAll();
+            verify(clientService).findAll(null, defaultPageable);
             verifyNoMoreInteractions(clientService);
         }
     }
@@ -640,13 +705,6 @@ public class ClientControllerTests {
         return objectMapper.readValue(
                 result.getResponse().getContentAsString(),
                 ClientResponseDTO.class
-        );
-    }
-
-    private ClientSummaryResponseDTO[] readClients(MvcResult result) throws Exception {
-        return objectMapper.readValue(
-                result.getResponse().getContentAsString(),
-                ClientSummaryResponseDTO[].class
         );
     }
 

@@ -1,9 +1,11 @@
-
 package com.lcsalvess.bankingsystem.bootstrap;
 
+import com.lcsalvess.bankingsystem.dto.request.UserRequestDTO;
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +13,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class AdminBootstrapRunner implements CommandLineRunner {
@@ -20,6 +25,7 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final Validator validator;
 
     @Value("${app.admin.username:}")
     private String adminUsername;
@@ -35,10 +41,12 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
     public AdminBootstrapRunner(
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            Validator validator
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.validator = validator;
     }
 
     @Override
@@ -64,6 +72,8 @@ public class AdminBootstrapRunner implements CommandLineRunner {
             return;
         }
 
+        validateCredentials();
+
         User admin = new User(
                 adminUsername,
                 adminEmail,
@@ -74,6 +84,29 @@ public class AdminBootstrapRunner implements CommandLineRunner {
         userRepository.save(admin);
 
         log.info("Usuário administrador inicial criado com sucesso.");
+    }
+
+    private void validateCredentials() {
+        UserRequestDTO candidate = new UserRequestDTO(
+                adminUsername,
+                adminEmail,
+                adminPassword,
+                Role.ADMIN
+        );
+
+        Set<ConstraintViolation<UserRequestDTO>> violations =
+                validator.validate(candidate);
+
+        if (!violations.isEmpty()) {
+            String details = violations.stream()
+                    .map(ConstraintViolation::getMessage)
+                    .sorted()
+                    .collect(Collectors.joining(" | "));
+
+            throw new IllegalStateException(
+                    "Credenciais do administrador inicial inválidas: " + details
+            );
+        }
     }
 
     private boolean credentialsConfigured() {

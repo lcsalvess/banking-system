@@ -46,9 +46,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class AccountControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.AccountControllerTests#";
-    private static final String INTERNAL_ERROR_MESSAGE = "Ocorreu um erro interno no servidor.";
-    private static final String INVALID_BODY_MESSAGE = "Dados da requisição inválidos.";
-    private static final String VALIDATION_MESSAGE = "Erro de validação.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -109,9 +106,9 @@ public class AccountControllerTests {
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             when(accountService.findAll())
-                    .thenThrow(new RuntimeException("Unexpected exception"));
+                    .thenThrow(new RuntimeException());
 
-            performErrorResponse(mockMvc.perform(get(URL)), 500, INTERNAL_ERROR_MESSAGE);
+            performErrorResponse(mockMvc.perform(get(URL)), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(accountService).findAll();
             verifyNoMoreInteractions(accountService);
@@ -147,9 +144,9 @@ public class AccountControllerTests {
         @DisplayName("Should return 400 when digit is invalid")
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
             when(accountService.findByAccountNumber("99999", "3"))
-                    .thenThrow(new InvalidAccountDigitException("Dígito da conta inválido."));
+                    .thenThrow(new InvalidAccountDigitException(ApiErrorMessages.INVALID_ACCOUNT_DIGIT));
 
-            performGet("3", 400, "Dígito da conta inválido.");
+            performGet("3", 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
             verify(accountService).findByAccountNumber("99999", "3");
             verifyNoMoreInteractions(accountService);
@@ -159,9 +156,9 @@ public class AccountControllerTests {
         @DisplayName("Should return 404 when account does not exist")
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
             when(accountService.findByAccountNumber("99999", "5"))
-                    .thenThrow(new AccountNotFoundException("Conta não encontrada."));
+                    .thenThrow(new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
 
-            performGet("5", 404, "Conta não encontrada.");
+            performGet("5", 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
             verify(accountService).findByAccountNumber("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -171,9 +168,9 @@ public class AccountControllerTests {
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             when(accountService.findByAccountNumber("99999", "5"))
-                    .thenThrow(new RuntimeException("Unexpected exception"));
+                    .thenThrow(new RuntimeException());
 
-            performGet("5", 500, INTERNAL_ERROR_MESSAGE);
+            performGet("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(accountService).findByAccountNumber("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -212,7 +209,7 @@ public class AccountControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(jsonPath("$.errors.accountNumber")
                             .value(ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH));
 
@@ -231,7 +228,7 @@ public class AccountControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(jsonPath("$.errors.digit")
                             .value(ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH));
 
@@ -291,7 +288,7 @@ public class AccountControllerTests {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body));
 
-            performErrorResponse(result, 400, INVALID_BODY_MESSAGE);
+            performErrorResponse(result, 400, ApiErrorMessages.INVALID_REQUEST_DATA);
 
             verifyNoInteractions(accountService);
         }
@@ -310,9 +307,9 @@ public class AccountControllerTests {
             AccountRequestDTO request = accountRequest();
 
             when(accountService.create(request))
-                    .thenThrow(new ClientNotFoundException("Cliente não encontrado."));
+                    .thenThrow(new ClientNotFoundException(ApiErrorMessages.CLIENT_NOT_FOUND));
 
-            performPost(request, 404, "Cliente não encontrado.");
+            performPost(request, 404, ApiErrorMessages.CLIENT_NOT_FOUND);
 
             verify(accountService).create(request);
             verifyNoMoreInteractions(accountService);
@@ -324,9 +321,9 @@ public class AccountControllerTests {
             AccountRequestDTO request = accountRequest();
 
             when(accountService.create(request))
-                    .thenThrow(new AccountAlreadyExistsException("O cliente já possui uma conta corrente."));
+                    .thenThrow(new AccountAlreadyExistsException(ApiErrorMessages.CHECKING_ACCOUNT_ALREADY_EXISTS));
 
-            performPost(request, 409, "O cliente já possui uma conta corrente.");
+            performPost(request, 409, ApiErrorMessages.CHECKING_ACCOUNT_ALREADY_EXISTS);
 
             verify(accountService).create(request);
             verifyNoMoreInteractions(accountService);
@@ -338,9 +335,9 @@ public class AccountControllerTests {
             AccountRequestDTO request = accountRequest();
 
             when(accountService.create(request))
-                    .thenThrow(new RuntimeException("Unexpected exception"));
+                    .thenThrow(new RuntimeException());
 
-            performPost(request, 500, INTERNAL_ERROR_MESSAGE);
+            performPost(request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(accountService).create(request);
             verifyNoMoreInteractions(accountService);
@@ -368,10 +365,10 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 400 when digit is invalid")
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            doThrow(new InvalidAccountDigitException("Dígito da conta inválido."))
+            doThrow(new InvalidAccountDigitException(ApiErrorMessages.INVALID_ACCOUNT_DIGIT))
                     .when(accountService).cancel("99999", "3");
 
-            performCancel("3", 400, "Dígito da conta inválido.");
+            performCancel("3", 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
             verify(accountService).cancel("99999", "3");
             verifyNoMoreInteractions(accountService);
@@ -380,10 +377,10 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 404 when account does not exist")
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
-            doThrow(new AccountNotFoundException("Conta não encontrada."))
+            doThrow(new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND))
                     .when(accountService).cancel("99999", "5");
 
-            performCancel("5", 404, "Conta não encontrada.");
+            performCancel("5", 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
             verify(accountService).cancel("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -392,10 +389,10 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 409 when account is not active")
         void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
-            doThrow(new AccountIsNotActiveException("Não é possível cancelar uma conta que não está ativa."))
+            doThrow(new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE))
                     .when(accountService).cancel("99999", "5");
 
-            performCancel("5", 409, "Não é possível cancelar uma conta que não está ativa.");
+            performCancel("5", 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
 
             verify(accountService).cancel("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -404,10 +401,10 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 409 when account has balance")
         void shouldReturnConflictWhenAccountHasBalance() throws Exception {
-            doThrow(new AccountHasBalanceException("Não é possível cancelar uma conta com saldo."))
+            doThrow(new AccountHasBalanceException(ApiErrorMessages.ACCOUNT_HAS_BALANCE))
                     .when(accountService).cancel("99999", "5");
 
-            performCancel("5", 409, "Não é possível cancelar uma conta com saldo.");
+            performCancel("5", 409, ApiErrorMessages.ACCOUNT_HAS_BALANCE);
 
             verify(accountService).cancel("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -416,10 +413,10 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            doThrow(new RuntimeException("Unexpected exception"))
+            doThrow(new RuntimeException())
                     .when(accountService).cancel("99999", "5");
 
-            performCancel("5", 500, INTERNAL_ERROR_MESSAGE);
+            performCancel("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(accountService).cancel("99999", "5");
             verifyNoMoreInteractions(accountService);
@@ -449,7 +446,7 @@ public class AccountControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(jsonPath("$.errors.accountNumber")
                             .value(ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH));
 
@@ -468,7 +465,7 @@ public class AccountControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(jsonPath("$.errors.digit")
                             .value(ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH));
 
@@ -492,16 +489,16 @@ public class AccountControllerTests {
         return Stream.of(
                 Arguments.of("client ID is null",
                         new AccountRequestDTO(null, AccountType.CHECKING),
-                        "clientId", "O ID do titular é obrigatório."),
+                        "clientId", ValidationMessages.REQUIRED_HOLDER_ID),
                 Arguments.of("client ID is zero",
                         new AccountRequestDTO(0L, AccountType.CHECKING),
-                        "clientId", "O ID do titular deve ser maior que zero."),
+                        "clientId", ValidationMessages.POSITIVE_HOLDER_ID),
                 Arguments.of("client ID is negative",
                         new AccountRequestDTO(-1L, AccountType.CHECKING),
-                        "clientId", "O ID do titular deve ser maior que zero."),
+                        "clientId", ValidationMessages.POSITIVE_HOLDER_ID),
                 Arguments.of("account type is null",
                         new AccountRequestDTO(1L, null),
-                        "type", "O tipo de conta é obrigatório.")
+                        "type", ValidationMessages.REQUIRED_ACCOUNT_TYPE)
         );
     }
 
@@ -567,7 +564,7 @@ public class AccountControllerTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                 .andExpect(jsonPath("$.errors." + field).value(message));
     }
 
@@ -576,7 +573,7 @@ public class AccountControllerTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(INVALID_BODY_MESSAGE));
+                .andExpect(jsonPath("$.message").value(ApiErrorMessages.INVALID_REQUEST_DATA));
     }
 
     private AccountResponseDTO readAccount(MvcResult result) throws Exception {

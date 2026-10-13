@@ -6,6 +6,7 @@ import com.lcsalvess.bankingsystem.entity.enums.State;
 import com.lcsalvess.bankingsystem.event.client.ClientOperationEvent;
 import com.lcsalvess.bankingsystem.event.client.ClientOperationType;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
 import com.lcsalvess.bankingsystem.service.address.AddressData;
 import com.lcsalvess.bankingsystem.service.client.ClientPersistenceService;
@@ -60,9 +61,6 @@ class ClientPersistenceServiceTests {
     private static final String UPDATED_NAME = "Cliente Atualizado";
     private static final String UPDATED_EMAIL = "atualizado@email.com";
     private static final String UPDATED_PHONE = "11888888888";
-
-    private static final String CLIENT_NOT_FOUND_MESSAGE =
-            "Cliente não encontrado.";
 
     @Mock
     private ClientRepository clientRepository;
@@ -515,7 +513,7 @@ class ClientPersistenceServiceTests {
                 executable
         );
 
-        assertEquals(CLIENT_NOT_FOUND_MESSAGE, exception.getMessage());
+        assertEquals(ApiErrorMessages.CLIENT_NOT_FOUND, exception.getMessage());
     }
 
     private static void assertAddressUnchanged(Address address) {

@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.dto.request.AddressRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
 import com.lcsalvess.bankingsystem.entity.Address;
 import com.lcsalvess.bankingsystem.entity.enums.State;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.AddressLookupService;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
@@ -41,7 +42,8 @@ class AddressServiceTests {
         void shouldCreateAddressCombiningProviderDataWithStreetNumberAndComplement() {
             AddressRequestDTO dto = new AddressRequestDTO("123", "Apto 45", POSTAL_CODE);
 
-            when(addressLookupService.findByPostalCode(POSTAL_CODE)).thenReturn(lookupResponse());
+            when(addressLookupService.findByPostalCode(POSTAL_CODE))
+                    .thenReturn(lookupResponse());
 
             Address result = addressService.createFromPostalCode(dto);
 
@@ -63,7 +65,8 @@ class AddressServiceTests {
         void shouldCreateAddressWithoutComplementWhenItIsNotInformed() {
             AddressRequestDTO dto = new AddressRequestDTO("123", null, POSTAL_CODE);
 
-            when(addressLookupService.findByPostalCode(POSTAL_CODE)).thenReturn(lookupResponse());
+            when(addressLookupService.findByPostalCode(POSTAL_CODE))
+                    .thenReturn(lookupResponse());
 
             Address result = addressService.createFromPostalCode(dto);
 
@@ -80,12 +83,16 @@ class AddressServiceTests {
             AddressRequestDTO dto = new AddressRequestDTO("123", null, POSTAL_CODE);
 
             when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenThrow(new PostalCodeNotFoundException("CEP " + POSTAL_CODE + " não encontrado em nenhum provedor."));
+                    .thenThrow(new PostalCodeNotFoundException(
+                            ApiErrorMessages.POSTAL_CODE_NOT_FOUND
+                    ));
 
-            PostalCodeNotFoundException exception = assertThrows(PostalCodeNotFoundException.class,
-                    () -> addressService.createFromPostalCode(dto));
+            PostalCodeNotFoundException exception = assertThrows(
+                    PostalCodeNotFoundException.class,
+                    () -> addressService.createFromPostalCode(dto)
+            );
 
-            assertEquals("CEP " + POSTAL_CODE + " não encontrado em nenhum provedor.", exception.getMessage());
+            assertEquals(ApiErrorMessages.POSTAL_CODE_NOT_FOUND, exception.getMessage());
 
             verify(addressLookupService).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressLookupService);
@@ -97,12 +104,19 @@ class AddressServiceTests {
             AddressRequestDTO dto = new AddressRequestDTO("123", null, POSTAL_CODE);
 
             when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenThrow(new AddressProviderUnavailableException("Serviços de CEP indisponíveis no momento."));
+                    .thenThrow(new AddressProviderUnavailableException(
+                            ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
+                    ));
 
-            AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class,
-                    () -> addressService.createFromPostalCode(dto));
+            AddressProviderUnavailableException exception = assertThrows(
+                    AddressProviderUnavailableException.class,
+                    () -> addressService.createFromPostalCode(dto)
+            );
 
-            assertEquals("Serviços de CEP indisponíveis no momento.", exception.getMessage());
+            assertEquals(
+                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
+                    exception.getMessage()
+            );
 
             verify(addressLookupService).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressLookupService);
@@ -116,9 +130,11 @@ class AddressServiceTests {
         @Test
         @DisplayName("Should return an API response DTO without exposing the integration DTO")
         void shouldReturnApiResponseDtoWithoutExposingIntegrationDto() {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE)).thenReturn(lookupResponse());
+            when(addressLookupService.findByPostalCode(POSTAL_CODE))
+                    .thenReturn(lookupResponse());
 
-            AddressLookupResponseDTO result = addressService.lookupByPostalCode(POSTAL_CODE);
+            AddressLookupResponseDTO result =
+                    addressService.lookupByPostalCode(POSTAL_CODE);
 
             assertEquals(
                     new AddressLookupResponseDTO(
@@ -143,11 +159,22 @@ class AddressServiceTests {
         @Test
         @DisplayName("Should return address data with the state converted to enum")
         void shouldReturnAddressDataWithTheStateConvertedToEnum() {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE)).thenReturn(lookupResponse());
+            when(addressLookupService.findByPostalCode(POSTAL_CODE))
+                    .thenReturn(lookupResponse());
 
-            AddressData result = addressService.findAddressByPostalCode(POSTAL_CODE);
+            AddressData result =
+                    addressService.findAddressByPostalCode(POSTAL_CODE);
 
-            assertEquals(new AddressData("Praça da Sé", "Sé", "São Paulo", State.SP, POSTAL_CODE), result);
+            assertEquals(
+                    new AddressData(
+                            "Praça da Sé",
+                            "Sé",
+                            "São Paulo",
+                            State.SP,
+                            POSTAL_CODE
+                    ),
+                    result
+            );
 
             verify(addressLookupService).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressLookupService);
@@ -157,12 +184,16 @@ class AddressServiceTests {
         @DisplayName("Should throw PostalCodeNotFoundException when postal code is not found")
         void shouldThrowPostalCodeNotFoundExceptionWhenPostalCodeIsNotFound() {
             when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenThrow(new PostalCodeNotFoundException("CEP " + POSTAL_CODE + " não encontrado em nenhum provedor."));
+                    .thenThrow(new PostalCodeNotFoundException(
+                            ApiErrorMessages.POSTAL_CODE_NOT_FOUND
+                    ));
 
-            PostalCodeNotFoundException exception = assertThrows(PostalCodeNotFoundException.class,
-                    () -> addressService.findAddressByPostalCode(POSTAL_CODE));
+            PostalCodeNotFoundException exception = assertThrows(
+                    PostalCodeNotFoundException.class,
+                    () -> addressService.findAddressByPostalCode(POSTAL_CODE)
+            );
 
-            assertEquals("CEP " + POSTAL_CODE + " não encontrado em nenhum provedor.", exception.getMessage());
+            assertEquals(ApiErrorMessages.POSTAL_CODE_NOT_FOUND, exception.getMessage());
 
             verify(addressLookupService).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressLookupService);
@@ -172,12 +203,19 @@ class AddressServiceTests {
         @DisplayName("Should throw AddressProviderUnavailableException when providers are unavailable")
         void shouldThrowAddressProviderUnavailableExceptionWhenProvidersAreUnavailable() {
             when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenThrow(new AddressProviderUnavailableException("Serviços de CEP indisponíveis no momento."));
+                    .thenThrow(new AddressProviderUnavailableException(
+                            ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
+                    ));
 
-            AddressProviderUnavailableException exception = assertThrows(AddressProviderUnavailableException.class,
-                    () -> addressService.findAddressByPostalCode(POSTAL_CODE));
+            AddressProviderUnavailableException exception = assertThrows(
+                    AddressProviderUnavailableException.class,
+                    () -> addressService.findAddressByPostalCode(POSTAL_CODE)
+            );
 
-            assertEquals("Serviços de CEP indisponíveis no momento.", exception.getMessage());
+            assertEquals(
+                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
+                    exception.getMessage()
+            );
 
             verify(addressLookupService).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(addressLookupService);
@@ -185,6 +223,12 @@ class AddressServiceTests {
     }
 
     private static AddressLookupResponse lookupResponse() {
-        return new AddressLookupResponse("Praça da Sé", "Sé", "São Paulo", "SP", POSTAL_CODE);
+        return new AddressLookupResponse(
+                "Praça da Sé",
+                "Sé",
+                "São Paulo",
+                "SP",
+                POSTAL_CODE
+        );
     }
 }

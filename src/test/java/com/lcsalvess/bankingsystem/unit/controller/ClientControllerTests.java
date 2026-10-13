@@ -127,7 +127,7 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(clientService.findAll()).thenThrow(new RuntimeException("Unexpected exception"));
+            when(clientService.findAll()).thenThrow(new RuntimeException());
 
             performErrorResponse(mockMvc.perform(get(CLIENTS_URL)), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
@@ -181,7 +181,7 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(clientService.findById(1L)).thenThrow(new RuntimeException("Unexpected exception"));
+            when(clientService.findById(1L)).thenThrow(new RuntimeException());
 
             performErrorResponse(mockMvc.perform(get(CLIENT_URL, 1L)), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
@@ -269,7 +269,7 @@ public class ClientControllerTests {
             ClientRequestDTO request = validClientRequest();
 
             when(clientService.create(request))
-                    .thenThrow(new AddressProviderUnavailableException("Serviços de CEP indisponíveis no momento."));
+                    .thenThrow(new AddressProviderUnavailableException(ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE));
 
             performErrorResponse(postClient(request), 503, ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE);
 
@@ -282,7 +282,7 @@ public class ClientControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             ClientRequestDTO request = validClientRequest();
 
-            when(clientService.create(request)).thenThrow(new RuntimeException("Unexpected exception"));
+            when(clientService.create(request)).thenThrow(new RuntimeException());
 
             performErrorResponse(postClient(request), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
@@ -431,7 +431,7 @@ public class ClientControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             ClientUpdateRequestDTO request = validClientUpdateRequest();
 
-            when(clientService.update(1L, request)).thenThrow(new RuntimeException("Unexpected exception"));
+            when(clientService.update(1L, request)).thenThrow(new RuntimeException());
 
             performErrorResponse(patchClient(1L, request), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 

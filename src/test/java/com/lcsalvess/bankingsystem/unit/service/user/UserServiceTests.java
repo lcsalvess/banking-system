@@ -23,10 +23,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class UserServiceTests {
+class UserServiceTests {
+
     @Mock
     private UserRepository userRepository;
 
@@ -42,24 +46,41 @@ public class UserServiceTests {
     @Nested
     @DisplayName("Ao criar um usuário")
     class CreateTests {
+
         @Test
         @DisplayName("Deve criar usuário com dados válidos")
         void shouldCreateUserSuccessfully() {
             UserRequestDTO dto = createUserRequestDTO();
-            when(passwordEncoder.encode(dto.password())).thenReturn("encoded-password");
-            User savedUser = new User(dto.username(), dto.email(), "encoded-password", Role.ADMIN);
+
+            when(passwordEncoder.encode(dto.password()))
+                    .thenReturn("encoded-password");
+
+            User savedUser = new User(
+                    dto.username(),
+                    dto.email(),
+                    "encoded-password",
+                    Role.ADMIN
+            );
+
             when(userRepository.save(any(User.class)))
                     .thenReturn(savedUser);
+
             UserResponseDTO response = userService.create(dto);
+
             assertEquals(dto.username(), response.username());
             assertEquals(dto.email(), response.email());
             assertEquals(dto.role(), response.role());
+
             verify(userRepository).existsByUsername(dto.username());
             verify(userRepository).existsByEmail(dto.email());
             verify(passwordEncoder).encode(dto.password());
             verify(userRepository).save(any(User.class));
+
             verify(eventPublisher).publishEvent(
-                    new UserOperationEvent(savedUser.getId(), UserOperationType.CREATED)
+                    new UserOperationEvent(
+                            savedUser.getId(),
+                            UserOperationType.CREATED
+                    )
             );
         }
 
@@ -67,8 +88,15 @@ public class UserServiceTests {
         @DisplayName("Deve lançar exceção quando o nome de usuário já existe")
         void shouldThrowWhenUsernameAlreadyExists() {
             UserRequestDTO dto = createUserRequestDTO();
-            when(userRepository.existsByUsername(dto.username())).thenReturn(true);
-            assertThrows(UsernameAlreadyExistsException.class, () -> userService.create(dto));
+
+            when(userRepository.existsByUsername(dto.username()))
+                    .thenReturn(true);
+
+            assertThrows(
+                    UsernameAlreadyExistsException.class,
+                    () -> userService.create(dto)
+            );
+
             verify(userRepository).existsByUsername(dto.username());
             verify(userRepository, never()).existsByEmail(any());
             verify(passwordEncoder, never()).encode(dto.password());
@@ -80,9 +108,18 @@ public class UserServiceTests {
         @DisplayName("Deve lançar exceção quando o e-mail já existe")
         void shouldThrowWhenEmailAlreadyExists() {
             UserRequestDTO dto = createUserRequestDTO();
-            when(userRepository.existsByUsername(dto.username())).thenReturn(false);
-            when(userRepository.existsByEmail(dto.email())).thenReturn(true);
-            assertThrows(UserEmailAlreadyExistsException.class, () -> userService.create(dto));
+
+            when(userRepository.existsByUsername(dto.username()))
+                    .thenReturn(false);
+
+            when(userRepository.existsByEmail(dto.email()))
+                    .thenReturn(true);
+
+            assertThrows(
+                    UserEmailAlreadyExistsException.class,
+                    () -> userService.create(dto)
+            );
+
             verify(userRepository).existsByUsername(dto.username());
             verify(userRepository).existsByEmail(dto.email());
             verify(passwordEncoder, never()).encode(dto.password());
@@ -91,7 +128,12 @@ public class UserServiceTests {
         }
 
         private UserRequestDTO createUserRequestDTO() {
-            return new UserRequestDTO("usuario.teste", "teste@teste.com.br", "teste123456", Role.ADMIN);
+            return new UserRequestDTO(
+                    "usuario.teste",
+                    "teste@teste.com.br",
+                    "teste123456",
+                    Role.ADMIN
+            );
         }
     }
 }

@@ -581,7 +581,7 @@ public class TransactionControllerTests {
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             when(transactionService.applyYield("99999", "5"))
-                    .thenThrow(new RuntimeException("Unexpected exception"));
+                    .thenThrow(new RuntimeException());
 
             performYield("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
@@ -744,7 +744,7 @@ public class TransactionControllerTests {
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             when(transactionService.findByAccountNumber("99999", "5"))
-                    .thenThrow(new RuntimeException("Unexpected exception"));
+                    .thenThrow(new RuntimeException());
 
             performGet("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 

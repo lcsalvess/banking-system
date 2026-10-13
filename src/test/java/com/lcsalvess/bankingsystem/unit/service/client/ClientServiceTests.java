@@ -598,13 +598,13 @@ public class ClientServiceTests {
                 Arguments.of(
                         "postal code is not found",
                         new PostalCodeNotFoundException(
-                                "CEP 01001000 não encontrado em nenhum provedor."
+                                ApiErrorMessages.POSTAL_CODE_NOT_FOUND
                         )
                 ),
                 Arguments.of(
                         "address provider is unavailable",
                         new AddressProviderUnavailableException(
-                                "Serviços de CEP indisponíveis no momento."
+                                ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
                         )
                 )
         );

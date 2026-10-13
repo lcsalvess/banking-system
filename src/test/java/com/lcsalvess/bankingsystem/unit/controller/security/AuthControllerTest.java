@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.unit.controller.security;
 
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,9 +43,9 @@ public class AuthControllerTest {
         userRepository.deleteAll();
 
         User user = new User(
-                "usuario.teste",
-                "usuario.teste@email.com",
-                passwordEncoder.encode("Senha123"),
+                "test-user",
+                "test-user@test.com",
+                passwordEncoder.encode("test-password"),
                 Role.EMPLOYEE
         );
 
@@ -62,10 +63,13 @@ public class AuthControllerTest {
         void shouldAuthenticateWithValidCredentials() throws Exception {
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
-                        "username": "usuario.teste",
-                        "password": "Senha123"
+                        "username": "test-user",
+                        "password": "test-password"
                     }
-                    """)).andExpect(status().isOk()).andExpect(jsonPath("$.token").isNotEmpty()).andExpect(jsonPath("$.username").value("usuario.teste"));
+                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.token").isNotEmpty())
+                    .andExpect(jsonPath("$.username").value("test-user"));
         }
 
         @Test
@@ -73,10 +77,11 @@ public class AuthControllerTest {
         void shouldRejectInvalidPassword() throws Exception {
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
-                        "username": "usuario.teste",
-                        "password": "SenhaErrada123"
+                        "username": "test-user",
+                        "password": "test-invalid-password"
                     }
-                    """)).andExpect(status().isUnauthorized());
+                    """))
+                    .andExpect(status().isUnauthorized());
         }
 
         @Test
@@ -84,10 +89,11 @@ public class AuthControllerTest {
         void shouldRejectNonexistentUser() throws Exception {
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
-                        "username": "usuario.inexistente",
-                        "password": "Senha123"
+                        "username": "test-invalid-user",
+                        "password": "test-invalid-password"
                     }
-                    """)).andExpect(status().isUnauthorized());
+                    """))
+                    .andExpect(status().isUnauthorized());
         }
 
         @Test
@@ -96,7 +102,7 @@ public class AuthControllerTest {
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
                         "username": "",
-                        "password": "Senha123"
+                        "password": "test-invalid-password"
                     }
                     """)).andExpect(status().isBadRequest());
         }
@@ -106,7 +112,7 @@ public class AuthControllerTest {
         void shouldRejectBlankPassword() throws Exception {
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
                     {
-                        "username": "usuario.teste",
+                        "username": "test-user",
                         "password": ""
                     }
                     """)).andExpect(status().isBadRequest());
@@ -115,7 +121,7 @@ public class AuthControllerTest {
         @Test
         @DisplayName("Deve rejeitar usuário inativo")
         void shouldRejectDisabledUser() throws Exception {
-            User user = userRepository.findByUsername("usuario.teste")
+            User user = userRepository.findByUsername("test-user")
                     .orElseThrow();
 
             user.deactivate();
@@ -125,14 +131,14 @@ public class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                     {
-                        "username": "usuario.teste",
-                        "password": "Senha123"
+                        "username": "test-user",
+                        "password": "test-password"
                     }
                     """))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.status").value(401))
                     .andExpect(jsonPath("$.message")
-                            .value("Não foi possível autenticar o usuário."));
+                            .value(ApiErrorMessages.AUTHENTICATION_FAILED));
         }
     }
 }

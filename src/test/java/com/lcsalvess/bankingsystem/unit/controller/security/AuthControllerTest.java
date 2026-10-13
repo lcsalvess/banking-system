@@ -138,7 +138,7 @@ public class AuthControllerTest {
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.status").value(401))
                     .andExpect(jsonPath("$.message")
-                            .value(ApiErrorMessages.AUTHENTICATION_FAILED));
+                            .value(ApiErrorMessages.INVALID_CREDENTIALS));
         }
     }
 }

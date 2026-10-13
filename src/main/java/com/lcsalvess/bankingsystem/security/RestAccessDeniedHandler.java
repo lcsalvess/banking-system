@@ -51,7 +51,7 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
                 : "anonymous";
 
         log.warn(
-                "Acesso negado: usuário={}, caminho={}, exceção={}",
+                "Access denied: user={}, path={}, exception={}",
                 username,
                 request.getRequestURI(),
                 exception.getClass().getSimpleName()

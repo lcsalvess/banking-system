@@ -46,32 +46,77 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Permite acesso público somente ao endpoint de login.
+                        // Public access: login only.
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/auth/login"
                         ).permitAll()
 
-                        // Documentação OpenAPI.
+                        // OpenAPI documentation.
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
                         ).permitAll()
 
-                        // Actuator: acesso de leitura para ambos os perfis.
+                        // Actuator: health and info.
                         .requestMatchers("/actuator/health", "/actuator/info")
                         .hasAnyRole("EMPLOYEE", "ADMIN")
 
-                        // Métricas: acesso exclusivo ao administrador.
+                        // Actuator: metrics restricted to administrators.
                         .requestMatchers("/actuator/metrics", "/actuator/metrics/**")
                         .hasRole("ADMIN")
 
-                        // Criação de usuários: acesso exclusivo ao administrador.
+                        // User management: administrators only.
                         .requestMatchers(HttpMethod.POST, "/api/v1/users")
                         .hasRole("ADMIN")
 
-                        // Demais endpoints exigem autenticação.
+                        // Client management: employees only.
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/clients"
+                        ).hasRole("EMPLOYEE")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/clients",
+                                "/api/v1/clients/**"
+                        ).hasRole("EMPLOYEE")
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/clients/**"
+                        ).hasRole("EMPLOYEE")
+
+                        // Account management: employees only.
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/accounts"
+                        ).hasRole("EMPLOYEE")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/accounts",
+                                "/api/v1/accounts/**"
+                        ).hasRole("EMPLOYEE")
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/accounts/**"
+                        ).hasRole("EMPLOYEE")
+
+                        // Financial operations: employees only.
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/transactions/deposit",
+                                "/api/v1/transactions/withdraw",
+                                "/api/v1/transactions/transfer",
+                                "/api/v1/transactions/yield/**"
+                        ).hasRole("EMPLOYEE")
+
+                        // Transaction history and lookup: read-only access.
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/transactions/**"
+                        ).hasAnyRole("EMPLOYEE", "ADMIN")
+
+                        // All remaining endpoints require authentication.
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptionHandling -> exceptionHandling

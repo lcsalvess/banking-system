@@ -52,7 +52,7 @@ public class AdminBootstrapRunner implements CommandLineRunner {
     @Override
     public void run(String @NonNull ... args) {
         if (userRepository.existsByRole(Role.ADMIN)) {
-            log.info("Usuário administrador já existe. Bootstrap ignorado.");
+            log.info("Administrator user already exists. Bootstrap skipped.");
             return;
         }
 
@@ -83,7 +83,7 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
         userRepository.save(admin);
 
-        log.info("Usuário administrador inicial criado com sucesso.");
+        log.info("Initial administrator user created successfully.");
     }
 
     private void validateCredentials() {

@@ -1,6 +1,7 @@
 
 package com.lcsalvess.bankingsystem.config;
 
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springdoc.core.utils.SpringDocAnnotationsUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -52,6 +54,18 @@ public class OpenApiConfig {
 
             if (openApi.getComponents().getSchemas() == null) {
                 openApi.getComponents().setSchemas(new LinkedHashMap<>());
+            }
+
+            if (!openApi.getComponents().getSchemas()
+                    .containsKey(ApiErrorResponse.class.getSimpleName())) {
+
+                SpringDocAnnotationsUtils.extractSchema(
+                        openApi.getComponents(),
+                        ApiErrorResponse.class,
+                        null,
+                        null,
+                        openApi.getSpecVersion()
+                );
             }
 
             openApi.getPaths().values().forEach(pathItem ->

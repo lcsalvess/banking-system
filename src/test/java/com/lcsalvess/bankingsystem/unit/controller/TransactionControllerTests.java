@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.controller;
 
+import com.lcsalvess.bankingsystem.config.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.TransactionController;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
@@ -20,18 +21,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -46,9 +55,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(TransactionController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(
-        WebMvcTestSecurityConfig.class
-)
+@Import({
+        WebMvcTestSecurityConfig.class,
+        PaginationConfig.class
+})
 public class TransactionControllerTests {
 
     private static final String PROVIDER =
@@ -662,94 +672,157 @@ public class TransactionControllerTests {
         private static final String URL =
                 "/api/v1/transactions/accounts/{accountNumber}";
 
+        private static final Pageable DEFAULT_PAGEABLE = PageRequest.of(
+                0, 10, Sort.by(Sort.Direction.DESC, "createdAt", "id")
+        );
+
         @Test
-        @DisplayName("Should return the account transactions successfully")
-        void shouldReturnTheAccountTransactionsSuccessfully() throws Exception {
+        @DisplayName("Should return the page of account transactions successfully")
+        void shouldReturnThePageOfAccountTransactionsSuccessfully() throws Exception {
             TransactionResponseDTO transaction1 =
                     mockTransaction(TransactionType.DEPOSIT);
 
             TransactionResponseDTO transaction2 =
                     mockTransaction(TransactionType.WITHDRAWAL);
 
-            when(transactionService.findByAccountNumber("99999", "5"))
-                    .thenReturn(List.of(transaction1, transaction2));
+            stubService(new PageImpl<>(
+                    List.of(transaction1, transaction2), DEFAULT_PAGEABLE, 2
+            ));
 
             MvcResult result = mockMvc.perform(get(URL, "99999")
                             .param("digit", "5"))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$", hasSize(2)))
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.page.size").value(10))
+                    .andExpect(jsonPath("$.page.number").value(0))
+                    .andExpect(jsonPath("$.page.totalElements").value(2))
+                    .andExpect(jsonPath("$.page.totalPages").value(1))
                     .andReturn();
 
-            TransactionResponseDTO[] response =
-                    objectMapper.readValue(
-                            result.getResponse().getContentAsString(),
-                            TransactionResponseDTO[].class
-                    );
+            TransactionResponseDTO[] content = readPageContent(result);
 
-            assertTransactionEquals(transaction1, response[0]);
-            assertTransactionEquals(transaction2, response[1]);
+            assertTransactionEquals(transaction1, content[0]);
+            assertTransactionEquals(transaction2, content[1]);
 
-            verify(transactionService).findByAccountNumber("99999", "5");
-            verifyNoMoreInteractions(transactionService);
+            Pageable pageable = verifyServiceCall(null, null, null);
+
+            assertEquals(DEFAULT_PAGEABLE, pageable);
         }
 
         @Test
-        @DisplayName("Should return empty list when the account has no transactions")
-        void shouldReturnEmptyListWhenAccountHasNoTransactions() throws Exception {
-            when(transactionService.findByAccountNumber("99999", "5"))
-                    .thenReturn(List.of());
+        @DisplayName("Should return empty page when the account has no transactions")
+        void shouldReturnEmptyPageWhenAccountHasNoTransactions() throws Exception {
+            stubService(new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
 
             mockMvc.perform(get(URL, "99999")
                             .param("digit", "5"))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.content", hasSize(0)))
+                    .andExpect(jsonPath("$.page.totalElements").value(0))
+                    .andExpect(jsonPath("$.page.totalPages").value(0));
 
-            verify(transactionService).findByAccountNumber("99999", "5");
-            verifyNoMoreInteractions(transactionService);
+            verifyServiceCall(null, null, null);
+        }
+
+        @Test
+        @DisplayName("Should forward type and date filters to the service")
+        void shouldForwardFiltersToTheService() throws Exception {
+            stubService(new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
+
+            mockMvc.perform(get(URL, "99999")
+                            .param("digit", "5")
+                            .param("type", "DEPOSIT")
+                            .param("startDate", "2026-01-01")
+                            .param("endDate", "2026-01-31"))
+                    .andExpect(status().isOk());
+
+            verifyServiceCall(
+                    TransactionType.DEPOSIT,
+                    LocalDate.of(2026, 1, 1),
+                    LocalDate.of(2026, 1, 31)
+            );
+        }
+
+        @Test
+        @DisplayName("Should forward custom page, size and sort to the service")
+        void shouldForwardCustomPagination() throws Exception {
+            stubService(new PageImpl<>(List.of(), PageRequest.of(2, 5), 0));
+
+            mockMvc.perform(get(URL, "99999")
+                            .param("digit", "5")
+                            .param("page", "2")
+                            .param("size", "5")
+                            .param("sort", "amount,asc"))
+                    .andExpect(status().isOk());
+
+            Pageable pageable = verifyServiceCall(null, null, null);
+
+            assertEquals(
+                    PageRequest.of(2, 5, Sort.by(Sort.Direction.ASC, "amount")),
+                    pageable
+            );
+        }
+
+        @Test
+        @DisplayName("Should limit the page size to the configured maximum")
+        void shouldLimitThePageSizeToTheMaximum() throws Exception {
+            stubService(new PageImpl<>(List.of(), PageRequest.of(0, 100), 0));
+
+            mockMvc.perform(get(URL, "99999")
+                            .param("digit", "5")
+                            .param("size", "1000"))
+                    .andExpect(status().isOk());
+
+            Pageable pageable = verifyServiceCall(null, null, null);
+
+            assertEquals(100, pageable.getPageSize());
         }
 
         @Test
         @DisplayName("Should return 400 when digit is invalid")
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            when(transactionService.findByAccountNumber("99999", "3"))
-                    .thenThrow(
-                            new InvalidAccountDigitException(
-                                    ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
-                            )
-                    );
+            when(transactionService.findByAccountNumber(
+                    eq("99999"), eq("3"), any(), any(), any(), any(Pageable.class)
+            )).thenThrow(
+                    new InvalidAccountDigitException(
+                            ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
+                    )
+            );
 
             performGet("3", 400, ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH);
 
-            verify(transactionService).findByAccountNumber("99999", "3");
+            verify(transactionService).findByAccountNumber(
+                    eq("99999"), eq("3"), isNull(), isNull(), isNull(), any(Pageable.class)
+            );
             verifyNoMoreInteractions(transactionService);
         }
 
         @Test
         @DisplayName("Should return 404 when account does not exist")
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
-            when(transactionService.findByAccountNumber("99999", "5"))
-                    .thenThrow(
-                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
-                    );
+            when(transactionService.findByAccountNumber(
+                    eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
+            )).thenThrow(
+                    new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
+            );
 
             performGet("5", 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
-            verify(transactionService).findByAccountNumber("99999", "5");
-            verifyNoMoreInteractions(transactionService);
+            verifyServiceCall(null, null, null);
         }
 
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(transactionService.findByAccountNumber("99999", "5"))
-                    .thenThrow(new RuntimeException());
+            when(transactionService.findByAccountNumber(
+                    eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
+            )).thenThrow(new RuntimeException());
 
             performGet("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
-            verify(transactionService).findByAccountNumber("99999", "5");
-            verifyNoMoreInteractions(transactionService);
+            verifyServiceCall(null, null, null);
         }
 
         @Test
@@ -797,7 +870,6 @@ public class TransactionControllerTests {
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
                     .andExpect(
                             jsonPath("$.errors.digit")
@@ -805,6 +877,74 @@ public class TransactionControllerTests {
                     );
 
             verifyNoInteractions(transactionService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when transaction type is invalid")
+        void shouldReturnBadRequestWhenTypeIsInvalid() throws Exception {
+            ResultActions result = mockMvc.perform(get(URL, "99999")
+                    .param("digit", "5")
+                    .param("type", "INVALID"));
+
+            performErrorResponse(result, 400, ApiErrorMessages.INVALID_REQUEST_PARAMETER);
+
+            verifyNoInteractions(transactionService);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @MethodSource(PROVIDER + "invalidDateParameters")
+        @DisplayName("Should return 400 when a date parameter is invalid")
+        void shouldReturnBadRequestWhenDateIsInvalid(
+                String scenario,
+                String parameter,
+                String value
+        ) throws Exception {
+            ResultActions result = mockMvc.perform(get(URL, "99999")
+                    .param("digit", "5")
+                    .param(parameter, value));
+
+            performErrorResponse(result, 400, ApiErrorMessages.INVALID_REQUEST_PARAMETER);
+
+            verifyNoInteractions(transactionService);
+        }
+
+        private void stubService(Page<TransactionResponseDTO> page) {
+            when(transactionService.findByAccountNumber(
+                    eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
+            )).thenReturn(page);
+        }
+
+        private Pageable verifyServiceCall(
+                TransactionType type,
+                LocalDate startDate,
+                LocalDate endDate
+        ) {
+            ArgumentCaptor<Pageable> pageableCaptor =
+                    ArgumentCaptor.forClass(Pageable.class);
+
+            verify(transactionService).findByAccountNumber(
+                    eq("99999"),
+                    eq("5"),
+                    eq(type),
+                    eq(startDate),
+                    eq(endDate),
+                    pageableCaptor.capture()
+            );
+            verifyNoMoreInteractions(transactionService);
+
+            return pageableCaptor.getValue();
+        }
+
+        private TransactionResponseDTO[] readPageContent(MvcResult result)
+                throws Exception {
+            JsonNode root = objectMapper.readTree(
+                    result.getResponse().getContentAsString()
+            );
+
+            return objectMapper.treeToValue(
+                    root.get("content"),
+                    TransactionResponseDTO[].class
+            );
         }
 
         private void performGet(
@@ -1108,6 +1248,16 @@ public class TransactionControllerTests {
                 Arguments.of("account number exceeds maximum length", "123456789012345678901"),
                 Arguments.of("account number contains letters", "1234A"),
                 Arguments.of("account number contains special characters", "123-5")
+        );
+    }
+
+    @SuppressWarnings("unused")
+    static Stream<Arguments> invalidDateParameters() {
+        return Stream.of(
+                Arguments.of("start date has invalid month", "startDate", "2026-13-01"),
+                Arguments.of("start date is not in ISO format", "startDate", "01/01/2026"),
+                Arguments.of("end date has invalid month", "endDate", "2026-00-10"),
+                Arguments.of("end date is not a date", "endDate", "abc")
         );
     }
 

@@ -17,10 +17,13 @@ import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.*;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
+import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +31,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -46,12 +48,30 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
-    public List<TransactionResponseDTO> findByAccountNumber(String accountNumber, String accountDigit) {
-        Account account = accountService.findEntityByAccountNumber(accountNumber, accountDigit);
+    public Page<TransactionResponseDTO> findByAccountNumber(
+            String accountNumber,
+            String accountDigit,
+            TransactionType type,
+            LocalDate startDate,
+            LocalDate endDate,
+            Pageable pageable
+    ) {
+        validateDateRange(startDate, endDate);
 
-        return transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(account.getId()).stream()
-                .map(TransactionResponseDTO::fromEntity)
-                .toList();
+        Account account = accountService.findEntityByAccountNumber(
+                accountNumber,
+                accountDigit
+        );
+
+        return transactionRepository.findAll(
+                TransactionSpecifications.byAccountAndFilters(
+                        account.getId(),
+                        type,
+                        startDate != null ? startDate.atStartOfDay() : null,
+                        endDate != null ? endDate.atTime(LocalTime.MAX) : null
+                ),
+                pageable
+        ).map(TransactionResponseDTO::fromEntity);
     }
 
     @Transactional(readOnly = true)
@@ -213,6 +233,12 @@ public class TransactionService {
     private void validateBalance(Account account, BigDecimal amount) {
         if (account.getBalance().compareTo(amount) < 0) {
             throw new InsufficientBalanceException(ApiErrorMessages.INSUFFICIENT_BALANCE);
+        }
+    }
+
+    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+            throw new InvalidDateRangeException(ApiErrorMessages.INVALID_DATE_RANGE);
         }
     }
 

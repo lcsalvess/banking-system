@@ -86,6 +86,9 @@ public final class ApiErrorMessages {
     public static final String NO_YIELD_AVAILABLE =
             "Não há rendimento disponível para esta conta.";
 
+    public static final String INVALID_DATE_RANGE =
+            "A data inicial não pode ser posterior à data final.";
+
     // Data integrity
     public static final String CLIENT_EMAIL_ALREADY_EXISTS =
             "Já existe um cliente cadastrado com este e-mail.";

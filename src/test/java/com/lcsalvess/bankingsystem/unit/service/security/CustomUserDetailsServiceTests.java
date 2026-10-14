@@ -46,7 +46,7 @@ class CustomUserDetailsServiceTests {
                     Role.EMPLOYEE
             );
 
-            when(userRepository.findByUsername(username))
+            when(userRepository.findByUsernameIgnoreCase(username))
                     .thenReturn(Optional.of(user));
 
             UserDetails result =
@@ -54,7 +54,7 @@ class CustomUserDetailsServiceTests {
 
             assertEquals(user, result);
 
-            verify(userRepository).findByUsername(username);
+            verify(userRepository).findByUsernameIgnoreCase(username);
         }
 
         @Test
@@ -62,7 +62,7 @@ class CustomUserDetailsServiceTests {
         void shouldThrowWhenUsernameDoesNotExist() {
             String username = "usuario.inexistente";
 
-            when(userRepository.findByUsername(username))
+            when(userRepository.findByUsernameIgnoreCase(username))
                     .thenReturn(Optional.empty());
 
             assertThrows(
@@ -70,7 +70,7 @@ class CustomUserDetailsServiceTests {
                     () -> customUserDetailsService.loadUserByUsername(username)
             );
 
-            verify(userRepository).findByUsername(username);
+            verify(userRepository).findByUsernameIgnoreCase(username);
         }
     }
 }

@@ -38,13 +38,13 @@ public class UserService {
         String username = UsernameNormalizer.normalize(dto.username());
         String email = EmailNormalizer.normalize(dto.email());
 
-        if (userRepository.existsByUsername(username)) {
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
             throw new UsernameAlreadyExistsException(
                     ApiErrorMessages.USERNAME_ALREADY_EXISTS
             );
         }
 
-        if (userRepository.existsByEmail(email)) {
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new UserEmailAlreadyExistsException(
                     ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
             );

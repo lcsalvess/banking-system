@@ -121,7 +121,7 @@ public class AuthControllerTest {
         @Test
         @DisplayName("Deve rejeitar usuário inativo")
         void shouldRejectDisabledUser() throws Exception {
-            User user = userRepository.findByUsername("test-user")
+            User user = userRepository.findByUsernameIgnoreCase("test-user")
                     .orElseThrow();
 
             user.deactivate();

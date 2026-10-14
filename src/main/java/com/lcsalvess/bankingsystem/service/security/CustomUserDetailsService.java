@@ -18,9 +18,9 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
+    public @NonNull UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
         String normalizedUsername = UsernameNormalizer.normalize(username);
-        return userRepository.findByUsername(normalizedUsername)
+        return userRepository.findByUsernameIgnoreCase(normalizedUsername)
                 .orElseThrow(() -> new UsernameNotFoundException(ApiErrorMessages.INVALID_CREDENTIALS));
     }
 }

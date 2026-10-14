@@ -71,8 +71,8 @@ class UserServiceTests {
             assertEquals(dto.email(), response.email());
             assertEquals(dto.role(), response.role());
 
-            verify(userRepository).existsByUsername(dto.username());
-            verify(userRepository).existsByEmail(dto.email());
+            verify(userRepository).existsByUsernameIgnoreCase(dto.username());
+            verify(userRepository).existsByEmailIgnoreCase(dto.email());
             verify(passwordEncoder).encode(dto.password());
             verify(userRepository).save(any(User.class));
 
@@ -89,7 +89,7 @@ class UserServiceTests {
         void shouldThrowWhenUsernameAlreadyExists() {
             UserRequestDTO dto = createUserRequestDTO();
 
-            when(userRepository.existsByUsername(dto.username()))
+            when(userRepository.existsByUsernameIgnoreCase(dto.username()))
                     .thenReturn(true);
 
             assertThrows(
@@ -97,8 +97,8 @@ class UserServiceTests {
                     () -> userService.create(dto)
             );
 
-            verify(userRepository).existsByUsername(dto.username());
-            verify(userRepository, never()).existsByEmail(any());
+            verify(userRepository).existsByUsernameIgnoreCase(dto.username());
+            verify(userRepository, never()).existsByEmailIgnoreCase(any());
             verify(passwordEncoder, never()).encode(dto.password());
             verify(userRepository, never()).save(any(User.class));
             verifyNoInteractions(eventPublisher);
@@ -109,10 +109,10 @@ class UserServiceTests {
         void shouldThrowWhenEmailAlreadyExists() {
             UserRequestDTO dto = createUserRequestDTO();
 
-            when(userRepository.existsByUsername(dto.username()))
+            when(userRepository.existsByUsernameIgnoreCase(dto.username()))
                     .thenReturn(false);
 
-            when(userRepository.existsByEmail(dto.email()))
+            when(userRepository.existsByEmailIgnoreCase(dto.email()))
                     .thenReturn(true);
 
             assertThrows(
@@ -120,8 +120,8 @@ class UserServiceTests {
                     () -> userService.create(dto)
             );
 
-            verify(userRepository).existsByUsername(dto.username());
-            verify(userRepository).existsByEmail(dto.email());
+            verify(userRepository).existsByUsernameIgnoreCase(dto.username());
+            verify(userRepository).existsByEmailIgnoreCase(dto.email());
             verify(passwordEncoder, never()).encode(dto.password());
             verify(userRepository, never()).save(any(User.class));
             verifyNoInteractions(eventPublisher);

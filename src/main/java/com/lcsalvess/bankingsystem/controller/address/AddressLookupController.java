@@ -1,13 +1,10 @@
 package com.lcsalvess.bankingsystem.controller.address;
 
 import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.service.address.AddressService;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.constraints.Pattern;
@@ -38,27 +35,19 @@ public class AddressLookupController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Address found successfully.",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = AddressLookupResponseDTO.class)
-                    )
+                    description = "Address found successfully."
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid postal code. It must contain exactly 8 digits.",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid postal code. It must contain exactly 8 digits."
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Postal code not found."
             ),
             @ApiResponse(
                     responseCode = "503",
-                    description = "Address providers are unavailable.",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Address providers are unavailable."
             )
     })
     @GetMapping("/lookup/{postalCode}")
@@ -69,10 +58,11 @@ public class AddressLookupController {
                     required = true,
                     example = "01001000"
             )
-            @PathVariable
+            @PathVariable("postalCode")
             @Pattern(
                     regexp = "^\\d{8}$",
-                    message = ValidationMessages.INVALID_POSTAL_CODE_FORMAT)
+                    message = ValidationMessages.INVALID_POSTAL_CODE_FORMAT
+            )
             String postalCode) {
         return addressService.lookupByPostalCode(postalCode);
     }

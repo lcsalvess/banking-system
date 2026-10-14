@@ -2,15 +2,11 @@ package com.lcsalvess.bankingsystem.controller;
 
 import com.lcsalvess.bankingsystem.dto.request.AccountRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.AccountResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
@@ -35,21 +31,17 @@ public class AccountController {
     }
 
     @Operation(
-            summary = "Get all accounts",
-            description = "Retrieves all registered accounts."
+            summary = "Get accounts",
+            description = """
+                Retrieves accounts using pagination and sorting.
+                The default page size is 10, and the default sort order
+                is ascending by account number. The maximum page size is 100.
+                """
     )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Accounts retrieved successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            array = @ArraySchema(
-                                    schema = @Schema(implementation = AccountResponseDTO.class)
-                            )
-                    )
-            )
-    })
+    @ApiResponse(
+            responseCode = "200",
+            description = "Accounts retrieved successfully"
+    )
     @GetMapping
     public Page<AccountResponseDTO> findAll(
             @ParameterObject
@@ -61,32 +53,20 @@ public class AccountController {
 
     @Operation(
             summary = "Get account by account number and digit",
-            description = "Retrieves an account by its number and digit."
+            description = "Retrieves an account using its account number and check digit."
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Account found successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = AccountResponseDTO.class)
-                    )
+                    description = "Account retrieved successfully"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description =  "Invalid account number or check digit",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description =  "Invalid account number or check digit"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Account not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account not found"
             )
     })
     @GetMapping("/{accountNumber}")
@@ -118,27 +98,15 @@ public class AccountController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Account created successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = AccountResponseDTO.class)
-                    )
+                    description = "Account created successfully"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid account data or request format",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid account data or request format"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account already exists",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account already exists"
             )
     })
     @PostMapping
@@ -149,7 +117,7 @@ public class AccountController {
 
     @Operation(
             summary = "Cancel an account",
-            description = "Cancels an existing account using its account number and check digit."
+            description = "Cancels an account using its account number and check digit."
     )
     @ApiResponses({
             @ApiResponse(
@@ -158,27 +126,15 @@ public class AccountController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid account number or check digit",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid account number or check digit"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Account not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account not found"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account already cancelled",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account cannot be cancelled due to its current state or remaining balance"
             )
     })
     @PatchMapping("/{accountNumber}")

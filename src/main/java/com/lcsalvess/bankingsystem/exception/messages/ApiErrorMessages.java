@@ -124,6 +124,8 @@ public final class ApiErrorMessages {
     public static final String UNSUPPORTED_MEDIA_TYPE =
             "Tipo de conteúdo não suportado.";
 
+    public static final String INVALID_SORT_PROPERTY =
+            "Propriedade de ordenação inválida.";
     // Infrastructure
     public static final String INTERNAL_SERVER_ERROR =
             "Ocorreu um erro interno no servidor.";

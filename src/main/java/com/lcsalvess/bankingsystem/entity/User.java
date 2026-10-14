@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.entity;
 
 import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.util.AppTimeZone;
 import com.lcsalvess.bankingsystem.util.EmailNormalizer;
 import com.lcsalvess.bankingsystem.util.UsernameNormalizer;
 import jakarta.persistence.*;
@@ -44,14 +45,14 @@ public class User implements UserDetails {
 
     @PrePersist
     public void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(AppTimeZone.ZONE);
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now(AppTimeZone.ZONE);
     }
 
     protected User() {

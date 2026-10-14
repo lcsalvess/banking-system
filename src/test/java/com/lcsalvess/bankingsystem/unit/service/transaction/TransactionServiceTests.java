@@ -20,6 +20,7 @@ import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,9 +42,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.*;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -77,7 +75,16 @@ public class TransactionServiceTests {
     private static final Long SAVINGS_ID = 2L;
 
     private static final BigDecimal OPERATION_AMOUNT = new BigDecimal("10.00");
-    private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 1, 15, 10, 30, 45);
+    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
+
+    // 23:30 em São Paulo já é o dia seguinte em UTC (02:30Z do dia 16): qualquer uso
+    // da zona errada muda a data e faz os testes falharem.
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 1, 15, 23, 30);
+    private static final LocalDate TODAY = NOW.toLocalDate();
+    private static final Clock CLOCK = Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE);
+
+    private static final LocalDateTime CREATED_AT =
+            LocalDateTime.of(2026, 1, 15, 10, 30, 45);
 
     @Mock
     private TransactionRepository transactionRepository;
@@ -91,8 +98,18 @@ public class TransactionServiceTests {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
     private TransactionService transactionService;
+
+    @BeforeEach
+    void setUp() {
+        transactionService = new TransactionService(
+                transactionRepository,
+                accountService,
+                currentUserService,
+                eventPublisher,
+                CLOCK
+        );
+    }
 
     @Nested
     @DisplayName("findByAccountNumber(String, String, TransactionType, LocalDate, LocalDate, Pageable)")
@@ -136,36 +153,55 @@ public class TransactionServiceTests {
         @DisplayName("Should apply type and date filters, using the whole start and end days")
         void shouldApplyTypeAndDateFilters() {
             CheckingAccount account = account();
-            Transaction deposit = new Transaction(TransactionType.DEPOSIT, OPERATION_AMOUNT, CREATED_AT, account, TEST_USER);
-            Specification<Transaction> specification = specification();
+            Transaction deposit = new Transaction(
+                    TransactionType.DEPOSIT,
+                    OPERATION_AMOUNT,
+                    CREATED_AT,
+                    account,
+                    TEST_USER
+            );
+
             Page<Transaction> page = new PageImpl<>(List.of(deposit), PAGEABLE, 1);
 
             LocalDate startDate = LocalDate.of(2026, 1, 1);
             LocalDate endDate = LocalDate.of(2026, 1, 31);
+
             LocalDateTime expectedStart = startDate.atStartOfDay();
-            LocalDateTime expectedEnd = endDate.atTime(LocalTime.MAX);
+            LocalDateTime expectedEndExclusive = endDate.plusDays(1).atStartOfDay();
 
             stubAccountLookup(account);
-            when(transactionRepository.findAll(specification, PAGEABLE)).thenReturn(page);
 
-            try (MockedStatic<TransactionSpecifications> specifications = mockStatic(TransactionSpecifications.class)) {
+            try (MockedStatic<TransactionSpecifications> specifications =
+                         mockStatic(TransactionSpecifications.class)) {
+
+                Specification<Transaction> specification = specification();
+
                 specifications.when(() -> TransactionSpecifications.byAccountAndFilters(
-                        ACCOUNT_ID, TransactionType.DEPOSIT, expectedStart, expectedEnd
+                        ACCOUNT_ID, TransactionType.DEPOSIT, expectedStart, expectedEndExclusive
                 )).thenReturn(specification);
 
+                when(transactionRepository.findAll(specification, PAGEABLE))
+                        .thenReturn(page);
+
                 Page<TransactionResponseDTO> result = transactionService.findByAccountNumber(
-                        ACCOUNT_NUMBER, ACCOUNT_DIGIT, TransactionType.DEPOSIT, startDate, endDate, PAGEABLE
+                        ACCOUNT_NUMBER,
+                        ACCOUNT_DIGIT,
+                        TransactionType.DEPOSIT,
+                        startDate,
+                        endDate,
+                        PAGEABLE
                 );
 
                 assertEquals(List.of(response(deposit)), result.getContent());
 
                 specifications.verify(() -> TransactionSpecifications.byAccountAndFilters(
-                        ACCOUNT_ID, TransactionType.DEPOSIT, expectedStart, expectedEnd
+                        ACCOUNT_ID, TransactionType.DEPOSIT, expectedStart, expectedEndExclusive
                 ));
+
+                verify(transactionRepository).findAll(specification, PAGEABLE);
             }
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findAll(specification, PAGEABLE);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -605,8 +641,7 @@ public class TransactionServiceTests {
                 String expectedBalance
         ) {
             SavingsAccount account = eligibleSavingsAccount(balance);
-            LocalDate today = LocalDate.now();
-
+            LocalDate today = TODAY;
             stubAccountOperationLookup(account);
             when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
@@ -621,7 +656,7 @@ public class TransactionServiceTests {
             ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
 
             verifyAccountOperationLookup(account);
-            verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtBetween(
+            verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                     eq(SAVINGS_ID), eq(TransactionType.YIELD), startCaptor.capture(), endCaptor.capture()
             );
             verify(currentUserService).getCurrentUser();
@@ -632,7 +667,7 @@ public class TransactionServiceTests {
             verifyNoMoreInteractionsOnMocks();
 
             assertEquals(today.atStartOfDay(), startCaptor.getValue());
-            assertEquals(today.atTime(LocalTime.MAX), endCaptor.getValue());
+            assertEquals(today.plusDays(1).atStartOfDay(), endCaptor.getValue());
             assertTransaction(transactionCaptor.getValue(), TransactionType.YIELD, new BigDecimal(expectedYield), account);
             assertEquals(response(transactionCaptor.getValue()), result);
         }
@@ -677,11 +712,11 @@ public class TransactionServiceTests {
         @Test
         @DisplayName("Should throw when yield was already applied today")
         void shouldThrowWhenYieldWasAlreadyAppliedToday() {
-            LocalDate lastYieldDate = LocalDate.now().minusMonths(1);
+            LocalDate lastYieldDate = TODAY.minusMonths(1);
             SavingsAccount account = savingsAccount("1000.00", lastYieldDate);
 
             stubAccountOperationLookup(account);
-            when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(
+            when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                     eq(SAVINGS_ID), eq(TransactionType.YIELD), any(), any()
             )).thenReturn(true);
 
@@ -790,8 +825,11 @@ public class TransactionServiceTests {
     @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
     static Stream<Arguments> ineligibleLastYieldDates() {
         return Stream.of(
-                Arguments.of("last yield was today", LocalDate.now()),
-                Arguments.of("last yield was one day short of a month", LocalDate.now().minusMonths(1).plusDays(1))
+                Arguments.of("last yield was today", TODAY),
+                Arguments.of(
+                        "last yield was one day short of a month",
+                        TODAY.minusMonths(1).plusDays(1)
+                )
         );
     }
 
@@ -853,7 +891,7 @@ public class TransactionServiceTests {
     }
 
     private void verifyYieldChecked() {
-        verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtBetween(
+        verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 eq(SAVINGS_ID), eq(TransactionType.YIELD), any(), any()
         );
     }
@@ -889,6 +927,7 @@ public class TransactionServiceTests {
         assertEquals(0, amount.compareTo(transaction.getAmount()));
         assertSame(account, transaction.getAccount());
         assertSame(TEST_USER, transaction.getPerformedBy());
+        assertEquals(NOW, transaction.getCreatedAt());
     }
 
     private static TransactionResponseDTO response(Transaction transaction) {
@@ -928,14 +967,19 @@ public class TransactionServiceTests {
     }
 
     private static SavingsAccount savingsAccount(String balance, LocalDate lastYieldDate) {
-        SavingsAccount account = new SavingsAccount(null, SAVINGS_NUMBER, SAVINGS_DIGIT);
+        SavingsAccount account = new SavingsAccount(
+                null,
+                SAVINGS_NUMBER,
+                SAVINGS_DIGIT,
+                lastYieldDate
+        );
+
         ReflectionTestUtils.setField(account, "id", SAVINGS_ID);
-        ReflectionTestUtils.setField(account, "lastYieldDate", lastYieldDate);
         account.credit(new BigDecimal(balance));
         return account;
     }
 
     private static SavingsAccount eligibleSavingsAccount(String balance) {
-        return savingsAccount(balance, LocalDate.now().minusMonths(1));
+        return savingsAccount(balance, TODAY.minusMonths(1));
     }
 }

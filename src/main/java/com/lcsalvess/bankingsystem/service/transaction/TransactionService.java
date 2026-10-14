@@ -28,9 +28,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.UUID;
 
 @Service
@@ -39,12 +39,14 @@ public class TransactionService {
     private final AccountService accountService;
     private final CurrentUserService currentUserService;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
-    public TransactionService(TransactionRepository transactionRepository, AccountService accountService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher) {
+    public TransactionService(TransactionRepository transactionRepository, AccountService accountService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher, Clock clock) {
         this.transactionRepository = transactionRepository;
         this.accountService = accountService;
         this.currentUserService = currentUserService;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -68,7 +70,7 @@ public class TransactionService {
                         account.getId(),
                         type,
                         startDate != null ? startDate.atStartOfDay() : null,
-                        endDate != null ? endDate.atTime(LocalTime.MAX) : null
+                        endDate != null ? endDate.plusDays(1).atStartOfDay() : null
                 ),
                 pageable
         ).map(TransactionResponseDTO::fromEntity);
@@ -256,7 +258,7 @@ public class TransactionService {
     }
 
     private void validateYieldAvailable(SavingsAccount savingsAccount, BigDecimal yieldAmount) {
-        if (!savingsAccount.isEligibleForYield()) {
+        if (!savingsAccount.isEligibleForYield(LocalDate.now(clock))) {
             throw new YieldNotAvailableException(ApiErrorMessages.YIELD_NOT_AVAILABLE);
         }
         if (yieldAmount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -265,16 +267,28 @@ public class TransactionService {
     }
 
     private void validateYieldAlreadyApplied(Long accountId) {
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
-        boolean alreadyApplied = transactionRepository.existsByAccountIdAndTypeAndCreatedAtBetween(accountId, TransactionType.YIELD, startOfDay, endOfDay);
+        LocalDate today = LocalDate.now(clock);
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endExclusive = today.plusDays(1).atStartOfDay();
+
+        boolean alreadyApplied =
+                transactionRepository
+                        .existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                                accountId,
+                                TransactionType.YIELD,
+                                startOfDay,
+                                endExclusive
+                        );
+
         if (alreadyApplied) {
-            throw new YieldAlreadyAppliedException(ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED);
+            throw new YieldAlreadyAppliedException(
+                    ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED
+            );
         }
     }
 
     private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account, User performedBy) {
-        Transaction transaction = new Transaction(type, amount, LocalDateTime.now(), account, performedBy);
+        Transaction transaction = new Transaction(type, amount, LocalDateTime.now(clock), account, performedBy);
         return transactionRepository.save(transaction);
     }
 
@@ -289,7 +303,7 @@ public class TransactionService {
                 new Transaction(
                         type,
                         amount,
-                        LocalDateTime.now(),
+                        LocalDateTime.now(clock),
                         account,
                         transferCode,
                         performedBy

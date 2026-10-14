@@ -9,13 +9,15 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 
 @Entity
-@Table(name= "savings_accounts")
+@Table(name = "savings_accounts")
 @PrimaryKeyJoinColumn(
         name = "id",
         foreignKey = @ForeignKey(name = "fk_savings_accounts_account")
 )
 public class SavingsAccount extends Account {
+
     private static final BigDecimal YIELD_RATE = new BigDecimal("0.005");
+
     @NotNull
     @Column(name = "last_yield_date", nullable = false)
     private LocalDate lastYieldDate;
@@ -26,10 +28,11 @@ public class SavingsAccount extends Account {
     public SavingsAccount(
             Client client,
             String accountNumber,
-            String accountDigit
+            String accountDigit,
+            LocalDate initialYieldDate
     ) {
         super(client, accountNumber, accountDigit, AccountType.SAVINGS);
-        this.lastYieldDate = LocalDate.now();
+        this.lastYieldDate = initialYieldDate;
     }
 
     public LocalDate getLastYieldDate() {
@@ -40,12 +43,13 @@ public class SavingsAccount extends Account {
         this.lastYieldDate = this.lastYieldDate.plusMonths(1);
     }
 
-    public boolean isEligibleForYield() {
-        return !LocalDate.now().isBefore(lastYieldDate.plusMonths(1));
+    public boolean isEligibleForYield(LocalDate referenceDate) {
+        return !referenceDate.isBefore(lastYieldDate.plusMonths(1));
     }
 
     public BigDecimal calculateYield() {
-        return getBalance().multiply(YIELD_RATE).setScale(2, RoundingMode.HALF_UP);
+        return getBalance()
+                .multiply(YIELD_RATE)
+                .setScale(2, RoundingMode.HALF_UP);
     }
-
 }

@@ -30,6 +30,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -78,6 +79,9 @@ class TransactionConcurrencyTests {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private Clock clock;
 
     @MockitoBean
     private CurrentUserService currentUserService;
@@ -483,12 +487,12 @@ class TransactionConcurrencyTests {
         Client client = createClient();
         GeneratedAccountNumber generated = accountNumberGenerator.generate();
 
-        SavingsAccount account =
-                new SavingsAccount(
-                        client,
-                        generated.number(),
-                        generated.digit()
-                );
+        SavingsAccount account = new SavingsAccount(
+                client,
+                generated.number(),
+                generated.digit(),
+                LocalDate.now(clock)
+        );
 
         account.credit(new BigDecimal(initialBalance));
 
@@ -496,7 +500,7 @@ class TransactionConcurrencyTests {
 
         jdbcTemplate.update(
                 "UPDATE savings_accounts SET last_yield_date = ? WHERE id = ?",
-                LocalDate.now().minusMonths(1),
+                LocalDate.now(clock).minusMonths(1),
                 saved.getId()
         );
 

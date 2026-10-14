@@ -19,6 +19,7 @@ import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,6 +40,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -65,6 +69,11 @@ public class AccountServiceTests {
     private static final String NON_EXISTENT_NUMBER = "99999";
     private static final String NON_EXISTENT_DIGIT = "7";
 
+    // 2026-01-01 23:30 em São Paulo = 2026-01-02T02:30Z. Se alguém usar UTC, a data muda.
+    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-01-02T02:30:00Z"), ZONE);
+    private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
+
     @Mock
     private AccountRepository accountRepository;
 
@@ -80,8 +89,19 @@ public class AccountServiceTests {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
     private AccountService accountService;
+
+    @BeforeEach
+    void setUp() {
+        accountService = new AccountService(
+                accountRepository,
+                accountNumberGenerator,
+                clientService,
+                currentUserService,
+                eventPublisher,
+                CLOCK
+        );
+    }
 
     @Nested
     @DisplayName("findAll(Pageable)")
@@ -275,6 +295,7 @@ public class AccountServiceTests {
             when(clientService.findEntityById(CLIENT_ID)).thenReturn(client);
             when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber(number, digit));
             when(currentUserService.getUsername()).thenReturn(USERNAME);
+
             when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer(invocation -> {
                 Account savedAccount = invocation.getArgument(0);
                 ReflectionTestUtils.setField(savedAccount, "id", SAVED_ACCOUNT_ID);
@@ -298,6 +319,10 @@ public class AccountServiceTests {
 
             assertInstanceOf(expectedClass, accountCaptor.getValue());
             assertSame(client, accountCaptor.getValue().getClient());
+
+            if (accountCaptor.getValue() instanceof SavingsAccount savingsAccount) {
+                assertEquals(TODAY, savingsAccount.getLastYieldDate());
+            }
         }
 
         @Test
@@ -692,7 +717,7 @@ public class AccountServiceTests {
     }
 
     private static SavingsAccount savingsAccount() {
-        SavingsAccount account = new SavingsAccount(client(), SAVINGS_NUMBER, SAVINGS_DIGIT);
+        SavingsAccount account = new SavingsAccount(client(), SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
         ReflectionTestUtils.setField(account, "id", 2L);
         return account;
     }

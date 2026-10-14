@@ -15,15 +15,15 @@ public final class TransactionSpecifications {
             Long accountId,
             TransactionType type,
             LocalDateTime startDate,
-            LocalDateTime endDate
+            LocalDateTime endExclusive
     ) {
         return (root, query, cb) -> cb.and(
                 cb.equal(root.get("account").get("id"), accountId),
                 type == null ? cb.conjunction() : cb.equal(root.get("type"), type),
                 startDate == null ? cb.conjunction()
                         : cb.greaterThanOrEqualTo(root.get("createdAt"), startDate),
-                endDate == null ? cb.conjunction()
-                        : cb.lessThanOrEqualTo(root.get("createdAt"), endDate)
+                endExclusive == null ? cb.conjunction()
+                        : cb.lessThan(root.get("createdAt"), endExclusive)
         );
     }
 }

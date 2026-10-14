@@ -15,10 +15,10 @@ public interface TransactionRepository extends
 
     Optional<Transaction> findByTransactionCode(UUID transactionCode);
 
-    boolean existsByAccountIdAndTypeAndCreatedAtBetween(
+    boolean existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
             Long accountId,
             TransactionType type,
             LocalDateTime startOfDay,
-            LocalDateTime endOfDay
+            LocalDateTime endExclusive
     );
 }

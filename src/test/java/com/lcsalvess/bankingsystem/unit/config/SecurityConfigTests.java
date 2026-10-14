@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.config;
 
+import com.lcsalvess.bankingsystem.config.ClockConfig;
 import com.lcsalvess.bankingsystem.config.JwtProperties;
 import com.lcsalvess.bankingsystem.config.SecurityConfig;
 import com.lcsalvess.bankingsystem.entity.User;
@@ -45,6 +46,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Clock;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -75,6 +77,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnableWebSecurity
 @EnableConfigurationProperties(JwtProperties.class)
 @Import({
+        ClockConfig.class,
         SecurityConfig.class,
         RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class,
@@ -636,7 +639,7 @@ class SecurityConfigTests {
     }
 
     private static JwtService serviceOf(String secret, long expirationInSeconds, String issuer) {
-        return new JwtService(new JwtProperties(secret, expirationInSeconds, issuer));
+        return new JwtService(new JwtProperties(secret, expirationInSeconds, issuer), Clock.systemUTC());
     }
 
     private static User createUser(Role role) {

@@ -27,9 +27,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
@@ -168,17 +169,15 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve definir iat próximo ao momento da geração")
-        void shouldSetIssuedAtCloseToNow() {
-            Instant before = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        @DisplayName("Deve definir iat e exp a partir do Clock injetado")
+        void shouldSetIssuedAtAndExpirationFromClock() {
+            Instant now = Instant.parse("2026-01-15T02:30:00Z");
+            JwtService service = serviceOf(SECRET, 3600, ISSUER, fixedClock(now));
 
-            String token = jwtService.generateToken(user);
+            Claims claims = parseAt(service.generateToken(user), now).getPayload();
 
-            Instant after = Instant.now();
-            Instant issuedAt = parse(token).getPayload().getIssuedAt().toInstant();
-
-            assertFalse(issuedAt.isBefore(before), "iat não pode ser anterior à geração");
-            assertFalse(issuedAt.isAfter(after), "iat não pode ser posterior à geração");
+            assertEquals(now, claims.getIssuedAt().toInstant());
+            assertEquals(now.plusSeconds(3600), claims.getExpiration().toInstant());
         }
 
         @ParameterizedTest(name = "expiração = {0}s")
@@ -245,6 +244,19 @@ class JwtServiceTests {
             String token = issuer.generateToken(user);
 
             assertEquals(USERNAME, validator.extractUsername(token));
+        }
+
+        @Test
+        @DisplayName("Deve validar a expiração usando o Clock injetado")
+        void shouldValidateExpirationAgainstInjectedClock() {
+            Instant issuedAt = Instant.parse("2026-01-15T02:30:00Z");
+            String token = serviceOf(SECRET, 3600, ISSUER, fixedClock(issuedAt)).generateToken(user);
+
+            JwtService beforeExpiration = serviceOf(SECRET, 3600, ISSUER, fixedClock(issuedAt.plusSeconds(3599)));
+            JwtService afterExpiration = serviceOf(SECRET, 3600, ISSUER, fixedClock(issuedAt.plusSeconds(3601)));
+
+            assertEquals(USERNAME, beforeExpiration.extractUsername(token));
+            assertThrows(ExpiredJwtException.class, () -> afterExpiration.extractUsername(token));
         }
 
         @Test
@@ -328,7 +340,15 @@ class JwtServiceTests {
     }
 
     private static JwtService serviceOf(String secret, long expirationInSeconds, String issuer) {
-        return new JwtService(new JwtProperties(secret, expirationInSeconds, issuer));
+        return serviceOf(secret, expirationInSeconds, issuer, Clock.systemUTC());
+    }
+
+    private static JwtService serviceOf(String secret, long expirationInSeconds, String issuer, Clock clock) {
+        return new JwtService(new JwtProperties(secret, expirationInSeconds, issuer), clock);
+    }
+
+    private static Clock fixedClock(Instant instant) {
+        return Clock.fixed(instant, ZoneOffset.UTC);
     }
 
     private static User createUser(String username) {
@@ -348,6 +368,15 @@ class JwtServiceTests {
         return Jwts.parser()
                 .verifyWith(key(SECRET))
                 .requireIssuer(ISSUER)
+                .build()
+                .parseSignedClaims(token);
+    }
+
+    private static Jws<Claims> parseAt(String token, Instant now) {
+        return Jwts.parser()
+                .verifyWith(key(SECRET))
+                .requireIssuer(ISSUER)
+                .clock(() -> Date.from(now))
                 .build()
                 .parseSignedClaims(token);
     }

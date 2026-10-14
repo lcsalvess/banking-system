@@ -10,6 +10,7 @@ import io.jsonwebtoken.security.WeakKeyException;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Clock;
 import java.util.Date;
 
 @Service
@@ -18,11 +19,13 @@ public class JwtService {
     private final SecretKey signingKey;
     private final long expirationInSeconds;
     private final String issuer;
+    private final Clock clock;
 
-    public JwtService(JwtProperties jwtProperties) {
+    public JwtService(JwtProperties jwtProperties, Clock clock) {
         this.signingKey = createSigningKey(jwtProperties.secret());
         this.expirationInSeconds = jwtProperties.expiration();
         this.issuer = jwtProperties.issuer();
+        this.clock = clock;
     }
 
     private SecretKey createSigningKey(String secret) {
@@ -41,7 +44,7 @@ public class JwtService {
     }
 
     public String generateToken(User user) {
-        Date issuedAt = new Date();
+        Date issuedAt = Date.from(clock.instant());
         Date expiration = new Date(issuedAt.getTime() + expirationInSeconds * 1000);
 
         return Jwts.builder()
@@ -57,6 +60,7 @@ public class JwtService {
         return Jwts.parser()
                 .verifyWith(signingKey)
                 .requireIssuer(issuer)
+                .clock(() -> Date.from(clock.instant()))
                 .build()
                 .parseSignedClaims(jwt)
                 .getPayload()

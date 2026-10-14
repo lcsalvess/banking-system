@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
 
 @Service
 public class AccountService {
@@ -38,12 +40,15 @@ public class AccountService {
 
     private final ApplicationEventPublisher eventPublisher;
 
-    public AccountService(AccountRepository accountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher) {
+    private final Clock clock;
+
+    public AccountService(AccountRepository accountRepository, AccountNumberGenerator accountNumberGenerator, ClientService clientService, CurrentUserService currentUserService, ApplicationEventPublisher eventPublisher, Clock clock) {
         this.accountRepository = accountRepository;
         this.accountNumberGenerator = accountNumberGenerator;
         this.clientService = clientService;
         this.currentUserService = currentUserService;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -126,7 +131,8 @@ public class AccountService {
         return new SavingsAccount(
                 client,
                 accountNumber.number(),
-                accountNumber.digit()
+                accountNumber.digit(),
+                LocalDate.now(clock)
         );
     }
 

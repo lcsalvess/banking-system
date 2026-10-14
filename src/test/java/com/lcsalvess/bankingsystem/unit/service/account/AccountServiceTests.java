@@ -34,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,39 +84,70 @@ public class AccountServiceTests {
     private AccountService accountService;
 
     @Nested
-    @DisplayName("findAll()")
+    @DisplayName("findAll(Pageable)")
     class FindAll {
 
         @Test
-        @DisplayName("Should return all accounts successfully")
-        void shouldReturnAllAccountsSuccessfully() {
-            when(accountRepository.findAllWithClient())
-                    .thenReturn(List.of(checkingAccount(), savingsAccount()));
+        @DisplayName("Should return a page of accounts successfully")
+        void shouldReturnPageOfAccountsSuccessfully() {
+            Pageable pageable = PageRequest.of(
+                    0,
+                    10,
+                    Sort.by("accountNumber").ascending()
+            );
 
-            List<AccountResponseDTO> result = accountService.findAll();
+            stubAccountPage(
+                    List.of(checkingAccount(), savingsAccount()),
+                    pageable
+            );
+
+            Page<AccountResponseDTO> result = accountService.findAll(pageable);
 
             assertEquals(
                     List.of(
-                            accountResponse(CHECKING_NUMBER, CHECKING_DIGIT, AccountType.CHECKING),
-                            accountResponse(SAVINGS_NUMBER, SAVINGS_DIGIT, AccountType.SAVINGS)
+                            accountResponse(
+                                    CHECKING_NUMBER,
+                                    CHECKING_DIGIT,
+                                    AccountType.CHECKING
+                            ),
+                            accountResponse(
+                                    SAVINGS_NUMBER,
+                                    SAVINGS_DIGIT,
+                                    AccountType.SAVINGS
+                            )
                     ),
-                    result
+                    result.getContent()
             );
 
-            verify(accountRepository).findAllWithClient();
+            assertEquals(0, result.getNumber());
+            assertEquals(10, result.getSize());
+            assertEquals(2, result.getTotalElements());
+            assertEquals(1, result.getTotalPages());
+
+            verify(accountRepository).findAllWithClient(pageable);
             verifyNoMoreInteractionsOnMocks();
         }
 
         @Test
-        @DisplayName("Should return empty list when there are no accounts")
-        void shouldReturnEmptyListWhenThereAreNoAccounts() {
-            when(accountRepository.findAllWithClient()).thenReturn(List.of());
+        @DisplayName("Should return an empty page when there are no accounts")
+        void shouldReturnEmptyPageWhenThereAreNoAccounts() {
+            Pageable pageable = PageRequest.of(
+                    0,
+                    10,
+                    Sort.by("accountNumber").ascending()
+            );
 
-            List<AccountResponseDTO> result = accountService.findAll();
+            stubAccountPage(List.of(), pageable);
 
-            assertEquals(List.of(), result);
+            Page<AccountResponseDTO> result = accountService.findAll(pageable);
 
-            verify(accountRepository).findAllWithClient();
+            assertTrue(result.isEmpty());
+            assertEquals(0, result.getNumber());
+            assertEquals(10, result.getSize());
+            assertEquals(0, result.getTotalElements());
+            assertEquals(0, result.getTotalPages());
+
+            verify(accountRepository).findAllWithClient(pageable);
             verifyNoMoreInteractionsOnMocks();
         }
     }
@@ -520,7 +552,8 @@ public class AccountServiceTests {
     static Stream<Arguments> transactionModes() {
         return Stream.of(
                 Arguments.of("findAll is read-only", "findAll",
-                        new Class<?>[]{}, true),
+                        new Class<?>[]{Pageable.class},
+                        true),
                 Arguments.of("findEntityByAccountNumber is read-only", "findEntityByAccountNumber",
                         new Class<?>[]{String.class, String.class}, true),
                 Arguments.of("findByAccountNumber is read-only", "findByAccountNumber",
@@ -557,6 +590,13 @@ public class AccountServiceTests {
                 Arguments.of("cancelled account without balance", BigDecimal.ZERO),
                 Arguments.of("cancelled account with balance", BigDecimal.TEN)
         );
+    }
+
+    private void stubAccountPage(List<Account> accounts, Pageable pageable) {
+        Page<Account> page = new PageImpl<>(accounts, pageable, accounts.size());
+
+        when(accountRepository.findAllWithClient(pageable))
+                .thenReturn(page);
     }
 
     private void stubAccountLookup(Account account) {

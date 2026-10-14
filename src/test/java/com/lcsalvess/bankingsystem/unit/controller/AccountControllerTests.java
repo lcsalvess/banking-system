@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.controller;
 
+import com.lcsalvess.bankingsystem.config.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.AccountController;
 import com.lcsalvess.bankingsystem.dto.request.AccountRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.AccountResponseDTO;
@@ -21,11 +22,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.*;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
@@ -40,9 +43,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AccountController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(
-        WebMvcTestSecurityConfig.class
-)
+@Import({
+        WebMvcTestSecurityConfig.class,
+        PaginationConfig.class
+})
 public class AccountControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.AccountControllerTests#";
@@ -63,54 +67,83 @@ public class AccountControllerTests {
         private static final String URL = "/api/v1/accounts";
 
         @Test
-        @DisplayName("Should return all accounts successfully")
-        void shouldReturnAllAccountsSuccessfully() throws Exception {
-            AccountResponseDTO account1 = mockAccount("99999", "5", AccountType.CHECKING);
-            AccountResponseDTO account2 = mockAccount("99998", "6", AccountType.SAVINGS);
+        @DisplayName("Should return a page of accounts successfully")
+        void shouldReturnPageOfAccountsSuccessfully() throws Exception {
+            AccountResponseDTO account1 =
+                    mockAccount("99999", "5", AccountType.CHECKING);
+            AccountResponseDTO account2 =
+                    mockAccount("99998", "6", AccountType.SAVINGS);
 
-            when(accountService.findAll()).thenReturn(List.of(account1, account2));
+            Pageable pageable = PageRequest.of(0, 10, Sort.by("accountNumber"));
+            Page<AccountResponseDTO> page =
+                    new PageImpl<>(List.of(account1, account2), pageable, 2);
 
-            MvcResult result = mockMvc.perform(get(URL))
+            when(accountService.findAll(any(Pageable.class))).thenReturn(page);
+
+            MvcResult result = mockMvc.perform(get(URL)
+                            .param("page", "0")
+                            .param("size", "10")
+                            .param("sort", "accountNumber,asc"))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$", hasSize(2)))
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.page.number").value(0))
+                    .andExpect(jsonPath("$.page.size").value(10))
+                    .andExpect(jsonPath("$.page.totalElements").value(2))
+                    .andExpect(jsonPath("$.page.totalPages").value(1))
                     .andReturn();
 
-            AccountResponseDTO[] response = objectMapper.readValue(
-                    result.getResponse().getContentAsString(),
+            JsonNode content = objectMapper.readTree(
+                    result.getResponse().getContentAsString()
+            ).get("content");
+
+            AccountResponseDTO[] response = objectMapper.treeToValue(
+                    content,
                     AccountResponseDTO[].class
             );
 
             assertAccountEquals(account1, response[0]);
             assertAccountEquals(account2, response[1]);
 
-            verify(accountService).findAll();
+            verify(accountService).findAll(any(Pageable.class));
             verifyNoMoreInteractions(accountService);
         }
 
         @Test
-        @DisplayName("Should return empty list when there are no accounts")
-        void shouldReturnEmptyListWhenThereAreNoAccounts() throws Exception {
-            when(accountService.findAll()).thenReturn(List.of());
+        @DisplayName("Should return an empty page when there are no accounts")
+        void shouldReturnEmptyPageWhenThereAreNoAccounts() throws Exception {
+            Pageable pageable = PageRequest.of(0, 10, Sort.by("accountNumber"));
+            Page<AccountResponseDTO> page =
+                    new PageImpl<>(List.of(), pageable, 0);
+
+            when(accountService.findAll(any(Pageable.class))).thenReturn(page);
 
             mockMvc.perform(get(URL))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.content", hasSize(0)))
+                    .andExpect(jsonPath("$.page.number").value(0))
+                    .andExpect(jsonPath("$.page.size").value(10))
+                    .andExpect(jsonPath("$.page.totalElements").value(0))
+                    .andExpect(jsonPath("$.page.totalPages").value(0));
 
-            verify(accountService).findAll();
+            verify(accountService).findAll(any(Pageable.class));
             verifyNoMoreInteractions(accountService);
         }
 
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(accountService.findAll())
+            when(accountService.findAll(any(Pageable.class)))
                     .thenThrow(new RuntimeException());
 
-            performErrorResponse(mockMvc.perform(get(URL)), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
+            performErrorResponse(
+                    mockMvc.perform(get(URL)),
+                    500,
+                    ApiErrorMessages.INTERNAL_SERVER_ERROR
+            );
 
-            verify(accountService).findAll();
+            verify(accountService).findAll(any(Pageable.class));
             verifyNoMoreInteractions(accountService);
         }
     }

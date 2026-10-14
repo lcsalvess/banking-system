@@ -18,12 +18,13 @@ import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Service
 public class AccountService {
@@ -46,8 +47,9 @@ public class AccountService {
     }
 
     @Transactional(readOnly = true)
-    public List<AccountResponseDTO> findAll() {
-        return accountRepository.findAllWithClient().stream().map(AccountResponseDTO::fromEntity).toList();
+    public Page<AccountResponseDTO> findAll(Pageable pageable) {
+        return accountRepository.findAllWithClient(pageable)
+                .map(AccountResponseDTO::fromEntity);
     }
 
     @Transactional(readOnly = true)

@@ -3,6 +3,8 @@ package com.lcsalvess.bankingsystem.controller;
 import com.lcsalvess.bankingsystem.dto.request.AccountRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.AccountResponseDTO;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
+import com.lcsalvess.bankingsystem.util.SortWhitelist;
+import com.lcsalvess.bankingsystem.util.SortableBy;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,11 +21,19 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
+
 @PreAuthorize("hasRole('EMPLOYEE')")
 @Validated
 @RestController
 @RequestMapping("/api/v1/accounts")
 public class AccountController {
+
+    private static final String SORTABLE = "accountNumber,id,balance,status,type";
+
+    private static final Set<String> SORTABLE_PROPERTIES =
+            Set.of(SORTABLE.split(","));
+
     private final AccountService accountService;
 
     public AccountController(AccountService accountService) {
@@ -33,21 +43,30 @@ public class AccountController {
     @Operation(
             summary = "Get accounts",
             description = """
-                Retrieves accounts using pagination and sorting.
-                The default page size is 10, and the default sort order
-                is ascending by account number. The maximum page size is 100.
-                """
+                    Retrieves accounts using pagination and sorting.
+                    The default page size is 10, and the default sort order
+                    is ascending by account number. The maximum page size is 100.
+                    """
     )
-    @ApiResponse(
-            responseCode = "200",
-            description = "Accounts retrieved successfully"
-    )
+    @SortableBy(SORTABLE)
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Accounts retrieved successfully"
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request parameters"
+            )
+    })
     @GetMapping
     public Page<AccountResponseDTO> findAll(
             @ParameterObject
             @PageableDefault(size = 10, sort = "accountNumber")
             Pageable pageable
     ) {
+        SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
+
         return accountService.findAll(pageable);
     }
 
@@ -62,7 +81,7 @@ public class AccountController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description =  "Invalid account number or check digit"
+                    description = "Invalid account number or check digit"
             ),
             @ApiResponse(
                     responseCode = "404",

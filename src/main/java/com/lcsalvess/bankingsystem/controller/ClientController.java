@@ -5,6 +5,8 @@ import com.lcsalvess.bankingsystem.dto.request.ClientUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.ClientResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.ClientSummaryResponseDTO;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
+import com.lcsalvess.bankingsystem.util.SortWhitelist;
+import com.lcsalvess.bankingsystem.util.SortableBy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -18,10 +20,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
+
 @PreAuthorize("hasRole('EMPLOYEE')")
 @RestController
 @RequestMapping("/api/v1/clients")
 public class ClientController {
+
+    private static final String SORTABLE = "id,name";
+
+    private static final Set<String> SORTABLE_PROPERTIES =
+            Set.of(SORTABLE.split(","));
 
     private final ClientService clientService;
 
@@ -59,10 +68,17 @@ public class ClientController {
             summary = "Get clients",
             description = "Retrieves clients using pagination and an optional name filter."
     )
-    @ApiResponse(
-            responseCode = "200",
-            description = "Clients retrieved successfully"
-    )
+    @SortableBy(SORTABLE)
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Clients retrieved successfully"
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request parameters"
+            )
+    })
     @GetMapping
     public Page<ClientSummaryResponseDTO> findAll(
             @Parameter(description = "Filter clients by name", example = "Lucas")
@@ -70,6 +86,8 @@ public class ClientController {
             @ParameterObject
             @PageableDefault(size = 10, sort = "id") Pageable pageable
     ) {
+        SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
+
         return clientService.findAll(name, pageable);
     }
 

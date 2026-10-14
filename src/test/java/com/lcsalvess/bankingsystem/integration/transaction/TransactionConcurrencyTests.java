@@ -12,6 +12,7 @@ import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
 import com.lcsalvess.bankingsystem.repository.*;
+import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
@@ -537,8 +538,8 @@ class TransactionConcurrencyTests {
     }
 
     private long countTransactions(Account account, TransactionType type) {
-        return transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(account.getId()).stream()
-                .filter(transaction -> transaction.getType() == type)
-                .count();
+        return transactionRepository.count(
+                TransactionSpecifications.byAccountAndFilters(account.getId(), type, null, null)
+        );
     }
 }

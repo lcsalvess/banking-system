@@ -15,6 +15,7 @@ import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.*;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
+import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
@@ -30,8 +31,14 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -88,42 +95,104 @@ public class TransactionServiceTests {
     private TransactionService transactionService;
 
     @Nested
-    @DisplayName("findByAccountNumber(String, String)")
+    @DisplayName("findByAccountNumber(String, String, TransactionType, LocalDate, LocalDate, Pageable)")
     class FindByAccountNumber {
 
+        private static final Pageable PAGEABLE = PageRequest.of(0, 10);
+
         @Test
-        @DisplayName("Should return the account transactions")
-        void shouldReturnTheAccountTransactions() {
+        @DisplayName("Should return the page of account transactions")
+        void shouldReturnThePageOfAccountTransactions() {
             CheckingAccount account = account();
             Transaction deposit = new Transaction(TransactionType.DEPOSIT, new BigDecimal("10.00"), CREATED_AT, account, TEST_USER);
             Transaction withdrawal = new Transaction(TransactionType.WITHDRAWAL, new BigDecimal("5.00"), CREATED_AT, account, TEST_USER);
+            Specification<Transaction> specification = specification();
+            Page<Transaction> page = new PageImpl<>(List.of(deposit, withdrawal), PAGEABLE, 2);
 
             stubAccountLookup(account);
-            when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of(deposit, withdrawal));
+            when(transactionRepository.findAll(specification, PAGEABLE)).thenReturn(page);
 
-            List<TransactionResponseDTO> result = transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
+            try (MockedStatic<TransactionSpecifications> specifications = mockStatic(TransactionSpecifications.class)) {
+                specifications.when(() -> TransactionSpecifications.byAccountAndFilters(ACCOUNT_ID, null, null, null))
+                        .thenReturn(specification);
 
-            assertEquals(List.of(response(deposit), response(withdrawal)), result);
+                Page<TransactionResponseDTO> result = transactionService.findByAccountNumber(
+                        ACCOUNT_NUMBER, ACCOUNT_DIGIT, null, null, null, PAGEABLE
+                );
+
+                assertEquals(List.of(response(deposit), response(withdrawal)), result.getContent());
+                assertEquals(2, result.getTotalElements());
+                assertEquals(PAGEABLE, result.getPageable());
+
+                specifications.verify(() -> TransactionSpecifications.byAccountAndFilters(ACCOUNT_ID, null, null, null));
+            }
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID);
+            verify(transactionRepository).findAll(specification, PAGEABLE);
             verifyNoMoreInteractionsOnMocks();
         }
 
         @Test
-        @DisplayName("Should return empty list when the account has no transactions")
-        void shouldReturnEmptyListWhenAccountHasNoTransactions() {
+        @DisplayName("Should apply type and date filters, using the whole start and end days")
+        void shouldApplyTypeAndDateFilters() {
             CheckingAccount account = account();
+            Transaction deposit = new Transaction(TransactionType.DEPOSIT, OPERATION_AMOUNT, CREATED_AT, account, TEST_USER);
+            Specification<Transaction> specification = specification();
+            Page<Transaction> page = new PageImpl<>(List.of(deposit), PAGEABLE, 1);
+
+            LocalDate startDate = LocalDate.of(2026, 1, 1);
+            LocalDate endDate = LocalDate.of(2026, 1, 31);
+            LocalDateTime expectedStart = startDate.atStartOfDay();
+            LocalDateTime expectedEnd = endDate.atTime(LocalTime.MAX);
 
             stubAccountLookup(account);
-            when(transactionRepository.findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID)).thenReturn(List.of());
+            when(transactionRepository.findAll(specification, PAGEABLE)).thenReturn(page);
 
-            List<TransactionResponseDTO> result = transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
+            try (MockedStatic<TransactionSpecifications> specifications = mockStatic(TransactionSpecifications.class)) {
+                specifications.when(() -> TransactionSpecifications.byAccountAndFilters(
+                        ACCOUNT_ID, TransactionType.DEPOSIT, expectedStart, expectedEnd
+                )).thenReturn(specification);
 
-            assertEquals(List.of(), result);
+                Page<TransactionResponseDTO> result = transactionService.findByAccountNumber(
+                        ACCOUNT_NUMBER, ACCOUNT_DIGIT, TransactionType.DEPOSIT, startDate, endDate, PAGEABLE
+                );
+
+                assertEquals(List.of(response(deposit)), result.getContent());
+
+                specifications.verify(() -> TransactionSpecifications.byAccountAndFilters(
+                        ACCOUNT_ID, TransactionType.DEPOSIT, expectedStart, expectedEnd
+                ));
+            }
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findByAccountIdOrderByCreatedAtDescIdDesc(ACCOUNT_ID);
+            verify(transactionRepository).findAll(specification, PAGEABLE);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should return empty page when the account has no transactions")
+        void shouldReturnEmptyPageWhenAccountHasNoTransactions() {
+            CheckingAccount account = account();
+            Specification<Transaction> specification = specification();
+
+            stubAccountLookup(account);
+            when(transactionRepository.findAll(specification, PAGEABLE))
+                    .thenReturn(new PageImpl<>(List.of(), PAGEABLE, 0));
+
+            try (MockedStatic<TransactionSpecifications> specifications = mockStatic(TransactionSpecifications.class)) {
+                specifications.when(() -> TransactionSpecifications.byAccountAndFilters(ACCOUNT_ID, null, null, null))
+                        .thenReturn(specification);
+
+                Page<TransactionResponseDTO> result = transactionService.findByAccountNumber(
+                        ACCOUNT_NUMBER, ACCOUNT_DIGIT, null, null, null, PAGEABLE
+                );
+
+                assertTrue(result.isEmpty());
+                assertEquals(0, result.getTotalElements());
+            }
+
+            verifyAccountLookup(account);
+            verify(transactionRepository).findAll(specification, PAGEABLE);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -136,11 +205,17 @@ public class TransactionServiceTests {
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
                     ApiErrorMessages.ACCOUNT_NOT_FOUND,
-                    () -> transactionService.findByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT)
+                    () -> transactionService.findByAccountNumber(
+                            ACCOUNT_NUMBER, ACCOUNT_DIGIT, null, null, null, PAGEABLE
+                    )
             );
 
             verify(accountService).findEntityByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
             verifyNoMoreInteractionsOnMocks();
+        }
+
+        private static Specification<Transaction> specification() {
+            return (root, query, cb) -> null;
         }
     }
 

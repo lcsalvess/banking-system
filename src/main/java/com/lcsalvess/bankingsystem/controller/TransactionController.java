@@ -4,23 +4,29 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
+import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Validated
@@ -35,39 +41,25 @@ public class TransactionController {
 
     @Operation(
             summary = "Retrieve transactions by account",
-            description = "Retrieves all transactions associated with the specified account number and digit."
+            description = "Retrieves transactions for the specified account, with pagination and optional filters."
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Transactions retrieved successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            array = @ArraySchema(
-                                    schema = @Schema(implementation = TransactionResponseDTO.class)
-                            )
-                    )
+                    description = "Transactions retrieved successfully"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid account number or check digit",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid account number, check digit, or date range"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Account not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account not found"
             )
     })
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN')")
     @GetMapping("/accounts/{accountNumber}")
-    public List<TransactionResponseDTO> findByAccountNumber(
+    public Page<TransactionResponseDTO> findByAccountNumber(
             @Parameter(
                     description = "Account number",
                     example = "12345",
@@ -75,15 +67,51 @@ public class TransactionController {
             )
             @ValidAccountNumber
             @PathVariable String accountNumber,
+
             @Parameter(
                     description = "Account check digit",
                     example = "1",
                     required = true
             )
             @ValidAccountDigit
-            @RequestParam String digit
+            @RequestParam String digit,
+
+            @Parameter(description = "Filter by transaction type")
+            @RequestParam(required = false)
+            TransactionType type,
+
+            @Parameter(
+                    description = "Start date (inclusive)",
+                    example = "2026-01-01"
+            )
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate startDate,
+
+            @Parameter(
+                    description = "End date (inclusive)",
+                    example = "2026-01-31"
+            )
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate endDate,
+
+            @ParameterObject
+            @PageableDefault(
+                    size = 10,
+                    sort = {"createdAt", "id"},
+                    direction = Sort.Direction.DESC
+            )
+            Pageable pageable
     ) {
-        return transactionService.findByAccountNumber(accountNumber, digit);
+        return transactionService.findByAccountNumber(
+                accountNumber,
+                digit,
+                type,
+                startDate,
+                endDate,
+                pageable
+        );
     }
 
     @Operation(

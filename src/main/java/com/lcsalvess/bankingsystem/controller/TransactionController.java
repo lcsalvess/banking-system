@@ -3,15 +3,14 @@ package com.lcsalvess.bankingsystem.controller;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.util.SortWhitelist;
+import com.lcsalvess.bankingsystem.util.SortableBy;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
@@ -27,12 +26,19 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Set;
 import java.util.UUID;
 
 @Validated
 @RestController
 @RequestMapping("/api/v1/transactions")
 public class TransactionController {
+
+    private static final String SORTABLE = "createdAt,id,type,amount";
+
+    private static final Set<String> SORTABLE_PROPERTIES =
+            Set.of(SORTABLE.split(","));
+
     private final TransactionService transactionService;
 
     public TransactionController(TransactionService transactionService) {
@@ -43,6 +49,7 @@ public class TransactionController {
             summary = "Retrieve transactions by account",
             description = "Retrieves transactions for the specified account, with pagination and optional filters."
     )
+    @SortableBy(SORTABLE)
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -50,7 +57,7 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid account number, check digit, or date range"
+                    description = "Invalid request parameters or account identifiers"
             ),
             @ApiResponse(
                     responseCode = "404",
@@ -104,6 +111,8 @@ public class TransactionController {
             )
             Pageable pageable
     ) {
+        SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
+
         return transactionService.findByAccountNumber(
                 accountNumber,
                 digit,
@@ -121,27 +130,15 @@ public class TransactionController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Transaction retrieved successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = TransactionResponseDTO.class)
-                    )
+                    description = "Transaction retrieved successfully"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid transaction UUID format",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid transaction UUID format"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Transaction not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Transaction not found"
             )
     })
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN')")
@@ -159,35 +156,19 @@ public class TransactionController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Deposit completed successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = TransactionResponseDTO.class)
-                    )
+                    description = "Deposit completed successfully"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid deposit amount",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid deposit amount"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Account not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account not found"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account is not active",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account is not active"
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
@@ -204,35 +185,19 @@ public class TransactionController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Withdrawal completed successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = TransactionResponseDTO.class)
-                    )
+                    description = "Withdrawal completed successfully"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid withdrawal amount",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid withdrawal amount"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Account not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account not found"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account is not active or has insufficient funds",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account is not active or has insufficient funds"
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
@@ -249,35 +214,19 @@ public class TransactionController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Transfer completed successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = TransactionResponseDTO.class)
-                    )
+                    description = "Transfer completed successfully"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid transfer request or account identifier",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid transfer request or account identifier"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Source or destination account not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Source or destination account not found"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account is not active or has insufficient funds",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account is not active or has insufficient funds"
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
@@ -294,35 +243,19 @@ public class TransactionController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Yield applied successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = TransactionResponseDTO.class)
-                    )
+                    description = "Yield applied successfully"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid account number or check digit",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Invalid account number or check digit"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Account not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account not found"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account is not active, is not a savings account, yield has already been applied, or yield is not available",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
-                    )
+                    description = "Account is not active, is not a savings account, yield has already been applied, or yield is not available"
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")

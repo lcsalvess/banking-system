@@ -36,6 +36,10 @@ import java.util.UUID;
 
 @Service
 public class TransactionService {
+
+    private static final LocalDate MIN_QUERY_DATE =
+            LocalDate.of(2020, 1, 1);
+
     private final TransactionRepository transactionRepository;
     private final AccountService accountService;
     private final CurrentUserService currentUserService;
@@ -249,9 +253,21 @@ public class TransactionService {
     }
 
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
-        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+        LocalDate today = LocalDate.now(clock);
+
+        if (isInvalidQueryDate(startDate, today)
+                || isInvalidQueryDate(endDate, today)) {
+            throw new InvalidDateRangeException(ApiErrorMessages.INVALID_QUERY_DATE);
+        }
+
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new InvalidDateRangeException(ApiErrorMessages.INVALID_DATE_RANGE);
         }
+    }
+
+    private boolean isInvalidQueryDate(LocalDate date, LocalDate today) {
+        return date != null
+                && (date.isBefore(MIN_QUERY_DATE) || date.isAfter(today));
     }
 
     private void validateDistinctAccounts(String fromAccountNumber, String toAccountNumber) {

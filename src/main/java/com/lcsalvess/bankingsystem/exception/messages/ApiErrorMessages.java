@@ -98,6 +98,9 @@ public final class ApiErrorMessages {
     public static final String INVALID_DATE_RANGE =
             "A data inicial não pode ser posterior à data final.";
 
+    public static final String INVALID_QUERY_DATE =
+            "As datas da consulta devem estar entre 01/01/2020 e a data atual.";
+
     // Data integrity
     public static final String CLIENT_EMAIL_ALREADY_EXISTS =
             "Já existe um cliente cadastrado com este e-mail.";

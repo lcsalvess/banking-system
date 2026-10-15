@@ -80,6 +80,9 @@ public final class ApiErrorMessages {
     public static final String INSUFFICIENT_BALANCE =
             "O valor informado é maior do que o saldo.";
 
+    public static final String BALANCE_LIMIT_EXCEEDED =
+            "A operação excede o saldo máximo permitido para a conta.";
+
     public static final String SAME_SOURCE_AND_DESTINATION_ACCOUNT =
             "A conta de origem não pode ser igual à conta de destino.";
 

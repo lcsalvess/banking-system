@@ -15,6 +15,14 @@ import java.math.BigDecimal;
 )
 @Inheritance(strategy = InheritanceType.JOINED)
 public abstract class Account {
+
+    /**
+     * Saldo máximo por conta. Mantém o valor dentro de NUMERIC(19,2) e dentro
+     * dos 15 dígitos significativos que um double (clientes JS) representa
+     * sem perda. Espelha a constraint ck_accounts_balance_max.
+     */
+    public static final BigDecimal MAX_BALANCE = new BigDecimal("9999999999999.99");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -67,6 +75,10 @@ public abstract class Account {
 
     public BigDecimal getBalance() {
         return balance;
+    }
+
+    public boolean canCredit(BigDecimal amount) {
+        return this.balance.add(amount).compareTo(MAX_BALANCE) <= 0;
     }
 
     public void credit(BigDecimal amount) {

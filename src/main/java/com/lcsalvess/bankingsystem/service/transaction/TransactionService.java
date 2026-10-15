@@ -93,6 +93,7 @@ public class TransactionService {
         Account account = accountService.findEntityByAccountNumberForUpdate(dto.accountNumber(), dto.digit());
 
         validateActiveAccount(account);
+        validateBalanceLimit(account, dto.amount());
 
         User performedBy = currentUserService.getCurrentUser();
         String username = performedBy.getUsername();
@@ -157,6 +158,7 @@ public class TransactionService {
         validateActiveAccount(fromAccount);
         validateActiveAccount(toAccount);
         validateBalance(fromAccount, dto.amount());
+        validateBalanceLimit(toAccount, dto.amount());
 
         User performedBy = currentUserService.getCurrentUser();
         String username = performedBy.getUsername();
@@ -207,6 +209,7 @@ public class TransactionService {
 
         BigDecimal yieldAmount = savingsAccount.calculateYield();
         validateYieldAvailable(savingsAccount, yieldAmount);
+        validateBalanceLimit(savingsAccount, yieldAmount);
 
         User performedBy = currentUserService.getCurrentUser();
         String username = performedBy.getUsername();
@@ -235,6 +238,12 @@ public class TransactionService {
     private void validateBalance(Account account, BigDecimal amount) {
         if (account.getBalance().compareTo(amount) < 0) {
             throw new InsufficientBalanceException(ApiErrorMessages.INSUFFICIENT_BALANCE);
+        }
+    }
+
+    private void validateBalanceLimit(Account account, BigDecimal amount) {
+        if (!account.canCredit(amount)) {
+            throw new BalanceLimitExceededException(ApiErrorMessages.BALANCE_LIMIT_EXCEEDED);
         }
     }
 

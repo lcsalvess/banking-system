@@ -164,6 +164,6 @@ public final class ValidationMessages {
     // ==================== VALORES MONETÁRIOS ====================
 
     public static final String INVALID_AMOUNT_PRECISION =
-            "O valor deve ter no máximo 17 dígitos inteiros e 2 casas decimais.";
+            "O valor deve ter no máximo 13 dígitos inteiros e 2 casas decimais.";
 
 }

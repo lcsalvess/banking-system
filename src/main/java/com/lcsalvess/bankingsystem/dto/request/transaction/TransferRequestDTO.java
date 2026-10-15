@@ -48,7 +48,7 @@ public record TransferRequestDTO(
         @NotNull(message = ValidationMessages.REQUIRED_TRANSFER_AMOUNT)
         @Positive(message = ValidationMessages.POSITIVE_TRANSFER_AMOUNT)
         @Digits(
-                integer = 17,
+                integer = 13,
                 fraction = 2,
                 message = ValidationMessages.INVALID_AMOUNT_PRECISION
         )

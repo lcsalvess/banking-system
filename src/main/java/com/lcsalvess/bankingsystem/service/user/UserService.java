@@ -15,12 +15,11 @@ import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.UserSpecifications;
 import com.lcsalvess.bankingsystem.util.EmailNormalizer;
+import com.lcsalvess.bankingsystem.util.PageableTieBreaker;
 import com.lcsalvess.bankingsystem.util.UsernameNormalizer;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,8 +28,6 @@ import java.util.List;
 
 @Service
 public class UserService {
-
-    private static final String TIE_BREAKER_PROPERTY = "id";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -61,7 +58,7 @@ public class UserService {
                                 role,
                                 active
                         ),
-                        withIdTieBreaker(pageable)
+                        PageableTieBreaker.withIdTieBreaker(pageable)
                 )
                 .map(this::toSummaryResponse);
     }
@@ -127,26 +124,6 @@ public class UserService {
         }
 
         return search.trim();
-    }
-
-    /**
-     * Garante ordenação total: sem um critério único no final, ordenar por
-     * colunas com empates (role, active) faz registros repetirem ou sumirem
-     * entre páginas.
-     */
-    private Pageable withIdTieBreaker(Pageable pageable) {
-        if (pageable.isUnpaged()
-                || pageable.getSort().getOrderFor(TIE_BREAKER_PROPERTY) != null) {
-            return pageable;
-        }
-
-        return PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                pageable.getSort().and(
-                        Sort.by(Sort.Direction.ASC, TIE_BREAKER_PROPERTY)
-                )
-        );
     }
 
     private void validateUsernameAvailability(String username) {

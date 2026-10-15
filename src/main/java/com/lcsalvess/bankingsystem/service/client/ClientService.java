@@ -16,6 +16,7 @@ import com.lcsalvess.bankingsystem.service.address.AddressData;
 import com.lcsalvess.bankingsystem.service.address.AddressService;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData.AddressUpdateData;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.util.PageableTieBreaker;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -88,14 +89,16 @@ public class ClientService {
             String name,
             Pageable pageable
     ) {
+        Pageable sortedPageable = PageableTieBreaker.withIdTieBreaker(pageable);
+
         Page<Client> clients;
 
         if (name == null || name.isBlank()) {
-            clients = clientRepository.findAll(pageable);
+            clients = clientRepository.findAll(sortedPageable);
         } else {
             clients = clientRepository.findByNameContainingIgnoreCase(
                     name.trim(),
-                    pageable
+                    sortedPageable
             );
         }
 

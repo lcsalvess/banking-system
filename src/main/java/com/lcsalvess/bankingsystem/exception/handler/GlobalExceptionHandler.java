@@ -125,7 +125,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             }
         }
 
-        log.warn("Data integrity violation.", exception);
+        // Não loga a exceção: o Detail do PostgreSQL traz os valores da linha
+        // (saldos, CPF, hash de senha). Só o SQLState e o nome da constraint.
+        log.warn(
+                "Data integrity violation: sqlState={}, constraint={}",
+                sqlStateOf(exception),
+                constraintNameOf(exception)
+        );
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -368,7 +374,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         );
     }
 
-        //-------------- MÉTODOS AUXILIARES ---------
+    //-------------- MÉTODOS AUXILIARES ---------
 
     private @Nullable ResponseEntity<Object> buildErrorResponse(
             Exception ex,
@@ -414,6 +420,30 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             String message
     ) {
         errors.merge(field, message, (existing, next) -> existing + "; " + next);
+    }
+
+    private static String sqlStateOf(Throwable throwable) {
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.JDBCException jdbcException
+                    && jdbcException.getSQLState() != null) {
+                return jdbcException.getSQLState();
+            }
+            if (cause instanceof java.sql.SQLException sqlException
+                    && sqlException.getSQLState() != null) {
+                return sqlException.getSQLState();
+            }
+        }
+        return "unknown";
+    }
+
+    private static String constraintNameOf(Throwable throwable) {
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation
+                    && violation.getConstraintName() != null) {
+                return violation.getConstraintName();
+            }
+        }
+        return "unknown";
     }
 
     private boolean isRequiredValidation(String code) {

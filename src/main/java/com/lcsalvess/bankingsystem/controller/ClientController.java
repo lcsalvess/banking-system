@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
 
+@Tag(
+        name = "Clients",
+        description = "Client registration and management."
+)
 @PreAuthorize("hasRole('EMPLOYEE')")
 @RestController
 @RequestMapping("/api/v1/clients")

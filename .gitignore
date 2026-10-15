@@ -4,9 +4,6 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### ANOTAÇÕES ###
-notes/
-
 ### STS ###
 .apt_generated
 .classpath
@@ -34,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Environment variables
+.env
+.env.*
+!.env.example

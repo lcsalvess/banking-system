@@ -4,6 +4,7 @@ package com.lcsalvess.bankingsystem.config;
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
@@ -68,19 +69,26 @@ public class OpenApiConfig {
                 );
             }
 
-            openApi.getPaths().values().forEach(pathItem ->
-                    pathItem.readOperations().forEach(operation -> {
-                        addResponseIfAbsent(
-                                operation,
-                                "401",
-                                "Unauthorized - Authentication is required or the JWT is invalid."
-                        );
+            openApi.getPaths().forEach((path, pathItem) ->
+                    pathItem.readOperationsMap().forEach((httpMethod, operation) -> {
+                        boolean isPublicLogin =
+                                "/api/v1/auth/login".equals(path)
+                                        && PathItem.HttpMethod.POST
+                                        .equals(httpMethod);
 
-                        addResponseIfAbsent(
-                                operation,
-                                "403",
-                                "Forbidden - Insufficient permissions to access this resource."
-                        );
+                        if (!isPublicLogin) {
+                            addResponseIfAbsent(
+                                    operation,
+                                    "401",
+                                    "Unauthorized - Authentication is required or the JWT is invalid."
+                            );
+
+                            addResponseIfAbsent(
+                                    operation,
+                                    "403",
+                                    "Forbidden - Insufficient permissions to access this resource."
+                            );
+                        }
 
                         addResponseIfAbsent(
                                 operation,

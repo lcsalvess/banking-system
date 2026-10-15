@@ -34,7 +34,7 @@ import java.util.Set;
 @RequestMapping("/api/v1/accounts")
 public class AccountController {
 
-    private static final String SORTABLE = "accountNumber,id,balance,status,type";
+    private static final String SORTABLE = "accountNumber,balance,status,type";
 
     private static final Set<String> SORTABLE_PROPERTIES =
             Set.of(SORTABLE.split(","));

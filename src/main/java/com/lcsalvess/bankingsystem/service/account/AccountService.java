@@ -14,6 +14,7 @@ import com.lcsalvess.bankingsystem.exception.account.*;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
+import com.lcsalvess.bankingsystem.util.PageableTieBreaker;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.springframework.context.ApplicationEventPublisher;
@@ -53,7 +54,9 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public Page<AccountResponseDTO> findAll(Pageable pageable) {
-        return accountRepository.findAllWithClient(pageable)
+        return accountRepository.findAllWithClient(
+                        PageableTieBreaker.withIdTieBreaker(pageable)
+                )
                 .map(AccountResponseDTO::fromEntity);
     }
 

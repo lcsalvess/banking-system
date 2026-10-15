@@ -113,7 +113,7 @@ public class AccountServiceTests {
             Pageable pageable = PageRequest.of(
                     0,
                     10,
-                    Sort.by("accountNumber").ascending()
+                    Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
             );
 
             stubAccountPage(
@@ -154,7 +154,7 @@ public class AccountServiceTests {
             Pageable pageable = PageRequest.of(
                     0,
                     10,
-                    Sort.by("accountNumber").ascending()
+                    Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
             );
 
             stubAccountPage(List.of(), pageable);
@@ -169,6 +169,29 @@ public class AccountServiceTests {
 
             verify(accountRepository).findAllWithClient(pageable);
             verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should append the id tie-breaker when the sort has no id")
+        void shouldAppendIdTieBreakerWhenSortHasNoId() {
+            Pageable requested = PageRequest.of(0, 10, Sort.by("balance").descending());
+
+            when(accountRepository.findAllWithClient(any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(), requested, 0));
+
+            accountService.findAll(requested);
+
+            ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+
+            verify(accountRepository).findAllWithClient(captor.capture());
+            verifyNoMoreInteractionsOnMocks();
+
+            assertEquals(
+                    Sort.by(Sort.Order.desc("balance"), Sort.Order.asc("id")),
+                    captor.getValue().getSort()
+            );
+            assertEquals(0, captor.getValue().getPageNumber());
+            assertEquals(10, captor.getValue().getPageSize());
         }
     }
 

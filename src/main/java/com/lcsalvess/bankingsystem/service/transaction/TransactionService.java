@@ -21,6 +21,7 @@ import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifica
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.util.PageableTieBreaker;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -72,7 +73,7 @@ public class TransactionService {
                         startDate != null ? startDate.atStartOfDay() : null,
                         endDate != null ? endDate.plusDays(1).atStartOfDay() : null
                 ),
-                pageable
+                PageableTieBreaker.withIdTieBreaker(pageable)
         ).map(TransactionResponseDTO::fromEntity);
     }
 

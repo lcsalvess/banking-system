@@ -38,6 +38,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -115,7 +116,11 @@ public class TransactionServiceTests {
     @DisplayName("findByAccountNumber(String, String, TransactionType, LocalDate, LocalDate, Pageable)")
     class FindByAccountNumber {
 
-        private static final Pageable PAGEABLE = PageRequest.of(0, 10);
+        private static final Pageable PAGEABLE = PageRequest.of(
+                0,
+                10,
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))
+        );
 
         @Test
         @DisplayName("Should return the page of account transactions")
@@ -250,6 +255,38 @@ public class TransactionServiceTests {
             verifyNoMoreInteractionsOnMocks();
         }
 
+        @Test
+        @DisplayName("Should append the id tie-breaker when the sort has no id")
+        void shouldAppendIdTieBreakerWhenSortHasNoId() {
+            CheckingAccount account = account();
+            Specification<Transaction> specification = specification();
+            Pageable requested = PageRequest.of(0, 10, Sort.by("amount").descending());
+
+            stubAccountLookup(account);
+            when(transactionRepository.findAll(eq(specification), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(), requested, 0));
+
+            try (MockedStatic<TransactionSpecifications> specifications = mockStatic(TransactionSpecifications.class)) {
+                specifications.when(() -> TransactionSpecifications.byAccountAndFilters(ACCOUNT_ID, null, null, null))
+                        .thenReturn(specification);
+
+                transactionService.findByAccountNumber(
+                        ACCOUNT_NUMBER, ACCOUNT_DIGIT, null, null, null, requested
+                );
+            }
+
+            ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+
+            verifyAccountLookup(account);
+            verify(transactionRepository).findAll(eq(specification), captor.capture());
+            verifyNoMoreInteractionsOnMocks();
+
+            assertEquals(
+                    Sort.by(Sort.Order.desc("amount"), Sort.Order.asc("id")),
+                    captor.getValue().getSort()
+            );
+        }
+
         private static Specification<Transaction> specification() {
             return (root, query, cb) -> null;
         }
@@ -356,6 +393,41 @@ public class TransactionServiceTests {
 
             verifyAccountOperationLookup(account);
             verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should throw when the deposit would exceed the maximum balance")
+        void shouldThrowWhenDepositExceedsMaximumBalance() {
+            CheckingAccount account = account();
+            BigDecimal amount = Account.MAX_BALANCE.subtract(new BigDecimal("100.00")).add(new BigDecimal("0.01"));
+
+            stubAccountOperationLookup(account);
+
+            assertThrowsWithMessage(
+                    BalanceLimitExceededException.class,
+                    ApiErrorMessages.BALANCE_LIMIT_EXCEEDED,
+                    () -> transactionService.deposit(operationRequest(amount))
+            );
+
+            assertBalance("100.00", account);
+
+            verifyAccountOperationLookup(account);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should accept a deposit that brings the balance exactly to the maximum")
+        void shouldAcceptDepositThatReachesMaximumBalanceExactly() {
+            CheckingAccount account = account();
+            BigDecimal amount = Account.MAX_BALANCE.subtract(new BigDecimal("100.00"));
+
+            stubAccountOperationLookup(account);
+            when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
+            stubSaveReturningArgument();
+
+            transactionService.deposit(operationRequest(amount));
+
+            assertEquals(Account.MAX_BALANCE, account.getBalance());
         }
     }
 
@@ -495,6 +567,35 @@ public class TransactionServiceTests {
             assertNotEquals(sent.getTransactionCode(), received.getTransactionCode());
 
             assertEquals(response(sent), result);
+        }
+
+        @Test
+        @DisplayName("Should throw when the transfer would exceed the destination maximum balance")
+        void shouldThrowWhenTransferExceedsDestinationMaximumBalance() {
+            CheckingAccount source = account();
+            CheckingAccount destination = checkingAccount(
+                    DESTINATION_NUMBER,
+                    DESTINATION_DIGIT,
+                    DESTINATION_ID,
+                    Account.MAX_BALANCE.subtract(new BigDecimal("10.00")).toPlainString()
+            );
+
+            stubTransferAccountLookup(source, destination);
+
+            assertThrowsWithMessage(
+                    BalanceLimitExceededException.class,
+                    ApiErrorMessages.BALANCE_LIMIT_EXCEEDED,
+                    () -> transactionService.transfer(transferRequest(new BigDecimal("10.01")))
+            );
+
+            assertBalance("100.00", source);
+            assertEquals(
+                    Account.MAX_BALANCE.subtract(new BigDecimal("10.00")),
+                    destination.getBalance()
+            );
+
+            verifyTransferAccountLookup(source, destination);
+            verifyNoMoreInteractionsOnMocks();
         }
 
         @Test
@@ -706,6 +807,28 @@ public class TransactionServiceTests {
             assertBalance("1000.00", account);
 
             verifyAccountOperationLookup(account);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should throw when the yield would exceed the maximum balance")
+        void shouldThrowWhenYieldExceedsMaximumBalance() {
+            SavingsAccount account = eligibleSavingsAccount(Account.MAX_BALANCE.toPlainString());
+            LocalDate lastYieldDate = account.getLastYieldDate();
+
+            stubAccountOperationLookup(account);
+
+            assertThrowsWithMessage(
+                    BalanceLimitExceededException.class,
+                    ApiErrorMessages.BALANCE_LIMIT_EXCEEDED,
+                    () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
+            );
+
+            assertEquals(Account.MAX_BALANCE, account.getBalance());
+            assertEquals(lastYieldDate, account.getLastYieldDate());
+
+            verifyAccountOperationLookup(account);
+            verifyYieldChecked();
             verifyNoMoreInteractionsOnMocks();
         }
 

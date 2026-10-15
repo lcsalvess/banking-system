@@ -54,7 +54,10 @@ public class TransactionController {
             summary = "Retrieve transactions by account",
             description = "Retrieves transactions for the specified account, with pagination and optional filters."
     )
-    @SortableBy(SORTABLE)
+    @SortableBy(
+            value = SORTABLE,
+            defaultSort = "createdAt,DESC;id,DESC"
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",

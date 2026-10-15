@@ -53,7 +53,10 @@ public class AccountController {
                     is ascending by account number. The maximum page size is 100.
                     """
     )
-    @SortableBy(SORTABLE)
+    @SortableBy(
+            value = SORTABLE,
+            defaultSort = "accountNumber,ASC"
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",

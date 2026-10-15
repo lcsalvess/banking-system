@@ -45,9 +45,16 @@ public class UserController {
 
     @Operation(
             summary = "List users",
-            description = "Retrieves a paginated list of users with optional filters."
+            description = """
+                Retrieves a paginated list of users with optional filters.
+                The default page size is 20, and the default sort order is
+                ascending by ID. The maximum page size is 100.
+                """
     )
-    @SortableBy(SORTABLE)
+    @SortableBy(
+            value = SORTABLE,
+            defaultSort = "id,ASC"
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",

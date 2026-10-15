@@ -2,10 +2,7 @@
 package com.lcsalvess.bankingsystem.config;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
-import io.swagger.v3.oas.models.Components;
-import io.swagger.v3.oas.models.ExternalDocumentation;
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.*;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
@@ -13,6 +10,7 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.jspecify.annotations.NonNull;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.utils.SpringDocAnnotationsUtils;
 import org.springframework.context.annotation.Bean;
@@ -118,7 +116,7 @@ Authenticate using the login endpoint, then click Authorize to provide your JWT 
 
                         operation.getResponses().forEach((status, response) -> {
                             if (status.matches("[45]\\d\\d")) {
-                                response.setContent(errorContent());
+                                response.setContent(errorContent(status));
                             }
                         });
 
@@ -134,13 +132,70 @@ Authenticate using the login endpoint, then click Authorize to provide your JWT 
                                 }
                             }
                         });
+
+                        if (PathItem.HttpMethod.POST.equals(httpMethod)) {
+                            setTransactionExample(path, operation);
+                        }
                     })
             );
         };
     }
 
+    private void setTransactionExample(
+            String path,
+            Operation operation
+    ) {
+        String type = switch (path) {
+            case "/api/v1/transactions/deposit" -> "DEPOSIT";
+            case "/api/v1/transactions/withdraw" -> "WITHDRAWAL";
+            case "/api/v1/transactions/transfer" -> "TRANSFER_SENT";
+            case "/api/v1/transactions/yield/{accountNumber}" -> "YIELD";
+            default -> null;
+        };
+
+        if (type == null) {
+            return;
+        }
+
+        ApiResponse response = operation.getResponses().get("201");
+
+        if (response == null || response.getContent() == null) {
+            return;
+        }
+
+        MediaType json = response.getContent().get("application/json");
+
+        if (json == null) {
+            return;
+        }
+
+        LinkedHashMap<String, Object> example = createExample(type);
+
+        json.setExample(example);
+    }
+
+    private static @NonNull LinkedHashMap<String, Object> createExample(String type) {
+        LinkedHashMap<String, Object> example = new LinkedHashMap<>();
+        example.put(
+                "transactionCode",
+                "108cf2a1-bcee-460a-a5db-f9b231947411"
+        );
+
+        if ("TRANSFER_SENT".equals(type)) {
+            example.put(
+                    "transferCode",
+                    "a12bc34d-5678-4abc-9def-1234567890ab"
+            );
+        }
+
+        example.put("type", type);
+        example.put("amount", 450.95);
+        example.put("createdAt", "2026-10-15T14:30:00");
+        return example;
+    }
+
     private void addResponseIfAbsent(
-            io.swagger.v3.oas.models.Operation operation,
+            Operation operation,
             String status,
             String description
     ) {
@@ -151,24 +206,41 @@ Authenticate using the login endpoint, then click Authorize to provide your JWT 
                     status,
                     new ApiResponse()
                             .description(description)
-                            .content(errorContent())
+                            .content(errorContent(status))
             );
             return;
         }
 
         if (response.getContent() == null
                 || response.getContent().isEmpty()) {
-            response.setContent(errorContent());
+            response.setContent(errorContent(status));
         }
     }
 
-    private Content errorContent() {
+    private Content errorContent(String status) {
+        String message = switch (status) {
+            case "400" -> "Request validation failed.";
+            case "401" -> "Authentication is required or the JWT is invalid.";
+            case "403" -> "Insufficient permissions to access this resource.";
+            case "404" -> "The requested resource was not found.";
+            case "405" -> "The HTTP method is not supported.";
+            case "409" -> "The request conflicts with the current resource state.";
+            case "415" -> "The request content type is not supported.";
+            case "503" -> "Service temporarily unavailable.";
+            default -> "Unexpected internal server error.";
+        };
+
         return new Content()
                 .addMediaType(
                         "application/json",
                         new MediaType()
                                 .schema(new Schema<>()
                                         .$ref("#/components/schemas/ApiErrorResponse"))
+                                .example(java.util.Map.of(
+                                        "status", Integer.parseInt(status),
+                                        "message", message,
+                                        "timestamp", "2026-10-15T18:30:00Z"
+                                ))
                 );
     }
 }

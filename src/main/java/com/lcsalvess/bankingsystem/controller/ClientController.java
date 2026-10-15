@@ -71,9 +71,16 @@ public class ClientController {
 
     @Operation(
             summary = "Get clients",
-            description = "Retrieves clients using pagination and an optional name filter."
+            description = """
+                Retrieves clients using pagination and an optional name filter.
+                The default page size is 10, and the default sort order is
+                ascending by ID. The maximum page size is 100.
+                """
     )
-    @SortableBy(SORTABLE)
+    @SortableBy(
+            value = SORTABLE,
+            defaultSort = "id,ASC"
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -124,8 +131,10 @@ public class ClientController {
 
     @Operation(
             summary = "Partially update client by ID",
-            description = "Updates only the fields sent in the request. "
-                    + "Omitted (null) fields are left unchanged."
+            description = "Only the provided client fields are updated; "
+                    + "omitted or null fields remain unchanged. "
+                    + "When an address is provided, it replaces the existing address entirely. "
+                    + "If the complement is omitted or set to null, the existing complement is cleared."
     )
     @ApiResponses({
             @ApiResponse(

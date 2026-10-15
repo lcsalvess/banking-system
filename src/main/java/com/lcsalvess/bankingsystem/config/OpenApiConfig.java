@@ -3,6 +3,7 @@ package com.lcsalvess.bankingsystem.config;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.ExternalDocumentation;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.info.Info;
@@ -28,9 +29,16 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Banking System API")
                         .version("1.0.0")
-                        .description(
-                                "RESTful API for a banking system developed with Java and Spring Boot."
-                        ))
+                        .description("""
+                            RESTful banking API built with Java 21, Spring Boot, and PostgreSQL.
+
+Features include user and client management, bank account operations, transaction processing, address lookup, and JWT-based authentication.
+
+Authenticate using the login endpoint, then click Authorize to provide your JWT and access protected endpoints.
+"""))
+                .externalDocs(new ExternalDocumentation()
+                        .description("Source code on GitHub")
+                        .url("https://github.com/lcsalvess/banking-system"))
                 .addSecurityItem(
                         new SecurityRequirement()
                                 .addList("bearerAuth")

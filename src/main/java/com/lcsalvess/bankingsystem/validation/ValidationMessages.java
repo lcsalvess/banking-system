@@ -10,8 +10,8 @@ public final class ValidationMessages {
     public static final String REQUIRED_PASSWORD =
             "A senha é obrigatória.";
 
-    public static final String PASSWORD_TOO_SHORT =
-            "A senha deve ter pelo menos 8 caracteres.";
+    public static final String PASSWORD_TOO_SHORT_OR_LONG =
+            "A senha deve ter entre 8 e 64 caracteres.";
 
     public static final String PASSWORD_EXCEEDS_MAX_BYTE_LENGTH =
             "A senha excede o limite de tamanho permitido.";

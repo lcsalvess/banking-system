@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.entity;
 
 import com.lcsalvess.bankingsystem.util.EmailNormalizer;
+import com.lcsalvess.bankingsystem.util.NameNormalizer;
 import jakarta.persistence.*;
 
 @Entity
@@ -30,7 +31,7 @@ public class Client {
     }
 
     public Client(String name, String cpf, String email, String phoneNumber, Address address) {
-        this.name = name;
+        this.name = NameNormalizer.normalize(name);
         this.cpf = cpf;
         this.email = EmailNormalizer.normalize(email);
         this.phoneNumber = phoneNumber;
@@ -38,7 +39,7 @@ public class Client {
     }
 
     public void update(String name, String email, String phoneNumber) {
-        if (name != null) {this.name = name;}
+        if (name != null) {this.name = NameNormalizer.normalize(name);}
 
         if (email != null) {this.email = EmailNormalizer.normalize(email);}
 

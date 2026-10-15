@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.entity;
 
 import com.lcsalvess.bankingsystem.entity.enums.State;
+import com.lcsalvess.bankingsystem.util.ComplementNormalizer;
 import jakarta.persistence.*;
 
 @Entity
@@ -31,7 +32,7 @@ public class Address {
     public Address(String streetName, String streetNumber, String complement, String neighborhood, String city, State state, String postalCode) {
         this.streetName = streetName;
         this.streetNumber = streetNumber;
-        this.complement = complement;
+        this.complement = ComplementNormalizer.normalize(complement);
         this.neighborhood = neighborhood;
         this.city = city;
         this.state = state;
@@ -48,9 +49,7 @@ public class Address {
             String postalCode) {
         this.streetName = streetName;
         this.streetNumber = streetNumber;
-        this.complement = complement == null || complement.isBlank()
-                ? null
-                : complement;
+        this.complement = ComplementNormalizer.normalize(complement);
         this.neighborhood = neighborhood;
         this.city = city;
         this.state = state;

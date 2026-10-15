@@ -55,6 +55,9 @@ public final class ApiErrorMessages {
     public static final String INVALID_ACCOUNT_DIGIT =
             "Dígito da conta inválido.";
 
+    public static final String ACTIVE_ACCOUNT_ALREADY_EXISTS =
+            "O cliente já possui uma conta ativa desse tipo.";
+
     public static final String CHECKING_ACCOUNT_ALREADY_EXISTS =
             "O cliente já possui uma conta corrente.";
 

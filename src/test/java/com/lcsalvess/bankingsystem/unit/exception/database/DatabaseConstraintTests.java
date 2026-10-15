@@ -36,7 +36,7 @@ class DatabaseConstraintTests {
         @DisplayName("Should follow the uk_ naming convention")
         void shouldFollowNamingConvention(DatabaseConstraint constraint) {
             assertTrue(
-                    constraint.getConstraintName().matches("^uk_[a-z0-9_]+$"),
+                    constraint.getConstraintName().matches("^(uk|ck)_[a-z0-9_]+$"),
                     constraint.getConstraintName()
             );
         }
@@ -79,6 +79,10 @@ class DatabaseConstraintTests {
             assertEquals(
                     "uk_accounts_client_type_active",
                     DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE.getConstraintName()
+            );
+            assertEquals(
+                    "ck_accounts_balance_max",
+                    DatabaseConstraint.ACCOUNT_BALANCE_MAX.getConstraintName()
             );
             assertEquals(
                     "uk_transactions_daily_yield",

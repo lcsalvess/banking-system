@@ -15,6 +15,7 @@ public enum DatabaseConstraint {
     CLIENT_CPF_UNIQUE("uk_clients_cpf"),
     CLIENT_EMAIL_UNIQUE("uk_clients_email"),
     ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE("uk_accounts_client_type_active"),
+    ACCOUNT_BALANCE_MAX("ck_accounts_balance_max"),
     TRANSACTION_DAILY_YIELD_UNIQUE("uk_transactions_daily_yield");
 
     private final String constraintName;

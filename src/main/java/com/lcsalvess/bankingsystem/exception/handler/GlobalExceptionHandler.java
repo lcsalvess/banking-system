@@ -404,6 +404,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             DatabaseConstraint.CLIENT_CPF_UNIQUE,
             ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS,
 
+            DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE,
+            ApiErrorMessages.ACTIVE_ACCOUNT_ALREADY_EXISTS,
+
+            DatabaseConstraint.ACCOUNT_BALANCE_MAX,
+            ApiErrorMessages.BALANCE_LIMIT_EXCEEDED,
+
             DatabaseConstraint.TRANSACTION_DAILY_YIELD_UNIQUE,
             ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED,
 

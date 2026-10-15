@@ -197,6 +197,14 @@ class GlobalExceptionHandlerTests {
                 Arguments.of(
                         DatabaseConstraint.USER_EMAIL_UNIQUE,
                         ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
+                ),
+                Arguments.of(
+                        DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE,
+                        ApiErrorMessages.ACTIVE_ACCOUNT_ALREADY_EXISTS
+                ),
+                Arguments.of(
+                        DatabaseConstraint.ACCOUNT_BALANCE_MAX,
+                        ApiErrorMessages.BALANCE_LIMIT_EXCEEDED
                 )
         );
     }

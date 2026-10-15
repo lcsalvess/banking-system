@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.bootstrap.AdminBootstrapRunner;
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -201,10 +202,10 @@ class AdminBootstrapRunnerTests {
                     assertThrows(IllegalStateException.class, () -> runner.run());
 
             assertTrue(exception.getMessage()
-                    .contains("O nome de usuário deve ter no máximo 20 caracteres."));
-            assertTrue(exception.getMessage().contains("O e-mail deve ser válido."));
+                    .contains(ValidationMessages.INVALID_USERNAME_LENGTH));
+            assertTrue(exception.getMessage().contains(ValidationMessages.INVALID_EMAIL));
             assertTrue(exception.getMessage()
-                    .contains("A senha deve ter pelo menos 8 caracteres."));
+                    .contains(ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG));
         }
     }
 
@@ -252,9 +253,9 @@ class AdminBootstrapRunnerTests {
         }
 
         @Test
-        @DisplayName("Should accept a password with exactly 72 bytes")
-        void shouldAcceptPasswordWithExactlyMaxBytes() {
-            String password = "a".repeat(72);
+        @DisplayName("Should accept a password with exactly 64 characters")
+        void shouldAcceptPasswordWithExactlyMaxCharacters() {
+            String password = "a".repeat(64);
 
             configure(VALID_USERNAME, VALID_EMAIL, password, false);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
@@ -298,36 +299,29 @@ class AdminBootstrapRunnerTests {
 
     @SuppressWarnings("unused")
     static Stream<Arguments> invalidCredentials() {
-        String usernameTooLong = "O nome de usuário deve ter no máximo 20 caracteres.";
-        String usernamePattern =
-                "O nome de usuário pode conter apenas letras, números, ponto, hífen e underscore.";
-        String emailInvalid = "O e-mail deve ser válido.";
-        String emailTooLong = "O e-mail deve ter no máximo 254 caracteres.";
-        String passwordTooShort = "A senha deve ter pelo menos 8 caracteres.";
-        String passwordTooLong = "A senha excede o limite de tamanho permitido.";
 
         // 64 + 1 + 186 + 4 = 255 characters, exceeding the 254-character limit.
         String longEmail = "a".repeat(64) + "@" + "b".repeat(186) + ".com";
 
         return Stream.of(
                 Arguments.of("username with 21 characters",
-                        "a".repeat(21), VALID_EMAIL, VALID_PASSWORD, usernameTooLong),
+                        "a".repeat(21), VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_LENGTH),
                 Arguments.of("username with whitespace",
-                        "admin root", VALID_EMAIL, VALID_PASSWORD, usernamePattern),
+                        "admin root", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_FORMAT),
                 Arguments.of("username with accented character",
-                        "admín", VALID_EMAIL, VALID_PASSWORD, usernamePattern),
+                        "admín", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_FORMAT),
                 Arguments.of("username with symbol",
-                        "admin@root", VALID_EMAIL, VALID_PASSWORD, usernamePattern),
+                        "admin@root", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_FORMAT),
                 Arguments.of("e-mail without at sign",
-                        VALID_USERNAME, "admin.example.com", VALID_PASSWORD, emailInvalid),
+                        VALID_USERNAME, "admin.example.com", VALID_PASSWORD, ValidationMessages.INVALID_EMAIL),
                 Arguments.of("e-mail above 254 characters",
-                        VALID_USERNAME, longEmail, VALID_PASSWORD, emailTooLong),
+                        VALID_USERNAME, longEmail, VALID_PASSWORD, ValidationMessages.INVALID_EMAIL_LENGTH),
                 Arguments.of("password with 7 characters",
-                        VALID_USERNAME, VALID_EMAIL, "1234567", passwordTooShort),
+                        VALID_USERNAME, VALID_EMAIL, "1234567", ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG),
                 Arguments.of("password with 73 bytes",
-                        VALID_USERNAME, VALID_EMAIL, "a".repeat(73), passwordTooLong),
+                        VALID_USERNAME, VALID_EMAIL, "a".repeat(73), ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH),
                 Arguments.of("password with 74 bytes in 37 multibyte characters",
-                        VALID_USERNAME, VALID_EMAIL, "é".repeat(37), passwordTooLong)
+                        VALID_USERNAME, VALID_EMAIL, "é".repeat(37), ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH)
         );
     }
 

@@ -7,6 +7,7 @@ import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.stream.Stream;
 
@@ -34,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -53,8 +56,22 @@ class AuthServiceTests {
     @Mock
     private Authentication authentication;
 
-    @InjectMocks
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     private AuthService authService;
+
+    @BeforeEach
+    void setUp() {
+        when(passwordEncoder.encode(anyString()))
+                .thenReturn("dummy-hash");
+
+        authService = new AuthService(
+                authManager,
+                jwtService,
+                passwordEncoder
+        );
+    }
 
     @Nested
     @DisplayName("Ao autenticar um usuário")
@@ -140,6 +157,12 @@ class AuthServiceTests {
             verify(authManager).authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
             );
+
+            verify(passwordEncoder).matches(
+                    dto.password(),
+                    "dummy-hash"
+            );
+
             verifyNoInteractions(jwtService);
         }
 

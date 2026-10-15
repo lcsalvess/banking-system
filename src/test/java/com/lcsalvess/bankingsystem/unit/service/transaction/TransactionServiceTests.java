@@ -169,7 +169,7 @@ public class TransactionServiceTests {
             Page<Transaction> page = new PageImpl<>(List.of(deposit), PAGEABLE, 1);
 
             LocalDate startDate = LocalDate.of(2026, 1, 1);
-            LocalDate endDate = LocalDate.of(2026, 1, 31);
+            LocalDate endDate = LocalDate.of(2026, 1, 15);
 
             LocalDateTime expectedStart = startDate.atStartOfDay();
             LocalDateTime expectedEndExclusive = endDate.plusDays(1).atStartOfDay();

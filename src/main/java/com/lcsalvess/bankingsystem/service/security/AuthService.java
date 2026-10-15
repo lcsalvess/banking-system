@@ -11,7 +11,10 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -20,10 +23,16 @@ public class AuthService {
 
     private final AuthenticationManager authManager;
     private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
+    private final String dummyPasswordHash;
 
-    public AuthService(AuthenticationManager authManager, JwtService jwtService) {
+    public AuthService(AuthenticationManager authManager, JwtService jwtService, PasswordEncoder passwordEncoder) {
         this.authManager = authManager;
         this.jwtService = jwtService;
+        this.passwordEncoder = passwordEncoder;
+        this.dummyPasswordHash = passwordEncoder.encode(
+                UUID.randomUUID().toString()
+        );
     }
 
     public LoginResponseDTO authenticate(LoginRequestDTO dto) {
@@ -49,6 +58,11 @@ public class AuthService {
         try {
             return authManager.authenticate(authToken);
         } catch (AccountStatusException exception) {
+            passwordEncoder.matches(
+                    dto.password() == null ? "" : dto.password(),
+                    dummyPasswordHash
+            );
+
             log.warn(
                     "Login rejected: account is not enabled for authentication. exceptionType={}",
                     exception.getClass().getSimpleName()

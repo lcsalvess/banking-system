@@ -68,7 +68,7 @@ public class SecurityConfig {
                         .hasRole("ADMIN")
 
                         // User management: administrators only.
-                        .requestMatchers(HttpMethod.POST, "/api/v1/users")
+                        .requestMatchers("/api/v1/users", "/api/v1/users/**")
                         .hasRole("ADMIN")
 
                         // Client management: employees only.

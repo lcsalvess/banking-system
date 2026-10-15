@@ -2,23 +2,82 @@ package com.lcsalvess.bankingsystem.controller;
 
 import com.lcsalvess.bankingsystem.dto.request.UserRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.UserResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.UserSummaryResponseDTO;
+import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.service.user.UserService;
+import com.lcsalvess.bankingsystem.util.SortWhitelist;
+import com.lcsalvess.bankingsystem.util.SortableBy;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
 
+    private static final String SORTABLE = "id,username,email,role,active";
+
+    private static final Set<String> SORTABLE_PROPERTIES =
+            Set.of(SORTABLE.split(","));
+
     private final UserService userService;
 
     public UserController(UserService userService) {
         this.userService = userService;
+    }
+
+    @Operation(
+            summary = "List users",
+            description = "Retrieves a paginated list of users with optional filters."
+    )
+    @SortableBy(SORTABLE)
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Users retrieved successfully."
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid pagination, sorting or filter parameters."
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The authenticated user does not have permission to perform this operation."
+            )
+    })
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public Page<UserSummaryResponseDTO> findAll(
+            @Parameter(
+                    description = "Search by username or email",
+                    example = "lucas"
+            )
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Role role,
+            @RequestParam(required = false) Boolean active,
+            @ParameterObject
+            @PageableDefault(
+                    size = 20,
+                    sort = "id",
+                    direction = Sort.Direction.ASC
+            )
+            Pageable pageable
+    ) {
+        SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
+
+        return userService.findAll(search, role, active, pageable);
     }
 
     @Operation(
@@ -45,5 +104,34 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponseDTO create(@RequestBody @Valid UserRequestDTO dto) {
         return userService.create(dto);
+    }
+
+    @Operation(
+            summary = "Deactivate a user",
+            description = "Deactivates an existing user without deleting their data. "
+                    + "Only users with the ADMIN role are authorized to perform this operation."
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "User deactivated successfully."
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The authenticated user does not have permission to perform this operation."
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found."
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "The last active administrator cannot be deactivated."
+            )
+    })
+    @PatchMapping("/{userId}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserResponseDTO deactivate(@PathVariable Long userId) {
+        return userService.deactivate(userId);
     }
 }

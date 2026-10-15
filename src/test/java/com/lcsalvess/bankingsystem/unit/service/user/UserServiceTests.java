@@ -6,7 +6,9 @@ import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
+import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
 import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
 import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.user.UserService;
@@ -20,8 +22,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,6 +59,12 @@ class UserServiceTests {
         void shouldCreateUserSuccessfully() {
             UserRequestDTO dto = createUserRequestDTO();
 
+            when(userRepository.existsByUsernameIgnoreCase(dto.username()))
+                    .thenReturn(false);
+
+            when(userRepository.existsByEmailIgnoreCase(dto.email()))
+                    .thenReturn(false);
+
             when(passwordEncoder.encode(dto.password()))
                     .thenReturn("encoded-password");
 
@@ -59,7 +72,7 @@ class UserServiceTests {
                     dto.username(),
                     dto.email(),
                     "encoded-password",
-                    Role.ADMIN
+                    dto.role()
             );
 
             when(userRepository.save(any(User.class)))
@@ -70,6 +83,7 @@ class UserServiceTests {
             assertEquals(dto.username(), response.username());
             assertEquals(dto.email(), response.email());
             assertEquals(dto.role(), response.role());
+            assertTrue(response.active());
 
             verify(userRepository).existsByUsernameIgnoreCase(dto.username());
             verify(userRepository).existsByEmailIgnoreCase(dto.email());
@@ -134,6 +148,171 @@ class UserServiceTests {
                     "teste123456",
                     Role.ADMIN
             );
+        }
+    }
+
+    @Nested
+    @DisplayName("Ao desativar um usuário")
+    class DeactivateTests {
+
+        @Test
+        @DisplayName("Deve desativar um administrador quando existem outros administradores ativos")
+        void shouldDeactivateAdminWhenOtherActiveAdminsExist() {
+            User admin = createUser(Role.ADMIN, true);
+            User anotherAdmin = createUser(Role.ADMIN, true);
+
+            when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
+                    .thenReturn(true);
+
+            when(userRepository.findById(1L))
+                    .thenReturn(Optional.of(admin));
+
+            when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
+                    .thenReturn(List.of(admin, anotherAdmin));
+
+            UserResponseDTO response = userService.deactivate(1L);
+
+            assertEquals(admin.getUsername(), response.username());
+            assertEquals(admin.getEmail(), response.email());
+            assertEquals(Role.ADMIN, response.role());
+            assertFalse(response.active());
+            assertFalse(admin.isActive());
+
+            verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
+            verify(userRepository).findActiveUsersByRoleForUpdate(Role.ADMIN);
+            verify(userRepository).findById(1L);
+
+            verify(eventPublisher).publishEvent(
+                    new UserOperationEvent(
+                            admin.getId(),
+                            UserOperationType.DEACTIVATED
+                    )
+            );
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção quando o usuário não existe")
+        void shouldThrowWhenUserDoesNotExist() {
+            when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
+                    .thenReturn(false);
+
+            when(userRepository.findById(1L))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(
+                    UserNotFoundException.class,
+                    () -> userService.deactivate(1L)
+            );
+
+            verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
+            verify(userRepository).findById(1L);
+
+            verify(userRepository, never())
+                    .findActiveUsersByRoleForUpdate(any());
+
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Deve retornar o usuário sem alterações quando já está inativo")
+        void shouldReturnUserWhenAlreadyInactive() {
+            User user = createUser(Role.EMPLOYEE, false);
+
+            when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
+                    .thenReturn(false);
+
+            when(userRepository.findById(1L))
+                    .thenReturn(Optional.of(user));
+
+            UserResponseDTO response = userService.deactivate(1L);
+
+            assertEquals(user.getUsername(), response.username());
+            assertEquals(user.getEmail(), response.email());
+            assertEquals(Role.EMPLOYEE, response.role());
+            assertFalse(response.active());
+            assertFalse(user.isActive());
+
+            verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
+            verify(userRepository).findById(1L);
+
+            verify(userRepository, never())
+                    .findActiveUsersByRoleForUpdate(any());
+
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Não deve desativar o último administrador ativo")
+        void shouldThrowWhenDeactivatingLastActiveAdmin() {
+            User admin = createUser(Role.ADMIN, true);
+
+            when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
+                    .thenReturn(true);
+
+            when(userRepository.findById(1L))
+                    .thenReturn(Optional.of(admin));
+
+            when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
+                    .thenReturn(List.of(admin));
+
+            assertThrows(
+                    LastAdminCannotBeDeactivatedException.class,
+                    () -> userService.deactivate(1L)
+            );
+
+            assertTrue(admin.isActive());
+
+            verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
+            verify(userRepository).findActiveUsersByRoleForUpdate(Role.ADMIN);
+
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("Deve desativar um funcionário sem consultar os administradores")
+        void shouldDeactivateEmployeeWithoutCheckingAdmins() {
+            User employee = createUser(Role.EMPLOYEE, true);
+
+            when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
+                    .thenReturn(false);
+
+            when(userRepository.findById(1L))
+                    .thenReturn(Optional.of(employee));
+
+            UserResponseDTO response = userService.deactivate(1L);
+
+            assertEquals(employee.getUsername(), response.username());
+            assertEquals(employee.getEmail(), response.email());
+            assertEquals(Role.EMPLOYEE, response.role());
+            assertFalse(response.active());
+            assertFalse(employee.isActive());
+
+            verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
+
+            verify(userRepository, never())
+                    .findActiveUsersByRoleForUpdate(any());
+
+            verify(eventPublisher).publishEvent(
+                    new UserOperationEvent(
+                            employee.getId(),
+                            UserOperationType.DEACTIVATED
+                    )
+            );
+        }
+
+        private User createUser(Role role, boolean active) {
+            User user = new User(
+                    "usuario.teste",
+                    "teste@teste.com.br",
+                    "encoded-password",
+                    role
+            );
+
+            if (!active) {
+                user.deactivate();
+            }
+
+            return user;
         }
     }
 }

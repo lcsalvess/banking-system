@@ -12,6 +12,12 @@ public final class ApiErrorMessages {
     public static final String USER_EMAIL_ALREADY_EXISTS =
             "E-mail já cadastrado.";
 
+    public static final String USER_NOT_FOUND =
+            "Usuário não encontrado.";
+
+    public static final String LAST_ADMIN_CANNOT_BE_DEACTIVATED =
+            "Não é possível desativar o último administrador ativo.";
+
     // Authentication and authorization
     public static final String INVALID_CREDENTIALS =
             "Usuário ou senha inválidos.";

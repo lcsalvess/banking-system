@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import com.lcsalvess.bankingsystem.validation.passwordbytelength.PasswordByteLength;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public record LoginRequestDTO(
         @Schema(
@@ -11,6 +12,7 @@ public record LoginRequestDTO(
                 example = "admin"
         )
         @NotBlank(message = ValidationMessages.REQUIRED_USERNAME)
+        @Size(max = 20, message = ValidationMessages.INVALID_USERNAME_LENGTH)
         String username,
 
         @Schema(

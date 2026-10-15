@@ -193,11 +193,12 @@ Shows the full request/response cycle, including authentication and authorizatio
 
 ### Transactions
 - Deposits, withdrawals, and transfers require an active account and a positive amount.
-- Amounts accept at most 17 integer digits and 2 decimal places.
+- Amounts accept at most 13 integer digits and 2 decimal places. An account balance cannot exceed `9999999999999.99` (also enforced by the `ck_accounts_balance_max` constraint); a deposit, transfer, or yield that would exceed it is rejected with `409 Conflict`.
 - Withdrawals and transfers require sufficient balance.
 - A transfer requires distinct and active source and destination accounts, and records one `TRANSFER_SENT` and one `TRANSFER_RECEIVED` transaction. Both share the same `transferCode` (UUID), which is returned only for transfer transactions.
 - Every operation that changes a balance locks the account row with a pessimistic write lock (`PESSIMISTIC_WRITE`) before validating it, so the balance check and the update cannot interleave with another request on the same account. Concurrent withdrawals therefore never overdraw an account, and concurrent deposits are never lost.
 - A transfer locks both accounts in ascending account number order, regardless of the transfer direction. Two opposite transfers (A to B and B to A) cannot deadlock.
+- Every pooled connection runs `SET lock_timeout = 3000`, so a request that waits more than 3 seconds for a row lock fails with `503 Service Unavailable` instead of holding a thread and a connection indefinitely.
 - All operations that change balances run inside a database transaction, so balance changes and transaction records are saved together or not at all.
 - Every transaction stores the user who performed it, taken from the authenticated principal. The value is mandatory and is kept in the database for auditing; it is not part of the API responses.
 - Every transaction receives a random UUID (`transactionCode`) when it is created. It is unique, immutable, and is the only identifier exposed by the API; the internal numeric ID is not part of the response.
@@ -268,24 +269,26 @@ Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Bus
 
 Full request and response schemas are available in Swagger UI.
 
-| Method | Endpoint                                               | Description                          | Access               |
-|--------|--------------------------------------------------------|--------------------------------------|----------------------|
-| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT       | Public               |
-| POST   | `/api/v1/users`                                        | Create a user                        | `ADMIN`              |
-| POST   | `/api/v1/clients`                                      | Register a client                    | `EMPLOYEE`           |
-| GET    | `/api/v1/clients`                                      | List clients                         | `EMPLOYEE`           |
-| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                   | `EMPLOYEE`           |
-| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client            | `EMPLOYEE`           |
-| POST   | `/api/v1/accounts`                                     | Create a checking or savings account | `EMPLOYEE`           |
-| GET    | `/api/v1/accounts`                                     | List accounts                        | `EMPLOYEE`           |
-| GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                       | `EMPLOYEE`           |
-| PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                    | `EMPLOYEE`           |
-| POST   | `/api/v1/transactions/deposit`                         | Deposit                              | `EMPLOYEE`           |
-| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                             | `EMPLOYEE`           |
-| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts            | `EMPLOYEE`           |
-| GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account    | `EMPLOYEE`, `ADMIN`  |
-| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID | `EMPLOYEE`, `ADMIN`  |
-| POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account     | `EMPLOYEE`           |
+| Method | Endpoint                                               | Description                           | Access               |
+|--------|--------------------------------------------------------|---------------------------------------|----------------------|
+| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT        | Public               |
+| POST   | `/api/v1/users`                                        | Create a user                         | `ADMIN`              |
+| GET    | `/api/v1/users`                                        | Retrieve a paginated list of users    | `ADMIN`              |
+| PATCH  | `/api/v1/users/{id}/deactivate`                        | Deactivate a user account             | `ADMIN`              |
+| POST   | `/api/v1/clients`                                      | Register a client                     | `EMPLOYEE`           |
+| GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients  | `EMPLOYEE`           |
+| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                    | `EMPLOYEE`           |
+| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client             | `EMPLOYEE`           |
+| POST   | `/api/v1/accounts`                                     | Create a checking or savings account  | `EMPLOYEE`           |
+| GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts | `EMPLOYEE`           |
+| GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                        | `EMPLOYEE`           |
+| PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                     | `EMPLOYEE`           |
+| POST   | `/api/v1/transactions/deposit`                         | Deposit                               | `EMPLOYEE`           |
+| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                              | `EMPLOYEE`           |
+| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts             | `EMPLOYEE`           |
+| GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account     | `EMPLOYEE`, `ADMIN`  |
+| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID  | `EMPLOYEE`, `ADMIN`  |
+| POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account      | `EMPLOYEE`           |
 
 `accountNumber` must have between 5 and 20 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
 
@@ -402,10 +405,10 @@ Validation errors also include the invalid fields. The same structure is used fo
 | Invalid credentials, invalid token, or deactivated user                            | `401 Unauthorized`          |
 | Access denied (role not allowed for the endpoint)                                  | `403 Forbidden`             |
 | CPF or e-mail already registered, including concurrent requests                    | `409 Conflict`              |
-| Address providers unavailable                                                      | `503 Service Unavailable`   |
+| Address providers unavailable, or row lock wait timeout                            | `503 Service Unavailable`   |
 | Unexpected error                                                                   | `500 Internal Server Error` |
 
-Database integrity violations are translated by constraint name through the `DatabaseConstraint` enum: a client CPF or e-mail conflict returns `409 Conflict`, a second yield on the same day returns `409 Conflict`, and any other violation returns `400 Bad Request` with a generic message. The constraint is identified by the name reported by the database, never by the exception message.
+Database integrity violations are translated by constraint name through the `DatabaseConstraint` enum: a client CPF or e-mail conflict returns `409 Conflict`, a second yield on the same day returns `409 Conflict`, and any other violation returns `500 Internal Server Error` with a generic message. Only the SQLState and the constraint name are logged, never the exception detail, because the database detail contains row values. The constraint is identified by the name reported by the database, never by the exception message.
 
 ---
 
@@ -444,7 +447,7 @@ Operations are logged through Spring application events:
 
 - PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
 - `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters. `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`. `V4__add_transaction_history_index.sql` creates the index `idx_transactions_account_created_id` on `transactions (account_id, created_at DESC, id DESC)`, which supports the transaction history query.
-- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing transactions to that user, and then makes the column `NOT NULL` with the foreign key `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data. `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`). `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive.
+- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing transactions to that user, and then makes the column `NOT NULL` with the foreign key `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data. `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`). `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive. `V9__add_account_balance_upper_bound.sql` adds the `ck_accounts_balance_max` check constraint (`balance <= 9999999999999.99`).
 - Schema changes must be added as new versioned migrations (`V9__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
 - Tables use plural snake_case names: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, and `transactions`.
 - Constraints follow a naming pattern: `uk_<table>_<column>` for unique constraints, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
@@ -573,7 +576,7 @@ Tests need a local PostgreSQL instance and the `DB_USERNAME`, `DB_PASSWORD`, and
 - [x] Integration tests with PostgreSQL for transaction and concurrency scenarios
 - [x] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
 - [x] Separate `local`, `prod`, and `test` profiles
-- [ ] Pagination and filtering on list endpoints
+- [x] Pagination and filtering on list endpoints
 - [ ] Docker Compose for the application and database
 - [ ] CI/CD pipeline with GitHub Actions
 - [ ] Refresh tokens

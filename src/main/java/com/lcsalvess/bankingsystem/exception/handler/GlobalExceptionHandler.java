@@ -422,17 +422,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         errors.merge(field, message, (existing, next) -> existing + "; " + next);
     }
 
+
     private static String sqlStateOf(Throwable throwable) {
-        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
-            if (cause instanceof org.hibernate.JDBCException jdbcException
-                    && jdbcException.getSQLState() != null) {
-                return jdbcException.getSQLState();
+        for (Throwable cause = throwable;
+             cause != null;
+             cause = cause.getCause()) {
+
+            if (cause instanceof org.hibernate.JDBCException jdbcException) {
+                java.sql.SQLException sqlException =
+                        jdbcException.getSQLException();
+
+                if (sqlException != null
+                        && sqlException.getSQLState() != null) {
+                    return sqlException.getSQLState();
+                }
             }
+
             if (cause instanceof java.sql.SQLException sqlException
                     && sqlException.getSQLState() != null) {
                 return sqlException.getSQLState();
             }
         }
+
         return "unknown";
     }
 

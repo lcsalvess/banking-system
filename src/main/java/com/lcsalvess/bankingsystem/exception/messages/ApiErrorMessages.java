@@ -5,6 +5,16 @@ public final class ApiErrorMessages {
     private ApiErrorMessages() {
     }
 
+    // JWT
+    public static final String JWT_SECRET_REQUIRED =
+            "O segredo JWT não pode ser nulo ou vazio.";
+
+    public static final String JWT_SECRET_INVALID_CONFIGURATION =
+            "Configuração do segredo JWT inválida.";
+
+    public static final String JWT_TOKEN_VERSION_INVALID =
+            "Claim de versão do token inválida.";
+
     // User
     public static final String USERNAME_ALREADY_EXISTS =
             "Nome de usuário já cadastrado.";

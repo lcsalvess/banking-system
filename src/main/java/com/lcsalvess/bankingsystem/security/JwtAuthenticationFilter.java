@@ -1,6 +1,8 @@
 package com.lcsalvess.bankingsystem.security;
 
+import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
+import com.lcsalvess.bankingsystem.service.security.JwtClaims;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -8,6 +10,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -17,12 +22,16 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private static final String BEARER_PREFIX = "Bearer ";
 
@@ -79,16 +88,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         try {
-            String username = jwtService.extractUsername(jwt);
+            JwtClaims claims = jwtService.parse(jwt);
 
             UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(username);
+                    userDetailsService.loadUserByUsername(claims.username());
 
             if (!userDetails.isEnabled()) {
                 authenticationEntryPoint.commence(
                         request,
                         response,
                         new DisabledException("User is disabled")
+                );
+                return;
+            }
+
+            // Token emitido antes da última troca de senha: não vale mais.
+            if (!(userDetails instanceof User user)
+                    || user.getTokenVersion() != claims.tokenVersion()) {
+                authenticationEntryPoint.commence(
+                        request,
+                        response,
+                        new BadCredentialsException("Invalid authentication")
                 );
                 return;
             }

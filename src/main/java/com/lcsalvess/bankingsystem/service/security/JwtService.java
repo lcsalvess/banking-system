@@ -2,6 +2,8 @@ package com.lcsalvess.bankingsystem.service.security;
 
 import com.lcsalvess.bankingsystem.config.JwtProperties;
 import com.lcsalvess.bankingsystem.entity.User;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.io.DecodingException;
@@ -15,6 +17,12 @@ import java.util.Date;
 
 @Service
 public class JwtService {
+
+    /**
+     * Claim personalizada do JWT que armazena a versão das credenciais do usuário.
+     * Utiliza "tv" como abreviação de "token version" para manter o token compacto.
+     */
+    static final String TOKEN_VERSION_CLAIM = "tv";
 
     private final SecretKey signingKey;
     private final long expirationInSeconds;
@@ -30,7 +38,7 @@ public class JwtService {
 
     private SecretKey createSigningKey(String secret) {
         if (secret == null || secret.isBlank()) {
-            throw new IllegalStateException("O segredo JWT não pode ser nulo ou vazio.");
+            throw new IllegalStateException(ApiErrorMessages.JWT_SECRET_REQUIRED);
         }
 
         try {
@@ -38,7 +46,7 @@ public class JwtService {
             return Keys.hmacShaKeyFor(keyBytes);
         } catch (DecodingException | WeakKeyException exception) {
             throw new IllegalStateException(
-                    "Configuração do segredo JWT inválida.",
+                    ApiErrorMessages.JWT_SECRET_INVALID_CONFIGURATION,
                     exception);
         }
     }
@@ -52,18 +60,49 @@ public class JwtService {
                 .issuer(issuer)
                 .issuedAt(issuedAt)
                 .expiration(expiration)
+                .claim(TOKEN_VERSION_CLAIM, user.getTokenVersion())
                 .signWith(signingKey)
                 .compact();
     }
 
     public String extractUsername(String jwt) {
-        return Jwts.parser()
+        return parse(jwt).username();
+    }
+
+    /**
+     * Valida assinatura, issuer e expiração e devolve os claims usados na autenticação.
+     * Tokens emitidos antes da introdução do claim de versão valem como versão 0.
+     */
+    public JwtClaims parse(String jwt) {
+        Claims claims = Jwts.parser()
                 .verifyWith(signingKey)
                 .requireIssuer(issuer)
                 .clock(() -> Date.from(clock.instant()))
                 .build()
                 .parseSignedClaims(jwt)
-                .getPayload()
-                .getSubject();
+                .getPayload();
+
+        int tokenVersion = extractTokenVersion(claims);
+
+        return new JwtClaims(claims.getSubject(), tokenVersion);
+    }
+
+    private int extractTokenVersion(Claims claims) {
+        Object version = claims.get(TOKEN_VERSION_CLAIM);
+
+        if (version == null) {
+            // Compatibilidade com tokens emitidos antes da versão de credenciais.
+            return 0;
+        }
+
+        if (!(version instanceof Number number)
+                || number.longValue() < 0
+                || number.longValue() > Integer.MAX_VALUE
+                || number.doubleValue() != number.intValue()) {
+            throw new IllegalArgumentException(
+                    ApiErrorMessages.JWT_TOKEN_VERSION_INVALID);
+        }
+
+        return number.intValue();
     }
 }

@@ -44,7 +44,7 @@ The application follows a modular layered architecture, separating responsibilit
 ```text
 src/main/java/com/lcsalvess/bankingsystem
 ├── bootstrap/       # Application startup and initialization
-├── config/          # Spring application configuration (Jackson, JWT properties, OpenAPI, security)
+├── config/          # Spring application configuration (Jackson, JWT properties, OpenAPI, pagination, clock, security)
 ├── controller/      # REST API endpoints
 │   ├── address/     # Address lookup endpoint
 │   └── security/    # Authentication endpoint
@@ -61,15 +61,15 @@ src/main/java/com/lcsalvess/bankingsystem
 │       ├── exception/
 │       ├── validation/
 │       └── viacep/
-├── repository/      # Database access through Spring Data JPA
+├── repository/      # Database access through Spring Data JPA, with Specifications for dynamic filters
 ├── security/        # JWT authentication filter and JSON handlers for 401/403 responses
 ├── serialization/   # Custom JSON serialization
-├── util/            # Utility classes (CPF masking, e-mail and username normalization)
+├── util/            # Utility classes (CPF masking, text normalization, sort whitelist, pagination tie-breaker)
 ├── service/         # Business rules and application logic
 │   ├── account/     # Account operations, row locking, and account number generation
 │   ├── address/     # Address-related application logic
 │   ├── client/      # Client operations and persistence responsibilities
-│   ├── security/    # Authentication, JWT, and current user
+│   ├── security/    # Authentication, JWT, password change, and current user
 │   ├── transaction/ # Transaction operations
 │   └── user/        # User operations
 └── validation/      # Custom constraints and validators
@@ -141,7 +141,9 @@ Shows the full request/response cycle, including authentication and authorizatio
 ## Features
 
 - **Authentication and authorization** with JWT and role-based access: `ADMIN` manages users and metrics, `EMPLOYEE` operates clients, accounts, and transactions
-- **User management**: user creation with role assignment and secure password storage
+- **User management**: user creation with role assignment, paginated listing with filters, deactivation and reactivation, and secure password storage (BCrypt)
+- **Password change**: any authenticated user can change their own password, which revokes every token issued before the change
+- **Token revocation**: every JWT carries a credential version (`tv` claim) checked against the database, so tokens stop working after a password change or a deactivation
 - **Client management**: registration, listing, lookup, and partial update (`PATCH`), including address data
 - **Sensitive data protection**: the CPF is masked in every client response
 - **Address lookup**: automatic address lookup by postal code using ViaCEP, with BrasilAPI as a fallback provider
@@ -158,6 +160,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Account cancellation** with balance and status validation, safe against concurrent deposits
 - **Input validation** using Bean Validation, with custom constraints for CPF, account number, and check digit
 - **Strict JSON input types**: text fields reject numbers and booleans, and monetary amounts reject strings
+- **Pagination, sorting, and filtering** on list endpoints, with a whitelist of sortable fields per endpoint, a maximum page size of 100, and the `id` as tie-breaker for a stable order
 - **Global exception handling** with a consistent error response
 - **Decoupled operation logging** using Spring application events
 - **Request tracing** with a correlation ID present in the response header and in every log line
@@ -216,11 +219,19 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Only `ADMIN` users can create new users.
 - Usernames have up to 20 characters and may contain only letters, digits, dot, hyphen, and underscore. They are trimmed and converted to lowercase on creation and on login, so usernames are case-insensitive.
 - E-mails can have up to 254 characters and are trimmed and stored in lowercase. Usernames and e-mails must be unique.
-- Passwords must have at least 8 characters and at most 72 bytes in UTF-8, the limit supported by BCrypt. The same limit is checked at login.
-- Passwords are stored as BCrypt hashes.
+- Passwords must have between 8 and 64 characters and at most 72 bytes in UTF-8, the limit supported by BCrypt. The same limits are checked at login and when changing the password.
+- Passwords are stored as BCrypt hashes (strength 12).
 - An initial `ADMIN` is created at startup from environment variables when no admin exists (see [Configuration](#configuration)). In the `prod` profile the application refuses to start when no admin exists and the credentials are not configured.
 - Username uniqueness is case-insensitive and enforced by the database through a unique index on `LOWER(username)`.
 - `system_migration` is a reserved technical user created by migration `V6` and hardened by `V8` (BCrypt password hash and a non-routable `.invalid` e-mail). It is inactive, cannot authenticate, and owns the transactions that already existed when the audit trail was introduced.
+- Only `ADMIN` users can list, deactivate, and reactivate users. The listing is paginated and can be filtered by `search` (username or e-mail), `role`, and `active`.
+- Deactivating a user is idempotent: an already inactive user is returned unchanged. A deactivated user cannot log in (the response is the same `401 Unauthorized` as for invalid credentials) and is rejected on every request, even with a token that was still valid.
+- The last active `ADMIN` cannot be deactivated (`409 Conflict`). The active admins are locked (`SELECT ... FOR UPDATE`) while the check runs, so concurrent deactivations cannot leave the system without an administrator.
+- Every user has a `token_version`, included in the JWT as the `tv` claim. Deactivation and password change increment it, so tokens issued before either event stay invalid, even if the account is reactivated later.
+- Reactivation is idempotent. The reserved `system_migration` user can never be reactivated (`409 Conflict`), and the `ck_users_system_migration_inactive` check constraint guarantees it stays inactive.
+- Any authenticated user can change their own password through `PATCH /api/v1/auth/password`, sending the current and the new password. A successful change returns `204 No Content`.
+- The current password must be correct, and the new password must differ from it. Otherwise the request is rejected with `400 Bad Request`.
+- A password change locks the user row, so concurrent changes are serialized. It increments the `token_version`, so every token issued before the change, including the one used in the request, is rejected with `401 Unauthorized`, and the user must log in again.
 
 ### Address Lookup
 
@@ -243,25 +254,29 @@ The API is stateless. Clients authenticate through `POST /api/v1/auth/login` and
 Authorization: Bearer <token>
 ```
 
-| Aspect             | Behavior                                                                                                      |
-|--------------------|---------------------------------------------------------------------------------------------------------------|
-| Token              | JWT signed with HMAC (key of at least 256 bits), valid for 1 hour by default                                  |
-| Token validation   | Signature, expiration, and issuer (`jwt.issuer`) are verified on every request                                |
-| User status        | The user is loaded from the database on every request; a deactivated user is rejected with `401 Unauthorized` |
-| Startup check      | The application does not start if `JWT_SECRET` is missing, is not valid Base64, or is too short               |
-| Public routes      | `/api/v1/auth/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**`                                    |
-| Protected routes   | Everything else requires a valid token and the role required by the endpoint                                  |
-| Invalid token      | `401 Unauthorized`                                                                                            |
-| Insufficient role  | `403 Forbidden`, returned as JSON by `RestAccessDeniedHandler`                                                |
+| Aspect                  | Behavior                                                                                                                                                                                                |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Token                   | JWT signed with HMAC (key of at least 256 bits), valid for 1 hour by default                                                                                                                            |
+| Token validation        | Signature, expiration, and issuer (`jwt.issuer`) are verified on every request                                                                                                                          |
+| Token revocation        | The `tv` claim must match the `token_version` of the user in the database. A password change or a deactivation increments it, so older tokens are rejected. Tokens without the claim count as version 0 |
+| User status             | The user is loaded from the database on every request; a deactivated user is rejected with `401 Unauthorized`                                                                                           |
+| Login of inactive users | Same `401 Unauthorized` and message as wrong credentials, with a password check against a dummy hash to keep the response time similar                                                                  |
+| Startup check           | The application does not start if `JWT_SECRET` is missing, is not valid Base64, or is too short                                                                                                         |
+| Public routes           | `POST /api/v1/auth/login`, `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**`                                                                                                                      |
+| Authenticated routes    | `PATCH /api/v1/auth/password`, open to any authenticated user, whatever the role                                                                                                                        |
+| Protected routes        | Everything else requires a valid token and the role required by the endpoint                                                                                                                            |
+| Invalid token           | `401 Unauthorized` (invalid, expired, or revoked token)                                                                                                                                                 |
+| Infrastructure failure  | `503 Service Unavailable` when the user cannot be loaded because the database is unavailable, so a valid token is not reported as invalid                                                               |
+| Insufficient role       | `403 Forbidden`, returned as JSON by `RestAccessDeniedHandler`                                                                                                                                          |
 
 ### Access by role
 
 | Role       | Allowed operations                                                                                                                                                                  |
 |------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `ADMIN`    | Create users, read the transaction history and look up transactions by code, `/actuator/health`, `/actuator/info`, and `/actuator/metrics`                                          |
+| `ADMIN`    | Create, list, deactivate, and reactivate users; read the transaction history and look up transactions by code; `/actuator/health`, `/actuator/info`, and `/actuator/metrics`        |
 | `EMPLOYEE` | Clients, accounts, address lookup, deposit, withdrawal, transfer, and yield; read the transaction history and look up transactions by code; `/actuator/health` and `/actuator/info` |
 
-Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Business operations require an `EMPLOYEE` user, which an `ADMIN` creates through `POST /api/v1/users`. Endpoint access is enforced with `@PreAuthorize` on the controllers and with request rules in `SecurityConfig` for the actuator.
+Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Business operations require an `EMPLOYEE` user, which an `ADMIN` creates through `POST /api/v1/users`. Endpoint access is enforced with `@PreAuthorize` on the controllers and with request rules in `SecurityConfig` for the actuator. Changing one's own password is the only operation open to every authenticated user.
 
 ---
 
@@ -269,30 +284,45 @@ Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Bus
 
 Full request and response schemas are available in Swagger UI.
 
-| Method | Endpoint                                               | Description                           | Access               |
-|--------|--------------------------------------------------------|---------------------------------------|----------------------|
-| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT        | Public               |
-| POST   | `/api/v1/users`                                        | Create a user                         | `ADMIN`              |
-| GET    | `/api/v1/users`                                        | Retrieve a paginated list of users    | `ADMIN`              |
-| PATCH  | `/api/v1/users/{id}/deactivate`                        | Deactivate a user account             | `ADMIN`              |
-| POST   | `/api/v1/clients`                                      | Register a client                     | `EMPLOYEE`           |
-| GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients  | `EMPLOYEE`           |
-| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                    | `EMPLOYEE`           |
-| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client             | `EMPLOYEE`           |
-| POST   | `/api/v1/accounts`                                     | Create a checking or savings account  | `EMPLOYEE`           |
-| GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts | `EMPLOYEE`           |
-| GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                        | `EMPLOYEE`           |
-| PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                     | `EMPLOYEE`           |
-| POST   | `/api/v1/transactions/deposit`                         | Deposit                               | `EMPLOYEE`           |
-| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                              | `EMPLOYEE`           |
-| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts             | `EMPLOYEE`           |
-| GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account     | `EMPLOYEE`, `ADMIN`  |
-| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID  | `EMPLOYEE`, `ADMIN`  |
-| POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account      | `EMPLOYEE`           |
+| Method | Endpoint                                               | Description                                   | Access              |
+|--------|--------------------------------------------------------|-----------------------------------------------|---------------------|
+| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT                | Public              |
+| PATCH  | `/api/v1/auth/password`                                | Change the password of the authenticated user | Authenticated       |
+| POST   | `/api/v1/users`                                        | Create a user                                 | `ADMIN`             |
+| GET    | `/api/v1/users`                                        | Retrieve a paginated list of users            | `ADMIN`             |
+| PATCH  | `/api/v1/users/{userId}/deactivate`                    | Deactivate a user account                     | `ADMIN`             |
+| PATCH  | `/api/v1/users/{userId}/reactivate`                    | Reactivate a user account                     | `ADMIN`             |
+| POST   | `/api/v1/clients`                                      | Register a client                             | `EMPLOYEE`          |
+| GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients          | `EMPLOYEE`          |
+| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                            | `EMPLOYEE`          |
+| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client                     | `EMPLOYEE`          |
+| POST   | `/api/v1/accounts`                                     | Create a checking or savings account          | `EMPLOYEE`          |
+| GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts         | `EMPLOYEE`          |
+| GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                                | `EMPLOYEE`          |
+| PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                             | `EMPLOYEE`          |
+| POST   | `/api/v1/transactions/deposit`                         | Deposit                                       | `EMPLOYEE`          |
+| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                                      | `EMPLOYEE`          |
+| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts                     | `EMPLOYEE`          |
+| GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account             | `EMPLOYEE`, `ADMIN` |
+| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID          | `EMPLOYEE`, `ADMIN` |
+| POST   | `/api/v1/transactions/yield/{accountNumber}?digit=`    | Apply yield to a savings account              | `EMPLOYEE`          |
 
 `accountNumber` must have between 5 and 20 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
 
 Request bodies are strict about JSON types: text fields reject numbers and booleans (`"accountNumber": 99999` is rejected), and monetary amounts reject strings (`"amount": "100.00"` is rejected; send `100.00`). Both return `400 Bad Request`.
+
+### Pagination, Sorting, and Filtering
+
+List endpoints accept `page`, `size`, and `sort` (for example `sort=balance,desc`). The maximum page size is 100, and larger values are capped. Sorting by a property outside the list of an endpoint returns `400 Bad Request`. The `id` is always added as a final tie-breaker, so pages keep a stable order.
+
+| Endpoint                                            | Filters                        | Sortable fields                              | Default sort                                 | Default size |
+|-----------------------------------------------------|--------------------------------|----------------------------------------------|----------------------------------------------|--------------|
+| `GET /api/v1/users`                                 | `search`, `role`, `active`     | `id`, `username`, `email`, `role`, `active`  | `id` ascending                               | 20           |
+| `GET /api/v1/clients`                               | `name`                         | `id`, `name`                                 | `id` ascending                               | 10           |
+| `GET /api/v1/accounts`                              | -                              | `accountNumber`, `balance`, `status`, `type` | `accountNumber` ascending                    | 10           |
+| `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate` | `createdAt`, `id`, `type`, `amount`          | `createdAt` descending, then `id` descending | 10           |
+
+On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Both must be between 2020-01-01 and the current date, and `startDate` cannot be after `endDate` (`400 Bad Request`).
 
 ### Address Lookup Endpoint
 
@@ -346,6 +376,16 @@ curl -X PATCH http://localhost:8080/api/v1/clients/1 \
 # 6. Look up a transaction by its public code
 curl http://localhost:8080/api/v1/transactions/code/<transaction-code> \
   -H "Authorization: Bearer <employee-token>"
+
+# 7. Change your own password (any authenticated user); tokens issued before the change stop working
+curl -X PATCH http://localhost:8080/api/v1/auth/password \
+  -H "Authorization: Bearer <employee-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword": "your-password", "newPassword": "your-new-password"}'
+
+# 8. Deactivate a user (ADMIN only)
+curl -X PATCH http://localhost:8080/api/v1/users/<user-id>/deactivate \
+  -H "Authorization: Bearer <admin-token>"
 ```
 
 Transactions are returned with their public identifier, and the internal ID is not exposed:
@@ -398,17 +438,17 @@ Validation errors also include the invalid fields. The same structure is used fo
 }
 ```
 
-| Scenario                                                                           | Status                      |
-|------------------------------------------------------------------------------------|-----------------------------|
-| Business rule violation                                                            | Defined by each exception   |
-| Bean Validation failure, invalid parameters, malformed body, or wrong JSON type    | `400 Bad Request`           |
-| Invalid credentials, invalid token, or deactivated user                            | `401 Unauthorized`          |
-| Access denied (role not allowed for the endpoint)                                  | `403 Forbidden`             |
-| CPF or e-mail already registered, including concurrent requests                    | `409 Conflict`              |
-| Address providers unavailable, or row lock wait timeout                            | `503 Service Unavailable`   |
-| Unexpected error                                                                   | `500 Internal Server Error` |
+| Scenario                                                                                                                                           | Status                      |
+|----------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| Business rule violation                                                                                                                            | Defined by each exception   |
+| Bean Validation failure, invalid parameters, malformed body, or wrong JSON type                                                                    | `400 Bad Request`           |
+| Invalid credentials, invalid or revoked token, or deactivated user                                                                                 | `401 Unauthorized`          |
+| Access denied (role not allowed for the endpoint)                                                                                                  | `403 Forbidden`             |
+| Value already registered (CPF, e-mail, or username), including concurrent requests, or a state conflict such as deactivating the last active admin | `409 Conflict`              |
+| Address providers unavailable, row lock wait timeout, or authentication infrastructure unavailable                                                 | `503 Service Unavailable`   |
+| Unexpected error                                                                                                                                   | `500 Internal Server Error` |
 
-Database integrity violations are translated by constraint name through the `DatabaseConstraint` enum: a client CPF or e-mail conflict returns `409 Conflict`, a second yield on the same day returns `409 Conflict`, and any other violation returns `500 Internal Server Error` with a generic message. Only the SQLState and the constraint name are logged, never the exception detail, because the database detail contains row values. The constraint is identified by the name reported by the database, never by the exception message.
+Database integrity violations are translated by constraint name through the `DatabaseConstraint` enum: a duplicate client CPF or e-mail, a duplicate username or user e-mail, a second active account of the same type, a balance above the limit, a second yield on the same day, or an attempt to activate the `system_migration` user returns `409 Conflict` with a message that identifies the problem, and any other violation returns `500 Internal Server Error` with a generic message. Only the SQLState and the constraint name are logged, never the exception detail, because the database detail contains row values. The constraint is identified by the name reported by the database, never by the exception message.
 
 ---
 
@@ -416,7 +456,7 @@ Database integrity violations are translated by constraint name through the `Dat
 
 Operations are logged through Spring application events:
 
-- Services publish an event after creating or changing data: client `CREATED`/`UPDATED`, account `CREATED`/`CANCELLED`, user `CREATED`, and transactions (deposit, withdrawal, transfer, and yield).
+- Services publish an event after creating or changing data: client `CREATED`/`UPDATED`, account `CREATED`/`CANCELLED`, user `CREATED`/`DEACTIVATED`/`REACTIVATED`/`PASSWORD_CHANGED`, and transactions (deposit, withdrawal, transfer, and yield).
 - Listeners use `@TransactionalEventListener` in the `AFTER_COMMIT` phase, so an operation is only logged as successful after its database transaction is committed.
 - The global exception handler logs business errors, authentication and authorization failures, data integrity violations, address provider failures, and unexpected errors.
 - The log level is controlled by `logging.level.com.lcsalvess.bankingsystem` (`INFO` by default), and SQL logging is disabled.
@@ -447,8 +487,8 @@ Operations are logged through Spring application events:
 
 - PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
 - `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters. `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`. `V4__add_transaction_history_index.sql` creates the index `idx_transactions_account_created_id` on `transactions (account_id, created_at DESC, id DESC)`, which supports the transaction history query.
-- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing transactions to that user, and then makes the column `NOT NULL` with the foreign key `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data. `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`). `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive. `V9__add_account_balance_upper_bound.sql` adds the `ck_accounts_balance_max` check constraint (`balance <= 9999999999999.99`).
-- Schema changes must be added as new versioned migrations (`V9__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
+- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing transactions to that user, and then makes the column `NOT NULL` with the foreign key `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data. `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`). `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive. `V9__add_account_balance_upper_bound.sql` adds the `ck_accounts_balance_max` check constraint (`balance <= 9999999999999.99`). `V10__add_user_token_version.sql` adds the `token_version` column to `users` (`INTEGER NOT NULL DEFAULT 0`), the credential version carried by every JWT. `V11__keep_system_migration_user_inactive.sql` adds the `ck_users_system_migration_inactive` check constraint, so the `system_migration` user can never be active.
+- Schema changes must be added as new versioned migrations (`V12__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
 - Tables use plural snake_case names: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, and `transactions`.
 - Constraints follow a naming pattern: `uk_<table>_<column>` for unique constraints, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
 - `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`, `checking_accounts`, and `savings_accounts` tables.
@@ -458,11 +498,12 @@ Operations are logged through Spring application events:
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).
 - `Transaction` also has a `transfer_code` column (UUID, nullable, not updatable). It is filled only for `TRANSFER_SENT` and `TRANSFER_RECEIVED` and holds the same value in both rows of a transfer.
 - Concurrency is handled with pessimistic locking: `AccountRepository.findByAccountNumberForUpdate` uses `LockModeType.PESSIMISTIC_WRITE`. The locking methods of `AccountService` require an existing transaction (`Propagation.MANDATORY`), so a lock can never be taken and released outside the operation that needs it.
+- User operations use the same mechanism: `UserRepository.findByIdForUpdate` locks the row on deactivation, reactivation, and password change. Deactivating an `ADMIN` also locks every active admin before the last-admin check, so concurrent deactivations always leave at least one active administrator.
 - `Transaction` has a `transaction_code` column (UUID, not null, not updatable) with the `uk_transactions_code` unique constraint, used as its public identifier.
 - Open Session in View is disabled (`spring.jpa.open-in-view=false`). Account queries that need the client use `JOIN FETCH` to avoid lazy loading outside a transaction.
 - Read operations in the services run with `@Transactional(readOnly = true)`, while operations that change data use regular transactions.
 - For clients, the transaction boundary is in `ClientPersistenceService`: `ClientService` resolves the address first and only then calls it, so the transaction covers just the persistence work.
-- Most entities have no public setters: `Client` and `Address` change through domain methods such as `Client.update(...)` and `Address.updateFrom(...)`. `User` changes only through its constructor, which normalizes the username and e-mail, and through `deactivate()`.
+- Most entities have no public setters: `Client` and `Address` change through domain methods such as `Client.update(...)` and `Address.updateFrom(...)`. `User` changes only through its constructor, which normalizes the username and e-mail, and through `deactivate()`, `reactivate()`, and `changePassword(...)`. `deactivate()` (when the user is active) and `changePassword(...)` increment `tokenVersion`.
 
 ---
 
@@ -552,17 +593,20 @@ Use the **Authorize** button and paste the JWT returned by `/api/v1/auth/login` 
 
 The test suite covers:
 
-- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, yield, and the lock acquisition of each), users, JWT, authentication, user details loading, address data resolution, and address lookup provider orchestration.
+- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, yield, and the lock acquisition of each), users (including deactivation and reactivation), password change, JWT (including the credential version claim), authentication, user details loading, address data resolution, and address lookup provider orchestration.
 - **Concurrency integration tests** (`TransactionConcurrencyTests`) against PostgreSQL, running operations on parallel threads released at the same instant: concurrent withdrawals that must not overdraw an account, deposits that must not be lost, mixed deposits and withdrawals, opposite transfers without deadlock, several transfers into the same account, transfers limited by the available balance, a yield requested twice at once, and an account cancellation racing with deposits.
-- **Security tests** for JWT generation and validation (secret, issuer, expiration), the security filter chain (public routes, token validation, method security, actuator access, and correlation ID on error responses), and the authentication entry point.
-- **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), address lookup, and authentication.
+- **User integration tests** against PostgreSQL: `PasswordChangeIntegrationTests` covers the password change flow end to end (login only with the new password, revocation of tokens issued before the change, validation failures, deactivated users, tokens that stay revoked after reactivation, and concurrent changes), and `UserDeactivationConcurrencyTests` checks that concurrent deactivations of admins always leave one active administrator and that deactivating the same admin twice at once is idempotent.
+- **Database configuration tests** (`DatabaseLockTimeoutTests`): the lock timeout applied to pooled connections and the balance upper bound constraint.
+- **Security tests** for JWT generation and validation (secret, issuer, expiration, credential version), the security filter chain (public routes, token validation, method security, actuator access, and correlation ID on error responses), and the authentication entry point.
+- **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), address lookup, and authentication (including password change).
 - **Provider client tests** for ViaCEP and Brasil API against a local HTTP server: response mapping, postal code not found, invalid responses, error statuses, timeouts, and unreachable providers.
 - **JSON coercion tests** that import `JacksonConfig` into a controller slice to check that wrongly typed fields are rejected.
 - **Validation tests** for CPF, account number, account digit, and password size in bytes.
 - **Filter tests** for the correlation ID: generation, reuse, lowercase normalization, rejection of non-canonical values, and MDC cleanup.
+- **Other unit tests** for the global exception handler, the database constraint mapping, the pagination tie-breaker, and the admin bootstrap runner.
 - **Context test** to verify the application starts.
 
-The suite has more than 300 test methods, many of them parameterized.
+The suite has more than 400 test methods, many of them parameterized.
 
 Tests need a local PostgreSQL instance and the `DB_USERNAME`, `DB_PASSWORD`, and `JWT_SECRET` environment variables. They run with the `test` profile against the `banking_system_test` database. Its schema is created by the same Flyway migrations used in the application and validated by Hibernate (`validate`).
 
@@ -577,6 +621,8 @@ Tests need a local PostgreSQL instance and the `DB_USERNAME`, `DB_PASSWORD`, and
 - [x] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
 - [x] Separate `local`, `prod`, and `test` profiles
 - [x] Pagination and filtering on list endpoints
+- [x] Password change with JWT invalidation
+- [x] User deactivation and reactivation
 - [ ] Docker Compose for the application and database
 - [ ] CI/CD pipeline with GitHub Actions
 - [ ] Refresh tokens

@@ -5,6 +5,7 @@ import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.service.user.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,9 @@ class PasswordChangeIntegrationTests {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserService userService;
 
     @Autowired
     private TransactionRepository transactionRepository;
@@ -225,6 +229,42 @@ class PasswordChangeIntegrationTests {
 
         changePassword(token, CURRENT_PASSWORD, NEW_PASSWORD)
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName(
+            "Deve manter tokens antigos inválidos após desativar e reativar o usuário"
+    )
+    void shouldKeepOldTokenRevokedAfterReactivation() throws Exception {
+        String oldToken = loginAndGetToken(CURRENT_PASSWORD);
+
+        User user = userRepository
+                .findByUsernameIgnoreCase(USERNAME)
+                .orElseThrow();
+
+        userService.deactivate(user.getId());
+        userService.reactivate(user.getId());
+
+        User reactivatedUser = userRepository
+                .findByUsernameIgnoreCase(USERNAME)
+                .orElseThrow();
+
+        assertTrue(reactivatedUser.isActive());
+
+        assertEquals(
+                1,
+                reactivatedUser.getTokenVersion(),
+                "A desativação deve incrementar a versão de segurança uma vez."
+        );
+
+        // O token emitido antes da desativação continua inválido.
+        changePassword(oldToken, CURRENT_PASSWORD, NEW_PASSWORD)
+                .andExpect(status().isUnauthorized());
+
+        // Um novo login deve emitir um token válido.
+        login(CURRENT_PASSWORD)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty());
     }
 
     @Test

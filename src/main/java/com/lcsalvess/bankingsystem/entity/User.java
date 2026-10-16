@@ -38,8 +38,9 @@ public class User implements UserDetails {
     private boolean active = true;
 
     /**
-     * Versão das credenciais do usuário. Todo JWT carrega a versão vigente na
-     * emissão; ao trocar a senha a versão sobe e os tokens anteriores deixam de valer.
+     * Versão de segurança incluída nos JWTs.
+     * É incrementada quando a senha muda ou a conta é desativada,
+     * invalidando os tokens emitidos com a versão anterior.
      */
     @Column(name = "token_version", nullable = false)
     private int tokenVersion;
@@ -77,7 +78,12 @@ public class User implements UserDetails {
     }
 
     public void deactivate() {
+        if (!this.active) {
+            return;
+        }
+
         this.active = false;
+        this.tokenVersion++;
     }
 
     public void changePassword(String encodedPassword) {

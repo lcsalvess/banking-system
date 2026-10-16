@@ -164,6 +164,7 @@ class UserServiceTests {
 
             assertEquals(employee.getUsername(), response.username());
             assertEquals(employee.getEmail(), response.email());
+            assertEquals(1, employee.getTokenVersion());
             assertEquals(Role.EMPLOYEE, response.role());
             assertTrue(response.active());
             assertTrue(employee.isActive());
@@ -263,6 +264,7 @@ class UserServiceTests {
 
             assertEquals(admin.getUsername(), response.username());
             assertEquals(admin.getEmail(), response.email());
+            assertEquals(1, admin.getTokenVersion());
             assertEquals(Role.ADMIN, response.role());
             assertFalse(response.active());
             assertFalse(admin.isActive());
@@ -317,6 +319,7 @@ class UserServiceTests {
 
             assertEquals(user.getUsername(), response.username());
             assertEquals(user.getEmail(), response.email());
+            assertEquals(1, user.getTokenVersion());
             assertEquals(Role.EMPLOYEE, response.role());
             assertFalse(response.active());
             assertFalse(user.isActive());
@@ -350,6 +353,7 @@ class UserServiceTests {
             );
 
             assertTrue(admin.isActive());
+            assertEquals(0, admin.getTokenVersion());
 
             verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
             verify(userRepository).findActiveUsersByRoleForUpdate(Role.ADMIN);
@@ -372,6 +376,7 @@ class UserServiceTests {
 
             assertEquals(employee.getUsername(), response.username());
             assertEquals(employee.getEmail(), response.email());
+            assertEquals(1, employee.getTokenVersion());
             assertEquals(Role.EMPLOYEE, response.role());
             assertFalse(response.active());
             assertFalse(employee.isActive());

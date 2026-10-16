@@ -3,6 +3,8 @@ package com.lcsalvess.bankingsystem.dto.response;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.time.LocalDateTime;
+
 public record UserResponseDTO(
         @Schema(
                 description = "Username assigned to the user.",
@@ -26,6 +28,18 @@ public record UserResponseDTO(
                 description = "Indicates whether the user account is active.",
                 example = "true"
         )
-        boolean active
+        boolean active,
+
+        @Schema(
+                description = "Date and time when the user was created.",
+                example = "2026-10-16T14:30:00"
+        )
+        LocalDateTime createdAt,
+
+        @Schema(
+                description = "Date and time when the user was last updated.",
+                example = "2026-10-16T15:45:00"
+        )
+        LocalDateTime updatedAt
 ) {
 }

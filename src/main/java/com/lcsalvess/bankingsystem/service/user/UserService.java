@@ -95,7 +95,9 @@ public class UserService {
     public UserResponseDTO reactivate(Long userId) {
         User user = findUserForUpdateOrThrow(userId);
 
-        if (SYSTEM_MIGRATION_USERNAME.equals(user.getUsername())) {
+        if (SYSTEM_MIGRATION_USERNAME.equals(
+                UsernameNormalizer.normalize(user.getUsername())
+        )) {
             throw new SystemUserCannotBeReactivatedException(
                     ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
             );
@@ -106,6 +108,8 @@ public class UserService {
         }
 
         user.reactivate();
+
+        userRepository.flush();
 
         eventPublisher.publishEvent(
                 new UserOperationEvent(
@@ -134,6 +138,8 @@ public class UserService {
         validateNotLastActiveAdmin(user, activeAdmins);
 
         user.deactivate();
+
+        userRepository.flush();
 
         eventPublisher.publishEvent(
                 new UserOperationEvent(
@@ -207,7 +213,9 @@ public class UserService {
                 user.getUsername(),
                 user.getEmail(),
                 user.getRole(),
-                user.isActive()
+                user.isActive(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
         );
     }
 }

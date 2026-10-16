@@ -51,6 +51,7 @@ public class DailyYieldScheduler {
         int applied = 0;
         int skipped = 0;
         int failed = 0;
+        boolean aborted = false;
 
         log.info(
                 "Starting daily yield processing for {}",
@@ -121,6 +122,8 @@ public class DailyYieldScheduler {
             }
 
         } catch (RuntimeException ex) {
+            aborted = true;
+
             log.error(
                     "Daily yield processing stopped while retrieving accounts after ID {}",
                     lastId,
@@ -128,9 +131,12 @@ public class DailyYieldScheduler {
             );
 
         } finally {
+            String status = aborted ? "aborted" : "completed";
+
             log.info(
-                    "Daily yield processing completed for {}: "
+                    "Daily yield processing {} for {}: "
                             + "processed={}, applied={}, skipped={}, failed={}",
+                    status,
                     referenceDate,
                     processed,
                     applied,

@@ -1,9 +1,9 @@
 
 package com.lcsalvess.bankingsystem.util;
 
-public final class ComplementNormalizer {
+public final class OptionalTextNormalizer {
 
-    private ComplementNormalizer() {
+    private OptionalTextNormalizer() {
     }
 
     public static String normalize(String complement) {

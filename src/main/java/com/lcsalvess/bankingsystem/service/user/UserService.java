@@ -15,6 +15,7 @@ import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.UserSpecifications;
 import com.lcsalvess.bankingsystem.util.EmailNormalizer;
+import com.lcsalvess.bankingsystem.util.OptionalTextNormalizer;
 import com.lcsalvess.bankingsystem.util.PageableTieBreaker;
 import com.lcsalvess.bankingsystem.util.UsernameNormalizer;
 import org.springframework.context.ApplicationEventPublisher;
@@ -50,7 +51,7 @@ public class UserService {
             Boolean active,
             Pageable pageable
     ) {
-        String normalizedSearch = normalizeSearch(search);
+        String normalizedSearch = OptionalTextNormalizer.normalize(search);
 
         return userRepository.findAll(
                         UserSpecifications.byFilters(
@@ -116,14 +117,6 @@ public class UserService {
         );
 
         return toResponse(user);
-    }
-
-    private String normalizeSearch(String search) {
-        if (search == null || search.isBlank()) {
-            return null;
-        }
-
-        return search.trim();
     }
 
     private void validateUsernameAvailability(String username) {

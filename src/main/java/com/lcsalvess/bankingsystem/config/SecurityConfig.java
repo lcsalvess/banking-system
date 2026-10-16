@@ -52,6 +52,12 @@ public class SecurityConfig {
                                 "/api/v1/auth/login"
                         ).permitAll()
 
+                        // Password change: any authenticated user.
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/v1/auth/password"
+                        ).authenticated()
+
                         // OpenAPI documentation.
                         .requestMatchers(
                                 "/swagger-ui/**",

@@ -10,6 +10,12 @@ public final class ValidationMessages {
     public static final String REQUIRED_PASSWORD =
             "A senha é obrigatória.";
 
+    public static final String REQUIRED_CURRENT_PASSWORD =
+            "A senha atual é obrigatória.";
+
+    public static final String REQUIRED_NEW_PASSWORD =
+            "A nova senha é obrigatória.";
+
     public static final String PASSWORD_TOO_SHORT_OR_LONG =
             "A senha deve ter entre 8 e 64 caracteres.";
 

@@ -18,6 +18,12 @@ public final class ApiErrorMessages {
     public static final String LAST_ADMIN_CANNOT_BE_DEACTIVATED =
             "Não é possível desativar o último administrador ativo.";
 
+    public static final String INVALID_CURRENT_PASSWORD =
+            "A senha atual está incorreta.";
+
+    public static final String PASSWORD_UNCHANGED =
+            "A nova senha deve ser diferente da senha atual.";
+
     // Authentication and authorization
     public static final String INVALID_CREDENTIALS =
             "Usuário ou senha inválidos.";

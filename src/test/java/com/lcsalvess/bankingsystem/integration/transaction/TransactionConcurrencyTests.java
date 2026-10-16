@@ -38,8 +38,7 @@ import java.util.concurrent.*;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @ActiveProfiles("test")
@@ -278,7 +277,7 @@ class TransactionConcurrencyTests {
     class ConcurrentYields {
 
         @Test
-        @DisplayName("Should apply yield only once when requests are concurrent")
+        @DisplayName("Should apply daily yield only once when requests are concurrent")
         void shouldApplyYieldOnlyOnceWhenRequestsAreConcurrent() throws Exception {
             SavingsAccount account = createSavingsAccount("1000.00");
 
@@ -289,12 +288,37 @@ class TransactionConcurrencyTests {
 
             assertEquals(1, countSucceeded(results));
 
-            assertBalance("1005.00", account);
+            // A taxa diária equivalente a 0,5% ao mês rende R$ 0,17
+            // sobre o saldo de R$ 1.000,00.
+            assertBalance("1000.17", account);
 
             assertEquals(
                     1,
                     countTransactions(account, TransactionType.YIELD)
             );
+
+            SavingsAccount persisted = (SavingsAccount) accountRepository
+                    .findById(account.getId())
+                    .orElseThrow();
+
+            assertEquals(LocalDate.now(clock), persisted.getLastYieldDate());
+
+            List<Transaction> yieldTransactions = transactionRepository.findAll(
+                    TransactionSpecifications.byAccountAndFilters(
+                            account.getId(),
+                            TransactionType.YIELD,
+                            null,
+                            null
+                    )
+            );
+
+            assertEquals(1, yieldTransactions.size());
+
+            Transaction yieldTransaction = yieldTransactions.getFirst();
+
+            assertEquals(LocalDate.now(clock), yieldTransaction.getYieldDate());
+            assertNull(yieldTransaction.getPerformedBy());
+            assertTrue(yieldTransaction.isPerformedBySystem());
         }
     }
 
@@ -500,7 +524,7 @@ class TransactionConcurrencyTests {
 
         jdbcTemplate.update(
                 "UPDATE savings_accounts SET last_yield_date = ? WHERE id = ?",
-                LocalDate.now(clock).minusMonths(1),
+                LocalDate.now(clock).minusDays(1),
                 saved.getId()
         );
 

@@ -55,9 +55,11 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class TransactionServiceTests {
 
-    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.service.transaction.TransactionServiceTests#";
+    private static final String PROVIDER =
+            "com.lcsalvess.bankingsystem.unit.service.transaction.TransactionServiceTests#";
 
     private static final String USERNAME = "test-user";
+
     private static final User TEST_USER = new User(
             USERNAME,
             "test-user@test.com",
@@ -68,21 +70,28 @@ public class TransactionServiceTests {
     private static final String ACCOUNT_NUMBER = "00001";
     private static final String ACCOUNT_DIGIT = "9";
     private static final Long ACCOUNT_ID = 1L;
+
     private static final String DESTINATION_NUMBER = "00003";
     private static final String DESTINATION_DIGIT = "5";
     private static final Long DESTINATION_ID = 3L;
+
     private static final String SAVINGS_NUMBER = "00002";
     private static final String SAVINGS_DIGIT = "7";
     private static final Long SAVINGS_ID = 2L;
 
     private static final BigDecimal OPERATION_AMOUNT = new BigDecimal("10.00");
+
     private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
 
-    // 23:30 em São Paulo já é o dia seguinte em UTC (02:30Z do dia 16): qualquer uso
-    // da zona errada muda a data e faz os testes falharem.
-    private static final LocalDateTime NOW = LocalDateTime.of(2026, 1, 15, 23, 30);
+    // 23:30 em São Paulo já é o dia seguinte em UTC.
+    // Isso ajuda a detectar problemas de fuso horário.
+    private static final LocalDateTime NOW =
+            LocalDateTime.of(2026, 1, 15, 23, 30);
+
     private static final LocalDate TODAY = NOW.toLocalDate();
-    private static final Clock CLOCK = Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE);
+
+    private static final Clock CLOCK =
+            Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE);
 
     private static final LocalDateTime CREATED_AT =
             LocalDateTime.of(2026, 1, 15, 10, 30, 45);
@@ -119,34 +128,81 @@ public class TransactionServiceTests {
         private static final Pageable PAGEABLE = PageRequest.of(
                 0,
                 10,
-                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))
+                Sort.by(Sort.Direction.DESC, "createdAt")
+                        .and(Sort.by(Sort.Direction.DESC, "id"))
         );
 
         @Test
         @DisplayName("Should return the page of account transactions")
         void shouldReturnThePageOfAccountTransactions() {
             CheckingAccount account = account();
-            Transaction deposit = new Transaction(TransactionType.DEPOSIT, new BigDecimal("10.00"), CREATED_AT, account, TEST_USER);
-            Transaction withdrawal = new Transaction(TransactionType.WITHDRAWAL, new BigDecimal("5.00"), CREATED_AT, account, TEST_USER);
+
+            Transaction deposit = new Transaction(
+                    TransactionType.DEPOSIT,
+                    new BigDecimal("10.00"),
+                    CREATED_AT,
+                    account,
+                    TEST_USER
+            );
+
+            Transaction withdrawal = new Transaction(
+                    TransactionType.WITHDRAWAL,
+                    new BigDecimal("5.00"),
+                    CREATED_AT,
+                    account,
+                    TEST_USER
+            );
+
             Specification<Transaction> specification = specification();
-            Page<Transaction> page = new PageImpl<>(List.of(deposit, withdrawal), PAGEABLE, 2);
+
+            Page<Transaction> page = new PageImpl<>(
+                    List.of(deposit, withdrawal),
+                    PAGEABLE,
+                    2
+            );
 
             stubAccountLookup(account);
-            when(transactionRepository.findAll(specification, PAGEABLE)).thenReturn(page);
 
-            try (MockedStatic<TransactionSpecifications> specifications = mockStatic(TransactionSpecifications.class)) {
-                specifications.when(() -> TransactionSpecifications.byAccountAndFilters(ACCOUNT_ID, null, null, null))
+            when(transactionRepository.findAll(specification, PAGEABLE))
+                    .thenReturn(page);
+
+            try (MockedStatic<TransactionSpecifications> specifications =
+                         mockStatic(TransactionSpecifications.class)) {
+
+                specifications.when(() ->
+                                TransactionSpecifications.byAccountAndFilters(
+                                        ACCOUNT_ID,
+                                        null,
+                                        null,
+                                        null
+                                ))
                         .thenReturn(specification);
 
-                Page<TransactionResponseDTO> result = transactionService.findByAccountNumber(
-                        ACCOUNT_NUMBER, ACCOUNT_DIGIT, null, null, null, PAGEABLE
+                Page<TransactionResponseDTO> result =
+                        transactionService.findByAccountNumber(
+                                ACCOUNT_NUMBER,
+                                ACCOUNT_DIGIT,
+                                null,
+                                null,
+                                null,
+                                PAGEABLE
+                        );
+
+                assertEquals(
+                        List.of(response(deposit), response(withdrawal)),
+                        result.getContent()
                 );
 
-                assertEquals(List.of(response(deposit), response(withdrawal)), result.getContent());
                 assertEquals(2, result.getTotalElements());
                 assertEquals(PAGEABLE, result.getPageable());
 
-                specifications.verify(() -> TransactionSpecifications.byAccountAndFilters(ACCOUNT_ID, null, null, null));
+                specifications.verify(() ->
+                        TransactionSpecifications.byAccountAndFilters(
+                                ACCOUNT_ID,
+                                null,
+                                null,
+                                null
+                        ));
             }
 
             verifyAccountLookup(account);
@@ -158,6 +214,7 @@ public class TransactionServiceTests {
         @DisplayName("Should apply type and date filters, using the whole start and end days")
         void shouldApplyTypeAndDateFilters() {
             CheckingAccount account = account();
+
             Transaction deposit = new Transaction(
                     TransactionType.DEPOSIT,
                     OPERATION_AMOUNT,
@@ -166,13 +223,18 @@ public class TransactionServiceTests {
                     TEST_USER
             );
 
-            Page<Transaction> page = new PageImpl<>(List.of(deposit), PAGEABLE, 1);
+            Page<Transaction> page = new PageImpl<>(
+                    List.of(deposit),
+                    PAGEABLE,
+                    1
+            );
 
             LocalDate startDate = LocalDate.of(2026, 1, 1);
             LocalDate endDate = LocalDate.of(2026, 1, 15);
 
             LocalDateTime expectedStart = startDate.atStartOfDay();
-            LocalDateTime expectedEndExclusive = endDate.plusDays(1).atStartOfDay();
+            LocalDateTime expectedEndExclusive =
+                    endDate.plusDays(1).atStartOfDay();
 
             stubAccountLookup(account);
 
@@ -181,27 +243,37 @@ public class TransactionServiceTests {
 
                 Specification<Transaction> specification = specification();
 
-                specifications.when(() -> TransactionSpecifications.byAccountAndFilters(
-                        ACCOUNT_ID, TransactionType.DEPOSIT, expectedStart, expectedEndExclusive
-                )).thenReturn(specification);
+                specifications.when(() ->
+                                TransactionSpecifications.byAccountAndFilters(
+                                        ACCOUNT_ID,
+                                        TransactionType.DEPOSIT,
+                                        expectedStart,
+                                        expectedEndExclusive
+                                ))
+                        .thenReturn(specification);
 
                 when(transactionRepository.findAll(specification, PAGEABLE))
                         .thenReturn(page);
 
-                Page<TransactionResponseDTO> result = transactionService.findByAccountNumber(
-                        ACCOUNT_NUMBER,
-                        ACCOUNT_DIGIT,
-                        TransactionType.DEPOSIT,
-                        startDate,
-                        endDate,
-                        PAGEABLE
-                );
+                Page<TransactionResponseDTO> result =
+                        transactionService.findByAccountNumber(
+                                ACCOUNT_NUMBER,
+                                ACCOUNT_DIGIT,
+                                TransactionType.DEPOSIT,
+                                startDate,
+                                endDate,
+                                PAGEABLE
+                        );
 
                 assertEquals(List.of(response(deposit)), result.getContent());
 
-                specifications.verify(() -> TransactionSpecifications.byAccountAndFilters(
-                        ACCOUNT_ID, TransactionType.DEPOSIT, expectedStart, expectedEndExclusive
-                ));
+                specifications.verify(() ->
+                        TransactionSpecifications.byAccountAndFilters(
+                                ACCOUNT_ID,
+                                TransactionType.DEPOSIT,
+                                expectedStart,
+                                expectedEndExclusive
+                        ));
 
                 verify(transactionRepository).findAll(specification, PAGEABLE);
             }
@@ -214,19 +286,35 @@ public class TransactionServiceTests {
         @DisplayName("Should return empty page when the account has no transactions")
         void shouldReturnEmptyPageWhenAccountHasNoTransactions() {
             CheckingAccount account = account();
+
             Specification<Transaction> specification = specification();
 
             stubAccountLookup(account);
+
             when(transactionRepository.findAll(specification, PAGEABLE))
                     .thenReturn(new PageImpl<>(List.of(), PAGEABLE, 0));
 
-            try (MockedStatic<TransactionSpecifications> specifications = mockStatic(TransactionSpecifications.class)) {
-                specifications.when(() -> TransactionSpecifications.byAccountAndFilters(ACCOUNT_ID, null, null, null))
+            try (MockedStatic<TransactionSpecifications> specifications =
+                         mockStatic(TransactionSpecifications.class)) {
+
+                specifications.when(() ->
+                                TransactionSpecifications.byAccountAndFilters(
+                                        ACCOUNT_ID,
+                                        null,
+                                        null,
+                                        null
+                                ))
                         .thenReturn(specification);
 
-                Page<TransactionResponseDTO> result = transactionService.findByAccountNumber(
-                        ACCOUNT_NUMBER, ACCOUNT_DIGIT, null, null, null, PAGEABLE
-                );
+                Page<TransactionResponseDTO> result =
+                        transactionService.findByAccountNumber(
+                                ACCOUNT_NUMBER,
+                                ACCOUNT_DIGIT,
+                                null,
+                                null,
+                                null,
+                                PAGEABLE
+                        );
 
                 assertTrue(result.isEmpty());
                 assertEquals(0, result.getTotalElements());
@@ -240,18 +328,31 @@ public class TransactionServiceTests {
         @Test
         @DisplayName("Should throw when account does not exist")
         void shouldThrowWhenAccountDoesNotExist() {
-            when(accountService.findEntityByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT))
-                    .thenThrow(new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
+            when(accountService.findEntityByAccountNumber(
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT
+            )).thenThrow(
+                    new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
+            );
 
             assertThrowsWithMessage(
                     AccountNotFoundException.class,
                     ApiErrorMessages.ACCOUNT_NOT_FOUND,
                     () -> transactionService.findByAccountNumber(
-                            ACCOUNT_NUMBER, ACCOUNT_DIGIT, null, null, null, PAGEABLE
+                            ACCOUNT_NUMBER,
+                            ACCOUNT_DIGIT,
+                            null,
+                            null,
+                            null,
+                            PAGEABLE
                     )
             );
 
-            verify(accountService).findEntityByAccountNumber(ACCOUNT_NUMBER, ACCOUNT_DIGIT);
+            verify(accountService).findEntityByAccountNumber(
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT
+            );
+
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -259,30 +360,63 @@ public class TransactionServiceTests {
         @DisplayName("Should append the id tie-breaker when the sort has no id")
         void shouldAppendIdTieBreakerWhenSortHasNoId() {
             CheckingAccount account = account();
+
             Specification<Transaction> specification = specification();
-            Pageable requested = PageRequest.of(0, 10, Sort.by("amount").descending());
+
+            Pageable requested = PageRequest.of(
+                    0,
+                    10,
+                    Sort.by("amount").descending()
+            );
 
             stubAccountLookup(account);
-            when(transactionRepository.findAll(eq(specification), any(Pageable.class)))
-                    .thenReturn(new PageImpl<>(List.of(), requested, 0));
 
-            try (MockedStatic<TransactionSpecifications> specifications = mockStatic(TransactionSpecifications.class)) {
-                specifications.when(() -> TransactionSpecifications.byAccountAndFilters(ACCOUNT_ID, null, null, null))
+            when(transactionRepository.findAll(
+                    eq(specification),
+                    any(Pageable.class)
+            )).thenReturn(
+                    new PageImpl<>(List.of(), requested, 0)
+            );
+
+            try (MockedStatic<TransactionSpecifications> specifications =
+                         mockStatic(TransactionSpecifications.class)) {
+
+                specifications.when(() ->
+                                TransactionSpecifications.byAccountAndFilters(
+                                        ACCOUNT_ID,
+                                        null,
+                                        null,
+                                        null
+                                ))
                         .thenReturn(specification);
 
                 transactionService.findByAccountNumber(
-                        ACCOUNT_NUMBER, ACCOUNT_DIGIT, null, null, null, requested
+                        ACCOUNT_NUMBER,
+                        ACCOUNT_DIGIT,
+                        null,
+                        null,
+                        null,
+                        requested
                 );
             }
 
-            ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+            ArgumentCaptor<Pageable> captor =
+                    ArgumentCaptor.forClass(Pageable.class);
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findAll(eq(specification), captor.capture());
+
+            verify(transactionRepository).findAll(
+                    eq(specification),
+                    captor.capture()
+            );
+
             verifyNoMoreInteractionsOnMocks();
 
             assertEquals(
-                    Sort.by(Sort.Order.desc("amount"), Sort.Order.asc("id")),
+                    Sort.by(
+                            Sort.Order.desc("amount"),
+                            Sort.Order.asc("id")
+                    ),
                     captor.getValue().getSort()
             );
         }
@@ -299,16 +433,29 @@ public class TransactionServiceTests {
         @Test
         @DisplayName("Should return the transaction when code exists")
         void shouldReturnTheTransactionWhenCodeExists() {
-            Transaction transaction = new Transaction(TransactionType.DEPOSIT, OPERATION_AMOUNT, CREATED_AT, account(), TEST_USER);
+            Transaction transaction = new Transaction(
+                    TransactionType.DEPOSIT,
+                    OPERATION_AMOUNT,
+                    CREATED_AT,
+                    account(),
+                    TEST_USER
+            );
 
-            when(transactionRepository.findByTransactionCode(transaction.getTransactionCode()))
-                    .thenReturn(Optional.of(transaction));
+            when(transactionRepository.findByTransactionCode(
+                    transaction.getTransactionCode()
+            )).thenReturn(Optional.of(transaction));
 
-            TransactionResponseDTO result = transactionService.findByTransactionCode(transaction.getTransactionCode());
+            TransactionResponseDTO result =
+                    transactionService.findByTransactionCode(
+                            transaction.getTransactionCode()
+                    );
 
             assertEquals(response(transaction), result);
 
-            verify(transactionRepository).findByTransactionCode(transaction.getTransactionCode());
+            verify(transactionRepository).findByTransactionCode(
+                    transaction.getTransactionCode()
+            );
+
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -317,7 +464,8 @@ public class TransactionServiceTests {
         void shouldThrowWhenTransactionDoesNotExist() {
             UUID transactionCode = UUID.randomUUID();
 
-            when(transactionRepository.findByTransactionCode(transactionCode)).thenReturn(Optional.empty());
+            when(transactionRepository.findByTransactionCode(transactionCode))
+                    .thenReturn(Optional.empty());
 
             assertThrowsWithMessage(
                     TransactionNotFoundException.class,
@@ -338,6 +486,7 @@ public class TransactionServiceTests {
         @DisplayName("Should deposit successfully")
         void shouldDepositSuccessfully() {
             CheckingAccount account = account();
+
             AccountOperationRequestDTO request = operationRequest(OPERATION_AMOUNT);
 
             stubAccountOperationLookup(account);
@@ -348,24 +497,41 @@ public class TransactionServiceTests {
 
             assertBalance("110.00", account);
 
-            ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
+            ArgumentCaptor<Transaction> transactionCaptor =
+                    ArgumentCaptor.forClass(Transaction.class);
 
             verifyAccountOperationLookup(account);
             verify(currentUserService).getCurrentUser();
             verify(transactionRepository).save(transactionCaptor.capture());
+
             verify(eventPublisher).publishEvent(
-                    new TransactionOperationEvent(TransactionType.DEPOSIT, ACCOUNT_NUMBER, OPERATION_AMOUNT, USERNAME)
+                    new TransactionOperationEvent(
+                            TransactionType.DEPOSIT,
+                            ACCOUNT_NUMBER,
+                            OPERATION_AMOUNT,
+                            USERNAME
+                    )
             );
+
             verifyNoMoreInteractionsOnMocks();
 
-            assertTransaction(transactionCaptor.getValue(), TransactionType.DEPOSIT, OPERATION_AMOUNT, account);
+            assertTransaction(
+                    transactionCaptor.getValue(),
+                    TransactionType.DEPOSIT,
+                    OPERATION_AMOUNT,
+                    account
+            );
+
             assertEquals(response(transactionCaptor.getValue()), result);
         }
 
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "invalidAmounts")
         @DisplayName("Should throw when amount is invalid")
-        void shouldThrowWhenAmountIsInvalid(String scenario, BigDecimal amount) {
+        void shouldThrowWhenAmountIsInvalid(
+                String scenario,
+                BigDecimal amount
+        ) {
             assertThrowsWithMessage(
                     InvalidAmountException.class,
                     ApiErrorMessages.INVALID_AMOUNT,
@@ -399,7 +565,10 @@ public class TransactionServiceTests {
         @DisplayName("Should throw when the deposit would exceed the maximum balance")
         void shouldThrowWhenDepositExceedsMaximumBalance() {
             CheckingAccount account = account();
-            BigDecimal amount = Account.MAX_BALANCE.subtract(new BigDecimal("100.00")).add(new BigDecimal("0.01"));
+
+            BigDecimal amount = Account.MAX_BALANCE
+                    .subtract(new BigDecimal("100.00"))
+                    .add(new BigDecimal("0.01"));
 
             stubAccountOperationLookup(account);
 
@@ -419,7 +588,9 @@ public class TransactionServiceTests {
         @DisplayName("Should accept a deposit that brings the balance exactly to the maximum")
         void shouldAcceptDepositThatReachesMaximumBalanceExactly() {
             CheckingAccount account = account();
-            BigDecimal amount = Account.MAX_BALANCE.subtract(new BigDecimal("100.00"));
+
+            BigDecimal amount = Account.MAX_BALANCE
+                    .subtract(new BigDecimal("100.00"));
 
             stubAccountOperationLookup(account);
             when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
@@ -438,36 +609,57 @@ public class TransactionServiceTests {
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "withdrawals")
         @DisplayName("Should withdraw successfully")
-        void shouldWithdrawSuccessfully(String scenario, BigDecimal amount, String expectedBalance) {
+        void shouldWithdrawSuccessfully(
+                String scenario,
+                BigDecimal amount,
+                String expectedBalance
+        ) {
             CheckingAccount account = account();
 
             stubAccountOperationLookup(account);
             when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
-            TransactionResponseDTO result = transactionService.withdraw(operationRequest(amount));
+            TransactionResponseDTO result =
+                    transactionService.withdraw(operationRequest(amount));
 
             assertBalance(expectedBalance, account);
 
-            ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
+            ArgumentCaptor<Transaction> transactionCaptor =
+                    ArgumentCaptor.forClass(Transaction.class);
 
             verifyAccountOperationLookup(account);
             verify(currentUserService).getCurrentUser();
             verify(transactionRepository).save(transactionCaptor.capture());
+
             verify(eventPublisher).publishEvent(
-                    new TransactionOperationEvent(TransactionType.WITHDRAWAL, ACCOUNT_NUMBER, amount, USERNAME)
+                    new TransactionOperationEvent(
+                            TransactionType.WITHDRAWAL,
+                            ACCOUNT_NUMBER,
+                            amount,
+                            USERNAME
+                    )
             );
+
             verifyNoMoreInteractionsOnMocks();
 
-            assertTransaction(transactionCaptor.getValue(), TransactionType.WITHDRAWAL, amount, account);
+            assertTransaction(
+                    transactionCaptor.getValue(),
+                    TransactionType.WITHDRAWAL,
+                    amount,
+                    account
+            );
+
             assertEquals(response(transactionCaptor.getValue()), result);
         }
 
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "invalidAmounts")
         @DisplayName("Should throw when amount is invalid")
-        void shouldThrowWhenAmountIsInvalid(String scenario, BigDecimal amount) {
-
+        void shouldThrowWhenAmountIsInvalid(
+                String scenario,
+                BigDecimal amount
+        ) {
             assertThrowsWithMessage(
                     InvalidAmountException.class,
                     ApiErrorMessages.INVALID_AMOUNT,
@@ -480,7 +672,10 @@ public class TransactionServiceTests {
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "amountsAboveBalance")
         @DisplayName("Should throw when amount exceeds balance")
-        void shouldThrowWhenAmountExceedsBalance(String scenario, BigDecimal amount) {
+        void shouldThrowWhenAmountExceedsBalance(
+                String scenario,
+                BigDecimal amount
+        ) {
             CheckingAccount account = account();
 
             stubAccountOperationLookup(account);
@@ -538,19 +733,30 @@ public class TransactionServiceTests {
             when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
-            TransactionResponseDTO result = transactionService.transfer(transferRequest(amount));
+            TransactionResponseDTO result =
+                    transactionService.transfer(transferRequest(amount));
 
             assertBalance(expectedSourceBalance, source);
             assertBalance(expectedDestinationBalance, destination);
 
-            ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
+            ArgumentCaptor<Transaction> transactionCaptor =
+                    ArgumentCaptor.forClass(Transaction.class);
 
             verifyTransferAccountLookup(source, destination);
             verify(currentUserService).getCurrentUser();
-            verify(transactionRepository, times(2)).save(transactionCaptor.capture());
-            verify(eventPublisher).publishEvent(new TransactionTransferEvent(
-                    TransactionType.TRANSFER_SENT, ACCOUNT_NUMBER, DESTINATION_NUMBER, amount, USERNAME
-            ));
+            verify(transactionRepository, times(2))
+                    .save(transactionCaptor.capture());
+
+            verify(eventPublisher).publishEvent(
+                    new TransactionTransferEvent(
+                            TransactionType.TRANSFER_SENT,
+                            ACCOUNT_NUMBER,
+                            DESTINATION_NUMBER,
+                            amount,
+                            USERNAME
+                    )
+            );
+
             verifyNoMoreInteractionsOnMocks();
 
             List<Transaction> saved = transactionCaptor.getAllValues();
@@ -558,12 +764,22 @@ public class TransactionServiceTests {
             Transaction sent = saved.get(0);
             Transaction received = saved.get(1);
 
-            assertTransaction(sent, TransactionType.TRANSFER_SENT, amount, source);
-            assertTransaction(received, TransactionType.TRANSFER_RECEIVED, amount, destination);
+            assertTransaction(
+                    sent,
+                    TransactionType.TRANSFER_SENT,
+                    amount,
+                    source
+            );
+
+            assertTransaction(
+                    received,
+                    TransactionType.TRANSFER_RECEIVED,
+                    amount,
+                    destination
+            );
 
             assertNotNull(sent.getTransferCode());
             assertEquals(sent.getTransferCode(), received.getTransferCode());
-
             assertNotEquals(sent.getTransactionCode(), received.getTransactionCode());
 
             assertEquals(response(sent), result);
@@ -573,11 +789,14 @@ public class TransactionServiceTests {
         @DisplayName("Should throw when the transfer would exceed the destination maximum balance")
         void shouldThrowWhenTransferExceedsDestinationMaximumBalance() {
             CheckingAccount source = account();
+
             CheckingAccount destination = checkingAccount(
                     DESTINATION_NUMBER,
                     DESTINATION_DIGIT,
                     DESTINATION_ID,
-                    Account.MAX_BALANCE.subtract(new BigDecimal("10.00")).toPlainString()
+                    Account.MAX_BALANCE
+                            .subtract(new BigDecimal("10.00"))
+                            .toPlainString()
             );
 
             stubTransferAccountLookup(source, destination);
@@ -585,10 +804,13 @@ public class TransactionServiceTests {
             assertThrowsWithMessage(
                     BalanceLimitExceededException.class,
                     ApiErrorMessages.BALANCE_LIMIT_EXCEEDED,
-                    () -> transactionService.transfer(transferRequest(new BigDecimal("10.01")))
+                    () -> transactionService.transfer(
+                            transferRequest(new BigDecimal("10.01"))
+                    )
             );
 
             assertBalance("100.00", source);
+
             assertEquals(
                     Account.MAX_BALANCE.subtract(new BigDecimal("10.00")),
                     destination.getBalance()
@@ -602,7 +824,11 @@ public class TransactionServiceTests {
         @DisplayName("Should throw when accounts are the same")
         void shouldThrowWhenAccountsAreTheSame() {
             TransferRequestDTO request = new TransferRequestDTO(
-                    ACCOUNT_NUMBER, ACCOUNT_DIGIT, ACCOUNT_NUMBER, ACCOUNT_DIGIT, OPERATION_AMOUNT
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT,
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT,
+                    OPERATION_AMOUNT
             );
 
             assertThrowsWithMessage(
@@ -619,6 +845,7 @@ public class TransactionServiceTests {
         void shouldThrowWhenSourceAccountIsNotActive() {
             CheckingAccount source = account();
             CheckingAccount destination = destinationAccount();
+
             source.cancel();
 
             stubTransferAccountLookup(source, destination);
@@ -641,6 +868,7 @@ public class TransactionServiceTests {
         void shouldThrowWhenDestinationAccountIsNotActive() {
             CheckingAccount source = account();
             CheckingAccount destination = destinationAccount();
+
             destination.cancel();
 
             stubTransferAccountLookup(source, destination);
@@ -661,8 +889,10 @@ public class TransactionServiceTests {
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "invalidAmounts")
         @DisplayName("Should throw when amount is invalid")
-        void shouldThrowWhenAmountIsInvalid(String scenario, BigDecimal amount) {
-
+        void shouldThrowWhenAmountIsInvalid(
+                String scenario,
+                BigDecimal amount
+        ) {
             assertThrowsWithMessage(
                     InvalidAmountException.class,
                     ApiErrorMessages.INVALID_AMOUNT,
@@ -675,7 +905,10 @@ public class TransactionServiceTests {
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "amountsAboveBalance")
         @DisplayName("Should throw when amount exceeds source balance")
-        void shouldThrowWhenAmountExceedsSourceBalance(String scenario, BigDecimal amount) {
+        void shouldThrowWhenAmountExceedsSourceBalance(
+                String scenario,
+                BigDecimal amount
+        ) {
             CheckingAccount source = account();
             CheckingAccount destination = destinationAccount();
 
@@ -731,10 +964,9 @@ public class TransactionServiceTests {
     @DisplayName("applyYield(String, String)")
     class ApplyYield {
 
-        // eligibleSavingsAccount usa lastYieldDate = hoje - 1 mês: exatamente a borda de elegibilidade.
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "yieldScenarios")
-        @DisplayName("Should apply yield successfully")
+        @DisplayName("Should apply daily yield successfully")
         void shouldApplyYieldSuccessfully(
                 String scenario,
                 String balance,
@@ -743,34 +975,56 @@ public class TransactionServiceTests {
         ) {
             SavingsAccount account = eligibleSavingsAccount(balance);
             LocalDate today = TODAY;
+
             stubAccountOperationLookup(account);
-            when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
-            TransactionResponseDTO result = transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT);
+            TransactionResponseDTO result =
+                    transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT);
 
             assertBalance(expectedBalance, account);
-            assertFalse(account.getLastYieldDate().isBefore(today));
+            assertEquals(today, account.getLastYieldDate());
 
-            ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-            ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-            ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
+            ArgumentCaptor<Transaction> transactionCaptor =
+                    ArgumentCaptor.forClass(Transaction.class);
 
             verifyAccountOperationLookup(account);
-            verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                    eq(SAVINGS_ID), eq(TransactionType.YIELD), startCaptor.capture(), endCaptor.capture()
+
+            verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    today
             );
-            verify(currentUserService).getCurrentUser();
+
             verify(transactionRepository).save(transactionCaptor.capture());
-            verify(eventPublisher).publishEvent(new TransactionOperationEvent(
-                    TransactionType.YIELD, SAVINGS_NUMBER, new BigDecimal(expectedYield), USERNAME
-            ));
+
+            verify(eventPublisher).publishEvent(
+                    new TransactionOperationEvent(
+                            TransactionType.YIELD,
+                            SAVINGS_NUMBER,
+                            new BigDecimal(expectedYield),
+                            "SYSTEM"
+                    )
+            );
+
             verifyNoMoreInteractionsOnMocks();
 
-            assertEquals(today.atStartOfDay(), startCaptor.getValue());
-            assertEquals(today.plusDays(1).atStartOfDay(), endCaptor.getValue());
-            assertTransaction(transactionCaptor.getValue(), TransactionType.YIELD, new BigDecimal(expectedYield), account);
-            assertEquals(response(transactionCaptor.getValue()), result);
+            Transaction transaction = transactionCaptor.getValue();
+
+            assertEquals(TransactionType.YIELD, transaction.getType());
+
+            assertEquals(
+                    0,
+                    new BigDecimal(expectedYield).compareTo(transaction.getAmount())
+            );
+
+            assertSame(account, transaction.getAccount());
+            assertNull(transaction.getPerformedBy());
+            assertTrue(transaction.isPerformedBySystem());
+            assertEquals(today, transaction.getYieldDate());
+            assertEquals(NOW, transaction.getCreatedAt());
+
+            assertEquals(response(transaction), result);
         }
 
         @Test
@@ -783,7 +1037,10 @@ public class TransactionServiceTests {
             assertThrowsWithMessage(
                     AccountIsNotSavingsException.class,
                     ApiErrorMessages.ACCOUNT_NOT_SAVINGS,
-                    () -> transactionService.applyYield(ACCOUNT_NUMBER, ACCOUNT_DIGIT)
+                    () -> transactionService.applyYield(
+                            ACCOUNT_NUMBER,
+                            ACCOUNT_DIGIT
+                    )
             );
 
             verifyAccountOperationLookup(account);
@@ -801,10 +1058,15 @@ public class TransactionServiceTests {
             assertThrowsWithMessage(
                     AccountIsNotActiveException.class,
                     ApiErrorMessages.ACCOUNT_NOT_ACTIVE,
-                    () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
+                    () -> transactionService.applyYield(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT
+                    )
             );
 
             assertBalance("1000.00", account);
+
+            assertEquals(TODAY.minusDays(1), account.getLastYieldDate());
 
             verifyAccountOperationLookup(account);
             verifyNoMoreInteractionsOnMocks();
@@ -813,7 +1075,10 @@ public class TransactionServiceTests {
         @Test
         @DisplayName("Should throw when the yield would exceed the maximum balance")
         void shouldThrowWhenYieldExceedsMaximumBalance() {
-            SavingsAccount account = eligibleSavingsAccount(Account.MAX_BALANCE.toPlainString());
+            SavingsAccount account = eligibleSavingsAccount(
+                    Account.MAX_BALANCE.toPlainString()
+            );
+
             LocalDate lastYieldDate = account.getLastYieldDate();
 
             stubAccountOperationLookup(account);
@@ -821,7 +1086,10 @@ public class TransactionServiceTests {
             assertThrowsWithMessage(
                     BalanceLimitExceededException.class,
                     ApiErrorMessages.BALANCE_LIMIT_EXCEEDED,
-                    () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
+                    () -> transactionService.applyYield(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT
+                    )
             );
 
             assertEquals(Account.MAX_BALANCE, account.getBalance());
@@ -835,18 +1103,28 @@ public class TransactionServiceTests {
         @Test
         @DisplayName("Should throw when yield was already applied today")
         void shouldThrowWhenYieldWasAlreadyAppliedToday() {
-            LocalDate lastYieldDate = TODAY.minusMonths(1);
-            SavingsAccount account = savingsAccount("1000.00", lastYieldDate);
+            LocalDate lastYieldDate = TODAY.minusDays(1);
+
+            SavingsAccount account = savingsAccount(
+                    "1000.00",
+                    lastYieldDate
+            );
 
             stubAccountOperationLookup(account);
-            when(transactionRepository.existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                    eq(SAVINGS_ID), eq(TransactionType.YIELD), any(), any()
+
+            when(transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
             )).thenReturn(true);
 
             assertThrowsWithMessage(
                     YieldAlreadyAppliedException.class,
                     ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED,
-                    () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
+                    () -> transactionService.applyYield(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT
+                    )
             );
 
             assertBalance("1000.00", account);
@@ -860,15 +1138,24 @@ public class TransactionServiceTests {
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "ineligibleLastYieldDates")
         @DisplayName("Should throw when account is not eligible for yield")
-        void shouldThrowWhenAccountIsNotEligibleForYield(String scenario, LocalDate lastYieldDate) {
-            SavingsAccount account = savingsAccount("1000.00", lastYieldDate);
+        void shouldThrowWhenAccountIsNotEligibleForYield(
+                String scenario,
+                LocalDate lastYieldDate
+        ) {
+            SavingsAccount account = savingsAccount(
+                    "1000.00",
+                    lastYieldDate
+            );
 
             stubAccountOperationLookup(account);
 
             assertThrowsWithMessage(
                     YieldNotAvailableException.class,
                     ApiErrorMessages.YIELD_NOT_AVAILABLE,
-                    () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
+                    () -> transactionService.applyYield(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT
+                    )
             );
 
             assertBalance("1000.00", account);
@@ -882,18 +1169,29 @@ public class TransactionServiceTests {
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "balancesWithoutYield")
         @DisplayName("Should throw when there is no yield available")
-        void shouldThrowWhenThereIsNoYieldAvailable(String scenario, String balance) {
+        void shouldThrowWhenThereIsNoYieldAvailable(
+                String scenario,
+                String balance
+        ) {
             SavingsAccount account = eligibleSavingsAccount(balance);
+
+            LocalDate lastYieldDate = account.getLastYieldDate();
 
             stubAccountOperationLookup(account);
 
             assertThrowsWithMessage(
                     YieldNotAvailableException.class,
                     ApiErrorMessages.NO_YIELD_AVAILABLE,
-                    () -> transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT)
+                    () -> transactionService.applyYield(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT
+                    )
             );
 
             assertBalance(balance, account);
+
+            // Se o rendimento arredonda para zero, a data não avança.
+            assertEquals(lastYieldDate, account.getLastYieldDate());
 
             verifyAccountOperationLookup(account);
             verifyYieldChecked();
@@ -901,7 +1199,7 @@ public class TransactionServiceTests {
         }
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused")
     static Stream<Arguments> invalidAmounts() {
         return Stream.of(
                 Arguments.of("amount is null", null),
@@ -910,68 +1208,116 @@ public class TransactionServiceTests {
         );
     }
 
-    // Saldo da conta de origem nos testes: 100.00.
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    // Saldo inicial da conta de origem: 100.00.
+    @SuppressWarnings("unused")
     static Stream<Arguments> amountsAboveBalance() {
         return Stream.of(
-                Arguments.of("amount exceeds balance", new BigDecimal("200.00")),
-                Arguments.of("amount is one cent above balance", new BigDecimal("100.01"))
-        );
-    }
-
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
-    static Stream<Arguments> withdrawals() {
-        return Stream.of(
-                Arguments.of("amount is less than balance", new BigDecimal("30.00"), "70.00"),
-                Arguments.of("amount equals balance", new BigDecimal("100.00"), "0.00")
-        );
-    }
-
-    // Saldos iniciais: origem 100.00, destino 50.00.
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
-    static Stream<Arguments> transfers() {
-        return Stream.of(
-                Arguments.of("amount is less than source balance", new BigDecimal("30.00"), "70.00", "80.00"),
-                Arguments.of("amount equals source balance", new BigDecimal("100.00"), "0.00", "150.00")
-        );
-    }
-
-    // Taxa de 0,5% com arredondamento HALF_UP em 2 casas.
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
-    static Stream<Arguments> yieldScenarios() {
-        return Stream.of(
-                Arguments.of("balance 1000.00 yields 5.00", "1000.00", "5.00", "1005.00"),
-                Arguments.of("balance 1.00 yields 0.01 (half up)", "1.00", "0.01", "1.01")
-        );
-    }
-
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
-    static Stream<Arguments> ineligibleLastYieldDates() {
-        return Stream.of(
-                Arguments.of("last yield was today", TODAY),
                 Arguments.of(
-                        "last yield was one day short of a month",
-                        TODAY.minusMonths(1).plusDays(1)
+                        "amount exceeds balance",
+                        new BigDecimal("200.00")
+                ),
+                Arguments.of(
+                        "amount is one cent above balance",
+                        new BigDecimal("100.01")
                 )
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused")
+    static Stream<Arguments> withdrawals() {
+        return Stream.of(
+                Arguments.of(
+                        "amount is less than balance",
+                        new BigDecimal("30.00"),
+                        "70.00"
+                ),
+                Arguments.of(
+                        "amount equals balance",
+                        new BigDecimal("100.00"),
+                        "0.00"
+                )
+        );
+    }
+
+    // Saldos iniciais: origem 100.00, destino 50.00.
+    @SuppressWarnings("unused")
+    static Stream<Arguments> transfers() {
+        return Stream.of(
+                Arguments.of(
+                        "amount is less than source balance",
+                        new BigDecimal("30.00"),
+                        "70.00",
+                        "80.00"
+                ),
+                Arguments.of(
+                        "amount equals source balance",
+                        new BigDecimal("100.00"),
+                        "0.00",
+                        "150.00"
+                )
+        );
+    }
+
+    // Taxa diária equivalente à taxa mensal de 0,5%,
+    // usando um período de referência de 30 dias.
+    @SuppressWarnings("unused")
+    static Stream<Arguments> yieldScenarios() {
+        return Stream.of(
+                Arguments.of(
+                        "balance 1000.00 yields 0.17",
+                        "1000.00",
+                        "0.17",
+                        "1000.17"
+                ),
+                Arguments.of(
+                        "balance 40.00 yields 0.01",
+                        "40.00",
+                        "0.01",
+                        "40.01"
+                )
+        );
+    }
+
+    @SuppressWarnings("unused")
+    static Stream<Arguments> ineligibleLastYieldDates() {
+        return Stream.of(
+                Arguments.of(
+                        "last yield was today",
+                        TODAY
+                ),
+                Arguments.of(
+                        "last yield date is in the future",
+                        TODAY.plusDays(1)
+                )
+        );
+    }
+
+    @SuppressWarnings("unused")
     static Stream<Arguments> balancesWithoutYield() {
         return Stream.of(
-                Arguments.of("balance is zero", "0.00"),
-                Arguments.of("yield rounds down to zero", "0.99")
+                Arguments.of(
+                        "balance is zero",
+                        "0.00"
+                ),
+                Arguments.of(
+                        "yield rounds down to zero",
+                        "0.99"
+                )
         );
     }
 
     private void stubAccountOperationLookup(Account account) {
-        when(accountService.findEntityByAccountNumberForUpdate(account.getAccountNumber(), account.getDigit()))
-                .thenReturn(account);
+        when(accountService.findEntityByAccountNumberForUpdate(
+                account.getAccountNumber(),
+                account.getDigit()
+        )).thenReturn(account);
     }
 
     private void stubAccountLookup(Account account) {
-        when(accountService.findEntityByAccountNumber(account.getAccountNumber(), account.getDigit()))
-                .thenReturn(account);
+        when(accountService.findEntityByAccountNumber(
+                account.getAccountNumber(),
+                account.getDigit()
+        )).thenReturn(account);
     }
 
     private void stubTransferAccountLookup(
@@ -989,11 +1335,17 @@ public class TransactionServiceTests {
     }
 
     private void verifyAccountOperationLookup(Account account) {
-        verify(accountService).findEntityByAccountNumberForUpdate(account.getAccountNumber(), account.getDigit());
+        verify(accountService).findEntityByAccountNumberForUpdate(
+                account.getAccountNumber(),
+                account.getDigit()
+        );
     }
 
     private void verifyAccountLookup(Account account) {
-        verify(accountService).findEntityByAccountNumber(account.getAccountNumber(), account.getDigit());
+        verify(accountService).findEntityByAccountNumber(
+                account.getAccountNumber(),
+                account.getDigit()
+        );
     }
 
     private void verifyTransferAccountLookup(
@@ -1014,17 +1366,29 @@ public class TransactionServiceTests {
     }
 
     private void verifyYieldChecked() {
-        verify(transactionRepository).existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                eq(SAVINGS_ID), eq(TransactionType.YIELD), any(), any()
+        verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
+                SAVINGS_ID,
+                TransactionType.YIELD,
+                TODAY
         );
     }
 
     private void verifyNoInteractionsOnMocks() {
-        verifyNoInteractions(transactionRepository, accountService, currentUserService, eventPublisher);
+        verifyNoInteractions(
+                transactionRepository,
+                accountService,
+                currentUserService,
+                eventPublisher
+        );
     }
 
     private void verifyNoMoreInteractionsOnMocks() {
-        verifyNoMoreInteractions(transactionRepository, accountService, currentUserService, eventPublisher);
+        verifyNoMoreInteractions(
+                transactionRepository,
+                accountService,
+                currentUserService,
+                eventPublisher
+        );
     }
 
     private static void assertThrowsWithMessage(
@@ -1036,10 +1400,17 @@ public class TransactionServiceTests {
         assertEquals(message, exception.getMessage());
     }
 
-    private static void assertBalance(String expected, Account account) {
-        assertEquals(0, new BigDecimal(expected).compareTo(account.getBalance()));
+    private static void assertBalance(
+            String expected,
+            Account account
+    ) {
+        assertEquals(
+                0,
+                new BigDecimal(expected).compareTo(account.getBalance())
+        );
     }
 
+    // Este helper continua sendo exclusivo de transações realizadas por usuários.
     private static void assertTransaction(
             Transaction transaction,
             TransactionType type,
@@ -1047,9 +1418,15 @@ public class TransactionServiceTests {
             Account account
     ) {
         assertEquals(type, transaction.getType());
-        assertEquals(0, amount.compareTo(transaction.getAmount()));
+
+        assertEquals(
+                0,
+                amount.compareTo(transaction.getAmount())
+        );
+
         assertSame(account, transaction.getAccount());
         assertSame(TEST_USER, transaction.getPerformedBy());
+        assertFalse(transaction.isPerformedBySystem());
         assertEquals(NOW, transaction.getCreatedAt());
     }
 
@@ -1063,33 +1440,70 @@ public class TransactionServiceTests {
         );
     }
 
-    private static AccountOperationRequestDTO operationRequest(BigDecimal amount) {
-        return new AccountOperationRequestDTO(ACCOUNT_NUMBER, ACCOUNT_DIGIT, amount);
+    private static AccountOperationRequestDTO operationRequest(
+            BigDecimal amount
+    ) {
+        return new AccountOperationRequestDTO(
+                ACCOUNT_NUMBER,
+                ACCOUNT_DIGIT,
+                amount
+        );
     }
 
-    private static TransferRequestDTO transferRequest(BigDecimal amount) {
+    private static TransferRequestDTO transferRequest(
+            BigDecimal amount
+    ) {
         return new TransferRequestDTO(
-                ACCOUNT_NUMBER, ACCOUNT_DIGIT, DESTINATION_NUMBER, DESTINATION_DIGIT, amount
+                ACCOUNT_NUMBER,
+                ACCOUNT_DIGIT,
+                DESTINATION_NUMBER,
+                DESTINATION_DIGIT,
+                amount
         );
     }
 
     private static CheckingAccount account() {
-        return checkingAccount(ACCOUNT_NUMBER, ACCOUNT_DIGIT, ACCOUNT_ID, "100.00");
+        return checkingAccount(
+                ACCOUNT_NUMBER,
+                ACCOUNT_DIGIT,
+                ACCOUNT_ID,
+                "100.00"
+        );
     }
 
     private static CheckingAccount destinationAccount() {
-        return checkingAccount(DESTINATION_NUMBER, DESTINATION_DIGIT, DESTINATION_ID, "50.00");
+        return checkingAccount(
+                DESTINATION_NUMBER,
+                DESTINATION_DIGIT,
+                DESTINATION_ID,
+                "50.00"
+        );
     }
 
-    private static CheckingAccount checkingAccount(String number, String digit, Long id, String balance) {
-        // o service não acessa o cliente da conta
-        CheckingAccount account = new CheckingAccount(null, number, digit);
+    private static CheckingAccount checkingAccount(
+            String number,
+            String digit,
+            Long id,
+            String balance
+    ) {
+        // O serviço não acessa o cliente da conta nesses testes.
+        CheckingAccount account = new CheckingAccount(
+                null,
+                number,
+                digit
+        );
+
         ReflectionTestUtils.setField(account, "id", id);
+
         account.credit(new BigDecimal(balance));
+
         return account;
     }
 
-    private static SavingsAccount savingsAccount(String balance, LocalDate lastYieldDate) {
+    private static SavingsAccount savingsAccount(
+            String balance,
+            LocalDate lastYieldDate
+    ) {
         SavingsAccount account = new SavingsAccount(
                 null,
                 SAVINGS_NUMBER,
@@ -1098,11 +1512,17 @@ public class TransactionServiceTests {
         );
 
         ReflectionTestUtils.setField(account, "id", SAVINGS_ID);
+
         account.credit(new BigDecimal(balance));
+
         return account;
     }
 
     private static SavingsAccount eligibleSavingsAccount(String balance) {
-        return savingsAccount(balance, TODAY.minusMonths(1));
+        // A conta recebeu rendimento ontem, portanto está elegível hoje.
+        return savingsAccount(
+                balance,
+                TODAY.minusDays(1)
+        );
     }
 }

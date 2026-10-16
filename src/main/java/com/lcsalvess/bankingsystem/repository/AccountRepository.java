@@ -1,6 +1,8 @@
 package com.lcsalvess.bankingsystem.repository;
 
 import com.lcsalvess.bankingsystem.entity.Account;
+import com.lcsalvess.bankingsystem.entity.SavingsAccount;
+import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +12,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface AccountRepository extends JpaRepository<Account, Long> {
@@ -40,4 +43,17 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     @Query(value = "SELECT nextval('account_number_seq')", nativeQuery = true)
     Long getNextAccountNumber();
+
+    @Query("""
+    SELECT s
+    FROM SavingsAccount s
+    WHERE s.status = :status
+      AND s.id > :afterId
+    ORDER BY s.id ASC
+    """)
+    List<SavingsAccount> findNextSavingsAccountsByStatus(
+            @Param("status") AccountStatus status,
+            @Param("afterId") Long afterId,
+            Pageable pageable
+    );
 }

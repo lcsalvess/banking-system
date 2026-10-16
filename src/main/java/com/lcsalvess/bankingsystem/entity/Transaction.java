@@ -6,7 +6,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -39,19 +41,22 @@ public class Transaction {
     @NotNull
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+    @Column(name = "yield_date")
+    private LocalDate yieldDate;
     @NotNull
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_transactions_account"))
     private Account account;
-    @NotNull
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "performed_by_user_id",
-            nullable = false,
             foreignKey = @ForeignKey(name = "fk_transactions_performed_by_user")
     )
     private User performedBy;
+
+    @Column(name = "performed_by_system", nullable = false)
+    private boolean performedBySystem;
 
     public Transaction() {
     }
@@ -68,7 +73,7 @@ public class Transaction {
         this.amount = amount;
         this.createdAt = createdAt;
         this.account = account;
-        this.performedBy = performedBy;
+        this.performedBy = requireHumanActor(performedBy);
     }
 
     public Transaction(
@@ -85,7 +90,53 @@ public class Transaction {
         this.amount = amount;
         this.createdAt = createdAt;
         this.account = account;
-        this.performedBy = performedBy;
+        this.performedBy = requireHumanActor(performedBy);
+    }
+
+    public Transaction(
+            TransactionType type,
+            BigDecimal amount,
+            LocalDateTime createdAt,
+            LocalDate yieldDate,
+            Account account,
+            User performedBy
+    ) {
+        this.transactionCode = UUID.randomUUID();
+        this.type = type;
+        this.amount = amount;
+        this.createdAt = createdAt;
+        this.yieldDate = yieldDate;
+        this.account = account;
+        this.performedBy = requireHumanActor(performedBy);
+    }
+
+    public Transaction(
+            TransactionType type,
+            BigDecimal amount,
+            LocalDateTime createdAt,
+            LocalDate yieldDate,
+            Account account
+    ) {
+        if (type != TransactionType.YIELD) {
+            throw new IllegalArgumentException(
+                    "System-generated transactions must be of type YIELD."
+            );
+        }
+
+        if (yieldDate == null) {
+            throw new IllegalArgumentException(
+                    "System-generated yield transactions require a yield date."
+            );
+        }
+
+        this.transactionCode = UUID.randomUUID();
+        this.type = type;
+        this.amount = amount;
+        this.createdAt = createdAt;
+        this.yieldDate = yieldDate;
+        this.account = account;
+        this.performedBy = null;
+        this.performedBySystem = true;
     }
 
     public Long getId() {
@@ -112,11 +163,26 @@ public class Transaction {
         return createdAt;
     }
 
+    public LocalDate getYieldDate() {
+        return yieldDate;
+    }
+
+    public boolean isPerformedBySystem() {
+        return performedBySystem;
+    }
+
     public Account getAccount() {
         return account;
     }
 
     public User getPerformedBy() {
         return performedBy;
+    }
+
+    private User requireHumanActor(User performedBy) {
+        return Objects.requireNonNull(
+                performedBy,
+                "Human transactions must have an associated user."
+        );
     }
 }

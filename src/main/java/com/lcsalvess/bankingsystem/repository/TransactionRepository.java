@@ -5,7 +5,7 @@ import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,10 +15,9 @@ public interface TransactionRepository extends
 
     Optional<Transaction> findByTransactionCode(UUID transactionCode);
 
-    boolean existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+    boolean existsByAccountIdAndTypeAndYieldDate(
             Long accountId,
             TransactionType type,
-            LocalDateTime startOfDay,
-            LocalDateTime endExclusive
+            LocalDate yieldDate
     );
 }

@@ -6,12 +6,13 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
-import com.lcsalvess.bankingsystem.exception.account.*;
+import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
+import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
+import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
+import com.lcsalvess.bankingsystem.exception.account.InvalidAccountDigitException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
-import com.lcsalvess.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
-import com.lcsalvess.bankingsystem.exception.transaction.YieldNotAvailableException;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
@@ -26,11 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -467,201 +464,6 @@ public class TransactionControllerTests {
 
             verify(transactionService).transfer(request);
             verifyNoMoreInteractions(transactionService);
-        }
-    }
-
-    @Nested
-    @DisplayName("POST /api/v1/transactions/yield/{accountNumber}")
-    class ApplyYield {
-
-        private static final String URL = "/api/v1/transactions/yield/{accountNumber}";
-
-        @Test
-        @DisplayName("Should apply yield successfully")
-        void shouldApplyYieldSuccessfully() throws Exception {
-            TransactionResponseDTO expected =
-                    mockTransaction(TransactionType.YIELD);
-
-            when(transactionService.applyYield("99999", "5"))
-                    .thenReturn(expected);
-
-            MvcResult result = mockMvc.perform(post(URL, "99999")
-                            .param("digit", "5"))
-                    .andExpect(status().isCreated())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andReturn();
-
-            assertTransactionEquals(expected, readTransaction(result));
-
-            verify(transactionService).applyYield("99999", "5");
-            verifyNoMoreInteractions(transactionService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when digit is invalid")
-        void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            when(transactionService.applyYield("99999", "3"))
-                    .thenThrow(
-                            new InvalidAccountDigitException(
-                                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT
-                            )
-                    );
-
-            performYield("3", 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
-
-            verify(transactionService).applyYield("99999", "3");
-            verifyNoMoreInteractions(transactionService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when account does not exist")
-        void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
-            when(transactionService.applyYield("99999", "5"))
-                    .thenThrow(
-                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
-                    );
-
-            performYield("5", 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
-
-            verify(transactionService).applyYield("99999", "5");
-            verifyNoMoreInteractions(transactionService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when account is not active")
-        void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
-            when(transactionService.applyYield("99999", "5"))
-                    .thenThrow(
-                            new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE)
-                    );
-
-            performYield("5", 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
-
-            verify(transactionService).applyYield("99999", "5");
-            verifyNoMoreInteractions(transactionService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when account is not a savings account")
-        void shouldReturnConflictWhenAccountIsNotSavings() throws Exception {
-            when(transactionService.applyYield("99999", "5"))
-                    .thenThrow(
-                            new AccountIsNotSavingsException(ApiErrorMessages.ACCOUNT_NOT_SAVINGS)
-                    );
-
-            performYield("5", 409, ApiErrorMessages.ACCOUNT_NOT_SAVINGS);
-
-            verify(transactionService).applyYield("99999", "5");
-            verifyNoMoreInteractions(transactionService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when yield is not available")
-        void shouldReturnConflictWhenYieldIsNotAvailable() throws Exception {
-            when(transactionService.applyYield("99999", "5"))
-                    .thenThrow(
-                            new YieldNotAvailableException(
-                                    ApiErrorMessages.YIELD_NOT_AVAILABLE
-                            )
-                    );
-
-            performYield("5", 409, ApiErrorMessages.YIELD_NOT_AVAILABLE);
-
-            verify(transactionService).applyYield("99999", "5");
-            verifyNoMoreInteractions(transactionService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when yield was already applied today")
-        void shouldReturnConflictWhenYieldWasAlreadyApplied() throws Exception {
-            when(transactionService.applyYield("99999", "5"))
-                    .thenThrow(
-                            new YieldAlreadyAppliedException(
-                                    ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED
-                            )
-                    );
-
-            performYield("5", 409, ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED);
-
-            verify(transactionService).applyYield("99999", "5");
-            verifyNoMoreInteractions(transactionService);
-        }
-
-        @Test
-        @DisplayName("Should return 500 when service throws an unexpected exception")
-        void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(transactionService.applyYield("99999", "5"))
-                    .thenThrow(new RuntimeException());
-
-            performYield("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
-
-            verify(transactionService).applyYield("99999", "5");
-            verifyNoMoreInteractions(transactionService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when digit is missing")
-        void shouldReturnBadRequestWhenDigitIsMissing() throws Exception {
-            mockMvc.perform(post(URL, "99999"))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
-
-            verifyNoInteractions(transactionService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "invalidAccountNumbers")
-        @DisplayName("Should return 400 when account number is invalid")
-        void shouldReturnBadRequestWhenAccountNumberIsInvalid(
-                String scenario,
-                String accountNumber
-        ) throws Exception {
-            mockMvc.perform(post(URL, accountNumber)
-                            .param("digit", "5"))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
-                    .andExpect(
-                            jsonPath("$.errors.accountNumber")
-                                    .value(ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH)
-                    );
-
-            verifyNoInteractions(transactionService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "invalidAccountDigits")
-        @DisplayName("Should return 400 when account digit has invalid format")
-        void shouldReturnBadRequestWhenAccountDigitHasInvalidFormat(
-                String scenario,
-                String digit
-        ) throws Exception {
-            mockMvc.perform(post(URL, "99999")
-                            .param("digit", digit))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
-                    .andExpect(
-                            jsonPath("$.errors.digit")
-                                    .value(ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH)
-                    );
-
-            verifyNoInteractions(transactionService);
-        }
-
-        private void performYield(
-                String digit,
-                int status,
-                String message
-        ) throws Exception {
-            ResultActions result =
-                    mockMvc.perform(post(URL, "99999")
-                            .param("digit", digit));
-
-            performErrorResponse(result, status, message);
         }
     }
 

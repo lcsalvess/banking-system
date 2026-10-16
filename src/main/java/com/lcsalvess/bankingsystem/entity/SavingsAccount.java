@@ -1,3 +1,4 @@
+
 package com.lcsalvess.bankingsystem.entity;
 
 import com.lcsalvess.bankingsystem.entity.enums.AccountType;
@@ -16,7 +17,8 @@ import java.time.LocalDate;
 )
 public class SavingsAccount extends Account {
 
-    private static final BigDecimal YIELD_RATE = new BigDecimal("0.005");
+    private static final BigDecimal MONTHLY_YIELD_RATE =
+            new BigDecimal("0.005");
 
     @NotNull
     @Column(name = "last_yield_date", nullable = false)
@@ -39,17 +41,30 @@ public class SavingsAccount extends Account {
         return lastYieldDate;
     }
 
-    public void updateLastYieldDate() {
-        this.lastYieldDate = this.lastYieldDate.plusMonths(1);
+    public void updateLastYieldDate(LocalDate referenceDate) {
+        if (referenceDate == null) {
+            throw new IllegalArgumentException(
+                    "A data de referência do rendimento é obrigatória."
+            );
+        }
+
+        this.lastYieldDate = referenceDate;
     }
 
     public boolean isEligibleForYield(LocalDate referenceDate) {
-        return !referenceDate.isBefore(lastYieldDate.plusMonths(1));
+        return referenceDate != null
+                && referenceDate.isAfter(lastYieldDate);
     }
 
+
     public BigDecimal calculateYield() {
+        double dailyRate = Math.pow(
+                1.0 + MONTHLY_YIELD_RATE.doubleValue(),
+                1.0 / 30.0
+        ) - 1.0;
+
         return getBalance()
-                .multiply(YIELD_RATE)
+                .multiply(BigDecimal.valueOf(dailyRate))
                 .setScale(2, RoundingMode.HALF_UP);
     }
 }

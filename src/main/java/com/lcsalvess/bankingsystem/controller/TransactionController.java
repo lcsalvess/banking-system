@@ -243,48 +243,4 @@ public class TransactionController {
     public TransactionResponseDTO transfer(@Valid @RequestBody TransferRequestDTO dto) {
         return transactionService.transfer(dto);
     }
-
-    @Operation(
-            summary = "Apply yield to a savings account",
-            description = "Calculates and applies the yield to a savings account and records the resulting transaction."
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "201",
-                    description = "Yield applied successfully"
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid account number or check digit"
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Account not found"
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Account is not active, is not a savings account, yield has already been applied, or yield is not available"
-            )
-    })
-    @PreAuthorize("hasRole('EMPLOYEE')")
-    @PostMapping("/yield/{accountNumber}")
-    @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO applyYield(
-            @Parameter(
-                    description = "Account number",
-                    example = "12345",
-                    required = true
-            )
-            @ValidAccountNumber
-            @PathVariable String accountNumber,
-            @Parameter(
-                    description = "Account check digit",
-                    example = "1",
-                    required = true
-            )
-            @ValidAccountDigit
-            @RequestParam String digit
-    ) {
-        return transactionService.applyYield(accountNumber, digit);
-    }
 }

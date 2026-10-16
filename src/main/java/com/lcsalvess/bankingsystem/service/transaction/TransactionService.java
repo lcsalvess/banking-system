@@ -204,26 +204,70 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponseDTO applyYield(String accountNumber, String accountDigit) {
-        Account account = accountService.findEntityByAccountNumberForUpdate(accountNumber, accountDigit);
+    public TransactionResponseDTO applyYield(
+            String accountNumber,
+            String accountDigit
+    ) {
+        return applyYieldForDate(
+                accountNumber,
+                accountDigit,
+                LocalDate.now(clock)
+        );
+    }
+
+    @Transactional
+    public TransactionResponseDTO applyYieldForDate(
+            String accountNumber,
+            String accountDigit,
+            LocalDate referenceDate
+    ) {
+        if (referenceDate == null) {
+            throw new IllegalArgumentException(
+                    ApiErrorMessages.YIELD_REFERENCE_DATE_REQUIRED
+            );
+        }
+
+        Account account = accountService.findEntityByAccountNumberForUpdate(
+                accountNumber,
+                accountDigit
+        );
 
         SavingsAccount savingsAccount = validateAndGetSavingsAccount(account);
 
         validateActiveAccount(savingsAccount);
-        validateYieldAlreadyApplied(savingsAccount.getId());
+
+        validateYieldAlreadyApplied(
+                savingsAccount.getId(),
+                referenceDate
+        );
 
         BigDecimal yieldAmount = savingsAccount.calculateYield();
-        validateYieldAvailable(savingsAccount, yieldAmount);
+
+        validateYieldAvailable(
+                savingsAccount,
+                yieldAmount,
+                referenceDate
+        );
+
         validateBalanceLimit(savingsAccount, yieldAmount);
 
-        User performedBy = currentUserService.getCurrentUser();
-        String username = performedBy.getUsername();
-
         savingsAccount.credit(yieldAmount);
-        savingsAccount.updateLastYieldDate();
+        savingsAccount.updateLastYieldDate(referenceDate);
 
-        Transaction transaction = registerTransaction(TransactionType.YIELD, yieldAmount, savingsAccount, performedBy);
-        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.YIELD, savingsAccount.getAccountNumber(), yieldAmount, username));
+        Transaction transaction = registerSystemYieldTransaction(
+                yieldAmount,
+                referenceDate,
+                savingsAccount
+        );
+
+        eventPublisher.publishEvent(
+                new TransactionOperationEvent(
+                        TransactionType.YIELD,
+                        savingsAccount.getAccountNumber(),
+                        yieldAmount,
+                        "SYSTEM"
+                )
+        );
 
         return TransactionResponseDTO.fromEntity(transaction);
     }
@@ -283,28 +327,35 @@ public class TransactionService {
         return savingsAccount;
     }
 
-    private void validateYieldAvailable(SavingsAccount savingsAccount, BigDecimal yieldAmount) {
-        if (!savingsAccount.isEligibleForYield(LocalDate.now(clock))) {
-            throw new YieldNotAvailableException(ApiErrorMessages.YIELD_NOT_AVAILABLE);
+    private void validateYieldAvailable(
+            SavingsAccount savingsAccount,
+            BigDecimal yieldAmount,
+            LocalDate referenceDate
+    ) {
+        if (!savingsAccount.isEligibleForYield(referenceDate)) {
+            throw new YieldNotAvailableException(
+                    ApiErrorMessages.YIELD_NOT_AVAILABLE
+            );
         }
-        if (yieldAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new YieldNotAvailableException(ApiErrorMessages.NO_YIELD_AVAILABLE);
+
+        if (yieldAmount == null
+                || yieldAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new YieldNotAvailableException(
+                    ApiErrorMessages.NO_YIELD_AVAILABLE
+            );
         }
     }
 
-    private void validateYieldAlreadyApplied(Long accountId) {
-        LocalDate today = LocalDate.now(clock);
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endExclusive = today.plusDays(1).atStartOfDay();
-
+    private void validateYieldAlreadyApplied(
+            Long accountId,
+            LocalDate referenceDate
+    ) {
         boolean alreadyApplied =
-                transactionRepository
-                        .existsByAccountIdAndTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                                accountId,
-                                TransactionType.YIELD,
-                                startOfDay,
-                                endExclusive
-                        );
+                transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+                        accountId,
+                        TransactionType.YIELD,
+                        referenceDate
+                );
 
         if (alreadyApplied) {
             throw new YieldAlreadyAppliedException(
@@ -334,6 +385,22 @@ public class TransactionService {
                         transferCode,
                         performedBy
                 );
+
+        return transactionRepository.save(transaction);
+    }
+
+    private Transaction registerSystemYieldTransaction(
+            BigDecimal amount,
+            LocalDate referenceDate,
+            SavingsAccount account
+    ) {
+        Transaction transaction = new Transaction(
+                TransactionType.YIELD,
+                amount,
+                LocalDateTime.now(clock),
+                referenceDate,
+                account
+        );
 
         return transactionRepository.save(transaction);
     }

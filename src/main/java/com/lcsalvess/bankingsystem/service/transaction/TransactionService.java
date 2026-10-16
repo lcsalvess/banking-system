@@ -223,7 +223,7 @@ public class TransactionService {
     ) {
         if (referenceDate == null) {
             throw new IllegalArgumentException(
-                    ApiErrorMessages.YIELD_REFERENCE_DATE_REQUIRED
+                    "A conta ainda não está disponível para receber rendimento."
             );
         }
 

@@ -117,9 +117,6 @@ public final class ApiErrorMessages {
     public static final String NO_YIELD_AVAILABLE =
             "Não há rendimento disponível para esta conta.";
 
-    public static final String YIELD_REFERENCE_DATE_REQUIRED =
-            "A data de referência do rendimento é obrigatória.";
-
     public static final String INVALID_DATE_RANGE =
             "A data inicial não pode ser posterior à data final.";
 

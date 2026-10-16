@@ -10,6 +10,9 @@ import com.lcsalvess.bankingsystem.security.RestAccessDeniedHandler;
 import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,12 +26,14 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
@@ -41,18 +46,23 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.util.Date;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -106,6 +116,9 @@ class SecurityConfigTests {
     private static final String ADMIN_URL = "/api/v1/probe/admin";
     private static final String LOGIN_URL = "/api/v1/auth/login";
     private static final String AUTH_PROBE_URL = "/api/v1/auth/probe";
+    private static final String PASSWORD_URL = "/api/v1/auth/probe/password";
+    private static final String UNAVAILABLE_MESSAGE =
+            "O serviço está temporariamente indisponível. Tente novamente.";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
     private static final String UNAUTHORIZED_MESSAGE = "Não foi possível autenticar o usuário.";
     private static final String FORBIDDEN_MESSAGE = "Você não tem permissão para acessar este recurso.";
@@ -425,6 +438,177 @@ class SecurityConfigTests {
     }
 
     @Nested
+    @DisplayName("Falha de infraestrutura ao carregar o usuário do token")
+    class InfrastructureFailureTests {
+
+        @Test
+        @DisplayName("Deve responder 503 em JSON, e não 401, quando o banco está indisponível")
+        void shouldReturn503WhenDatabaseIsUnavailable() throws Exception {
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenThrow(new DataAccessResourceFailureException("Sensitive connection detail"));
+
+            expectServiceUnavailable(mockMvc.perform(get(PROTECTED_URL)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(createUser(Role.EMPLOYEE)))));
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Deve responder 503 em JSON quando não é possível abrir a transação")
+        void shouldReturn503WhenTransactionCannotBeCreated() throws Exception {
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenThrow(new CannotCreateTransactionException("Sensitive transaction detail"));
+
+            expectServiceUnavailable(mockMvc.perform(get(PROTECTED_URL)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(createUser(Role.EMPLOYEE)))));
+        }
+
+        @Test
+        @DisplayName("Não deve expor detalhes da falha na resposta")
+        void shouldNotExposeFailureDetails() throws Exception {
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenThrow(new DataAccessResourceFailureException("Sensitive connection detail"));
+
+            mockMvc.perform(get(PROTECTED_URL)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(createUser(Role.EMPLOYEE))))
+                    .andExpect(content().string(
+                            org.hamcrest.Matchers.not(
+                                    org.hamcrest.Matchers.containsString("Sensitive connection detail")
+                            )
+                    ));
+        }
+
+        @Test
+        @DisplayName("Deve incluir o correlation ID na resposta 503")
+        void shouldIncludeCorrelationIdOnServiceUnavailableResponse() throws Exception {
+            String correlationId = UUID.randomUUID().toString();
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenThrow(new DataAccessResourceFailureException("db down"));
+
+            MvcResult result = mockMvc.perform(get(PROTECTED_URL)
+                            .header(CORRELATION_ID_HEADER, correlationId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(createUser(Role.EMPLOYEE))))
+                    .andExpect(status().isServiceUnavailable())
+                    .andReturn();
+
+            assertEquals(correlationId, result.getResponse().getHeader(CORRELATION_ID_HEADER));
+        }
+    }
+
+    @Nested
+    @DisplayName("Versão das credenciais do token")
+    class TokenVersionTests {
+
+        @Test
+        @DisplayName("Deve responder 401 para token emitido antes da troca de senha")
+        void shouldReturn401ForTokenIssuedBeforePasswordChange() throws Exception {
+            User user = createUser(Role.EMPLOYEE);
+            String tokenBeforeChange = bearer(user);
+
+            user.changePassword("novo-hash");
+            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
+
+            expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
+                    .header(HttpHeaders.AUTHORIZATION, tokenBeforeChange)));
+        }
+
+        @Test
+        @DisplayName("Deve aceitar token emitido depois da troca de senha")
+        void shouldAcceptTokenIssuedAfterPasswordChange() throws Exception {
+            User user = createUser(Role.EMPLOYEE);
+
+            user.changePassword("novo-hash");
+            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
+
+            mockMvc.perform(get(PROTECTED_URL)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(user)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(USERNAME));
+        }
+
+        @Test
+        @DisplayName("Deve aceitar token sem o claim de versão enquanto o usuário está na versão 0")
+        void shouldAcceptLegacyTokenWhileUserIsAtVersionZero() throws Exception {
+            User user = createUser(Role.EMPLOYEE);
+            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
+
+            mockMvc.perform(get(PROTECTED_URL)
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + legacyToken()))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("Deve responder 401 para token sem o claim de versão depois da troca de senha")
+        void shouldReturn401ForLegacyTokenAfterPasswordChange() throws Exception {
+            User user = createUser(Role.EMPLOYEE);
+            user.changePassword("novo-hash");
+            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
+
+            expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + legacyToken())));
+        }
+    }
+
+    @Nested
+    @DisplayName("Rota de troca de senha")
+    class PasswordRouteTests {
+
+        @Test
+        @DisplayName("Deve responder 401 em JSON sem token")
+        void shouldReturn401WithoutToken() throws Exception {
+            expectUnauthorized(mockMvc.perform(patch(PASSWORD_URL)));
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Deve responder 401 com token inválido")
+        void shouldReturn401WithInvalidToken() throws Exception {
+            expectUnauthorized(mockMvc.perform(patch(PASSWORD_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer token-invalido")));
+
+            verifyNoInteractions(userDetailsService);
+        }
+
+        @Test
+        @DisplayName("Deve permitir EMPLOYEE autenticado, sem exigir CSRF")
+        void shouldAllowAuthenticatedEmployee() throws Exception {
+            User employee = createUser(Role.EMPLOYEE);
+            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(employee);
+
+            mockMvc.perform(patch(PASSWORD_URL)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("password-probe"));
+        }
+
+        @Test
+        @DisplayName("Deve permitir ADMIN autenticado")
+        void shouldAllowAuthenticatedAdmin() throws Exception {
+            User admin = createUser(Role.ADMIN);
+            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(admin);
+
+            mockMvc.perform(patch(PASSWORD_URL)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(admin)))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("Deve responder 401 para token anterior à última troca de senha")
+        void shouldReturn401ForRevokedToken() throws Exception {
+            User employee = createUser(Role.EMPLOYEE);
+            String revokedToken = bearer(employee);
+
+            employee.changePassword("novo-hash");
+            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(employee);
+
+            expectUnauthorized(mockMvc.perform(patch(PASSWORD_URL)
+                    .header(HttpHeaders.AUTHORIZATION, revokedToken)));
+        }
+    }
+
+    @Nested
     @DisplayName("Autorização por perfil (@EnableMethodSecurity)")
     class MethodSecurityTests {
 
@@ -605,6 +789,22 @@ class SecurityConfigTests {
         }
 
         @Test
+        @DisplayName("Deve sinalizar falha de banco como InternalAuthenticationServiceException, e não como credencial inválida")
+        void shouldWrapDatabaseFailureAsInternalAuthenticationServiceException() {
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenThrow(new DataAccessResourceFailureException("db down"));
+
+            InternalAuthenticationServiceException exception = assertThrows(
+                    InternalAuthenticationServiceException.class,
+                    () -> authenticationManager.authenticate(
+                            UsernamePasswordAuthenticationToken.unauthenticated(USERNAME, PASSWORD)
+                    )
+            );
+
+            assertInstanceOf(DataAccessResourceFailureException.class, exception.getCause());
+        }
+
+        @Test
         @DisplayName("Deve rejeitar usuário inativo mesmo com a senha correta")
         void shouldRejectDisabledUserEvenWithCorrectPassword() {
             User user = createUserWithEncodedPassword();
@@ -632,6 +832,25 @@ class SecurityConfigTests {
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value(UNAUTHORIZED_MESSAGE))
                 .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    private void expectServiceUnavailable(ResultActions actions) throws Exception {
+        actions.andExpect(status().isServiceUnavailable())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.message").value(UNAVAILABLE_MESSAGE))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    /** Token como os emitidos antes da introdução do claim de versão (sem "tv"). */
+    private static String legacyToken() {
+        return Jwts.builder()
+                .subject(USERNAME)
+                .issuer(ISSUER)
+                .issuedAt(new Date())
+                .expiration(Date.from(Instant.now().plusSeconds(3600)))
+                .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
+                .compact();
     }
 
     private String bearer(User user) {
@@ -680,6 +899,11 @@ class SecurityConfigTests {
         @PostMapping("/api/v1/auth/probe")
         public String protectedAuthRoute() {
             return "auth-probe";
+        }
+
+        @PatchMapping("/api/v1/auth/probe/password")
+        public String passwordRoute() {
+            return "password-probe";
         }
     }
 }

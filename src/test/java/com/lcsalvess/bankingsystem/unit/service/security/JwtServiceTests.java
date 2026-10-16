@@ -3,6 +3,7 @@ package com.lcsalvess.bankingsystem.unit.service.security;
 import com.lcsalvess.bankingsystem.config.JwtProperties;
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.service.security.JwtClaims;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -210,7 +211,17 @@ class JwtServiceTests {
         void shouldContainOnlyStandardClaims() {
             Claims claims = parse(jwtService.generateToken(user)).getPayload();
 
-            assertEquals(Set.of("sub", "iss", "iat", "exp"), claims.keySet());
+            assertEquals(Set.of("sub", "iss", "iat", "exp", "tv"), claims.keySet());
+        }
+
+        @Test
+        @DisplayName("Deve registrar no claim tv a versão das credenciais do usuário")
+        void shouldIncludeTokenVersion() {
+            user.changePassword("novo-hash");
+
+            Claims claims = parse(jwtService.generateToken(user)).getPayload();
+
+            assertEquals(1, ((Number) claims.get("tv")).intValue());
         }
 
         @Test
@@ -336,6 +347,70 @@ class JwtServiceTests {
         @DisplayName("Deve rejeitar token nulo ou vazio")
         void shouldRejectNullOrEmptyToken(String token) {
             assertThrows(IllegalArgumentException.class, () -> jwtService.extractUsername(token));
+        }
+    }
+
+    @Nested
+    @DisplayName("Ao ler os claims de um token JWT")
+    class ParseTests {
+
+        @Test
+        @DisplayName("Deve devolver o username e a versão do token")
+        void shouldReturnUsernameAndTokenVersion() {
+            user.changePassword("novo-hash");
+            user.changePassword("outro-hash");
+
+            JwtClaims claims = jwtService.parse(jwtService.generateToken(user));
+
+            assertEquals(USERNAME, claims.username());
+            assertEquals(2, claims.tokenVersion());
+        }
+
+        @Test
+        @DisplayName("Deve tratar token sem o claim de versão como versão 0")
+        void shouldTreatTokenWithoutVersionAsZero() {
+            String legacyToken = Jwts.builder()
+                    .subject(USERNAME)
+                    .issuer(ISSUER)
+                    .issuedAt(new Date())
+                    .expiration(inOneHour())
+                    .signWith(key(SECRET))
+                    .compact();
+
+            JwtClaims claims = jwtService.parse(legacyToken);
+
+            assertEquals(USERNAME, claims.username());
+            assertEquals(0, claims.tokenVersion());
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar token expirado")
+        void shouldRejectExpiredToken() {
+            String token = Jwts.builder()
+                    .subject(USERNAME)
+                    .issuer(ISSUER)
+                    .issuedAt(Date.from(Instant.now().minusSeconds(120)))
+                    .expiration(Date.from(Instant.now().minusSeconds(60)))
+                    .claim("tv", 0)
+                    .signWith(key(SECRET))
+                    .compact();
+
+            assertThrows(ExpiredJwtException.class, () -> jwtService.parse(token));
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar token assinado com outra chave")
+        void shouldRejectTokenSignedWithAnotherKey() {
+            String token = Jwts.builder()
+                    .subject(USERNAME)
+                    .issuer(ISSUER)
+                    .issuedAt(new Date())
+                    .expiration(inOneHour())
+                    .claim("tv", 0)
+                    .signWith(key(OTHER_SECRET))
+                    .compact();
+
+            assertThrows(SignatureException.class, () -> jwtService.parse(token));
         }
     }
 

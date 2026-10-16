@@ -5,6 +5,8 @@ import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.handler.GlobalExceptionHandler;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import com.lcsalvess.bankingsystem.exception.user.InvalidCurrentPasswordException;
+import com.lcsalvess.bankingsystem.exception.user.PasswordUnchangedException;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import jakarta.validation.*;
@@ -20,13 +22,18 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.bind.annotation.*;
 
@@ -96,12 +103,70 @@ class GlobalExceptionHandlerTests {
             throws Exception {
 
         performThrowing(
-                new AuthenticationServiceException("Internal auth detail")
+                new InsufficientAuthenticationException("Internal auth detail")
         )
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message")
                         .value(ApiErrorMessages.AUTHENTICATION_FAILED))
+                .andExpect(content().string(
+                        not(containsString("Internal auth detail"))
+                ));
+    }
+
+    @Test
+    void shouldReturnServiceUnavailableWhenAuthenticationFailsBecauseOfDatabase()
+            throws Exception {
+
+        performThrowing(
+                new InternalAuthenticationServiceException(
+                        "Sensitive connection detail",
+                        new DataAccessResourceFailureException(
+                                "Sensitive connection detail"
+                        )
+                )
+        )
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
+                .andExpect(content().string(
+                        not(containsString("Sensitive connection detail"))
+                ));
+    }
+
+    @Test
+    void shouldReturnServiceUnavailableWhenAuthenticationFailsBecauseOfTransaction()
+            throws Exception {
+
+        performThrowing(
+                new AuthenticationServiceException(
+                        "Sensitive transaction detail",
+                        new CannotCreateTransactionException(
+                                "Sensitive transaction detail"
+                        )
+                )
+        )
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
+                .andExpect(content().string(
+                        not(containsString("Sensitive transaction detail"))
+                ));
+    }
+
+    @Test
+    void shouldReturnInternalServerErrorWhenAuthenticationFailsForUnknownReason()
+            throws Exception {
+
+        performThrowing(
+                new AuthenticationServiceException("Internal auth detail")
+        )
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.INTERNAL_SERVER_ERROR))
                 .andExpect(content().string(
                         not(containsString("Internal auth detail"))
                 ));
@@ -389,6 +454,31 @@ class GlobalExceptionHandlerTests {
                 ));
     }
 
+    @ParameterizedTest
+    @MethodSource("databaseUnavailableExceptions")
+    void shouldReturnServiceUnavailableWhenDatabaseIsUnavailable(
+            Throwable exception
+    ) throws Exception {
+
+        performThrowing(exception)
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
+                .andExpect(content().string(
+                        not(containsString("Sensitive database detail"))
+                ));
+    }
+
+    @SuppressWarnings("unused") // usado via @MethodSource
+    static Stream<Throwable> databaseUnavailableExceptions() {
+        return Stream.of(
+                new DataAccessResourceFailureException("Sensitive database detail"),
+                new QueryTimeoutException("Sensitive database detail"),
+                new CannotCreateTransactionException("Sensitive database detail")
+        );
+    }
+
     @Test
     void shouldReturnServiceUnavailableWhenDatabaseLockCannotBeAcquired()
             throws Exception {
@@ -405,6 +495,41 @@ class GlobalExceptionHandlerTests {
                 .andExpect(content().string(
                         not(containsString("Sensitive database lock detail"))
                 ));
+    }
+
+    // -------------------------------------------------------------------------
+    // TROCA DE SENHA
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @MethodSource("passwordChangeExceptions")
+    void shouldReturnBadRequestWhenPasswordChangeIsRejected(
+            BusinessException exception,
+            String expectedMessage
+    ) throws Exception {
+
+        performThrowing(exception)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(expectedMessage));
+    }
+
+    @SuppressWarnings("unused") // usado via @MethodSource
+    static Stream<Arguments> passwordChangeExceptions() {
+        return Stream.of(
+                Arguments.of(
+                        new InvalidCurrentPasswordException(
+                                ApiErrorMessages.INVALID_CURRENT_PASSWORD
+                        ),
+                        ApiErrorMessages.INVALID_CURRENT_PASSWORD
+                ),
+                Arguments.of(
+                        new PasswordUnchangedException(
+                                ApiErrorMessages.PASSWORD_UNCHANGED
+                        ),
+                        ApiErrorMessages.PASSWORD_UNCHANGED
+                )
+        );
     }
 
     // -------------------------------------------------------------------------

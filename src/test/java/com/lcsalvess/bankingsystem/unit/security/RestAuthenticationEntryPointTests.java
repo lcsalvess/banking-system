@@ -192,6 +192,46 @@ class RestAuthenticationEntryPointTests {
         }
     }
 
+    @Nested
+    @DisplayName("Service unavailable response")
+    class ServiceUnavailableResponse {
+
+        @Test
+        @DisplayName("Should return a JSON 503 response with the expected error")
+        void shouldReturnJsonServiceUnavailableResponse() throws Exception {
+            authenticationEntryPoint.commenceServiceUnavailable(response);
+
+            ApiErrorResponse errorResponse = readErrorResponse();
+
+            MediaType contentType = MediaType.parseMediaType(
+                    response.getContentType()
+            );
+
+            assertAll(
+                    () -> assertEquals(
+                            HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+                            response.getStatus()
+                    ),
+                    () -> assertTrue(
+                            MediaType.APPLICATION_JSON.isCompatibleWith(contentType)
+                    ),
+                    () -> assertEquals(
+                            StandardCharsets.UTF_8.name(),
+                            response.getCharacterEncoding()
+                    ),
+                    () -> assertEquals(
+                            HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+                            errorResponse.status()
+                    ),
+                    () -> assertEquals(
+                            "O serviço está temporariamente indisponível. Tente novamente.",
+                            errorResponse.message()
+                    ),
+                    () -> assertNotNull(errorResponse.timestamp())
+            );
+        }
+    }
+
     private void assertUnauthorizedResponse(ApiErrorResponse errorResponse) {
         MediaType contentType = MediaType.parseMediaType(
                 response.getContentType()

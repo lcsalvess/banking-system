@@ -12,15 +12,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -53,6 +59,36 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.UNAUTHORIZED.value(),
                 ApiErrorMessages.INVALID_CREDENTIALS
         );
+    }
+
+    /**
+     * Falha interna ao processar a autenticação (por exemplo, banco fora do ar durante
+     * o login, que o Spring Security embrulha em InternalAuthenticationServiceException).
+     * Não é problema de credencial, então não pode virar 401.
+     */
+    @ExceptionHandler(AuthenticationServiceException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthenticationServiceException(
+            AuthenticationServiceException exception) {
+
+        if (isDatabaseFailure(exception)) {
+            log.error("Authentication unavailable: database failure.", exception);
+
+            return ResponseEntity
+                    .status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new ApiErrorResponse(
+                            HttpStatus.SERVICE_UNAVAILABLE.value(),
+                            ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE
+                    ));
+        }
+
+        log.error("Authentication failed due to an internal error.", exception);
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiErrorResponse(
+                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        ApiErrorMessages.INTERNAL_SERVER_ERROR
+                ));
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -346,6 +382,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
 
+    @ExceptionHandler({
+            DataAccessResourceFailureException.class,
+            QueryTimeoutException.class,
+            CannotCreateTransactionException.class
+    })
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ApiErrorResponse handleDatabaseUnavailable(Exception exception) {
+
+        log.error("Database unavailable.", exception);
+
+        return new ApiErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE
+        );
+    }
+
     @ExceptionHandler(PessimisticLockingFailureException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public ApiErrorResponse handlePessimisticLockingFailure(
@@ -428,6 +480,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         errors.merge(field, message, (existing, next) -> existing + "; " + next);
     }
 
+
+    private static boolean isDatabaseFailure(Throwable throwable) {
+        for (Throwable cause = throwable;
+             cause != null;
+             cause = cause.getCause()) {
+
+            if (cause instanceof DataAccessException
+                    || cause instanceof TransactionException) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static String sqlStateOf(Throwable throwable) {
         for (Throwable cause = throwable;

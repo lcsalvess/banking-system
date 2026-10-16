@@ -130,6 +130,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     new BadCredentialsException("Invalid authentication")
             );
             return;
+        } catch (DataAccessException | TransactionException exception) {
+            // Falha de infraestrutura não é credencial inválida: responder 401
+            // faria o cliente descartar um token válido e reautenticar em vão.
+            log.error("Could not load the user while authenticating the request.", exception);
+            authenticationEntryPoint.commenceServiceUnavailable(response);
+            return;
         }
 
         filterChain.doFilter(request, response);

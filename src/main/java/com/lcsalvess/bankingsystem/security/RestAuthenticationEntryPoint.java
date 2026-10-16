@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -24,9 +25,9 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     @Override
     public void commence(
-            HttpServletRequest request,
+            @NonNull HttpServletRequest request,
             HttpServletResponse response,
-            AuthenticationException exception
+            @NonNull AuthenticationException exception
     ) throws IOException {
 
         ApiErrorResponse errorResponse = new ApiErrorResponse(
@@ -35,6 +36,28 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         );
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8);
+
+        response.getWriter().write(
+                jsonMapper.writeValueAsString(errorResponse)
+        );
+    }
+
+    /**
+     * Responde 503 em JSON quando a autenticação não pôde ser concluída por falha de
+     * infraestrutura (por exemplo, banco indisponível), em vez de um 401 enganoso.
+     */
+    public void commenceServiceUnavailable(
+            HttpServletResponse response
+    ) throws IOException {
+
+        ApiErrorResponse errorResponse = new ApiErrorResponse(
+                HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+                ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE
+        );
+
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8);
 

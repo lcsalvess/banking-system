@@ -37,6 +37,13 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private boolean active = true;
 
+    /**
+     * Versão das credenciais do usuário. Todo JWT carrega a versão vigente na
+     * emissão; ao trocar a senha a versão sobe e os tokens anteriores deixam de valer.
+     */
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -67,6 +74,15 @@ public class User implements UserDetails {
 
     public void deactivate() {
         this.active = false;
+    }
+
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+        this.tokenVersion++;
+    }
+
+    public int getTokenVersion() {
+        return tokenVersion;
     }
 
     public Long getId() {

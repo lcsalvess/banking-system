@@ -119,6 +119,32 @@ public class UserController {
     }
 
     @Operation(
+            summary = "Reactivate a user",
+            description = "Reactivates an existing inactive user account. "
+                    + "Only users with the ADMIN role are authorized "
+                    + "to perform this operation."
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "User reactivated successfully."
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The authenticated user does not have permission."
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found."
+            )
+    })
+    @PatchMapping("/{userId}/reactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserResponseDTO reactivate(@PathVariable Long userId) {
+        return userService.reactivate(userId);
+    }
+
+    @Operation(
             summary = "Deactivate a user",
             description = "Deactivates an existing user without deleting their data. "
                     + "Only users with the ADMIN role are authorized to perform this operation."

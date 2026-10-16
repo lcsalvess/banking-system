@@ -3,5 +3,6 @@ package com.lcsalvess.bankingsystem.event.user;
 public enum UserOperationType {
     CREATED,
     DEACTIVATED,
+    REACTIVATED,
     PASSWORD_CHANGED
 }

@@ -72,6 +72,10 @@ public class User implements UserDetails {
         this.role = role;
     }
 
+    public void reactivate() {
+        this.active = true;
+    }
+
     public void deactivate() {
         this.active = false;
     }

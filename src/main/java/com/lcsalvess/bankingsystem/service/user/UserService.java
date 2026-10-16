@@ -8,10 +8,7 @@ import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
-import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
-import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
-import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.user.*;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.UserSpecifications;
 import com.lcsalvess.bankingsystem.util.EmailNormalizer;
@@ -29,6 +26,9 @@ import java.util.List;
 
 @Service
 public class UserService {
+
+    private static final String SYSTEM_MIGRATION_USERNAME =
+            "system_migration";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -92,6 +92,32 @@ public class UserService {
     }
 
     @Transactional
+    public UserResponseDTO reactivate(Long userId) {
+        User user = findUserForUpdateOrThrow(userId);
+
+        if (SYSTEM_MIGRATION_USERNAME.equals(user.getUsername())) {
+            throw new SystemUserCannotBeReactivatedException(
+                    ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
+            );
+        }
+
+        if (user.isActive()) {
+            return toResponse(user);
+        }
+
+        user.reactivate();
+
+        eventPublisher.publishEvent(
+                new UserOperationEvent(
+                        user.getId(),
+                        UserOperationType.REACTIVATED
+                )
+        );
+
+        return toResponse(user);
+    }
+
+    @Transactional
     public UserResponseDTO deactivate(Long userId) {
         // O lock vem ANTES de carregar o alvo. Assim, as entidades de admin
         // entram no contexto de persistência já com o estado commitado mais
@@ -99,7 +125,7 @@ public class UserService {
         // "já desativado" (idempotente) em vez de virar um 409 indevido.
         List<User> activeAdmins = lockActiveAdminsIfTargetIsAdmin(userId);
 
-        User user = findUserOrThrow(userId);
+        User user = findUserForUpdateOrThrow(userId);
 
         if (!user.isActive()) {
             return toResponse(user);
@@ -135,8 +161,8 @@ public class UserService {
         }
     }
 
-    private User findUserOrThrow(Long userId) {
-        return userRepository.findById(userId)
+    private User findUserForUpdateOrThrow(Long userId) {
+        return userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new UserNotFoundException(
                         ApiErrorMessages.USER_NOT_FOUND
                 ));

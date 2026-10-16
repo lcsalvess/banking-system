@@ -6,10 +6,7 @@ import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
-import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
-import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
-import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
-import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.user.*;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.user.UserService;
 import org.junit.jupiter.api.DisplayName;
@@ -152,6 +149,98 @@ class UserServiceTests {
     }
 
     @Nested
+    @DisplayName("Ao reativar um usuário")
+    class ReactivateTests {
+
+        @Test
+        @DisplayName("Deve reativar um usuário inativo com sucesso")
+        void shouldReactivateInactiveUser() {
+            User employee = createUser(Role.EMPLOYEE, false);
+
+            when(userRepository.findByIdForUpdate(1L))
+                    .thenReturn(Optional.of(employee));
+
+            UserResponseDTO response = userService.reactivate(1L);
+
+            assertEquals(employee.getUsername(), response.username());
+            assertEquals(employee.getEmail(), response.email());
+            assertEquals(Role.EMPLOYEE, response.role());
+            assertTrue(response.active());
+            assertTrue(employee.isActive());
+
+            verify(userRepository).findByIdForUpdate(1L);
+
+            verify(eventPublisher).publishEvent(
+                    new UserOperationEvent(
+                            employee.getId(),
+                            UserOperationType.REACTIVATED
+                    )
+            );
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção quando o usuário não existe")
+        void shouldThrowWhenUserDoesNotExist() {
+            when(userRepository.findByIdForUpdate(1L))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(
+                    UserNotFoundException.class,
+                    () -> userService.reactivate(1L)
+            );
+
+            verify(userRepository).findByIdForUpdate(1L);
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Deve retornar o usuário sem alterações quando já está ativo")
+        void shouldReturnUserWhenAlreadyActive() {
+            User employee = createUser(Role.EMPLOYEE, true);
+
+            when(userRepository.findByIdForUpdate(1L))
+                    .thenReturn(Optional.of(employee));
+
+            UserResponseDTO response = userService.reactivate(1L);
+
+            assertEquals(employee.getUsername(), response.username());
+            assertEquals(employee.getEmail(), response.email());
+            assertEquals(Role.EMPLOYEE, response.role());
+            assertTrue(response.active());
+            assertTrue(employee.isActive());
+
+            verify(userRepository).findByIdForUpdate(1L);
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Não deve reativar o usuário técnico do sistema")
+        void shouldNotReactivateSystemMigrationUser() {
+            User systemUser = new User(
+                    "system_migration",
+                    "system-migration@invalid.example",
+                    "encoded-password",
+                    Role.EMPLOYEE
+            );
+
+            systemUser.deactivate();
+
+            when(userRepository.findByIdForUpdate(1L))
+                    .thenReturn(Optional.of(systemUser));
+
+            assertThrows(
+                    SystemUserCannotBeReactivatedException.class,
+                    () -> userService.reactivate(1L)
+            );
+
+            assertFalse(systemUser.isActive());
+
+            verify(userRepository).findByIdForUpdate(1L);
+            verifyNoInteractions(eventPublisher);
+        }
+    }
+
+    @Nested
     @DisplayName("Ao desativar um usuário")
     class DeactivateTests {
 
@@ -164,7 +253,7 @@ class UserServiceTests {
             when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
                     .thenReturn(true);
 
-            when(userRepository.findById(1L))
+            when(userRepository.findByIdForUpdate(1L))
                     .thenReturn(Optional.of(admin));
 
             when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
@@ -180,7 +269,7 @@ class UserServiceTests {
 
             verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
             verify(userRepository).findActiveUsersByRoleForUpdate(Role.ADMIN);
-            verify(userRepository).findById(1L);
+            verify(userRepository).findByIdForUpdate(1L);
 
             verify(eventPublisher).publishEvent(
                     new UserOperationEvent(
@@ -196,7 +285,7 @@ class UserServiceTests {
             when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
                     .thenReturn(false);
 
-            when(userRepository.findById(1L))
+            when(userRepository.findByIdForUpdate(1L))
                     .thenReturn(Optional.empty());
 
             assertThrows(
@@ -205,7 +294,7 @@ class UserServiceTests {
             );
 
             verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
-            verify(userRepository).findById(1L);
+            verify(userRepository).findByIdForUpdate(1L);
 
             verify(userRepository, never())
                     .findActiveUsersByRoleForUpdate(any());
@@ -221,7 +310,7 @@ class UserServiceTests {
             when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
                     .thenReturn(false);
 
-            when(userRepository.findById(1L))
+            when(userRepository.findByIdForUpdate(1L))
                     .thenReturn(Optional.of(user));
 
             UserResponseDTO response = userService.deactivate(1L);
@@ -233,7 +322,7 @@ class UserServiceTests {
             assertFalse(user.isActive());
 
             verify(userRepository).existsByIdAndRole(1L, Role.ADMIN);
-            verify(userRepository).findById(1L);
+            verify(userRepository).findByIdForUpdate(1L);
 
             verify(userRepository, never())
                     .findActiveUsersByRoleForUpdate(any());
@@ -249,7 +338,7 @@ class UserServiceTests {
             when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
                     .thenReturn(true);
 
-            when(userRepository.findById(1L))
+            when(userRepository.findByIdForUpdate(1L))
                     .thenReturn(Optional.of(admin));
 
             when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
@@ -276,7 +365,7 @@ class UserServiceTests {
             when(userRepository.existsByIdAndRole(1L, Role.ADMIN))
                     .thenReturn(false);
 
-            when(userRepository.findById(1L))
+            when(userRepository.findByIdForUpdate(1L))
                     .thenReturn(Optional.of(employee));
 
             UserResponseDTO response = userService.deactivate(1L);
@@ -299,20 +388,20 @@ class UserServiceTests {
                     )
             );
         }
+    }
 
-        private User createUser(Role role, boolean active) {
-            User user = new User(
-                    "usuario.teste",
-                    "teste@teste.com.br",
-                    "encoded-password",
-                    role
-            );
+    private User createUser(Role role, boolean active) {
+        User user = new User(
+                "usuario.teste",
+                "teste@teste.com.br",
+                "encoded-password",
+                role
+        );
 
-            if (!active) {
-                user.deactivate();
-            }
-
-            return user;
+        if (!active) {
+            user.deactivate();
         }
+
+        return user;
     }
 }

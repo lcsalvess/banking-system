@@ -152,7 +152,7 @@ class PasswordChangeServiceTests {
         @DisplayName("Deve lançar exceção quando o usuário autenticado não existe mais")
         void shouldThrowWhenAuthenticatedUserNoLongerExists() {
             when(currentUserService.getCurrentUser()).thenReturn(principal);
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+            when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.empty());
 
             UserNotFoundException exception = assertThrows(
                     UserNotFoundException.class,
@@ -169,7 +169,7 @@ class PasswordChangeServiceTests {
 
     private void mockCurrentUserFound() {
         when(currentUserService.getCurrentUser()).thenReturn(principal);
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(persistedUser));
+        when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(persistedUser));
     }
 
     private ChangePasswordRequestDTO request(String currentPassword, String newPassword) {

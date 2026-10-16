@@ -12,11 +12,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+
+import java.util.List;
+import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -223,6 +227,122 @@ class PasswordChangeIntegrationTests {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName(
+            "Deve permitir apenas uma troca de senha quando duas requisições ocorrem simultaneamente"
+    )
+    void shouldSerializeConcurrentPasswordChanges() throws Exception {
+        String token = loginAndGetToken(CURRENT_PASSWORD);
+
+        String firstNewPassword = "first-new-password";
+        String secondNewPassword = "second-new-password";
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try {
+            Future<Integer> firstResult = executor.submit(
+                    () -> changePasswordAfterStart(
+                            token,
+                            CURRENT_PASSWORD,
+                            firstNewPassword,
+                            ready,
+                            start
+                    )
+            );
+
+            Future<Integer> secondResult = executor.submit(
+                    () -> changePasswordAfterStart(
+                            token,
+                            CURRENT_PASSWORD,
+                            secondNewPassword,
+                            ready,
+                            start
+                    )
+            );
+
+            // Garante que as duas tarefas estejam prontas antes da largada.
+            assertTrue(
+                    ready.await(10, TimeUnit.SECONDS),
+                    "As duas requisições deveriam estar prontas para iniciar."
+            );
+
+            // Libera as duas requisições praticamente ao mesmo tempo.
+            start.countDown();
+
+            int firstStatus = firstResult.get(20, TimeUnit.SECONDS);
+            int secondStatus = secondResult.get(20, TimeUnit.SECONDS);
+
+            List<Integer> statuses = List.of(firstStatus, secondStatus);
+
+            // Exatamente uma troca deve ser concluída.
+            assertEquals(
+                    1L,
+                    statuses.stream()
+                            .filter(status -> status == HttpStatus.NO_CONTENT.value())
+                            .count(),
+                    "Exatamente uma troca de senha deve ser bem-sucedida."
+            );
+
+            // A segunda solicitação pode receber 400 se chegar ao serviço
+            // e a senha antiga já não corresponder, ou 401 se o filtro JWT
+            // detectar que o token foi invalidado.
+            assertTrue(
+                    statuses.stream().allMatch(status ->
+                            status == HttpStatus.NO_CONTENT.value()
+                                    || status == HttpStatus.BAD_REQUEST.value()
+                                    || status == HttpStatus.UNAUTHORIZED.value()
+                    ),
+                    "As respostas devem ser 204, 400 ou 401. Recebidas: " + statuses
+            );
+
+            User savedUser = userRepository
+                    .findByUsernameIgnoreCase(USERNAME)
+                    .orElseThrow();
+
+            // A versão não pode sofrer atualização perdida.
+            assertEquals(
+                    1,
+                    savedUser.getTokenVersion(),
+                    "A versão das credenciais deve ser incrementada exatamente uma vez."
+            );
+
+            boolean firstPasswordWon = passwordEncoder.matches(
+                    firstNewPassword,
+                    savedUser.getPassword()
+            );
+
+            boolean secondPasswordWon = passwordEncoder.matches(
+                    secondNewPassword,
+                    savedUser.getPassword()
+            );
+
+            // Exatamente uma das novas senhas deve corresponder ao hash persistido.
+            assertTrue(
+                    firstPasswordWon ^ secondPasswordWon,
+                    "Apenas uma das novas senhas deve estar armazenada."
+            );
+
+            String winningPassword = firstPasswordWon
+                    ? firstNewPassword
+                    : secondNewPassword;
+
+            // A senha antiga não deve mais autenticar.
+            login(CURRENT_PASSWORD)
+                    .andExpect(status().isUnauthorized());
+
+            // A senha vencedora deve autenticar normalmente.
+            login(winningPassword)
+                    .andExpect(status().isOk());
+        } finally {
+            // Evita deixar tarefas aguardando caso alguma asserção falhe.
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private ResultActions changePassword(
             String token,
             String currentPassword,
@@ -262,5 +382,27 @@ class PasswordChangeIntegrationTests {
                     "newPassword": "%s"
                 }
                 """.formatted(currentPassword, newPassword);
+    }
+
+    private int changePasswordAfterStart(
+            String token,
+            String currentPassword,
+            String newPassword,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) throws Exception {
+
+        ready.countDown();
+
+        if (!start.await(10, TimeUnit.SECONDS)) {
+            throw new IllegalStateException(
+                    "Tempo excedido aguardando o início do teste concorrente."
+            );
+        }
+
+        return changePassword(token, currentPassword, newPassword)
+                .andReturn()
+                .getResponse()
+                .getStatus();
     }
 }

@@ -40,4 +40,14 @@ public interface UserRepository extends
             order by u.id
             """)
     List<User> findActiveUsersByRoleForUpdate(@Param("role") Role role);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select u
+        from User u
+        where u.id = :userId
+        """)
+    Optional<User> findByIdForUpdate(
+            @Param("userId") Long userId
+    );
 }

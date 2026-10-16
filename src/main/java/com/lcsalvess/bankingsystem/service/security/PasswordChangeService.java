@@ -38,7 +38,7 @@ public class PasswordChangeService {
     public void changePassword(ChangePasswordRequestDTO dto) {
         Long userId = currentUserService.getCurrentUser().getId();
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new UserNotFoundException(
                         ApiErrorMessages.USER_NOT_FOUND
                 ));

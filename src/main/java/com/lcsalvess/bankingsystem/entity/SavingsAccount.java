@@ -1,4 +1,3 @@
-
 package com.lcsalvess.bankingsystem.entity;
 
 import com.lcsalvess.bankingsystem.entity.enums.AccountType;
@@ -19,6 +18,14 @@ public class SavingsAccount extends Account {
 
     private static final BigDecimal MONTHLY_YIELD_RATE =
             new BigDecimal("0.005");
+
+    private static final BigDecimal DAILY_YIELD_RATE =
+            BigDecimal.valueOf(
+                    Math.pow(
+                            1.0 + MONTHLY_YIELD_RATE.doubleValue(),
+                            1.0 / 30.0
+                    ) - 1.0
+            );
 
     @NotNull
     @Column(name = "last_yield_date", nullable = false)
@@ -56,15 +63,9 @@ public class SavingsAccount extends Account {
                 && referenceDate.isAfter(lastYieldDate);
     }
 
-
     public BigDecimal calculateYield() {
-        double dailyRate = Math.pow(
-                1.0 + MONTHLY_YIELD_RATE.doubleValue(),
-                1.0 / 30.0
-        ) - 1.0;
-
         return getBalance()
-                .multiply(BigDecimal.valueOf(dailyRate))
+                .multiply(DAILY_YIELD_RATE)
                 .setScale(2, RoundingMode.HALF_UP);
     }
 }

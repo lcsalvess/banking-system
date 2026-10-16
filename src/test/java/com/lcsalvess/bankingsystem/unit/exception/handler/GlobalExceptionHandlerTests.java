@@ -264,6 +264,10 @@ class GlobalExceptionHandlerTests {
                         ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
                 ),
                 Arguments.of(
+                        DatabaseConstraint.SYSTEM_MIGRATION_USER_INACTIVE,
+                        ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
+                ),
+                Arguments.of(
                         DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE,
                         ApiErrorMessages.ACTIVE_ACCOUNT_ALREADY_EXISTS
                 ),

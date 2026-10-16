@@ -34,6 +34,9 @@ public final class ApiErrorMessages {
     public static final String PASSWORD_UNCHANGED =
             "A nova senha deve ser diferente da senha atual.";
 
+    public static final String SYSTEM_USER_CANNOT_BE_REACTIVATED =
+            "Não é permitido reativar o usuário técnico do sistema.";
+
     // Authentication and authorization
     public static final String INVALID_CREDENTIALS =
             "Usuário ou senha inválidos.";

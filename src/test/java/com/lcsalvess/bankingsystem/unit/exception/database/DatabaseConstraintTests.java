@@ -74,6 +74,7 @@ class DatabaseConstraintTests {
         void shouldExposeTheExactName() {
             assertEquals("uk_users_username", DatabaseConstraint.USER_USERNAME_UNIQUE.getConstraintName());
             assertEquals("uk_users_email", DatabaseConstraint.USER_EMAIL_UNIQUE.getConstraintName());
+            assertEquals("ck_users_system_migration_inactive", DatabaseConstraint.SYSTEM_MIGRATION_USER_INACTIVE.getConstraintName());
             assertEquals("uk_clients_cpf", DatabaseConstraint.CLIENT_CPF_UNIQUE.getConstraintName());
             assertEquals("uk_clients_email", DatabaseConstraint.CLIENT_EMAIL_UNIQUE.getConstraintName());
             assertEquals(

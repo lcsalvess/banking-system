@@ -10,6 +10,7 @@ import org.hibernate.exception.ConstraintViolationException;
  */
 public enum DatabaseConstraint {
 
+    SYSTEM_MIGRATION_USER_INACTIVE("ck_users_system_migration_inactive"),
     USER_USERNAME_UNIQUE("uk_users_username"),
     USER_EMAIL_UNIQUE("uk_users_email"),
     CLIENT_CPF_UNIQUE("uk_clients_cpf"),

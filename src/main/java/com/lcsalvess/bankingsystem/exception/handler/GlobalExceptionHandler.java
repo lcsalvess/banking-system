@@ -469,7 +469,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ApiErrorMessages.USERNAME_ALREADY_EXISTS,
 
             DatabaseConstraint.USER_EMAIL_UNIQUE,
-            ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
+            ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS,
+
+            DatabaseConstraint.SYSTEM_MIGRATION_USER_INACTIVE,
+            ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
     );
 
     private void addValidationError(

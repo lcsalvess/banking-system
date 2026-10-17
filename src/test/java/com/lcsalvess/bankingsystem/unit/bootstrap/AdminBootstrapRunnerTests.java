@@ -312,6 +312,8 @@ class AdminBootstrapRunnerTests {
                         "admín", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_FORMAT),
                 Arguments.of("username with symbol",
                         "admin@root", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_FORMAT),
+                Arguments.of("username reserved for the system",
+                        "SYSTEM", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.RESERVED_USERNAME),
                 Arguments.of("e-mail without at sign",
                         VALID_USERNAME, "admin.example.com", VALID_PASSWORD, ValidationMessages.INVALID_EMAIL),
                 Arguments.of("e-mail above 254 characters",

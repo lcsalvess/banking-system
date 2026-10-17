@@ -22,6 +22,7 @@ import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.util.PageableTieBreaker;
+import com.lcsalvess.bankingsystem.util.SystemActor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -304,7 +305,7 @@ public class TransactionService {
                         TransactionType.YIELD,
                         savingsAccount.getAccountNumber(),
                         yieldAmount,
-                        "SYSTEM"
+                        SystemActor.NAME
                 )
         );
 

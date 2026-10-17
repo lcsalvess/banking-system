@@ -34,6 +34,9 @@ public final class ValidationMessages {
     public static final String INVALID_USERNAME_FORMAT =
             "O nome de usuário pode conter apenas letras, números, ponto, hífen e underscore.";
 
+    public static final String RESERVED_USERNAME =
+            "Este nome de usuário é reservado e não pode ser utilizado.";
+
     public static final String REQUIRED_USER_ROLE =
             "O perfil do usuário é obrigatório.";
 

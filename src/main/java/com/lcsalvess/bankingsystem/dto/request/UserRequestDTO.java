@@ -3,12 +3,13 @@ package com.lcsalvess.bankingsystem.dto.request;
 import com.lcsalvess.bankingsystem.entity.enums.Role;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import com.lcsalvess.bankingsystem.validation.passwordbytelength.PasswordByteLength;
+import com.lcsalvess.bankingsystem.validation.reservedusername.NotReservedUsername;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
 public record UserRequestDTO(
         @Schema(
-                description = "Unique username. Only letters, numbers, dots, underscores and hyphens are allowed.",
+                description = "Unique username. Only letters, numbers, dots, underscores and hyphens are allowed. The name \"system\" is reserved.",
                 example = "john.doe",
                 maxLength = 20
         )
@@ -18,6 +19,7 @@ public record UserRequestDTO(
                 regexp = "^[a-zA-Z0-9._-]+$",
                 message = ValidationMessages.INVALID_USERNAME_FORMAT
         )
+        @NotReservedUsername
         String username,
 
         @Schema(

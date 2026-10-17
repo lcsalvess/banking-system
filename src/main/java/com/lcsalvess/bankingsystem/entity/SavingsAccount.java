@@ -16,16 +16,14 @@ import java.time.LocalDate;
 )
 public class SavingsAccount extends Account {
 
-    private static final BigDecimal MONTHLY_YIELD_RATE =
-            new BigDecimal("0.005");
-
+    /**
+     * Taxa diária equivalente a 0,5% ao mês composto em 30 dias:
+     * (1 + 0,005)^(1/30) - 1.
+     * É uma constante decimal, e não um cálculo com {@code Math.pow}, para que
+     * o valor creditado não dependa da aritmética de ponto flutuante da JVM.
+     */
     private static final BigDecimal DAILY_YIELD_RATE =
-            BigDecimal.valueOf(
-                    Math.pow(
-                            1.0 + MONTHLY_YIELD_RATE.doubleValue(),
-                            1.0 / 30.0
-                    ) - 1.0
-            );
+            new BigDecimal("0.000166265204228477063643");
 
     private static final int FINANCIAL_SCALE = 2;
 

@@ -8,7 +8,9 @@ import java.time.ZoneId;
  */
 public final class AppTimeZone {
 
-    public static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
+    public static final String ID = "America/Sao_Paulo";
+
+    public static final ZoneId ZONE = ZoneId.of(ID);
 
     private AppTimeZone() {
     }

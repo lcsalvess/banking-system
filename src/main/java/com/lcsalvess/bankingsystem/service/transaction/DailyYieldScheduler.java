@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.entity.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
+import com.lcsalvess.bankingsystem.util.AppTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -42,7 +43,7 @@ public class DailyYieldScheduler {
 
     @Scheduled(
             cron = "${banking.yield.cron:0 5 0 * * *}",
-            zone = "America/Sao_Paulo"
+            zone = AppTimeZone.ID
     )
     public void processDailyYields() {
         LocalDate referenceDate = LocalDate.now(clock);

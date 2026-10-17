@@ -548,6 +548,24 @@ class SecurityConfigTests {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + legacyToken())));
         }
+
+        @Test
+        @DisplayName("Deve responder 401 para token com claim tv inválido")
+        void shouldReturn401ForTokenWithInvalidVersionClaim() throws Exception {
+            String token = Jwts.builder()
+                    .subject(USERNAME)
+                    .issuer(ISSUER)
+                    .issuedAt(new Date())
+                    .expiration(Date.from(Instant.now().plusSeconds(3600)))
+                    .claim("tv", "invalid")
+                    .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
+                    .compact();
+
+            expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)));
+
+            verifyNoInteractions(userDetailsService);
+        }
     }
 
     @Nested

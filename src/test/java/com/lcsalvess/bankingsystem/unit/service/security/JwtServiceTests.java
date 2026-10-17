@@ -412,6 +412,24 @@ class JwtServiceTests {
 
             assertThrows(SignatureException.class, () -> jwtService.parse(token));
         }
+
+        @Test
+        @DisplayName("Deve rejeitar token com claim tv inválido")
+        void shouldRejectTokenWithInvalidVersionClaim() {
+            String token = Jwts.builder()
+                    .subject(USERNAME)
+                    .issuer(ISSUER)
+                    .issuedAt(new Date())
+                    .expiration(inOneHour())
+                    .claim("tv", "invalid")
+                    .signWith(key(SECRET))
+                    .compact();
+
+            assertThrows(
+                    JwtException.class,
+                    () -> jwtService.parse(token)
+            );
+        }
     }
 
     private static JwtService serviceOf(String secret, long expirationInSeconds, String issuer) {

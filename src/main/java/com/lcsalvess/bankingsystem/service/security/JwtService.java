@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.config.JwtProperties;
 import com.lcsalvess.bankingsystem.entity.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.io.DecodingException;
@@ -99,7 +100,7 @@ public class JwtService {
                 || number.longValue() < 0
                 || number.longValue() > Integer.MAX_VALUE
                 || number.doubleValue() != number.intValue()) {
-            throw new IllegalArgumentException(
+            throw new JwtException(
                     ApiErrorMessages.JWT_TOKEN_VERSION_INVALID);
         }
 

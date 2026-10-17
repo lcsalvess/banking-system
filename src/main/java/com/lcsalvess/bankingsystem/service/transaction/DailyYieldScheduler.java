@@ -42,7 +42,7 @@ public class DailyYieldScheduler {
     }
 
     @Scheduled(
-            cron = "${banking.yield.cron:0 5 0 * * *}",
+            cron = "${banking.yield.cron}",
             zone = AppTimeZone.ID
     )
     public void processDailyYields() {

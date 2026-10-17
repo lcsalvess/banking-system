@@ -124,9 +124,6 @@ public final class ApiErrorMessages {
     public static final String CLIENT_CPF_ALREADY_EXISTS =
             "Já existe um cliente cadastrado com este CPF.";
 
-    public static final String DAILY_YIELD_ALREADY_APPLIED =
-            "O rendimento já foi aplicado para esta conta hoje.";
-
     public static final String DATABASE_INTEGRITY_ERROR =
             "Erro de integridade de dados no banco.";
 

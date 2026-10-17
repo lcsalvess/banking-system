@@ -462,9 +462,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             DatabaseConstraint.ACCOUNT_BALANCE_MAX,
             ApiErrorMessages.BALANCE_LIMIT_EXCEEDED,
 
-            DatabaseConstraint.TRANSACTION_DAILY_YIELD_UNIQUE,
-            ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED,
-
             DatabaseConstraint.USER_USERNAME_UNIQUE,
             ApiErrorMessages.USERNAME_ALREADY_EXISTS,
 

@@ -252,10 +252,6 @@ class GlobalExceptionHandlerTests {
                         ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS
                 ),
                 Arguments.of(
-                        DatabaseConstraint.TRANSACTION_DAILY_YIELD_UNIQUE,
-                        ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED
-                ),
-                Arguments.of(
                         DatabaseConstraint.USER_USERNAME_UNIQUE,
                         ApiErrorMessages.USERNAME_ALREADY_EXISTS
                 ),

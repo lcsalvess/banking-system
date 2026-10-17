@@ -85,10 +85,6 @@ class DatabaseConstraintTests {
                     "ck_accounts_balance_max",
                     DatabaseConstraint.ACCOUNT_BALANCE_MAX.getConstraintName()
             );
-            assertEquals(
-                    "uk_transactions_daily_yield",
-                    DatabaseConstraint.TRANSACTION_DAILY_YIELD_UNIQUE.getConstraintName()
-            );
         }
     }
 

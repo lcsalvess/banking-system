@@ -264,6 +264,10 @@ class GlobalExceptionHandlerTests {
                         ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
                 ),
                 Arguments.of(
+                        DatabaseConstraint.USER_USERNAME_RESERVED,
+                        ApiErrorMessages.RESERVED_USERNAME
+                ),
+                Arguments.of(
                         DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE,
                         ApiErrorMessages.ACTIVE_ACCOUNT_ALREADY_EXISTS
                 ),

@@ -1,5 +1,7 @@
 package com.lcsalvess.bankingsystem.exception.messages;
 
+import com.lcsalvess.bankingsystem.validation.ValidationMessages;
+
 public final class ApiErrorMessages {
 
     private ApiErrorMessages() {
@@ -21,6 +23,9 @@ public final class ApiErrorMessages {
 
     public static final String USER_EMAIL_ALREADY_EXISTS =
             "E-mail já cadastrado.";
+
+    public static final String RESERVED_USERNAME =
+            ValidationMessages.RESERVED_USERNAME;
 
     public static final String USER_NOT_FOUND =
             "Usuário não encontrado.";

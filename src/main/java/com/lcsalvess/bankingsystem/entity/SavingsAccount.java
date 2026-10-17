@@ -94,13 +94,6 @@ public class SavingsAccount extends Account {
     }
 
     /**
-     * Calcula o rendimento diário com base no saldo atual.
-     */
-    public BigDecimal calculateYield() {
-        return calculateYield(getBalance());
-    }
-
-    /**
      * Calcula o rendimento diário com base no saldo histórico informado.
      * O valor monetário final é arredondado para duas casas decimais.
      */

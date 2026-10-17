@@ -1,21 +1,24 @@
 package com.lcsalvess.bankingsystem.unit.service.transaction;
 
+import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.lcsalvess.bankingsystem.entity.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
-import com.lcsalvess.bankingsystem.exception.transaction.YieldNotAvailableException;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
+import com.lcsalvess.bankingsystem.service.transaction.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.service.transaction.DailyYieldScheduler;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ch.qos.logback.classic.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -26,7 +29,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -64,240 +66,400 @@ class DailyYieldSchedulerTests {
         );
     }
 
-    @Test
-    @DisplayName("Should process all active savings accounts in batches")
-    void shouldProcessAllSavingsAccountsInBatches() {
-        SavingsAccount first = savingsAccount(
-                1L, "00001", "1"
-        );
+    @Nested
+    @DisplayName("Account batch processing")
+    class AccountBatchProcessing {
 
-        SavingsAccount second = savingsAccount(
-                2L, "00002", "2"
-        );
+        @Test
+        @DisplayName("Should process all active savings accounts in batches")
+        void shouldProcessAllSavingsAccountsInBatches() {
+            SavingsAccount first = savingsAccount(
+                    1L, "00001", "1"
+            );
 
-        when(accountRepository.findNextSavingsAccountsByStatus(
-                eq(AccountStatus.ACTIVE),
-                eq(0L),
-                any(Pageable.class)
-        )).thenReturn(List.of(first, second));
+            SavingsAccount second = savingsAccount(
+                    2L, "00002", "2"
+            );
 
-        when(accountRepository.findNextSavingsAccountsByStatus(
-                eq(AccountStatus.ACTIVE),
-                eq(2L),
-                any(Pageable.class)
-        )).thenReturn(List.of());
+            givenAccounts(first, second);
+            givenYieldResult(first, TODAY, DailyYieldProcessingResult.APPLIED);
+            givenYieldResult(second, TODAY, DailyYieldProcessingResult.APPLIED);
 
-        scheduler.processDailyYields();
+            scheduler.processDailyYields();
 
-        verify(accountRepository).findNextSavingsAccountsByStatus(
-                AccountStatus.ACTIVE,
-                0L,
-                PageRequest.of(0, 100)
-        );
+            verifyBatchLookups(2L);
+            verifyYieldCall(first, TODAY);
+            verifyYieldCall(second, TODAY);
 
-        verify(accountRepository).findNextSavingsAccountsByStatus(
-                AccountStatus.ACTIVE,
-                2L,
-                PageRequest.of(0, 100)
-        );
+            verifyNoMoreInteractions(accountRepository, transactionService);
+        }
 
-        verify(transactionService).applyYieldForDate(
-                "00001", "1", TODAY
-        );
+        @Test
+        @DisplayName("Should finish when there are no active savings accounts")
+        void shouldFinishWhenThereAreNoActiveSavingsAccounts() {
+            givenAccounts();
 
-        verify(transactionService).applyYieldForDate(
-                "00002", "2", TODAY
-        );
+            scheduler.processDailyYields();
 
-        verifyNoMoreInteractions(transactionService);
+            verifyBatchLookups();
+
+            verifyNoMoreInteractions(accountRepository);
+            verifyNoInteractions(transactionService);
+        }
+
+        @Test
+        @DisplayName("Should continue processing when one account fails")
+        void shouldContinueProcessingWhenOneAccountFails() {
+            SavingsAccount first = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            SavingsAccount second = savingsAccount(
+                    2L, "00002", "2"
+            );
+
+            givenAccounts(first, second);
+
+            when(transactionService.processDailyYieldForDate(
+                    first.getAccountNumber(),
+                    first.getDigit(),
+                    TODAY
+            )).thenThrow(
+                    new IllegalStateException("Simulated failure")
+            );
+
+            givenYieldResult(
+                    second,
+                    TODAY,
+                    DailyYieldProcessingResult.APPLIED
+            );
+
+            scheduler.processDailyYields();
+
+            verifyBatchLookups(2L);
+            verifyYieldCall(first, TODAY);
+            verifyYieldCall(second, TODAY);
+
+            verifyNoMoreInteractions(accountRepository, transactionService);
+        }
+
+        @Test
+        @DisplayName("Should continue after an account has no yield available")
+        void shouldContinueWhenYieldIsNotAvailable() {
+            SavingsAccount first = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            SavingsAccount second = savingsAccount(
+                    2L, "00002", "2"
+            );
+
+            givenAccounts(first, second);
+
+            givenYieldResult(
+                    first,
+                    TODAY,
+                    DailyYieldProcessingResult.NO_YIELD_AVAILABLE
+            );
+
+            givenYieldResult(
+                    second,
+                    TODAY,
+                    DailyYieldProcessingResult.APPLIED
+            );
+
+            scheduler.processDailyYields();
+
+            verifyBatchLookups(2L);
+            verifyYieldCall(first, TODAY);
+            verifyYieldCall(second, TODAY);
+
+            verifyNoMoreInteractions(accountRepository, transactionService);
+        }
     }
 
-    @Test
-    @DisplayName("Should continue processing when one account fails")
-    void shouldContinueProcessingWhenOneAccountFails() {
-        SavingsAccount first = savingsAccount(
-                1L, "00001", "1"
-        );
+    @Nested
+    @DisplayName("Infrastructure failure handling")
+    class InfrastructureFailureHandling {
 
-        SavingsAccount second = savingsAccount(
-                2L, "00002", "2"
-        );
+        @Test
+        @DisplayName("Should log aborted when fetching the next batch fails")
+        void shouldLogAbortedWhenFetchingNextBatchFails() {
+            SavingsAccount first = savingsAccount(
+                    1L, "00001", "1"
+            );
 
-        when(accountRepository.findNextSavingsAccountsByStatus(
-                eq(AccountStatus.ACTIVE),
-                eq(0L),
-                any(Pageable.class)
-        )).thenReturn(List.of(first, second));
+            SavingsAccount second = savingsAccount(
+                    2L, "00002", "2"
+            );
 
-        when(accountRepository.findNextSavingsAccountsByStatus(
-                eq(AccountStatus.ACTIVE),
-                eq(2L),
-                any(Pageable.class)
-        )).thenReturn(List.of());
+            givenBatchLookupFailure(first, second);
 
-        when(transactionService.applyYieldForDate(
-                "00001", "1", TODAY
-        )).thenThrow(new IllegalStateException("Simulated failure"));
+            givenYieldResult(first, TODAY, DailyYieldProcessingResult.APPLIED);
+            givenYieldResult(second, TODAY, DailyYieldProcessingResult.APPLIED);
 
-        assertDoesNotThrow(() -> scheduler.processDailyYields());
+            Logger schedulerLogger =
+                    (Logger) LoggerFactory.getLogger(DailyYieldScheduler.class);
 
-        verify(transactionService).applyYieldForDate(
-                "00001", "1", TODAY
-        );
+            ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+            logAppender.start();
+            schedulerLogger.addAppender(logAppender);
 
-        verify(transactionService).applyYieldForDate(
-                "00002", "2", TODAY
-        );
+            try {
+                scheduler.processDailyYields();
 
-        verifyNoMoreInteractions(transactionService);
+                assertTrue(
+                        logAppender.list.stream()
+                                .map(ILoggingEvent::getFormattedMessage)
+                                .anyMatch(message ->
+                                        message.contains(
+                                                "Daily yield processing aborted for "
+                                                        + TODAY
+                                        )
+                                ),
+                        "The scheduler should log that processing was aborted."
+                );
+
+                assertTrue(
+                        logAppender.list.stream()
+                                .map(ILoggingEvent::getFormattedMessage)
+                                .anyMatch(message ->
+                                        message.contains(
+                                                "Daily yield processing stopped while retrieving accounts"
+                                        )
+                                ),
+                        "The scheduler should log the batch retrieval failure."
+                );
+
+                verifyBatchLookups(2L);
+                verifyYieldCall(first, TODAY);
+                verifyYieldCall(second, TODAY);
+
+                verifyNoMoreInteractions(accountRepository, transactionService);
+
+            } finally {
+                schedulerLogger.detachAppender(logAppender);
+                logAppender.stop();
+            }
+        }
+
+        @Test
+        @DisplayName("Should retry transient infrastructure failures")
+        void shouldRetryTransientInfrastructureFailures() {
+            SavingsAccount account = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            givenAccounts(account);
+
+            when(transactionService.processDailyYieldForDate(
+                    account.getAccountNumber(),
+                    account.getDigit(),
+                    TODAY
+            ))
+                    .thenThrow(
+                            new PessimisticLockingFailureException(
+                                    "Simulated temporary lock failure"
+                            )
+                    )
+                    .thenReturn(DailyYieldProcessingResult.APPLIED);
+
+            scheduler.processDailyYields();
+
+            verifyBatchLookups(1L);
+
+            verify(transactionService, times(2)).processDailyYieldForDate(
+                    account.getAccountNumber(),
+                    account.getDigit(),
+                    TODAY
+            );
+
+            verifyNoMoreInteractions(accountRepository, transactionService);
+        }
+
+        @Test
+        @DisplayName("Should continue with other accounts after exhausting retries")
+        void shouldContinueWhenRetriesAreExhausted() {
+            SavingsAccount first = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            SavingsAccount second = savingsAccount(
+                    2L, "00002", "2"
+            );
+
+            givenAccounts(first, second);
+
+            when(transactionService.processDailyYieldForDate(
+                    first.getAccountNumber(),
+                    first.getDigit(),
+                    TODAY
+            )).thenThrow(
+                    new PessimisticLockingFailureException(
+                            "Temporary failure"
+                    )
+            );
+
+            givenYieldResult(second, TODAY, DailyYieldProcessingResult.APPLIED);
+
+            scheduler.processDailyYields();
+
+            verifyBatchLookups(2L);
+
+            verify(transactionService, times(3)).processDailyYieldForDate(
+                    first.getAccountNumber(),
+                    first.getDigit(),
+                    TODAY
+            );
+
+            verifyYieldCall(second, TODAY);
+
+            verifyNoMoreInteractions(accountRepository, transactionService);
+        }
     }
 
-    @Test
-    @DisplayName("Should finish when there are no active savings accounts")
-    void shouldFinishWhenThereAreNoActiveSavingsAccounts() {
-        when(accountRepository.findNextSavingsAccountsByStatus(
-                eq(AccountStatus.ACTIVE),
-                eq(0L),
-                any(Pageable.class)
-        )).thenReturn(List.of());
+    @Nested
+    @DisplayName("Pending date recovery")
+    class PendingDateRecovery {
 
-        assertDoesNotThrow(() -> scheduler.processDailyYields());
+        @Test
+        @DisplayName("Should process pending dates in chronological order")
+        void shouldProcessPendingDatesInChronologicalOrder() {
+            SavingsAccount account = savingsAccount(
+                    1L, "00001", "1"
+            );
 
-        verify(accountRepository).findNextSavingsAccountsByStatus(
-                AccountStatus.ACTIVE,
-                0L,
-                PageRequest.of(0, 100)
-        );
+            ReflectionTestUtils.setField(
+                    account,
+                    "lastYieldProcessedDate",
+                    TODAY.minusDays(3)
+            );
 
-        verifyNoInteractions(transactionService);
+            givenAccounts(account);
+
+            LocalDate firstDate = TODAY.minusDays(2);
+            LocalDate secondDate = TODAY.minusDays(1);
+
+            givenYieldResult(
+                    account,
+                    firstDate,
+                    DailyYieldProcessingResult.APPLIED
+            );
+
+            givenYieldResult(
+                    account,
+                    secondDate,
+                    DailyYieldProcessingResult.APPLIED
+            );
+
+            givenYieldResult(
+                    account,
+                    TODAY,
+                    DailyYieldProcessingResult.APPLIED
+            );
+
+            scheduler.processDailyYields();
+
+            InOrder inOrder = inOrder(transactionService);
+
+            inOrder.verify(transactionService).processDailyYieldForDate(
+                    account.getAccountNumber(),
+                    account.getDigit(),
+                    firstDate
+            );
+
+            inOrder.verify(transactionService).processDailyYieldForDate(
+                    account.getAccountNumber(),
+                    account.getDigit(),
+                    secondDate
+            );
+
+            inOrder.verify(transactionService).processDailyYieldForDate(
+                    account.getAccountNumber(),
+                    account.getDigit(),
+                    TODAY
+            );
+
+            verifyBatchLookups(1L);
+
+            verifyNoMoreInteractions(accountRepository, transactionService);
+        }
     }
 
-    @Test
-    @DisplayName("Should continue after an account has no yield available")
-    void shouldContinueWhenYieldIsNotAvailable() {
-        SavingsAccount first = savingsAccount(
-                1L, "00001", "1"
-        );
-
-        SavingsAccount second = savingsAccount(
-                2L, "00002", "2"
-        );
-
+    private void givenFirstBatch(SavingsAccount... accounts) {
         when(accountRepository.findNextSavingsAccountsByStatus(
                 eq(AccountStatus.ACTIVE),
                 eq(0L),
                 any(Pageable.class)
-        )).thenReturn(List.of(first, second));
-
-        when(accountRepository.findNextSavingsAccountsByStatus(
-                eq(AccountStatus.ACTIVE),
-                eq(2L),
-                any(Pageable.class)
-        )).thenReturn(List.of());
-
-        when(transactionService.applyYieldForDate(
-                "00001", "1", TODAY
-        )).thenThrow(
-                new YieldNotAvailableException(
-                        "Rendimento diário indisponível."
-                )
-        );
-
-        assertDoesNotThrow(() -> scheduler.processDailyYields());
-
-        verify(transactionService).applyYieldForDate(
-                "00001", "1", TODAY
-        );
-
-        verify(transactionService).applyYieldForDate(
-                "00002", "2", TODAY
-        );
-
-        verifyNoMoreInteractions(transactionService);
+        )).thenReturn(List.of(accounts));
     }
 
-    @Test
-    @DisplayName("Should log aborted when fetching the next batch fails")
-    void shouldLogAbortedWhenFetchingNextBatchFails() {
-        SavingsAccount first = savingsAccount(
-                1L, "00001", "1"
-        );
+    private void givenAccounts(SavingsAccount... accounts) {
+        givenFirstBatch(accounts);
 
-        SavingsAccount second = savingsAccount(
-                2L, "00002", "2"
-        );
+        if (accounts.length == 0) {
+            return;
+        }
+
+        long lastId = accounts[accounts.length - 1].getId();
 
         when(accountRepository.findNextSavingsAccountsByStatus(
                 eq(AccountStatus.ACTIVE),
-                eq(0L),
+                eq(lastId),
                 any(Pageable.class)
-        )).thenReturn(List.of(first, second));
+        )).thenReturn(List.of());
+    }
+
+    private void givenBatchLookupFailure(SavingsAccount... accounts) {
+        givenFirstBatch(accounts);
+
+        long lastId = accounts[accounts.length - 1].getId();
 
         when(accountRepository.findNextSavingsAccountsByStatus(
                 eq(AccountStatus.ACTIVE),
-                eq(2L),
+                eq(lastId),
                 any(Pageable.class)
         )).thenThrow(
                 new IllegalStateException("Simulated batch lookup failure")
         );
+    }
 
-        Logger schedulerLogger =
-                (Logger) LoggerFactory.getLogger(DailyYieldScheduler.class);
+    private void givenYieldResult(
+            SavingsAccount account,
+            LocalDate referenceDate,
+            DailyYieldProcessingResult result
+    ) {
+        when(transactionService.processDailyYieldForDate(
+                account.getAccountNumber(),
+                account.getDigit(),
+                referenceDate
+        )).thenReturn(result);
+    }
 
-        ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
-        logAppender.start();
-        schedulerLogger.addAppender(logAppender);
+    private void verifyYieldCall(
+            SavingsAccount account,
+            LocalDate referenceDate
+    ) {
+        verify(transactionService).processDailyYieldForDate(
+                account.getAccountNumber(),
+                account.getDigit(),
+                referenceDate
+        );
+    }
 
-        try {
-            assertDoesNotThrow(() -> scheduler.processDailyYields());
+    private void verifyBatchLookups(long... afterIds) {
+        verify(accountRepository).findNextSavingsAccountsByStatus(
+                AccountStatus.ACTIVE,
+                0L,
+                PageRequest.of(0, 100)
+        );
 
-            assertTrue(
-                    logAppender.list.stream()
-                            .map(ILoggingEvent::getFormattedMessage)
-                            .anyMatch(message ->
-                                    message.contains(
-                                            "Daily yield processing aborted for " + TODAY
-                                    )
-                            ),
-                    "The scheduler should log that processing was aborted."
-            );
-
-            assertTrue(
-                    logAppender.list.stream()
-                            .map(ILoggingEvent::getFormattedMessage)
-                            .anyMatch(message ->
-                                    message.contains(
-                                            "Daily yield processing stopped while retrieving accounts"
-                                    )
-                            ),
-                    "The scheduler should log the batch retrieval failure."
-            );
-
+        for (long afterId : afterIds) {
             verify(accountRepository).findNextSavingsAccountsByStatus(
                     AccountStatus.ACTIVE,
-                    0L,
+                    afterId,
                     PageRequest.of(0, 100)
             );
-
-            verify(accountRepository).findNextSavingsAccountsByStatus(
-                    AccountStatus.ACTIVE,
-                    2L,
-                    PageRequest.of(0, 100)
-            );
-
-            verify(transactionService).applyYieldForDate(
-                    "00001", "1", TODAY
-            );
-
-            verify(transactionService).applyYieldForDate(
-                    "00002", "2", TODAY
-            );
-
-            verifyNoMoreInteractions(accountRepository, transactionService);
-
-        } finally {
-            schedulerLogger.detachAppender(logAppender);
-            logAppender.stop();
         }
     }
 

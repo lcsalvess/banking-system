@@ -17,6 +17,7 @@ import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.service.transaction.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,8 +33,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
@@ -45,7 +48,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest
 class TransactionConcurrencyTests {
 
-    // Keep at or below the Hikari default pool size (10) so tests never starve on connections.
+    // Keep at or below the Hikari default pool size (10).
     private static final int THREADS = 10;
     private static final int TIMEOUT_SECONDS = 30;
 
@@ -110,13 +113,19 @@ class TransactionConcurrencyTests {
         when(currentUserService.getUsername()).thenReturn(testUser.getUsername());
     }
 
+    // ---------------------------------------------------------------------
+    // Concurrent withdrawals
+    // ---------------------------------------------------------------------
+
     @Nested
     @DisplayName("Concurrent withdrawals")
     class ConcurrentWithdrawals {
 
         @Test
         @DisplayName("Should prevent two withdrawals from overdrawing the account")
-        void shouldPreventConcurrentWithdrawalsFromOverdrawingAccount() throws Exception {
+        void shouldPreventConcurrentWithdrawalsFromOverdrawingAccount()
+                throws Exception {
+
             CheckingAccount account = createCheckingAccount("1000.00");
 
             List<Boolean> results = runConcurrently(List.of(
@@ -126,23 +135,36 @@ class TransactionConcurrencyTests {
 
             assertEquals(1, countSucceeded(results));
             assertBalance("300.00", account);
-            assertEquals(1, countTransactions(account, TransactionType.WITHDRAWAL));
+            assertEquals(
+                    1,
+                    countTransactions(account, TransactionType.WITHDRAWAL)
+            );
         }
 
         @Test
         @DisplayName("Should allow only as many withdrawals as the balance supports")
-        void shouldAllowOnlyAsManyWithdrawalsAsBalanceSupports() throws Exception {
+        void shouldAllowOnlyAsManyWithdrawalsAsBalanceSupports()
+                throws Exception {
+
             CheckingAccount account = createCheckingAccount("1000.00");
 
-            List<Callable<Boolean>> tasks = repeat(THREADS, () -> withdrawal(account, "200.00"));
+            List<Callable<Boolean>> tasks =
+                    repeat(THREADS, () -> withdrawal(account, "200.00"));
 
             List<Boolean> results = runConcurrently(tasks);
 
             assertEquals(5, countSucceeded(results));
             assertBalance("0.00", account);
-            assertEquals(5, countTransactions(account, TransactionType.WITHDRAWAL));
+            assertEquals(
+                    5,
+                    countTransactions(account, TransactionType.WITHDRAWAL)
+            );
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Concurrent deposits
+    // ---------------------------------------------------------------------
 
     @Nested
     @DisplayName("Concurrent deposits")
@@ -153,13 +175,17 @@ class TransactionConcurrencyTests {
         void shouldNotLoseAnyDeposit() throws Exception {
             CheckingAccount account = createCheckingAccount("0.00");
 
-            List<Callable<Boolean>> tasks = repeat(THREADS, () -> deposit(account, "50.00"));
+            List<Callable<Boolean>> tasks =
+                    repeat(THREADS, () -> deposit(account, "50.00"));
 
             List<Boolean> results = runConcurrently(tasks);
 
             assertEquals(THREADS, countSucceeded(results));
             assertBalance("500.00", account);
-            assertEquals(THREADS, countTransactions(account, TransactionType.DEPOSIT));
+            assertEquals(
+                    THREADS,
+                    countTransactions(account, TransactionType.DEPOSIT)
+            );
         }
 
         @Test
@@ -168,17 +194,31 @@ class TransactionConcurrencyTests {
             CheckingAccount account = createCheckingAccount("1000.00");
 
             List<Callable<Boolean>> tasks = new ArrayList<>();
-            tasks.addAll(repeat(THREADS / 2, () -> deposit(account, "200.00")));
-            tasks.addAll(repeat(THREADS / 2, () -> withdrawal(account, "200.00")));
+            tasks.addAll(
+                    repeat(THREADS / 2, () -> deposit(account, "200.00"))
+            );
+            tasks.addAll(
+                    repeat(THREADS / 2, () -> withdrawal(account, "200.00"))
+            );
 
             List<Boolean> results = runConcurrently(tasks);
 
             assertEquals(THREADS, countSucceeded(results));
             assertBalance("1000.00", account);
-            assertEquals(THREADS / 2, countTransactions(account, TransactionType.DEPOSIT));
-            assertEquals(THREADS / 2, countTransactions(account, TransactionType.WITHDRAWAL));
+            assertEquals(
+                    THREADS / 2,
+                    countTransactions(account, TransactionType.DEPOSIT)
+            );
+            assertEquals(
+                    THREADS / 2,
+                    countTransactions(account, TransactionType.WITHDRAWAL)
+            );
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Concurrent transfers
+    // ---------------------------------------------------------------------
 
     @Nested
     @DisplayName("Concurrent transfers")
@@ -186,7 +226,9 @@ class TransactionConcurrencyTests {
 
         @Test
         @DisplayName("Should complete concurrent opposite transfers without deadlock")
-        void shouldCompleteConcurrentOppositeTransfersWithoutDeadlock() throws Exception {
+        void shouldCompleteConcurrentOppositeTransfersWithoutDeadlock()
+                throws Exception {
+
             CheckingAccount first = createCheckingAccount("1000.00");
             CheckingAccount second = createCheckingAccount("1000.00");
 
@@ -220,7 +262,9 @@ class TransactionConcurrencyTests {
 
         @Test
         @DisplayName("Should not lose credits when multiple transfers target the same account")
-        void shouldNotLoseCreditsWhenMultipleTransfersTargetSameAccount() throws Exception {
+        void shouldNotLoseCreditsWhenMultipleTransfersTargetSameAccount()
+                throws Exception {
+
             CheckingAccount firstSource = createCheckingAccount("100.00");
             CheckingAccount secondSource = createCheckingAccount("100.00");
             CheckingAccount thirdSource = createCheckingAccount("100.00");
@@ -247,7 +291,9 @@ class TransactionConcurrencyTests {
 
         @Test
         @DisplayName("Should allow only as many concurrent transfers as the balance supports")
-        void shouldAllowOnlyAsManyConcurrentTransfersAsBalanceSupports() throws Exception {
+        void shouldAllowOnlyAsManyConcurrentTransfersAsBalanceSupports()
+                throws Exception {
+
             CheckingAccount source = createCheckingAccount("100.00");
             CheckingAccount destination = createCheckingAccount("0.00");
 
@@ -272,13 +318,19 @@ class TransactionConcurrencyTests {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Concurrent yields
+    // ---------------------------------------------------------------------
+
     @Nested
     @DisplayName("Concurrent yields")
     class ConcurrentYields {
 
         @Test
         @DisplayName("Should apply daily yield only once when requests are concurrent")
-        void shouldApplyYieldOnlyOnceWhenRequestsAreConcurrent() throws Exception {
+        void shouldApplyYieldOnlyOnceWhenRequestsAreConcurrent()
+                throws Exception {
+
             SavingsAccount account = createSavingsAccount("1000.00");
 
             List<Boolean> results = runConcurrently(List.of(
@@ -288,8 +340,7 @@ class TransactionConcurrencyTests {
 
             assertEquals(1, countSucceeded(results));
 
-            // A taxa diária equivalente a 0,5% ao mês rende R$ 0,17
-            // sobre o saldo de R$ 1.000,00.
+            // A daily rate equivalent to 0.5% monthly yields R$ 0.17 on R$ 1,000.
             assertBalance("1000.17", account);
 
             assertEquals(
@@ -297,9 +348,9 @@ class TransactionConcurrencyTests {
                     countTransactions(account, TransactionType.YIELD)
             );
 
-            SavingsAccount persisted = (SavingsAccount) accountRepository
-                    .findById(account.getId())
-                    .orElseThrow();
+            SavingsAccount persisted = (SavingsAccount)
+                    accountRepository.findById(account.getId())
+                            .orElseThrow();
 
             assertEquals(LocalDate.now(clock), persisted.getLastYieldDate());
 
@@ -322,6 +373,60 @@ class TransactionConcurrencyTests {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Concurrent daily yield recovery
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Concurrent daily yield recovery")
+    class ConcurrentDailyYieldRecovery {
+
+        @Test
+        @DisplayName("Should apply recovered daily yield only once when requests are concurrent")
+        void shouldApplyRecoveredYieldOnlyOnceWhenRequestsAreConcurrent()
+                throws Exception {
+
+            SavingsAccount account = createSavingsAccount("1000.00");
+            LocalDate referenceDate = LocalDate.now(clock);
+
+            transactionRepository.saveAndFlush(
+                    new Transaction(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("1000.00"),
+                            referenceDate.minusDays(1).atTime(12, 0),
+                            account,
+                            findTestUser()
+                    )
+            );
+
+            List<Boolean> results = runConcurrently(List.of(
+                    processDailyYield(account, referenceDate),
+                    processDailyYield(account, referenceDate)
+            ));
+
+            assertEquals(1, countSucceeded(results));
+            assertBalance("1000.17", account);
+
+            assertEquals(
+                    1,
+                    countTransactions(account, TransactionType.YIELD)
+            );
+
+            SavingsAccount persisted = (SavingsAccount)
+                    accountRepository.findById(account.getId())
+                            .orElseThrow();
+
+            assertEquals(referenceDate, persisted.getLastYieldDate());
+            assertEquals(
+                    referenceDate,
+                    persisted.getLastYieldProcessedDate()
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Concurrent account cancellation and deposits
+    // ---------------------------------------------------------------------
 
     @Nested
     @DisplayName("Concurrent account cancellation and deposits")
@@ -331,6 +436,7 @@ class TransactionConcurrencyTests {
         @DisplayName("Should preserve account state when cancellation races with deposit")
         void shouldPreserveAccountStateWhenCancellationRacesWithDeposit()
                 throws Exception {
+
             CheckingAccount account = createCheckingAccount("0.00");
 
             List<Boolean> results = runConcurrently(List.of(
@@ -348,17 +454,207 @@ class TransactionConcurrencyTests {
                         0,
                         BigDecimal.ZERO.compareTo(persisted.getBalance())
                 );
-                assertEquals(0, countTransactions(account, TransactionType.DEPOSIT));
+                assertEquals(
+                        0,
+                        countTransactions(account, TransactionType.DEPOSIT)
+                );
             } else {
                 assertEquals(
                         0,
                         new BigDecimal("100.00").compareTo(persisted.getBalance())
                 );
-                assertEquals(1, countTransactions(account, TransactionType.DEPOSIT));
+                assertEquals(
+                        1,
+                        countTransactions(account, TransactionType.DEPOSIT)
+                );
             }
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Historical balance reconstruction
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Historical balance reconstruction")
+    class HistoricalBalanceReconstruction {
+
+        @Test
+        @DisplayName("Should reconstruct the balance at the start of a day")
+        void shouldCalculateBalanceAtStartOfDay() {
+            SavingsAccount account = createSavingsAccount("0.00");
+            User actor = findTestUser();
+
+            LocalDate referenceDate = LocalDate.of(2026, 1, 16);
+
+            UUID outgoingTransferCode = UUID.randomUUID();
+            UUID incomingTransferCode = UUID.randomUUID();
+
+            transactionRepository.saveAllAndFlush(List.of(
+                    new Transaction(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("100.00"),
+                            LocalDateTime.of(2026, 1, 10, 10, 0),
+                            account,
+                            actor
+                    ),
+                    new Transaction(
+                            TransactionType.WITHDRAWAL,
+                            new BigDecimal("10.00"),
+                            LocalDateTime.of(2026, 1, 11, 10, 0),
+                            account,
+                            actor
+                    ),
+                    new Transaction(
+                            TransactionType.TRANSFER_SENT,
+                            new BigDecimal("20.00"),
+                            LocalDateTime.of(2026, 1, 12, 10, 0),
+                            account,
+                            outgoingTransferCode,
+                            actor
+                    ),
+                    new Transaction(
+                            TransactionType.TRANSFER_RECEIVED,
+                            new BigDecimal("30.00"),
+                            LocalDateTime.of(2026, 1, 13, 10, 0),
+                            account,
+                            incomingTransferCode,
+                            actor
+                    ),
+                    new Transaction(
+                            TransactionType.YIELD,
+                            new BigDecimal("2.50"),
+                            LocalDateTime.of(2026, 1, 16, 0, 5),
+                            LocalDate.of(2026, 1, 15),
+                            account
+                    ),
+                    new Transaction(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("999.00"),
+                            LocalDateTime.of(2026, 1, 16, 10, 0),
+                            account,
+                            actor
+                    )
+            ));
+
+            BigDecimal actual =
+                    transactionRepository.calculateBalanceAtStartOfDay(
+                            account.getId(),
+                            referenceDate,
+                            referenceDate.atStartOfDay()
+                    );
+
+            assertEquals(
+                    0,
+                    new BigDecimal("102.50").compareTo(actual),
+                    "The historical balance should include only transactions "
+                            + "effective before the reference day."
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Sequential daily yield recovery
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Sequential daily yield recovery")
+    class SequentialDailyYieldRecovery {
+
+        @Test
+        @DisplayName("Should recover pending dates and compound daily yields correctly")
+        void shouldRecoverPendingDatesAndCompoundYieldsCorrectly() {
+            SavingsAccount account = createSavingsAccount("1000.00");
+
+            LocalDate today = LocalDate.now(clock);
+            LocalDate lastProcessedDate = today.minusDays(3);
+
+            setYieldProcessingDates(
+                    account,
+                    lastProcessedDate,
+                    lastProcessedDate
+            );
+
+            SavingsAccount persistedAccount = (SavingsAccount)
+                    accountRepository.findById(account.getId())
+                            .orElseThrow();
+
+            transactionRepository.saveAndFlush(
+                    new Transaction(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("1000.00"),
+                            lastProcessedDate.minusDays(1).atTime(12, 0),
+                            persistedAccount,
+                            findTestUser()
+                    )
+            );
+
+            // Process the first pending date.
+            LocalDate firstDate = lastProcessedDate.plusDays(1);
+
+            DailyYieldProcessingResult firstResult =
+                    transactionService.processDailyYieldForDate(
+                            account.getAccountNumber(),
+                            account.getDigit(),
+                            firstDate
+                    );
+
+            assertEquals(
+                    DailyYieldProcessingResult.APPLIED,
+                    firstResult
+            );
+
+            // Simulate a restart by clearing the persistence context.
+            entityManager.clear();
+
+            SavingsAccount checkpointedAccount = (SavingsAccount)
+                    accountRepository.findById(account.getId())
+                            .orElseThrow();
+
+            assertEquals(
+                    firstDate,
+                    checkpointedAccount.getLastYieldProcessedDate(),
+                    "The first processed date must survive a persistence-context reset."
+            );
+
+            // Resume from the next pending date.
+            for (
+                    LocalDate referenceDate = firstDate.plusDays(1);
+                    !referenceDate.isAfter(today);
+                    referenceDate = referenceDate.plusDays(1)
+            ) {
+                DailyYieldProcessingResult result =
+                        transactionService.processDailyYieldForDate(
+                                account.getAccountNumber(),
+                                account.getDigit(),
+                                referenceDate
+                        );
+
+                assertEquals(
+                        DailyYieldProcessingResult.APPLIED,
+                        result,
+                        "Expected recovery to resume successfully for " + referenceDate
+                );
+            }
+
+            assertBalance("1000.51", account);
+
+            assertEquals(
+                    3,
+                    countTransactions(account, TransactionType.YIELD)
+            );
+
+            SavingsAccount recoveredAccount = (SavingsAccount)
+                    accountRepository.findById(account.getId())
+                            .orElseThrow();
+
+            assertEquals(today, recoveredAccount.getLastYieldDate());
+            assertEquals(
+                    today,
+                    recoveredAccount.getLastYieldProcessedDate()
+            );
+        }
+    }
 
     // ---------------------------------------------------------------------
     // Tasks
@@ -419,11 +715,21 @@ class TransactionConcurrencyTests {
                 );
 
                 return true;
-
-            } catch (YieldAlreadyAppliedException e) {
+            } catch (YieldAlreadyAppliedException ex) {
                 return false;
             }
         };
+    }
+
+    private Callable<Boolean> processDailyYield(
+            SavingsAccount account,
+            LocalDate referenceDate
+    ) {
+        return () -> transactionService.processDailyYieldForDate(
+                account.getAccountNumber(),
+                account.getDigit(),
+                referenceDate
+        ) == DailyYieldProcessingResult.APPLIED;
     }
 
     private Callable<Boolean> cancel(Account account) {
@@ -454,12 +760,15 @@ class TransactionConcurrencyTests {
     // ---------------------------------------------------------------------
 
     /**
-     * Runs all tasks at the same instant (barrier + start latch). Any exception other than
-     * the ones handled inside the tasks (deadlock, lock timeout, unexpected failure) is
-     * rethrown here, so the test fails with the real cause instead of hanging.
+     * Starts all tasks together. Unexpected failures are rethrown through Future.get(),
+     * so deadlocks and lock timeouts fail the test rather than being silently ignored.
      */
-    private List<Boolean> runConcurrently(List<Callable<Boolean>> tasks) throws Exception {
-        ExecutorService executor = Executors.newFixedThreadPool(tasks.size());
+    private List<Boolean> runConcurrently(List<Callable<Boolean>> tasks)
+            throws Exception {
+
+        ExecutorService executor =
+                Executors.newFixedThreadPool(tasks.size());
+
         CountDownLatch ready = new CountDownLatch(tasks.size());
         CountDownLatch start = new CountDownLatch(1);
 
@@ -472,25 +781,39 @@ class TransactionConcurrencyTests {
                     }))
                     .toList();
 
-            assertTrue(ready.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "Threads did not become ready in time");
+            assertTrue(
+                    ready.await(TIMEOUT_SECONDS, TimeUnit.SECONDS),
+                    "Threads did not become ready in time."
+            );
+
             start.countDown();
 
             List<Boolean> results = new ArrayList<>();
+
             for (Future<Boolean> future : futures) {
                 results.add(future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
             }
+
             return results;
+
         } finally {
             executor.shutdownNow();
         }
     }
 
-    private List<Callable<Boolean>> repeat(int times, Supplier<Callable<Boolean>> factory) {
-        return IntStream.range(0, times).mapToObj(i -> factory.get()).toList();
+    private List<Callable<Boolean>> repeat(
+            int times,
+            Supplier<Callable<Boolean>> factory
+    ) {
+        return IntStream.range(0, times)
+                .mapToObj(i -> factory.get())
+                .toList();
     }
 
     private long countSucceeded(List<Boolean> results) {
-        return results.stream().filter(Boolean::booleanValue).count();
+        return results.stream()
+                .filter(Boolean::booleanValue)
+                .count();
     }
 
     // ---------------------------------------------------------------------
@@ -501,7 +824,12 @@ class TransactionConcurrencyTests {
         Client client = createClient();
         GeneratedAccountNumber generated = accountNumberGenerator.generate();
 
-        CheckingAccount account = new CheckingAccount(client, generated.number(), generated.digit());
+        CheckingAccount account = new CheckingAccount(
+                client,
+                generated.number(),
+                generated.digit()
+        );
+
         account.credit(new BigDecimal(initialBalance));
 
         return accountRepository.saveAndFlush(account);
@@ -511,26 +839,54 @@ class TransactionConcurrencyTests {
         Client client = createClient();
         GeneratedAccountNumber generated = accountNumberGenerator.generate();
 
+        // Both yield dates begin yesterday, making the account eligible today.
+        LocalDate initialYieldDate = LocalDate.now(clock).minusDays(1);
+
         SavingsAccount account = new SavingsAccount(
                 client,
                 generated.number(),
                 generated.digit(),
-                LocalDate.now(clock)
+                initialYieldDate
         );
 
         account.credit(new BigDecimal(initialBalance));
 
-        SavingsAccount saved = accountRepository.saveAndFlush(account);
+        return accountRepository.saveAndFlush(account);
+    }
 
-        jdbcTemplate.update(
-                "UPDATE savings_accounts SET last_yield_date = ? WHERE id = ?",
-                LocalDate.now(clock).minusDays(1),
-                saved.getId()
+    /**
+     * Overrides the persisted checkpoint only when a test needs a historical scenario.
+     * The persistence context is cleared to prevent stale entity state after direct SQL.
+     */
+    private void setYieldProcessingDates(
+            SavingsAccount account,
+            LocalDate lastYieldDate,
+            LocalDate lastProcessedDate
+    ) {
+        int updatedRows = jdbcTemplate.update(
+                """
+                UPDATE savings_accounts
+                SET last_yield_date = ?,
+                    last_yield_processed_date = ?
+                WHERE id = ?
+                """,
+                lastYieldDate,
+                lastProcessedDate,
+                account.getId()
+        );
+
+        assertEquals(
+                1,
+                updatedRows,
+                "Exactly one savings account should be updated."
         );
 
         entityManager.clear();
+    }
 
-        return (SavingsAccount) accountRepository.findById(saved.getId())
+    private User findTestUser() {
+        return userRepository
+                .findByUsernameIgnoreCase("test-user")
                 .orElseThrow();
     }
 
@@ -559,15 +915,25 @@ class TransactionConcurrencyTests {
     }
 
     private void assertBalance(String expected, Account account) {
-        BigDecimal actual = accountRepository.findById(account.getId()).orElseThrow().getBalance();
+        BigDecimal actual = accountRepository.findById(account.getId())
+                .orElseThrow()
+                .getBalance();
 
-        assertEquals(0, new BigDecimal(expected).compareTo(actual),
-                "Expected balance " + expected + " but was " + actual);
+        assertEquals(
+                0,
+                new BigDecimal(expected).compareTo(actual),
+                "Expected balance " + expected + " but was " + actual
+        );
     }
 
     private long countTransactions(Account account, TransactionType type) {
         return transactionRepository.count(
-                TransactionSpecifications.byAccountAndFilters(account.getId(), type, null, null)
+                TransactionSpecifications.byAccountAndFilters(
+                        account.getId(),
+                        type,
+                        null,
+                        null
+                )
         );
     }
 }

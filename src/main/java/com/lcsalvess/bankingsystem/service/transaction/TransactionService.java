@@ -272,6 +272,114 @@ public class TransactionService {
         return TransactionResponseDTO.fromEntity(transaction);
     }
 
+    @Transactional
+    public DailyYieldProcessingResult processDailyYieldForDate(
+            String accountNumber,
+            String accountDigit,
+            LocalDate referenceDate
+    ) {
+        if (referenceDate == null) {
+            throw new IllegalArgumentException(
+                    "A data de referência do rendimento é obrigatória."
+            );
+        }
+
+        if (referenceDate.isAfter(LocalDate.now(clock))) {
+            throw new IllegalArgumentException(
+                    "A data de referência não pode estar no futuro."
+            );
+        }
+
+        Account account = accountService.findEntityByAccountNumberForUpdate(
+                accountNumber,
+                accountDigit
+        );
+
+        SavingsAccount savingsAccount =
+                validateAndGetSavingsAccount(account);
+
+        validateActiveAccount(savingsAccount);
+
+        LocalDate lastProcessedDate =
+                savingsAccount.getLastYieldProcessedDate();
+
+        if (!referenceDate.isAfter(lastProcessedDate)) {
+            return DailyYieldProcessingResult.ALREADY_PROCESSED;
+        }
+
+        if (!referenceDate.equals(lastProcessedDate.plusDays(1))) {
+            throw new IllegalStateException(
+                    "As datas de rendimento devem ser processadas em ordem."
+            );
+        }
+
+        boolean alreadyApplied =
+                transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+                        savingsAccount.getId(),
+                        TransactionType.YIELD,
+                        referenceDate
+                );
+
+        if (alreadyApplied) {
+            if (referenceDate.isAfter(savingsAccount.getLastYieldDate())) {
+                savingsAccount.updateLastYieldDate(referenceDate);
+            }
+
+            savingsAccount.markYieldDateProcessed(referenceDate);
+
+            return DailyYieldProcessingResult.ALREADY_PROCESSED;
+        }
+
+        if (!savingsAccount.isEligibleForYield(referenceDate)) {
+            savingsAccount.markYieldDateProcessed(referenceDate);
+
+            return DailyYieldProcessingResult.NOT_ELIGIBLE;
+        }
+
+        BigDecimal balanceAtStartOfDay =
+                transactionRepository.calculateBalanceAtStartOfDay(
+                        savingsAccount.getId(),
+                        referenceDate,
+                        referenceDate.atStartOfDay()
+                );
+
+        BigDecimal yieldAmount =
+                savingsAccount.calculateYield(balanceAtStartOfDay);
+
+        if (yieldAmount.signum() <= 0) {
+            savingsAccount.markYieldDateProcessed(referenceDate);
+
+            return DailyYieldProcessingResult.NO_YIELD_AVAILABLE;
+        }
+
+        if (!savingsAccount.canCredit(yieldAmount)) {
+            savingsAccount.markYieldDateProcessed(referenceDate);
+
+            return DailyYieldProcessingResult.BALANCE_LIMIT_REACHED;
+        }
+
+        savingsAccount.credit(yieldAmount);
+        savingsAccount.updateLastYieldDate(referenceDate);
+        savingsAccount.markYieldDateProcessed(referenceDate);
+
+        registerSystemYieldTransaction(
+                yieldAmount,
+                referenceDate,
+                savingsAccount
+        );
+
+        eventPublisher.publishEvent(
+                new TransactionOperationEvent(
+                        TransactionType.YIELD,
+                        savingsAccount.getAccountNumber(),
+                        yieldAmount,
+                        "SYSTEM"
+                )
+        );
+
+        return DailyYieldProcessingResult.APPLIED;
+    }
+
     private void validateActiveAccount(Account account) {
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_NOT_ACTIVE);

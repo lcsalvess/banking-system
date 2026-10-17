@@ -19,6 +19,7 @@ import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifica
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.service.transaction.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -1195,6 +1196,189 @@ public class TransactionServiceTests {
 
             verifyAccountOperationLookup(account);
             verifyYieldChecked();
+            verifyNoMoreInteractionsOnMocks();
+        }
+    }
+
+    @Nested
+    @DisplayName("processDailyYieldForDate(...)")
+    class ProcessDailyYieldForDate {
+
+        @Test
+        @DisplayName("Should apply yield and advance processing date")
+        void shouldApplyYieldAndAdvanceProcessingDate() {
+            SavingsAccount account = eligibleSavingsAccount("1000.00");
+
+            stubAccountOperationLookup(account);
+
+            when(transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            )).thenReturn(false);
+
+            when(transactionRepository.calculateBalanceAtStartOfDay(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            )).thenReturn(new BigDecimal("1000.00"));
+
+            stubSaveReturningArgument();
+
+            DailyYieldProcessingResult result =
+                    transactionService.processDailyYieldForDate(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT,
+                            TODAY
+                    );
+
+            assertEquals(DailyYieldProcessingResult.APPLIED, result);
+            assertBalance("1000.17", account);
+            assertEquals(TODAY, account.getLastYieldDate());
+            assertEquals(TODAY, account.getLastYieldProcessedDate());
+
+            verifyAccountOperationLookup(account);
+
+            verify(transactionRepository)
+                    .existsByAccountIdAndTypeAndYieldDate(
+                            SAVINGS_ID,
+                            TransactionType.YIELD,
+                            TODAY
+                    );
+
+            verify(transactionRepository).calculateBalanceAtStartOfDay(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            );
+
+            verify(transactionRepository).save(any(Transaction.class));
+
+            verify(eventPublisher).publishEvent(
+                    new TransactionOperationEvent(
+                            TransactionType.YIELD,
+                            SAVINGS_NUMBER,
+                            new BigDecimal("0.17"),
+                            "SYSTEM"
+                    )
+            );
+
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should advance processing date when yield rounds to zero")
+        void shouldAdvanceProcessingDateWhenYieldRoundsToZero() {
+            SavingsAccount account = eligibleSavingsAccount("0.99");
+
+            stubAccountOperationLookup(account);
+
+            when(transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            )).thenReturn(false);
+
+            when(transactionRepository.calculateBalanceAtStartOfDay(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            )).thenReturn(new BigDecimal("0.99"));
+
+            DailyYieldProcessingResult result =
+                    transactionService.processDailyYieldForDate(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT,
+                            TODAY
+                    );
+
+            assertEquals(
+                    DailyYieldProcessingResult.NO_YIELD_AVAILABLE,
+                    result
+            );
+
+            assertBalance("0.99", account);
+            assertEquals(TODAY.minusDays(1), account.getLastYieldDate());
+            assertEquals(TODAY, account.getLastYieldProcessedDate());
+
+            verifyAccountOperationLookup(account);
+
+            verify(transactionRepository)
+                    .existsByAccountIdAndTypeAndYieldDate(
+                            SAVINGS_ID,
+                            TransactionType.YIELD,
+                            TODAY
+                    );
+
+            verify(transactionRepository).calculateBalanceAtStartOfDay(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            );
+
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should mark date processed when yield exceeds balance limit")
+        void shouldMarkDateProcessedWhenYieldExceedsBalanceLimit() {
+            SavingsAccount account = eligibleSavingsAccount(
+                    Account.MAX_BALANCE.toPlainString()
+            );
+
+            stubAccountOperationLookup(account);
+
+            when(transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            )).thenReturn(false);
+
+            when(transactionRepository.calculateBalanceAtStartOfDay(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            )).thenReturn(Account.MAX_BALANCE);
+
+            DailyYieldProcessingResult result =
+                    transactionService.processDailyYieldForDate(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT,
+                            TODAY
+                    );
+
+            assertEquals(
+                    DailyYieldProcessingResult.BALANCE_LIMIT_REACHED,
+                    result
+            );
+
+            assertBalance(Account.MAX_BALANCE.toPlainString(), account);
+
+            assertEquals(
+                    TODAY.minusDays(1),
+                    account.getLastYieldDate()
+            );
+
+            assertEquals(
+                    TODAY,
+                    account.getLastYieldProcessedDate()
+            );
+
+            verifyAccountOperationLookup(account);
+
+            verify(transactionRepository)
+                    .existsByAccountIdAndTypeAndYieldDate(
+                            SAVINGS_ID,
+                            TransactionType.YIELD,
+                            TODAY
+                    );
+
+            verify(transactionRepository).calculateBalanceAtStartOfDay(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            );
+
             verifyNoMoreInteractionsOnMocks();
         }
     }

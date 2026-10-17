@@ -13,7 +13,10 @@ import com.lcsalvess.bankingsystem.exception.account.AccountIsNotSavingsExceptio
 import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
 import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.exception.transaction.*;
+import com.lcsalvess.bankingsystem.exception.transaction.BalanceLimitExceededException;
+import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
+import com.lcsalvess.bankingsystem.exception.transaction.InvalidAmountException;
+import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
@@ -35,16 +38,15 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
-import java.time.*;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -962,245 +964,6 @@ public class TransactionServiceTests {
     }
 
     @Nested
-    @DisplayName("applyYield(String, String)")
-    class ApplyYield {
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "yieldScenarios")
-        @DisplayName("Should apply daily yield successfully")
-        void shouldApplyYieldSuccessfully(
-                String scenario,
-                String balance,
-                String expectedYield,
-                String expectedBalance
-        ) {
-            SavingsAccount account = eligibleSavingsAccount(balance);
-            LocalDate today = TODAY;
-
-            stubAccountOperationLookup(account);
-            stubSaveReturningArgument();
-
-            TransactionResponseDTO result =
-                    transactionService.applyYield(SAVINGS_NUMBER, SAVINGS_DIGIT);
-
-            assertBalance(expectedBalance, account);
-            assertEquals(today, account.getLastYieldDate());
-
-            ArgumentCaptor<Transaction> transactionCaptor =
-                    ArgumentCaptor.forClass(Transaction.class);
-
-            verifyAccountOperationLookup(account);
-
-            verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
-                    SAVINGS_ID,
-                    TransactionType.YIELD,
-                    today
-            );
-
-            verify(transactionRepository).save(transactionCaptor.capture());
-
-            verify(eventPublisher).publishEvent(
-                    new TransactionOperationEvent(
-                            TransactionType.YIELD,
-                            SAVINGS_NUMBER,
-                            new BigDecimal(expectedYield),
-                            "SYSTEM"
-                    )
-            );
-
-            verifyNoMoreInteractionsOnMocks();
-
-            Transaction transaction = transactionCaptor.getValue();
-
-            assertEquals(TransactionType.YIELD, transaction.getType());
-
-            assertEquals(
-                    0,
-                    new BigDecimal(expectedYield).compareTo(transaction.getAmount())
-            );
-
-            assertSame(account, transaction.getAccount());
-            assertNull(transaction.getPerformedBy());
-            assertTrue(transaction.isPerformedBySystem());
-            assertEquals(today, transaction.getYieldDate());
-            assertEquals(NOW, transaction.getCreatedAt());
-
-            assertEquals(response(transaction), result);
-        }
-
-        @Test
-        @DisplayName("Should throw when account is not a savings account")
-        void shouldThrowWhenAccountIsNotSavings() {
-            CheckingAccount account = account();
-
-            stubAccountOperationLookup(account);
-
-            assertThrowsWithMessage(
-                    AccountIsNotSavingsException.class,
-                    ApiErrorMessages.ACCOUNT_NOT_SAVINGS,
-                    () -> transactionService.applyYield(
-                            ACCOUNT_NUMBER,
-                            ACCOUNT_DIGIT
-                    )
-            );
-
-            verifyAccountOperationLookup(account);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when savings account is not active")
-        void shouldThrowWhenSavingsAccountIsNotActive() {
-            SavingsAccount account = eligibleSavingsAccount("1000.00");
-            account.cancel();
-
-            stubAccountOperationLookup(account);
-
-            assertThrowsWithMessage(
-                    AccountIsNotActiveException.class,
-                    ApiErrorMessages.ACCOUNT_NOT_ACTIVE,
-                    () -> transactionService.applyYield(
-                            SAVINGS_NUMBER,
-                            SAVINGS_DIGIT
-                    )
-            );
-
-            assertBalance("1000.00", account);
-
-            assertEquals(TODAY.minusDays(1), account.getLastYieldDate());
-
-            verifyAccountOperationLookup(account);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when the yield would exceed the maximum balance")
-        void shouldThrowWhenYieldExceedsMaximumBalance() {
-            SavingsAccount account = eligibleSavingsAccount(
-                    Account.MAX_BALANCE.toPlainString()
-            );
-
-            LocalDate lastYieldDate = account.getLastYieldDate();
-
-            stubAccountOperationLookup(account);
-
-            assertThrowsWithMessage(
-                    BalanceLimitExceededException.class,
-                    ApiErrorMessages.BALANCE_LIMIT_EXCEEDED,
-                    () -> transactionService.applyYield(
-                            SAVINGS_NUMBER,
-                            SAVINGS_DIGIT
-                    )
-            );
-
-            assertEquals(Account.MAX_BALANCE, account.getBalance());
-            assertEquals(lastYieldDate, account.getLastYieldDate());
-
-            verifyAccountOperationLookup(account);
-            verifyYieldChecked();
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when yield was already applied today")
-        void shouldThrowWhenYieldWasAlreadyAppliedToday() {
-            LocalDate lastYieldDate = TODAY.minusDays(1);
-
-            SavingsAccount account = savingsAccount(
-                    "1000.00",
-                    lastYieldDate
-            );
-
-            stubAccountOperationLookup(account);
-
-            when(transactionRepository.existsByAccountIdAndTypeAndYieldDate(
-                    SAVINGS_ID,
-                    TransactionType.YIELD,
-                    TODAY
-            )).thenReturn(true);
-
-            assertThrowsWithMessage(
-                    YieldAlreadyAppliedException.class,
-                    ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED,
-                    () -> transactionService.applyYield(
-                            SAVINGS_NUMBER,
-                            SAVINGS_DIGIT
-                    )
-            );
-
-            assertBalance("1000.00", account);
-            assertEquals(lastYieldDate, account.getLastYieldDate());
-
-            verifyAccountOperationLookup(account);
-            verifyYieldChecked();
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "ineligibleLastYieldDates")
-        @DisplayName("Should throw when account is not eligible for yield")
-        void shouldThrowWhenAccountIsNotEligibleForYield(
-                String scenario,
-                LocalDate lastYieldDate
-        ) {
-            SavingsAccount account = savingsAccount(
-                    "1000.00",
-                    lastYieldDate
-            );
-
-            stubAccountOperationLookup(account);
-
-            assertThrowsWithMessage(
-                    YieldNotAvailableException.class,
-                    ApiErrorMessages.YIELD_NOT_AVAILABLE,
-                    () -> transactionService.applyYield(
-                            SAVINGS_NUMBER,
-                            SAVINGS_DIGIT
-                    )
-            );
-
-            assertBalance("1000.00", account);
-            assertEquals(lastYieldDate, account.getLastYieldDate());
-
-            verifyAccountOperationLookup(account);
-            verifyYieldChecked();
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "balancesWithoutYield")
-        @DisplayName("Should throw when there is no yield available")
-        void shouldThrowWhenThereIsNoYieldAvailable(
-                String scenario,
-                String balance
-        ) {
-            SavingsAccount account = eligibleSavingsAccount(balance);
-
-            LocalDate lastYieldDate = account.getLastYieldDate();
-
-            stubAccountOperationLookup(account);
-
-            assertThrowsWithMessage(
-                    YieldNotAvailableException.class,
-                    ApiErrorMessages.NO_YIELD_AVAILABLE,
-                    () -> transactionService.applyYield(
-                            SAVINGS_NUMBER,
-                            SAVINGS_DIGIT
-                    )
-            );
-
-            assertBalance(balance, account);
-
-            // Se o rendimento arredonda para zero, a data não avança.
-            assertEquals(lastYieldDate, account.getLastYieldDate());
-
-            verifyAccountOperationLookup(account);
-            verifyYieldChecked();
-            verifyNoMoreInteractionsOnMocks();
-        }
-    }
-
-    @Nested
     @DisplayName("processDailyYieldForDate(...)")
     class ProcessDailyYieldForDate {
 
@@ -1238,22 +1001,17 @@ public class TransactionServiceTests {
             assertEquals(TODAY, account.getLastYieldProcessedDate());
 
             verifyAccountOperationLookup(account);
-
-            verify(transactionRepository)
-                    .existsByAccountIdAndTypeAndYieldDate(
-                            SAVINGS_ID,
-                            TransactionType.YIELD,
-                            TODAY
-                    );
-
+            verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
                     TODAY.atStartOfDay()
             );
-
             verify(transactionRepository).save(any(Transaction.class));
-
             verify(eventPublisher).publishEvent(
                     new TransactionOperationEvent(
                             TransactionType.YIELD,
@@ -1264,6 +1022,163 @@ public class TransactionServiceTests {
             );
 
             verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should apply yield when the calculated amount is one cent")
+        void shouldApplyYieldWhenCalculatedAmountIsOneCent() {
+            SavingsAccount account = eligibleSavingsAccount("40.00");
+
+            stubAccountOperationLookup(account);
+
+            when(transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            )).thenReturn(false);
+
+            when(transactionRepository.calculateBalanceAtStartOfDay(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            )).thenReturn(new BigDecimal("40.00"));
+
+            stubSaveReturningArgument();
+
+            DailyYieldProcessingResult result =
+                    transactionService.processDailyYieldForDate(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT,
+                            TODAY
+                    );
+
+            assertEquals(DailyYieldProcessingResult.APPLIED, result);
+            assertBalance("40.01", account);
+            assertEquals(TODAY, account.getLastYieldDate());
+            assertEquals(TODAY, account.getLastYieldProcessedDate());
+
+            verifyAccountOperationLookup(account);
+            verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            );
+            verify(transactionRepository).calculateBalanceAtStartOfDay(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            );
+            verify(transactionRepository).save(any(Transaction.class));
+            verify(eventPublisher).publishEvent(
+                    new TransactionOperationEvent(
+                            TransactionType.YIELD,
+                            SAVINGS_NUMBER,
+                            new BigDecimal("0.01"),
+                            "SYSTEM"
+                    )
+            );
+
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should reject an account that is not a savings account")
+        void shouldRejectAccountThatIsNotSavings() {
+            CheckingAccount account = account();
+
+            stubAccountOperationLookup(account);
+
+            assertThrowsWithMessage(
+                    AccountIsNotSavingsException.class,
+                    ApiErrorMessages.ACCOUNT_NOT_SAVINGS,
+                    () -> transactionService.processDailyYieldForDate(
+                            ACCOUNT_NUMBER,
+                            ACCOUNT_DIGIT,
+                            TODAY
+                    )
+            );
+
+            verifyAccountOperationLookup(account);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should reject an inactive savings account")
+        void shouldRejectInactiveSavingsAccount() {
+            SavingsAccount account = eligibleSavingsAccount("1000.00");
+            account.cancel();
+
+            stubAccountOperationLookup(account);
+
+            assertThrowsWithMessage(
+                    AccountIsNotActiveException.class,
+                    ApiErrorMessages.ACCOUNT_NOT_ACTIVE,
+                    () -> transactionService.processDailyYieldForDate(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT,
+                            TODAY
+                    )
+            );
+
+            assertBalance("1000.00", account);
+            assertEquals(TODAY.minusDays(1), account.getLastYieldDate());
+
+            verifyAccountOperationLookup(account);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should return already processed when yield already exists")
+        void shouldReturnAlreadyProcessedWhenYieldAlreadyExists() {
+            SavingsAccount account = eligibleSavingsAccount("1000.00");
+
+            stubAccountOperationLookup(account);
+
+            when(transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            )).thenReturn(true);
+
+            DailyYieldProcessingResult result =
+                    transactionService.processDailyYieldForDate(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT,
+                            TODAY
+                    );
+
+            assertEquals(
+                    DailyYieldProcessingResult.ALREADY_PROCESSED,
+                    result
+            );
+            assertBalance("1000.00", account);
+            assertEquals(TODAY, account.getLastYieldDate());
+            assertEquals(TODAY, account.getLastYieldProcessedDate());
+
+            verifyAccountOperationLookup(account);
+            verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            );
+
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should reject a future reference date")
+        void shouldRejectFutureReferenceDate() {
+            assertThrowsWithMessage(
+                    IllegalArgumentException.class,
+                    "A data de referência não pode estar no futuro.",
+                    () -> transactionService.processDailyYieldForDate(
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT,
+                            TODAY.plusDays(1)
+                    )
+            );
+
+            verifyNoInteractionsOnMocks();
         }
 
         @Test
@@ -1296,20 +1211,16 @@ public class TransactionServiceTests {
                     DailyYieldProcessingResult.NO_YIELD_AVAILABLE,
                     result
             );
-
             assertBalance("0.99", account);
             assertEquals(TODAY.minusDays(1), account.getLastYieldDate());
             assertEquals(TODAY, account.getLastYieldProcessedDate());
 
             verifyAccountOperationLookup(account);
-
-            verify(transactionRepository)
-                    .existsByAccountIdAndTypeAndYieldDate(
-                            SAVINGS_ID,
-                            TransactionType.YIELD,
-                            TODAY
-                    );
-
+            verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
@@ -1351,28 +1262,16 @@ public class TransactionServiceTests {
                     DailyYieldProcessingResult.BALANCE_LIMIT_REACHED,
                     result
             );
-
             assertBalance(Account.MAX_BALANCE.toPlainString(), account);
-
-            assertEquals(
-                    TODAY.minusDays(1),
-                    account.getLastYieldDate()
-            );
-
-            assertEquals(
-                    TODAY,
-                    account.getLastYieldProcessedDate()
-            );
+            assertEquals(TODAY.minusDays(1), account.getLastYieldDate());
+            assertEquals(TODAY, account.getLastYieldProcessedDate());
 
             verifyAccountOperationLookup(account);
-
-            verify(transactionRepository)
-                    .existsByAccountIdAndTypeAndYieldDate(
-                            SAVINGS_ID,
-                            TransactionType.YIELD,
-                            TODAY
-                    );
-
+            verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
+                    SAVINGS_ID,
+                    TransactionType.YIELD,
+                    TODAY
+            );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
@@ -1442,54 +1341,6 @@ public class TransactionServiceTests {
         );
     }
 
-    // Taxa diária equivalente à taxa mensal de 0,5%,
-    // usando um período de referência de 30 dias.
-    @SuppressWarnings("unused")
-    static Stream<Arguments> yieldScenarios() {
-        return Stream.of(
-                Arguments.of(
-                        "balance 1000.00 yields 0.17",
-                        "1000.00",
-                        "0.17",
-                        "1000.17"
-                ),
-                Arguments.of(
-                        "balance 40.00 yields 0.01",
-                        "40.00",
-                        "0.01",
-                        "40.01"
-                )
-        );
-    }
-
-    @SuppressWarnings("unused")
-    static Stream<Arguments> ineligibleLastYieldDates() {
-        return Stream.of(
-                Arguments.of(
-                        "last yield was today",
-                        TODAY
-                ),
-                Arguments.of(
-                        "last yield date is in the future",
-                        TODAY.plusDays(1)
-                )
-        );
-    }
-
-    @SuppressWarnings("unused")
-    static Stream<Arguments> balancesWithoutYield() {
-        return Stream.of(
-                Arguments.of(
-                        "balance is zero",
-                        "0.00"
-                ),
-                Arguments.of(
-                        "yield rounds down to zero",
-                        "0.99"
-                )
-        );
-    }
-
     private void stubAccountOperationLookup(Account account) {
         when(accountService.findEntityByAccountNumberForUpdate(
                 account.getAccountNumber(),
@@ -1547,14 +1398,6 @@ public class TransactionServiceTests {
     private void stubSaveReturningArgument() {
         when(transactionRepository.save(any(Transaction.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-    }
-
-    private void verifyYieldChecked() {
-        verify(transactionRepository).existsByAccountIdAndTypeAndYieldDate(
-                SAVINGS_ID,
-                TransactionType.YIELD,
-                TODAY
-        );
     }
 
     private void verifyNoInteractionsOnMocks() {

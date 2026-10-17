@@ -10,7 +10,6 @@ import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
 import com.lcsalvess.bankingsystem.exception.account.AccountHasBalanceException;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
-import com.lcsalvess.bankingsystem.exception.transaction.YieldAlreadyAppliedException;
 import com.lcsalvess.bankingsystem.repository.*;
 import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
@@ -318,72 +317,17 @@ class TransactionConcurrencyTests {
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Concurrent yields
-    // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Concurrent daily yield processing
+// ---------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Concurrent yields")
-    class ConcurrentYields {
+    @DisplayName("Concurrent daily yield processing")
+    class ConcurrentDailyYieldProcessing {
 
         @Test
         @DisplayName("Should apply daily yield only once when requests are concurrent")
-        void shouldApplyYieldOnlyOnceWhenRequestsAreConcurrent()
-                throws Exception {
-
-            SavingsAccount account = createSavingsAccount("1000.00");
-
-            List<Boolean> results = runConcurrently(List.of(
-                    applyYield(account),
-                    applyYield(account)
-            ));
-
-            assertEquals(1, countSucceeded(results));
-
-            // A daily rate equivalent to 0.5% monthly yields R$ 0.17 on R$ 1,000.
-            assertBalance("1000.17", account);
-
-            assertEquals(
-                    1,
-                    countTransactions(account, TransactionType.YIELD)
-            );
-
-            SavingsAccount persisted = (SavingsAccount)
-                    accountRepository.findById(account.getId())
-                            .orElseThrow();
-
-            assertEquals(LocalDate.now(clock), persisted.getLastYieldDate());
-
-            List<Transaction> yieldTransactions = transactionRepository.findAll(
-                    TransactionSpecifications.byAccountAndFilters(
-                            account.getId(),
-                            TransactionType.YIELD,
-                            null,
-                            null
-                    )
-            );
-
-            assertEquals(1, yieldTransactions.size());
-
-            Transaction yieldTransaction = yieldTransactions.getFirst();
-
-            assertEquals(LocalDate.now(clock), yieldTransaction.getYieldDate());
-            assertNull(yieldTransaction.getPerformedBy());
-            assertTrue(yieldTransaction.isPerformedBySystem());
-        }
-    }
-
-    // ---------------------------------------------------------------------
-    // Concurrent daily yield recovery
-    // ---------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("Concurrent daily yield recovery")
-    class ConcurrentDailyYieldRecovery {
-
-        @Test
-        @DisplayName("Should apply recovered daily yield only once when requests are concurrent")
-        void shouldApplyRecoveredYieldOnlyOnceWhenRequestsAreConcurrent()
+        void shouldApplyDailyYieldOnlyOnceWhenRequestsAreConcurrent()
                 throws Exception {
 
             SavingsAccount account = createSavingsAccount("1000.00");
@@ -421,6 +365,23 @@ class TransactionConcurrencyTests {
                     referenceDate,
                     persisted.getLastYieldProcessedDate()
             );
+
+            List<Transaction> yieldTransactions = transactionRepository.findAll(
+                    TransactionSpecifications.byAccountAndFilters(
+                            account.getId(),
+                            TransactionType.YIELD,
+                            null,
+                            null
+                    )
+            );
+
+            assertEquals(1, yieldTransactions.size());
+
+            Transaction yieldTransaction = yieldTransactions.getFirst();
+
+            assertEquals(referenceDate, yieldTransaction.getYieldDate());
+            assertNull(yieldTransaction.getPerformedBy());
+            assertTrue(yieldTransaction.isPerformedBySystem());
         }
     }
 
@@ -701,21 +662,6 @@ class TransactionConcurrencyTests {
 
                 return true;
             } catch (InsufficientBalanceException ex) {
-                return false;
-            }
-        };
-    }
-
-    private Callable<Boolean> applyYield(SavingsAccount account) {
-        return () -> {
-            try {
-                transactionService.applyYield(
-                        account.getAccountNumber(),
-                        account.getDigit()
-                );
-
-                return true;
-            } catch (YieldAlreadyAppliedException ex) {
                 return false;
             }
         };

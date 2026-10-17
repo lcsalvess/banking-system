@@ -112,8 +112,7 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/v1/transactions/deposit",
                                 "/api/v1/transactions/withdraw",
-                                "/api/v1/transactions/transfer",
-                                "/api/v1/transactions/yield/**"
+                                "/api/v1/transactions/transfer"
                         ).hasRole("EMPLOYEE")
 
                         // Transaction history and lookup: read-only access.

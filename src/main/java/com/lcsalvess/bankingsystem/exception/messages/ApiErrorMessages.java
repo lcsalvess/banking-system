@@ -111,12 +111,6 @@ public final class ApiErrorMessages {
     public static final String ACCOUNT_NOT_SAVINGS =
             "A conta informada não é poupança.";
 
-    public static final String YIELD_NOT_AVAILABLE =
-            "A conta ainda não está disponível para receber rendimento.";
-
-    public static final String NO_YIELD_AVAILABLE =
-            "Não há rendimento disponível para esta conta.";
-
     public static final String INVALID_DATE_RANGE =
             "A data inicial não pode ser posterior à data final.";
 

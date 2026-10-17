@@ -204,75 +204,6 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponseDTO applyYield(
-            String accountNumber,
-            String accountDigit
-    ) {
-        return applyYieldForDate(
-                accountNumber,
-                accountDigit,
-                LocalDate.now(clock)
-        );
-    }
-
-    @Transactional
-    public TransactionResponseDTO applyYieldForDate(
-            String accountNumber,
-            String accountDigit,
-            LocalDate referenceDate
-    ) {
-        if (referenceDate == null) {
-            throw new IllegalArgumentException(
-                    "A conta ainda não está disponível para receber rendimento."
-            );
-        }
-
-        Account account = accountService.findEntityByAccountNumberForUpdate(
-                accountNumber,
-                accountDigit
-        );
-
-        SavingsAccount savingsAccount = validateAndGetSavingsAccount(account);
-
-        validateActiveAccount(savingsAccount);
-
-        validateYieldAlreadyApplied(
-                savingsAccount.getId(),
-                referenceDate
-        );
-
-        BigDecimal yieldAmount = savingsAccount.calculateYield();
-
-        validateYieldAvailable(
-                savingsAccount,
-                yieldAmount,
-                referenceDate
-        );
-
-        validateBalanceLimit(savingsAccount, yieldAmount);
-
-        savingsAccount.credit(yieldAmount);
-        savingsAccount.updateLastYieldDate(referenceDate);
-
-        Transaction transaction = registerSystemYieldTransaction(
-                yieldAmount,
-                referenceDate,
-                savingsAccount
-        );
-
-        eventPublisher.publishEvent(
-                new TransactionOperationEvent(
-                        TransactionType.YIELD,
-                        savingsAccount.getAccountNumber(),
-                        yieldAmount,
-                        "SYSTEM"
-                )
-        );
-
-        return TransactionResponseDTO.fromEntity(transaction);
-    }
-
-    @Transactional
     public DailyYieldProcessingResult processDailyYieldForDate(
             String accountNumber,
             String accountDigit,
@@ -435,43 +366,6 @@ public class TransactionService {
         return savingsAccount;
     }
 
-    private void validateYieldAvailable(
-            SavingsAccount savingsAccount,
-            BigDecimal yieldAmount,
-            LocalDate referenceDate
-    ) {
-        if (!savingsAccount.isEligibleForYield(referenceDate)) {
-            throw new YieldNotAvailableException(
-                    ApiErrorMessages.YIELD_NOT_AVAILABLE
-            );
-        }
-
-        if (yieldAmount == null
-                || yieldAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new YieldNotAvailableException(
-                    ApiErrorMessages.NO_YIELD_AVAILABLE
-            );
-        }
-    }
-
-    private void validateYieldAlreadyApplied(
-            Long accountId,
-            LocalDate referenceDate
-    ) {
-        boolean alreadyApplied =
-                transactionRepository.existsByAccountIdAndTypeAndYieldDate(
-                        accountId,
-                        TransactionType.YIELD,
-                        referenceDate
-                );
-
-        if (alreadyApplied) {
-            throw new YieldAlreadyAppliedException(
-                    ApiErrorMessages.DAILY_YIELD_ALREADY_APPLIED
-            );
-        }
-    }
-
     private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account, User performedBy) {
         Transaction transaction = new Transaction(type, amount, LocalDateTime.now(clock), account, performedBy);
         return transactionRepository.save(transaction);
@@ -497,7 +391,7 @@ public class TransactionService {
         return transactionRepository.save(transaction);
     }
 
-    private Transaction registerSystemYieldTransaction(
+    private void registerSystemYieldTransaction(
             BigDecimal amount,
             LocalDate referenceDate,
             SavingsAccount account
@@ -510,6 +404,6 @@ public class TransactionService {
                 account
         );
 
-        return transactionRepository.save(transaction);
+        transactionRepository.save(transaction);
     }
 }

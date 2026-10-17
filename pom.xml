@@ -31,6 +31,8 @@
         <logback.version>1.6.3</logback.version>
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <tomcat.version>11.0.26</tomcat.version>
+        <!-- Permite a substituição tardia do argLine pelo Maven Surefire. -->
+        <argLine/>
     </properties>
 
     <dependencyManagement>
@@ -171,6 +173,35 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!--
+                Generates Maven properties containing the resolved paths of
+                dependency JARs, including transitive test dependencies.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.11.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+                Loads Mockito as a Java agent before test execution to avoid
+                dynamic self-attachment and prepare for future JDK restrictions.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
             </plugin>
         </plugins>
     </build>

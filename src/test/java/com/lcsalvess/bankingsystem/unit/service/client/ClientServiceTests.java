@@ -1,15 +1,15 @@
 package com.lcsalvess.bankingsystem.unit.service.client;
 
-import com.lcsalvess.bankingsystem.dto.request.AddressRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.AddressUpdateRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.ClientRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.ClientUpdateRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.AddressResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.ClientResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.ClientSummaryResponseDTO;
-import com.lcsalvess.bankingsystem.entity.Address;
-import com.lcsalvess.bankingsystem.entity.Client;
-import com.lcsalvess.bankingsystem.entity.enums.State;
+import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.address.AddressUpdateRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientUpdateRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.address.AddressResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.client.ClientResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.client.ClientSummaryResponseDTO;
+import com.lcsalvess.bankingsystem.entity.address.Address;
+import com.lcsalvess.bankingsystem.entity.client.Client;
+import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;

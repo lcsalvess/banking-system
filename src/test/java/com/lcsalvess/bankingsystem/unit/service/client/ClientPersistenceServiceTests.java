@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.service.client;
 
-import com.lcsalvess.bankingsystem.entity.Address;
-import com.lcsalvess.bankingsystem.entity.Client;
-import com.lcsalvess.bankingsystem.entity.enums.State;
+import com.lcsalvess.bankingsystem.entity.address.Address;
+import com.lcsalvess.bankingsystem.entity.client.Client;
+import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.event.client.ClientOperationEvent;
 import com.lcsalvess.bankingsystem.event.client.ClientOperationType;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;

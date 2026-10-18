@@ -1,11 +1,15 @@
 package com.lcsalvess.bankingsystem.unit.service.account;
 
-import com.lcsalvess.bankingsystem.dto.request.AccountRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.AccountResponseDTO;
-import com.lcsalvess.bankingsystem.entity.*;
-import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
-import com.lcsalvess.bankingsystem.entity.enums.AccountType;
-import com.lcsalvess.bankingsystem.entity.enums.State;
+import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
+import com.lcsalvess.bankingsystem.entity.account.Account;
+import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
+import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
+import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
+import com.lcsalvess.bankingsystem.entity.account.AccountType;
+import com.lcsalvess.bankingsystem.entity.address.Address;
+import com.lcsalvess.bankingsystem.entity.address.State;
+import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
 import com.lcsalvess.bankingsystem.exception.account.*;

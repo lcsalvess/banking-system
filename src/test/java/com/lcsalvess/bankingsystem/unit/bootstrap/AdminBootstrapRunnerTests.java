@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.bootstrap;
 
 import com.lcsalvess.bankingsystem.bootstrap.AdminBootstrapRunner;
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Validation;

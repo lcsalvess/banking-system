@@ -1,11 +1,11 @@
 package com.lcsalvess.bankingsystem.service.client;
 
-import com.lcsalvess.bankingsystem.dto.request.ClientRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.ClientUpdateRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.ClientResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.ClientSummaryResponseDTO;
-import com.lcsalvess.bankingsystem.entity.Address;
-import com.lcsalvess.bankingsystem.entity.Client;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientUpdateRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.client.ClientResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.client.ClientSummaryResponseDTO;
+import com.lcsalvess.bankingsystem.entity.address.Address;
+import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientEmailAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
@@ -16,7 +16,7 @@ import com.lcsalvess.bankingsystem.service.address.AddressData;
 import com.lcsalvess.bankingsystem.service.address.AddressService;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData.AddressUpdateData;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
-import com.lcsalvess.bankingsystem.util.PageableTieBreaker;
+import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

@@ -1,9 +1,9 @@
 package com.lcsalvess.bankingsystem.unit.service.user;
 
-import com.lcsalvess.bankingsystem.dto.request.UserRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.UserResponseDTO;
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
 import com.lcsalvess.bankingsystem.exception.user.*;

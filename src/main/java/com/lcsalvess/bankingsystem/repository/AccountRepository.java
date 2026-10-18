@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.repository;
 
-import com.lcsalvess.bankingsystem.entity.Account;
-import com.lcsalvess.bankingsystem.entity.SavingsAccount;
-import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
+import com.lcsalvess.bankingsystem.entity.account.Account;
+import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
+import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

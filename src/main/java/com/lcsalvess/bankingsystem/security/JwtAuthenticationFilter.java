@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.security;
 
-import com.lcsalvess.bankingsystem.entity.User;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
 import com.lcsalvess.bankingsystem.service.security.JwtClaims;
 import com.lcsalvess.bankingsystem.service.security.JwtService;

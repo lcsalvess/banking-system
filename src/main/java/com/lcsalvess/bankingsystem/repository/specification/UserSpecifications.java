@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.repository.specification;
 
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.Locale;

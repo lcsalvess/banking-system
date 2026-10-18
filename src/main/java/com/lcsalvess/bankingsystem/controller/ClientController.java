@@ -1,12 +1,12 @@
 package com.lcsalvess.bankingsystem.controller;
 
-import com.lcsalvess.bankingsystem.dto.request.ClientRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.ClientUpdateRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.ClientResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.ClientSummaryResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientUpdateRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.client.ClientResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.client.ClientSummaryResponseDTO;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
-import com.lcsalvess.bankingsystem.util.SortWhitelist;
-import com.lcsalvess.bankingsystem.util.SortableBy;
+import com.lcsalvess.bankingsystem.util.pagination.SortWhitelist;
+import com.lcsalvess.bankingsystem.util.pagination.SortableBy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

@@ -1,10 +1,10 @@
 package com.lcsalvess.bankingsystem.service.transaction;
 
-import com.lcsalvess.bankingsystem.entity.SavingsAccount;
-import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
+import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
+import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
-import com.lcsalvess.bankingsystem.util.AppTimeZone;
+import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;

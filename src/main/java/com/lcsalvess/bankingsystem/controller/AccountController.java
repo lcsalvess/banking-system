@@ -1,10 +1,10 @@
 package com.lcsalvess.bankingsystem.controller;
 
-import com.lcsalvess.bankingsystem.dto.request.AccountRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.AccountResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
-import com.lcsalvess.bankingsystem.util.SortWhitelist;
-import com.lcsalvess.bankingsystem.util.SortableBy;
+import com.lcsalvess.bankingsystem.util.pagination.SortWhitelist;
+import com.lcsalvess.bankingsystem.util.pagination.SortableBy;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;

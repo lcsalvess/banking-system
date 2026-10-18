@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.bootstrap;
 
-import com.lcsalvess.bankingsystem.dto.request.UserRequestDTO;
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;

@@ -1,0 +1,99 @@
+package com.lcsalvess.bankingsystem.entity.account;
+
+import com.lcsalvess.bankingsystem.entity.client.Client;
+import jakarta.persistence.*;
+
+import java.math.BigDecimal;
+
+@Entity
+@Table(
+        name = "accounts",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_accounts_account_number", columnNames = "account_number")
+        }
+)
+@Inheritance(strategy = InheritanceType.JOINED)
+public abstract class Account {
+
+    /**
+     * Saldo máximo por conta. Mantém o valor dentro de NUMERIC(19,2) e dentro
+     * dos 15 dígitos significativos que um double (clientes JS) representa
+     * sem perda. Espelha a constraint ck_accounts_balance_max.
+     */
+    public static final BigDecimal MAX_BALANCE = new BigDecimal("9999999999999.99");
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_accounts_client"))
+    private Client client;
+    @Column(name = "account_number", nullable = false, length = 20)
+    private String accountNumber;
+    @Column(name = "account_digit", nullable = false, length = 1)
+    private String digit;
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal balance = BigDecimal.ZERO;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AccountStatus status = AccountStatus.ACTIVE;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false, length = 20)
+    private AccountType type;
+
+    public Account() {
+    }
+
+    public Account(Client client, String accountNumber, String digit, AccountType type) {
+        this.client = client;
+        this.accountNumber = accountNumber;
+        this.digit = digit;
+        this.type = type;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public AccountType getType() {
+        return type;
+    }
+
+    public Client getClient() {
+        return client;
+    }
+
+    public String getAccountNumber() {
+        return accountNumber;
+    }
+
+    public String getDigit() {
+        return digit;
+    }
+
+    public BigDecimal getBalance() {
+        return balance;
+    }
+
+    public boolean canCredit(BigDecimal amount) {
+        return this.balance.add(amount).compareTo(MAX_BALANCE) <= 0;
+    }
+
+    public void credit(BigDecimal amount) {
+        this.balance = this.balance.add(amount);
+    }
+
+    public void debit(BigDecimal amount) {
+        this.balance = this.balance.subtract(amount);
+    }
+
+    public void cancel() {
+        this.status = AccountStatus.CANCELLED;
+    }
+
+    public AccountStatus getStatus() {
+        return status;
+    }
+
+}

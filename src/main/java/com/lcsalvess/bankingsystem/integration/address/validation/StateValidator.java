@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.address.validation;
 
-import com.lcsalvess.bankingsystem.entity.enums.State;
+import com.lcsalvess.bankingsystem.entity.address.State;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

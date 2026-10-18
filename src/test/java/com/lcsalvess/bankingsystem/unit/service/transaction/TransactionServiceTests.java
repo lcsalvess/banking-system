@@ -1010,6 +1010,11 @@ public class TransactionServiceTests {
                     TransactionType.YIELD,
                     TODAY
             );
+            verify(transactionRepository).findBalanceAtStartOfDayFromSnapshot(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
@@ -1066,6 +1071,11 @@ public class TransactionServiceTests {
                     SAVINGS_ID,
                     TransactionType.YIELD,
                     TODAY
+            );
+            verify(transactionRepository).findBalanceAtStartOfDayFromSnapshot(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
             );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
@@ -1225,6 +1235,11 @@ public class TransactionServiceTests {
                     TransactionType.YIELD,
                     TODAY
             );
+            verify(transactionRepository).findBalanceAtStartOfDayFromSnapshot(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
+            );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
@@ -1275,6 +1290,11 @@ public class TransactionServiceTests {
                     SAVINGS_ID,
                     TransactionType.YIELD,
                     TODAY
+            );
+            verify(transactionRepository).findBalanceAtStartOfDayFromSnapshot(
+                    SAVINGS_ID,
+                    TODAY,
+                    TODAY.atStartOfDay()
             );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,

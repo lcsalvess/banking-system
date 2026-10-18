@@ -268,12 +268,23 @@ public class TransactionService {
             return DailyYieldProcessingResult.NOT_ELIGIBLE;
         }
 
+        // Caminho rápido: lê o balance_after da última transação anterior ao
+        // dia. Se o histórico não estiver em ordem (rendimento retroativo
+        // gravado depois de movimentações mais novas), a consulta não retorna
+        // nada e o saldo é reconstruído somando o histórico.
         BigDecimal balanceAtStartOfDay =
-                transactionRepository.calculateBalanceAtStartOfDay(
-                        savingsAccount.getId(),
-                        referenceDate,
-                        referenceDate.atStartOfDay()
-                );
+                transactionRepository.findBalanceAtStartOfDayFromSnapshot(
+                                savingsAccount.getId(),
+                                referenceDate,
+                                referenceDate.atStartOfDay()
+                        )
+                        .orElseGet(() ->
+                                transactionRepository.calculateBalanceAtStartOfDay(
+                                        savingsAccount.getId(),
+                                        referenceDate,
+                                        referenceDate.atStartOfDay()
+                                )
+                        );
 
         BigDecimal yieldAmount =
                 savingsAccount.calculateYield(balanceAtStartOfDay);
@@ -368,7 +379,14 @@ public class TransactionService {
     }
 
     private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account, User performedBy) {
-        Transaction transaction = new Transaction(type, amount, LocalDateTime.now(clock), account, performedBy);
+        Transaction transaction = new Transaction(
+                type,
+                amount,
+                LocalDateTime.now(clock),
+                account,
+                performedBy,
+                account.getBalance()
+        );
         return transactionRepository.save(transaction);
     }
 
@@ -386,7 +404,8 @@ public class TransactionService {
                         LocalDateTime.now(clock),
                         account,
                         transferCode,
-                        performedBy
+                        performedBy,
+                        account.getBalance()
                 );
 
         return transactionRepository.save(transaction);
@@ -402,7 +421,8 @@ public class TransactionService {
                 amount,
                 LocalDateTime.now(clock),
                 referenceDate,
-                account
+                account,
+                account.getBalance()
         );
 
         transactionRepository.save(transaction);

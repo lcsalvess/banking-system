@@ -121,8 +121,8 @@ public class SecurityConfig {
                                 "/api/v1/transactions/**"
                         ).hasAnyRole("EMPLOYEE", "ADMIN")
 
-                        // All remaining endpoints require authentication.
-                        .anyRequest().authenticated()
+                        // Deny any endpoint not explicitly authorized above.
+                        .anyRequest().denyAll()
                 )
                 .exceptionHandling(exceptionHandling -> exceptionHandling
                         .authenticationEntryPoint(authenticationEntryPoint)

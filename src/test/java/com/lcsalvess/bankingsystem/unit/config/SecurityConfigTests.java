@@ -10,6 +10,7 @@ import com.lcsalvess.bankingsystem.security.RestAccessDeniedHandler;
 import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import com.lcsalvess.securityprobetest.SecurityProbeController;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -29,7 +30,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -47,10 +47,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.CannotCreateTransactionException;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Clock;
@@ -67,22 +63,29 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Testa a {@link SecurityConfig} com a cadeia de filtros real: {@code CorrelationIdFilter},
- * {@code JwtAuthenticationFilter}, {@link RestAuthenticationEntryPoint} e {@link JwtService}.
- * Somente o {@link CustomUserDetailsService} é substituído por mock (evita o banco de dados).
- * As propriedades {@code jwt.*} são vinculadas ao {@link JwtProperties} real.
+ * Tests {@link SecurityConfig} with the real security filter chain:
+ * {@code CorrelationIdFilter}, {@code JwtAuthenticationFilter},
+ * {@link RestAuthenticationEntryPoint} and {@link JwtService}.
+ * Only {@link CustomUserDetailsService} is replaced with a mock to avoid
+ * database access. The real {@link JwtProperties} configuration is used.
  *
- * <p>Slices de controller não escaneiam {@code @Configuration}, por isso a
- * {@code SecurityConfig} é importada explicitamente. Os filtros ({@code @Component}) e o
- * {@code GlobalExceptionHandler} entram no slice por escaneamento, como em produção.
+ * <p>This test uses a restricted {@code @WebMvcTest} slice. The security
+ * configuration and its required dependencies are imported explicitly.
+ * MVC-supported filters and exception handlers are included in the slice
+ * according to Spring Boot's test configuration.
  *
- * <p>Não importa {@code WebMvcTestSecurityConfig}: aqui a segurança é real.
+ * <p>{@code SecurityProbeController} is explicitly selected by
+ * {@code @WebMvcTest(controllers = SecurityProbeController.class)}.
+ * It resides outside the application's component-scan package so test-only
+ * request mappings are not registered in the full application context.
  *
- * <p>O slice não traz a auto-configuração do Spring Security, por isso o teste ativa
- * {@code @EnableWebSecurity} e monta o {@link MockMvc} só com o {@code springSecurityFilterChain}.
- * Assim a ordem dos filtros é a da {@link SecurityConfig}, e não a ordem de registro dos beans.
+ * <p>{@code WebMvcTestSecurityConfig} is intentionally not imported because
+ * this test exercises the real security configuration.
+ *
+ * <p>The test builds {@link MockMvc} with the actual
+ * {@code springSecurityFilterChain} to preserve the configured filter order.
  */
-@WebMvcTest(controllers = SecurityConfigTests.ProbeController.class)
+@WebMvcTest(controllers = SecurityProbeController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @EnableWebSecurity
 @EnableConfigurationProperties(JwtProperties.class)
@@ -91,7 +94,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SecurityConfig.class,
         RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class,
-        JwtService.class
+        JwtService.class,
+        SecurityProbeController.class
 })
 @TestPropertySource(properties = {
         "jwt.secret=" + SecurityConfigTests.SECRET,
@@ -112,11 +116,12 @@ class SecurityConfigTests {
 
     private static final String USERNAME = "usuario.teste";
     private static final String PASSWORD = "Senha123";
-    private static final String PROTECTED_URL = "/api/v1/probe";
-    private static final String ADMIN_URL = "/api/v1/probe/admin";
+    private static final String PROTECTED_URL = "/api/v1/transactions/probe";
+    private static final String POST_PROTECTED_URL = "/api/v1/transactions/deposit";
+    private static final String ADMIN_URL = "/api/v1/users/test-probe";
     private static final String LOGIN_URL = "/api/v1/auth/login";
     private static final String AUTH_PROBE_URL = "/api/v1/auth/probe";
-    private static final String PASSWORD_URL = "/api/v1/auth/probe/password";
+    private static final String PASSWORD_URL = "/api/v1/auth/password";
     private static final String UNAVAILABLE_MESSAGE =
             "O serviço está temporariamente indisponível. Tente novamente.";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
@@ -396,15 +401,14 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve autenticar o usuário do token em outras rotas de auth")
-        void shouldAuthenticateTokenUserOnOtherAuthRoutes() throws Exception {
+        @DisplayName("Deve negar uma rota de auth sem regra explícita, mesmo com token válido")
+        void shouldDenyUnmatchedAuthRouteForAuthenticatedTokenUser() throws Exception {
             User user = createUser(Role.EMPLOYEE);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
 
             mockMvc.perform(post(AUTH_PROBE_URL)
                             .header(HttpHeaders.AUTHORIZATION, bearer(user)))
-                    .andExpect(status().isOk())
-                    .andExpect(content().string("auth-probe"));
+                    .andExpect(status().isForbidden());
 
             verify(userDetailsService).loadUserByUsername(USERNAME);
         }
@@ -415,7 +419,7 @@ class SecurityConfigTests {
             User user = createUser(Role.EMPLOYEE);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
 
-            mockMvc.perform(post(PROTECTED_URL)
+            mockMvc.perform(post(POST_PROTECTED_URL)
                             .header(HttpHeaders.AUTHORIZATION, bearer(user)))
                     .andExpect(status().isOk())
                     .andExpect(content().string("created"));
@@ -890,38 +894,5 @@ class SecurityConfigTests {
                 passwordEncoder.encode(PASSWORD),
                 Role.EMPLOYEE
         );
-    }
-
-    /**
-     * Endpoints mínimos para exercitar as regras da {@link SecurityConfig}.
-     * É detectado por escaneamento porque está listado em {@code controllers} do {@code @WebMvcTest}.
-     */
-    @RestController
-    public static class ProbeController {
-        @GetMapping("/api/v1/probe")
-        public String whoAmI(Authentication authentication) {
-            return authentication.getName();
-        }
-
-        @PostMapping("/api/v1/probe")
-        public String create() {
-            return "created";
-        }
-
-        @PreAuthorize("hasRole('ADMIN')")
-        @GetMapping("/api/v1/probe/admin")
-        public String adminOnly() {
-            return "admin";
-        }
-
-        @PostMapping("/api/v1/auth/probe")
-        public String protectedAuthRoute() {
-            return "auth-probe";
-        }
-
-        @PatchMapping("/api/v1/auth/probe/password")
-        public String passwordRoute() {
-            return "password-probe";
-        }
     }
 }

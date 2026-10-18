@@ -368,7 +368,14 @@ public class TransactionService {
     }
 
     private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account, User performedBy) {
-        Transaction transaction = new Transaction(type, amount, LocalDateTime.now(clock), account, performedBy);
+        Transaction transaction = new Transaction(
+                type,
+                amount,
+                LocalDateTime.now(clock),
+                account,
+                performedBy,
+                account.getBalance()
+        );
         return transactionRepository.save(transaction);
     }
 
@@ -386,7 +393,8 @@ public class TransactionService {
                         LocalDateTime.now(clock),
                         account,
                         transferCode,
-                        performedBy
+                        performedBy,
+                        account.getBalance()
                 );
 
         return transactionRepository.save(transaction);
@@ -402,7 +410,8 @@ public class TransactionService {
                 amount,
                 LocalDateTime.now(clock),
                 referenceDate,
-                account
+                account,
+                account.getBalance()
         );
 
         transactionRepository.save(transaction);

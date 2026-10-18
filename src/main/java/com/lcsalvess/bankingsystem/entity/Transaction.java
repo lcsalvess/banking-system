@@ -38,6 +38,16 @@ public class Transaction {
     @Positive
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
+    /**
+     * Saldo da conta imediatamente após esta transação. É gravado na mesma
+     * transação de banco da alteração do saldo, com a linha da conta travada,
+     * então, para uma conta, as linhas ordenadas por id são o histórico exato
+     * do saldo.
+     */
+    @NotNull
+    @Column(name = "balance_after", nullable = false, updatable = false,
+            precision = 19, scale = 2)
+    private BigDecimal balanceAfter;
     @NotNull
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -66,11 +76,13 @@ public class Transaction {
             BigDecimal amount,
             LocalDateTime createdAt,
             Account account,
-            User performedBy
+            User performedBy,
+            BigDecimal balanceAfter
     ) {
         this.transactionCode = UUID.randomUUID();
         this.type = type;
         this.amount = amount;
+        this.balanceAfter = requireValidBalanceAfter(balanceAfter);
         this.createdAt = createdAt;
         this.account = account;
         this.performedBy = requireHumanActor(performedBy);
@@ -82,12 +94,14 @@ public class Transaction {
             LocalDateTime createdAt,
             Account account,
             UUID transferCode,
-            User performedBy
+            User performedBy,
+            BigDecimal balanceAfter
     ) {
         this.transactionCode = UUID.randomUUID();
         this.transferCode = transferCode;
         this.type = type;
         this.amount = amount;
+        this.balanceAfter = requireValidBalanceAfter(balanceAfter);
         this.createdAt = createdAt;
         this.account = account;
         this.performedBy = requireHumanActor(performedBy);
@@ -99,11 +113,13 @@ public class Transaction {
             LocalDateTime createdAt,
             LocalDate yieldDate,
             Account account,
-            User performedBy
+            User performedBy,
+            BigDecimal balanceAfter
     ) {
         this.transactionCode = UUID.randomUUID();
         this.type = type;
         this.amount = amount;
+        this.balanceAfter = requireValidBalanceAfter(balanceAfter);
         this.createdAt = createdAt;
         this.yieldDate = yieldDate;
         this.account = account;
@@ -115,7 +131,8 @@ public class Transaction {
             BigDecimal amount,
             LocalDateTime createdAt,
             LocalDate yieldDate,
-            Account account
+            Account account,
+            BigDecimal balanceAfter
     ) {
         if (type != TransactionType.YIELD) {
             throw new IllegalArgumentException(
@@ -132,6 +149,7 @@ public class Transaction {
         this.transactionCode = UUID.randomUUID();
         this.type = type;
         this.amount = amount;
+        this.balanceAfter = requireValidBalanceAfter(balanceAfter);
         this.createdAt = createdAt;
         this.yieldDate = yieldDate;
         this.account = account;
@@ -159,6 +177,10 @@ public class Transaction {
         return amount;
     }
 
+    public BigDecimal getBalanceAfter() {
+        return balanceAfter;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -177,6 +199,22 @@ public class Transaction {
 
     public User getPerformedBy() {
         return performedBy;
+    }
+
+    private static BigDecimal requireValidBalanceAfter(BigDecimal balanceAfter) {
+        Objects.requireNonNull(
+                balanceAfter,
+                "The balance after the transaction is required."
+        );
+
+        if (balanceAfter.signum() < 0
+                || balanceAfter.compareTo(Account.MAX_BALANCE) > 0) {
+            throw new IllegalArgumentException(
+                    "The balance after the transaction is out of range."
+            );
+        }
+
+        return balanceAfter;
     }
 
     private User requireHumanActor(User performedBy) {

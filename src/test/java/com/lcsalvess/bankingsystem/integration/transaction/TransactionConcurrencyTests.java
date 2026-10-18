@@ -339,7 +339,8 @@ class TransactionConcurrencyTests {
                             new BigDecimal("1000.00"),
                             referenceDate.minusDays(1).atTime(12, 0),
                             account,
-                            findTestUser()
+                            findTestUser(),
+                            new BigDecimal("1000.00")
                     )
             );
 
@@ -457,14 +458,16 @@ class TransactionConcurrencyTests {
                             new BigDecimal("100.00"),
                             LocalDateTime.of(2026, 1, 10, 10, 0),
                             account,
-                            actor
+                            actor,
+                            new BigDecimal("100.00")
                     ),
                     new Transaction(
                             TransactionType.WITHDRAWAL,
                             new BigDecimal("10.00"),
                             LocalDateTime.of(2026, 1, 11, 10, 0),
                             account,
-                            actor
+                            actor,
+                            new BigDecimal("90.00")
                     ),
                     new Transaction(
                             TransactionType.TRANSFER_SENT,
@@ -472,7 +475,8 @@ class TransactionConcurrencyTests {
                             LocalDateTime.of(2026, 1, 12, 10, 0),
                             account,
                             outgoingTransferCode,
-                            actor
+                            actor,
+                            new BigDecimal("70.00")
                     ),
                     new Transaction(
                             TransactionType.TRANSFER_RECEIVED,
@@ -480,21 +484,24 @@ class TransactionConcurrencyTests {
                             LocalDateTime.of(2026, 1, 13, 10, 0),
                             account,
                             incomingTransferCode,
-                            actor
+                            actor,
+                            new BigDecimal("100.00")
                     ),
                     new Transaction(
                             TransactionType.YIELD,
                             new BigDecimal("2.50"),
                             LocalDateTime.of(2026, 1, 16, 0, 5),
                             LocalDate.of(2026, 1, 15),
-                            account
+                            account,
+                            new BigDecimal("102.50")
                     ),
                     new Transaction(
                             TransactionType.DEPOSIT,
                             new BigDecimal("999.00"),
                             LocalDateTime.of(2026, 1, 16, 10, 0),
                             account,
-                            actor
+                            actor,
+                            new BigDecimal("1101.50")
                     )
             ));
 
@@ -546,7 +553,8 @@ class TransactionConcurrencyTests {
                             new BigDecimal("1000.00"),
                             lastProcessedDate.minusDays(1).atTime(12, 0),
                             persistedAccount,
-                            findTestUser()
+                            findTestUser(),
+                            new BigDecimal("1000.00")
                     )
             );
 

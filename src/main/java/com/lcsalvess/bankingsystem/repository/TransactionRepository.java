@@ -126,20 +126,28 @@ public interface TransactionRepository extends
      * snapshot consistente de contas e transações.
      */
     @Query(value = """
-        SELECT a.id AS "accountId",
-               a.account_number AS "accountNumber",
-               a.balance AS "accountBalance",
-               COALESCE(last_tx.balance_after, 0) AS "ledgerBalance"
-        FROM accounts a
-        LEFT JOIN LATERAL (
-            SELECT t.balance_after
-            FROM transactions t
-            WHERE t.account_id = a.id
-            ORDER BY t.id DESC
-            LIMIT 1
-        ) last_tx ON TRUE
-        WHERE a.balance <> COALESCE(last_tx.balance_after, 0)
-        ORDER BY a.id
+        SELECT m."accountId" AS "accountId",
+               m."accountNumber" AS "accountNumber",
+               m."accountBalance" AS "accountBalance",
+               m."ledgerBalance" AS "ledgerBalance"
+        FROM (
+            SELECT a.id AS "accountId",
+                   a.account_number AS "accountNumber",
+                   a.balance AS "accountBalance",
+                   COALESCE(
+                       (
+                           SELECT t.balance_after
+                           FROM transactions t
+                           WHERE t.account_id = a.id
+                           ORDER BY t.id DESC
+                           LIMIT 1
+                       ),
+                       0
+                   ) AS "ledgerBalance"
+            FROM accounts a
+        ) m
+        WHERE m."accountBalance" <> m."ledgerBalance"
+        ORDER BY m."accountId"
         """, nativeQuery = true)
     List<BalanceMismatch> findBalanceMismatches();
 

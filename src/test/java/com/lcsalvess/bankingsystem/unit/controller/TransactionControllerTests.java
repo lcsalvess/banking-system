@@ -779,7 +779,9 @@ public class TransactionControllerTests {
                     null,
                     TransactionType.DEPOSIT,
                     new BigDecimal("100.00"),
-                    LocalDateTime.of(2026, 1, 15, 10, 30, 45)
+                    LocalDateTime.of(2026, 1, 15, 10, 30, 45),
+                    null,
+                    new BigDecimal("100.00")
             );
 
             when(transactionService.findByTransactionCode(transactionCode))
@@ -1149,6 +1151,11 @@ public class TransactionControllerTests {
                 expected.amount().compareTo(actual.amount())
         );
         assertEquals(expected.createdAt(), actual.createdAt());
+        assertEquals(expected.yieldDate(), actual.yieldDate());
+        assertEquals(
+                0,
+                expected.balanceAfter().compareTo(actual.balanceAfter())
+        );
     }
 
     private static AccountOperationRequestDTO operationRequest() {
@@ -1179,7 +1186,9 @@ public class TransactionControllerTests {
                         : null,
                 type,
                 new BigDecimal("100.00"),
-                LocalDateTime.of(2026, 1, 15, 10, 30, 45)
+                LocalDateTime.of(2026, 1, 15, 10, 30, 45),
+                null,
+                new BigDecimal("100.00")
         );
     }
 }

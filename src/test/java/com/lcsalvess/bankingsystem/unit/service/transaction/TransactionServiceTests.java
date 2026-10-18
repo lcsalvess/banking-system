@@ -1487,7 +1487,9 @@ public class TransactionServiceTests {
                 transaction.getTransferCode(),
                 transaction.getType(),
                 transaction.getAmount(),
-                transaction.getCreatedAt()
+                transaction.getCreatedAt(),
+                transaction.getYieldDate(),
+                transaction.getBalanceAfter()
         );
     }
 

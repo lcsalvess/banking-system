@@ -69,7 +69,9 @@ class JacksonConfigTests {
                             null,
                             TransactionType.DEPOSIT,
                             new BigDecimal("100.00"),
-                            LocalDateTime.of(2026, 1, 15, 10, 30, 45)
+                            LocalDateTime.of(2026, 1, 15, 10, 30, 45),
+                            null,
+                            new BigDecimal("100.00")
                     ));
 
             mockMvc.perform(post(URL)

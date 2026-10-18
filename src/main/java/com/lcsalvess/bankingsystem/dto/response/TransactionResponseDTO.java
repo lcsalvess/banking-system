@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -42,7 +43,21 @@ public record TransactionResponseDTO(
                 description = "Date and time when the transaction was created.",
                 example = "2026-10-15T14:30:00"
         )
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+
+        @Schema(
+                description = "Reference date used for the yield. Omitted for transactions other than YIELD.",
+                example = "2026-10-14",
+                nullable = true
+        )
+        LocalDate yieldDate,
+
+        @Schema(
+                description = "Account balance immediately after this transaction was applied.",
+                example = "150.00"
+        )
+        @JsonSerialize(using = MoneySerializer.class)
+        BigDecimal balanceAfter
 ) {
     public static TransactionResponseDTO fromEntity(Transaction transaction) {
         return new TransactionResponseDTO(
@@ -50,7 +65,9 @@ public record TransactionResponseDTO(
                 transaction.getTransferCode(),
                 transaction.getType(),
                 transaction.getAmount(),
-                transaction.getCreatedAt()
+                transaction.getCreatedAt(),
+                transaction.getYieldDate(),
+                transaction.getBalanceAfter()
         );
     }
 }

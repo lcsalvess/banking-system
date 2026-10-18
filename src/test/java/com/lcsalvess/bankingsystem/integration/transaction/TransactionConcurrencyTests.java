@@ -17,6 +17,7 @@ import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.DailyYieldProcessingResult;
+import com.lcsalvess.bankingsystem.service.transaction.BalanceReconciliationJob;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,6 +84,9 @@ class TransactionConcurrencyTests {
 
     @Autowired
     private Clock clock;
+
+    @Autowired
+    private BalanceReconciliationJob balanceReconciliationJob;
 
     @MockitoBean
     private CurrentUserService currentUserService;
@@ -518,6 +522,159 @@ class TransactionConcurrencyTests {
                     "The historical balance should include only transactions "
                             + "effective before the reference day."
             );
+
+            BigDecimal fromSnapshot =
+                    transactionRepository.findBalanceAtStartOfDayFromSnapshot(
+                            account.getId(),
+                            referenceDate,
+                            referenceDate.atStartOfDay()
+                    ).orElseThrow();
+
+            assertEquals(
+                    0,
+                    new BigDecimal("102.50").compareTo(fromSnapshot),
+                    "The snapshot read should match the reconstructed balance "
+                            + "when the ledger is in order."
+            );
+        }
+
+        @Test
+        @DisplayName("Should not use the snapshot when a backdated yield was recorded after newer transactions")
+        void shouldFallBackWhenBackdatedYieldWasRecordedLate() {
+            SavingsAccount account = createSavingsAccount("0.00");
+            User actor = findTestUser();
+
+            LocalDate referenceDate = LocalDate.of(2026, 1, 16);
+
+            // Inserted in this order: the yield for 2026-01-15 is recorded
+            // after a deposit made on 2026-01-16, so the balance after the
+            // yield (1100.17) includes a deposit that is not part of the
+            // balance at the start of 2026-01-16 (1000.17).
+            transactionRepository.saveAllAndFlush(List.of(
+                    new Transaction(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("1000.00"),
+                            LocalDateTime.of(2026, 1, 14, 9, 0),
+                            account,
+                            actor,
+                            new BigDecimal("1000.00")
+                    ),
+                    new Transaction(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("100.00"),
+                            LocalDateTime.of(2026, 1, 16, 12, 0),
+                            account,
+                            actor,
+                            new BigDecimal("1100.00")
+                    ),
+                    new Transaction(
+                            TransactionType.YIELD,
+                            new BigDecimal("0.17"),
+                            LocalDateTime.of(2026, 1, 16, 13, 0),
+                            LocalDate.of(2026, 1, 15),
+                            account,
+                            new BigDecimal("1100.17")
+                    )
+            ));
+
+            assertTrue(
+                    transactionRepository.findBalanceAtStartOfDayFromSnapshot(
+                            account.getId(),
+                            referenceDate,
+                            referenceDate.atStartOfDay()
+                    ).isEmpty(),
+                    "The snapshot must not be used when the history is out of order."
+            );
+
+            BigDecimal reconstructed =
+                    transactionRepository.calculateBalanceAtStartOfDay(
+                            account.getId(),
+                            referenceDate,
+                            referenceDate.atStartOfDay()
+                    );
+
+            assertEquals(
+                    0,
+                    new BigDecimal("1000.17").compareTo(reconstructed),
+                    "The reconstruction must exclude the deposit made on the reference day."
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Balance snapshot and reconciliation
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Balance snapshot and reconciliation")
+    class BalanceSnapshot {
+
+        @Test
+        @DisplayName("Should record the balance after each operation and reconcile")
+        void shouldRecordBalanceAfterEachOperation() {
+            CheckingAccount source = createCheckingAccount("0.00");
+            CheckingAccount destination = createCheckingAccount("0.00");
+
+            transactionService.deposit(operation(source, "100.00"));
+            transactionService.withdraw(operation(source, "30.00"));
+            transactionService.transfer(
+                    new TransferRequestDTO(
+                            source.getAccountNumber(),
+                            source.getDigit(),
+                            destination.getAccountNumber(),
+                            destination.getDigit(),
+                            new BigDecimal("20.00")
+                    )
+            );
+
+            assertSnapshots(source, "100.00", "70.00", "50.00");
+            assertSnapshots(destination, "20.00");
+
+            assertEquals(
+                    0,
+                    balanceReconciliationJob.reconcile(),
+                    "A consistent ledger must not produce mismatches."
+            );
+            assertTrue(
+                    transactionRepository
+                            .findFirstBalanceChainBreak(source.getId())
+                            .isEmpty()
+            );
+        }
+
+        @Test
+        @DisplayName("Should report an account whose balance diverges from the ledger")
+        void shouldReportDivergingAccount() {
+            CheckingAccount account = createCheckingAccount("0.00");
+
+            transactionService.deposit(operation(account, "100.00"));
+
+            jdbcTemplate.update(
+                    "UPDATE accounts SET balance = balance + 1 WHERE id = ?",
+                    account.getId()
+            );
+
+            assertEquals(1, balanceReconciliationJob.reconcile());
+        }
+
+        private void assertSnapshots(Account account, String... expected) {
+            List<BigDecimal> actual = jdbcTemplate.queryForList(
+                    "SELECT balance_after FROM transactions "
+                            + "WHERE account_id = ? ORDER BY id",
+                    BigDecimal.class,
+                    account.getId()
+            );
+
+            assertEquals(expected.length, actual.size());
+
+            for (int i = 0; i < expected.length; i++) {
+                assertEquals(
+                        0,
+                        new BigDecimal(expected[i]).compareTo(actual.get(i)),
+                        "Unexpected balance_after at position " + i
+                                + ": " + actual.get(i)
+                );
+            }
         }
     }
 

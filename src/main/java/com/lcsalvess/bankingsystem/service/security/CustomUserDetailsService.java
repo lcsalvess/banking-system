@@ -2,7 +2,7 @@ package com.lcsalvess.bankingsystem.service.security;
 
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
-import com.lcsalvess.bankingsystem.util.UsernameNormalizer;
+import com.lcsalvess.bankingsystem.util.normalization.UsernameNormalizer;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

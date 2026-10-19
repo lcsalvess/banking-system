@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.integration.security;
 
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;

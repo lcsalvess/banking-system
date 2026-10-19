@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.event.transaction;
 
-import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
+import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 
 import java.math.BigDecimal;
 

@@ -2,10 +2,14 @@ package com.lcsalvess.bankingsystem.unit.service.transaction;
 
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.TransactionResponseDTO;
-import com.lcsalvess.bankingsystem.entity.*;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
-import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.entity.account.Account;
+import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
+import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
+import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
+import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;

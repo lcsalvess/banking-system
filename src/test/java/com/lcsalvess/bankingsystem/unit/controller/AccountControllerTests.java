@@ -1,11 +1,11 @@
 package com.lcsalvess.bankingsystem.unit.controller;
 
-import com.lcsalvess.bankingsystem.config.PaginationConfig;
+import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.AccountController;
-import com.lcsalvess.bankingsystem.dto.request.AccountRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.AccountResponseDTO;
-import com.lcsalvess.bankingsystem.entity.enums.AccountStatus;
-import com.lcsalvess.bankingsystem.entity.enums.AccountType;
+import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
+import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
+import com.lcsalvess.bankingsystem.entity.account.AccountType;
 import com.lcsalvess.bankingsystem.exception.account.*;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;

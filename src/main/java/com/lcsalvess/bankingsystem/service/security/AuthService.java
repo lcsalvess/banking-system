@@ -2,7 +2,7 @@ package com.lcsalvess.bankingsystem.service.security;
 
 import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
-import com.lcsalvess.bankingsystem.entity.User;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.dto.response.security;
 
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record LoginResponseDTO(

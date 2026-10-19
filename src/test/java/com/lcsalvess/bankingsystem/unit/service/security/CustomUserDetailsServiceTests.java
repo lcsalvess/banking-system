@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.service.security;
 
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
 import org.junit.jupiter.api.DisplayName;

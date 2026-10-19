@@ -1,9 +1,9 @@
 package com.lcsalvess.bankingsystem.service.address;
 
-import com.lcsalvess.bankingsystem.dto.request.AddressRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.AddressLookupResponseDTO;
-import com.lcsalvess.bankingsystem.entity.Address;
-import com.lcsalvess.bankingsystem.entity.enums.State;
+import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.address.AddressLookupResponseDTO;
+import com.lcsalvess.bankingsystem.entity.address.Address;
+import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.integration.address.AddressLookupService;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import org.springframework.stereotype.Service;

@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDTO;
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;

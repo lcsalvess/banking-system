@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.repository.specification;
 
-import com.lcsalvess.bankingsystem.entity.Transaction;
-import com.lcsalvess.bankingsystem.entity.enums.TransactionType;
+import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
+import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;

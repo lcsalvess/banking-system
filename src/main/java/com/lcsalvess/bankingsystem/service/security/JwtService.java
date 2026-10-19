@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.service.security;
 
-import com.lcsalvess.bankingsystem.config.JwtProperties;
-import com.lcsalvess.bankingsystem.entity.User;
+import com.lcsalvess.bankingsystem.config.security.JwtProperties;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;

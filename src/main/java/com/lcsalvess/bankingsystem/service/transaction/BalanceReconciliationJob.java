@@ -2,7 +2,7 @@ package com.lcsalvess.bankingsystem.service.transaction;
 
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.projection.BalanceMismatch;
-import com.lcsalvess.bankingsystem.util.AppTimeZone;
+import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

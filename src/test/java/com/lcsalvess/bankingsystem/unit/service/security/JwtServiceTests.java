@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.service.security;
 
-import com.lcsalvess.bankingsystem.config.JwtProperties;
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.config.security.JwtProperties;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.service.security.JwtClaims;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import io.jsonwebtoken.Claims;

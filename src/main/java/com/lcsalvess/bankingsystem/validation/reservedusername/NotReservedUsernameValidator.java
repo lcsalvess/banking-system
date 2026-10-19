@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.validation.reservedusername;
 
-import com.lcsalvess.bankingsystem.util.SystemActor;
-import com.lcsalvess.bankingsystem.util.UsernameNormalizer;
+import com.lcsalvess.bankingsystem.util.actor.SystemActor;
+import com.lcsalvess.bankingsystem.util.normalization.UsernameNormalizer;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

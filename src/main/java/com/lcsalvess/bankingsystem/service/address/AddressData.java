@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.service.address;
 
-import com.lcsalvess.bankingsystem.entity.enums.State;
+import com.lcsalvess.bankingsystem.entity.address.State;
 
 public record AddressData(
         String streetName,

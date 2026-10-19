@@ -2,8 +2,8 @@ package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
-import com.lcsalvess.bankingsystem.entity.User;
-import com.lcsalvess.bankingsystem.entity.enums.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
@@ -15,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AccountExpiredException;

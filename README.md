@@ -23,7 +23,7 @@ The main goal is to build a realistic backend system while exploring software en
 | Spring Security       | -       | Authentication and authorization         |
 | Spring Events         | -       | Decoupled operation logging              |
 | Spring Scheduling     | -       | Automatic daily yield processing         |
-| Spring Boot Actuator  | -       | Health, info, and metrics endpoints      |
+| Spring Boot Actuator  | -       | Health, info, metrics, and probes        |
 | Micrometer            | -       | Metrics and observability                |
 | JWT (JJWT)            | 0.13.0  | Stateless authentication                 |
 | BCrypt                | -       | Password hashing                         |
@@ -174,7 +174,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Global exception handling** with a consistent error response
 - **Decoupled operation logging** using Spring application events
 - **Request tracing** with a correlation ID present in the response header and in every log line
-- **Observability** with Spring Boot Actuator (health, info, metrics) and Micrometer timers
+- **Observability** with Spring Boot Actuator (health, info, metrics, and public liveness/readiness probes) and Micrometer timers
 - **Environment profiles** (`local`, `prod`, and `test`) that separate database configuration and API documentation exposure
 - **Interactive API documentation** with Swagger UI, enabled only in the `local` profile
 
@@ -229,7 +229,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - The balance is rebuilt from the transaction history as it stood at 00:00 of the reference date, not read from the current balance. A deposit made on the same day does not earn yield that day, and each day of a catch-up is calculated on its own historical balance, so previous yields compound.
 - Every yield transaction carries a `yield_date`, the date it refers to. An account becomes eligible on the day after its creation or after its last yield date.
 - Each savings account keeps a `last_yield_processed_date`, the cursor of the processing. Dates are processed one at a time, in chronological order, and an out-of-order date is rejected. Each account and date pair runs in its own database transaction, under the account row lock.
-- Missed days are credited by the next run, one day at a time. If the application was down, the job also runs once right after startup (in every profile except `test`) to recover them.
+- Missed days are credited by the next run, one day at a time. If the application was down, the job also runs once right after startup (in every profile except `test`) to recover them. This recovery runs in a background thread, so a long catch-up does not delay the readiness probe, and a failure in it is logged without affecting the application. Running it alongside the scheduled job is safe because the processing is idempotent.
 - Processing is idempotent. A date that was already processed is skipped, and the partial unique index `uk_transactions_daily_yield` (`account_id`, `yield_date`) guarantees a single yield per account per date, even with concurrent executions or several application instances.
 - A date is marked as processed even when no yield is credited: the account is not eligible yet, the yield rounds to zero, or crediting it would exceed the balance limit. Skipped days are not credited retroactively.
 - If processing an account fails, the date stays pending and the next run resumes from it. Transient database failures are retried up to 3 times with an increasing delay. A persistent failure stops only that account, and the others continue. An account that is no longer active is skipped.
@@ -249,7 +249,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - When creating a user or setting a new password, the password must contain 8–64 characters, at least one uppercase ASCII letter, one lowercase ASCII letter, one digit, and one special character. It must also be no more than 72 bytes when encoded in UTF-8, the limit supported by BCrypt.
 - The complexity rule is not reapplied to the login password or the current password during a password change, so existing credentials are not rejected solely for lacking the new composition requirements. The existing character-length and UTF-8 byte-length checks still apply to these fields.
 - Passwords are stored as BCrypt hashes (strength 12).
-- An initial `ADMIN` is created at startup from environment variables when no admin exists (see [Configuration](#configuration)). In the `prod` profile the application refuses to start when no admin exists and the credentials are not configured.
+- An initial `ADMIN` is created at startup from environment variables when no admin exists (see [Configuration](#configuration)). The application refuses to start when no admin exists and the credentials are not configured, in every profile except `local` and `test`, which relax this rule.
 - Username uniqueness is case-insensitive and enforced by the database through a unique index on `LOWER(username)`.
 - The username `system` (case-insensitive, ignoring surrounding spaces) is reserved for the actor of system-generated operations, such as the daily yield, and is rejected when creating a user and for the initial admin. The `ck_users_username_not_system` check constraint enforces the same rule in the database.
 - `system_migration` is a reserved technical user created by migration `V6` and hardened by `V8` (BCrypt password hash and a non-routable `.invalid` e-mail). It is inactive, cannot authenticate, and owns the transactions that already existed when the audit trail was introduced.
@@ -307,7 +307,7 @@ Authorization: Bearer <token>
 | `ADMIN`    | Create, list, deactivate, and reactivate users; read the transaction history and look up transactions by code; `/actuator/health`, `/actuator/info`, and `/actuator/metrics`                                           |
 | `EMPLOYEE` | Clients (including internal address lookup during creation/update), accounts, deposits, withdrawals, and transfers; read transaction history and look up transactions by code; `/actuator/health` and `/actuator/info` |
 
-Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Business operations require an `EMPLOYEE` user, which an `ADMIN` creates through `POST /api/v1/users`. Endpoint access is enforced with `@PreAuthorize` on the controllers and with request rules in `SecurityConfig` for the actuator. Changing one's own password is the only operation open to every authenticated user.
+Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Business operations require an `EMPLOYEE` user, which an `ADMIN` creates through `POST /api/v1/users`. Endpoint access is enforced with `@PreAuthorize` on the controllers and with request rules in `SecurityConfig` for the actuator. Changing one's own password is the only operation open to every authenticated user. The only unauthenticated routes are the login, the liveness and readiness probes, and, when enabled, the OpenAPI documentation; every other route is denied by default.
 
 ---
 
@@ -364,11 +364,13 @@ Address lookup is not exposed as a standalone endpoint. It is performed internal
 
 ### Actuator Endpoints
 
-| Method | Endpoint             | Description                          | Access               |
-| ------ | -------------------- | ------------------------------------ | -------------------- |
-| GET    | `/actuator/health`   | Application health                   | `EMPLOYEE`, `ADMIN`  |
-| GET    | `/actuator/info`     | Application information              | `EMPLOYEE`, `ADMIN`  |
-| GET    | `/actuator/metrics`  | Micrometer metrics                   | `ADMIN`              |
+| Method | Endpoint                     | Description                          | Access               |
+| ------ | ---------------------------- | ------------------------------------ | -------------------- |
+| GET    | `/actuator/health/liveness`  | Liveness probe (no details)          | Public               |
+| GET    | `/actuator/health/readiness` | Readiness probe (no details)         | Public               |
+| GET    | `/actuator/health`           | Application health                   | `EMPLOYEE`, `ADMIN`  |
+| GET    | `/actuator/info`             | Application information              | `EMPLOYEE`, `ADMIN`  |
+| GET    | `/actuator/metrics`          | Micrometer metrics                   | `ADMIN`              |
 
 ---
 
@@ -504,6 +506,8 @@ Operations are logged through Spring application events:
 ## Observability
 
 - Spring Boot Actuator exposes `health`, `info`, and `metrics`. `health` and `info` require an `EMPLOYEE` or `ADMIN` token, `metrics` requires `ADMIN`, and health details are shown only to authorized users.
+- The liveness (`/actuator/health/liveness`) and readiness (`/actuator/health/readiness`) probes are enabled explicitly and are public, so Docker and Kubernetes health checks work without a token. They never show details. Other `/actuator/health/**` paths remain denied.
+- Readiness only becomes `ACCEPTING_TRAFFIC` after the startup listeners return, which is why the daily yield recovery runs in a background thread.
 - Custom Micrometer timers:
 
 | Timer                       | Description                                                              |
@@ -562,11 +566,11 @@ CREATE DATABASE banking_system_test;
 
 | Profile | Database                                                                    | Swagger UI / OpenAPI | Admin bootstrap required |
 |---------|-----------------------------------------------------------------------------|----------------------|--------------------------|
-| `local` | `DB_URL`, defaulting to `jdbc:postgresql://localhost:5432/banking_system`   | Enabled              | No                       |
+| `local` | `DB_URL`, defaulting to `jdbc:postgresql://localhost:5432/banking_system`   | Enabled              | No (overridden)          |
 | `prod`  | `DB_URL` is required                                                        | Disabled             | Yes                      |
-| `test`  | `jdbc:postgresql://localhost:5432/banking_system_test` (used by the tests)  | Disabled             | No                       |
+| `test`  | `jdbc:postgresql://localhost:5432/banking_system_test` (used by the tests)  | Disabled             | No (overridden)          |
 
-Without an active profile, `DB_URL` is required, the API documentation is disabled, and the admin bootstrap is not required. Use `local` for development.
+Without an active profile, `DB_URL` is required, the API documentation is disabled, and the admin bootstrap is required, as in `prod`: the requirement is the default (`app.admin.bootstrap.required=true`) and only `local` and `test` turn it off. Use `local` for development.
 
 3. Set the environment variables:
 
@@ -581,7 +585,7 @@ Without an active profile, `DB_URL` is required, the API documentation is disabl
 | `ADMIN_EMAIL`            | No                                | E-mail of the initial admin                                     |
 | `ADMIN_PASSWORD`         | No                                | Password of the initial admin                                   |
 
-The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*` variables are set. `ADMIN_PASSWORD` must satisfy the same password policy used for user creation, including complexity and size limits. When no admin exists and the variables are missing, the application logs a warning and starts in `local` and `test`, but fails at startup in `prod` (`app.admin.bootstrap.required=true`), so a production deployment never runs without an administrator. The initial admin can only manage users: create an `EMPLOYEE` user to operate clients, accounts, and transactions (see [Example](#example)). To generate a suitable secret:
+The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*` variables are set. `ADMIN_PASSWORD` must satisfy the same password policy used for user creation, including complexity and size limits. When no admin exists and the variables are missing, the application logs a warning and starts in `local` and `test`, but fails at startup in any other profile, including `prod` and no profile (`app.admin.bootstrap.required=true` is the default), so a deployment never runs without an administrator, even if the profile is not set. The initial admin can only manage users: create an `EMPLOYEE` user to operate clients, accounts, and transactions (see [Example](#example)). To generate a suitable secret:
 
 ```bash
 openssl rand -base64 32
@@ -629,16 +633,16 @@ Use the **Authorize** button and paste the JWT returned by `/api/v1/auth/login` 
 
 The test suite covers:
 
-- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, daily yield processing, and the lock acquisition of each), the daily yield scheduler (batching, retries, isolation of per-account failures, chronological catch-up, and interrupted runs) and its startup recovery, users (including deactivation and reactivation), password change, JWT (including the credential version claim), authentication, user details loading, address data resolution, and address lookup provider orchestration.
+- **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, daily yield processing, and the lock acquisition of each), the daily yield scheduler (batching, retries, isolation of per-account failures, chronological catch-up, and interrupted runs) and its asynchronous startup recovery (executor hand-off, failure isolation, and the default dedicated thread), users (including deactivation and reactivation), password change, JWT (including the credential version claim), authentication, user details loading, address data resolution, and address lookup provider orchestration.
 - **Concurrency integration tests** (`TransactionConcurrencyTests`) against PostgreSQL, running operations on parallel threads released at the same instant: concurrent withdrawals that must not overdraw an account, deposits that must not be lost, mixed deposits and withdrawals, opposite transfers without deadlock, several transfers into the same account, transfers limited by the available balance, a daily yield processed twice at once, and an account cancellation racing with deposits. The same class also checks the start-of-day balance calculation and the recovery of pending yield dates with compounded yields.
 - **User integration tests** against PostgreSQL: `PasswordChangeIntegrationTests` covers the password change flow end to end (login only with the new password, revocation of tokens issued before the change, validation failures, deactivated users, tokens that stay revoked after reactivation, and concurrent changes), and `UserDeactivationConcurrencyTests` checks that concurrent deactivations of admins always leave one active administrator and that deactivating the same admin twice at once is idempotent.
 - **Transaction idempotency integration tests** against PostgreSQL: `TransactionIdempotencyIntegrationTests` covers repeated requests, replay of the original result, conflicts when a key is reused with different data, rollback behavior, and concurrent requests; `TransactionIdempotencyCleanupIntegrationTests` verifies the retention cleanup.
 - **Database configuration tests** (`DatabaseLockTimeoutTests`): the lock timeout applied to pooled connections and the balance upper bound constraint. `ReservedUsernameConstraintTests` inserts users directly into PostgreSQL to check that the database rejects the reserved username, in any case, and accepts names that only contain it.
-- **Security tests** for JWT generation and validation (secret, issuer, expiration, credential version, and malformed version claim), the security filter chain (public routes, token validation, method security, actuator access, and correlation ID on error responses), and the authentication entry point.
+- **Security tests** for JWT generation and validation (secret, issuer, expiration, credential version, and malformed version claim), the security filter chain (public routes, token validation, method security, actuator access including the public liveness and readiness probes, and correlation ID on error responses), and the authentication entry point.
 - **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), and authentication (including password change). Address lookup behavior is covered by service/orchestration tests and provider-client tests, not a standalone lookup endpoint.
 - **Provider client tests** for ViaCEP and Brasil API against a local HTTP server: response mapping, postal code not found, invalid responses, error statuses, timeouts, and unreachable providers.
 - **JSON coercion tests** that import `JacksonConfig` into a controller slice to check that wrongly typed fields are rejected.
-- **Validation tests** for CPF, account number, account digit, password size in bytes, password complexity, and reserved username.
+- **Validation tests** for CPF, account number, account digit, password size in bytes, password complexity (including passwords with line breaks), and reserved username.
 - **Filter tests** for the correlation ID: generation, reuse, lowercase normalization, rejection of non-canonical values, and MDC cleanup.
 - **Other unit tests** for the global exception handler, the database constraint mapping, the pagination tie-breaker, and the admin bootstrap runner.
 - **Context test** to verify the application starts.

@@ -22,7 +22,7 @@ import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
-import com.lcsalvess.bankingsystem.service.transaction.DailyYieldProcessingResult;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.service.transaction.BalanceReconciliationJob;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import jakarta.persistence.EntityManager;

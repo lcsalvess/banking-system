@@ -21,6 +21,7 @@ import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifica
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
 import com.lcsalvess.bankingsystem.util.actor.SystemActor;
 import org.springframework.context.ApplicationEventPublisher;

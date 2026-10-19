@@ -1,9 +1,10 @@
-package com.lcsalvess.bankingsystem.service.transaction;
+package com.lcsalvess.bankingsystem.service.transaction.yield;
 
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
+import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

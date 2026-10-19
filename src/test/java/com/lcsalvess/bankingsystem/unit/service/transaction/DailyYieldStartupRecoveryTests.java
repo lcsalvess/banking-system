@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.service.transaction;
 
-import com.lcsalvess.bankingsystem.service.transaction.DailyYieldScheduler;
-import com.lcsalvess.bankingsystem.service.transaction.DailyYieldStartupRecovery;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldScheduler;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldStartupRecovery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

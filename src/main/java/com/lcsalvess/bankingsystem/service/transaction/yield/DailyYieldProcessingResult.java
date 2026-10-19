@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.service.transaction;
+package com.lcsalvess.bankingsystem.service.transaction.yield;
 
 public enum DailyYieldProcessingResult {
     APPLIED,

@@ -1,7 +1,6 @@
 package com.lcsalvess.bankingsystem.service.address;
 
 import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.address.AddressLookupResponseDTO;
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.integration.address.AddressLookupService;
@@ -27,18 +26,6 @@ public class AddressService {
                 addressData.neighborhood(),
                 addressData.city(),
                 addressData.state(),
-                addressData.postalCode()
-        );
-    }
-
-    public AddressLookupResponseDTO lookupByPostalCode(String postalCode) {
-        AddressData addressData = findAddressByPostalCode(postalCode);
-
-        return new AddressLookupResponseDTO(
-                addressData.streetName(),
-                addressData.neighborhood(),
-                addressData.city(),
-                addressData.state().name(),
                 addressData.postalCode()
         );
     }

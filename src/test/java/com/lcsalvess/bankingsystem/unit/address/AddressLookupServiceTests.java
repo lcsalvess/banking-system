@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.address;
 
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.AddressLookupService;
 import com.lcsalvess.bankingsystem.integration.address.AddressProvider;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
@@ -18,18 +19,15 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AddressLookupServiceTests {
 
     private static final String POSTAL_CODE = "01001000";
-
-    private static final String UNAVAILABLE_MESSAGE =
-            "O serviço de consulta de endereços está temporariamente indisponível.";
-
-    private static final String POSTAL_CODE_NOT_FOUND_MESSAGE =
-            "CEP não encontrado em nenhum provedor.";
 
     private static final String VIACEP_POSTAL_CODE_NOT_FOUND_MESSAGE =
             "CEP não encontrado no ViaCEP.";
@@ -42,6 +40,9 @@ class AddressLookupServiceTests {
 
     private static final String BRASIL_API_UNAVAILABLE_MESSAGE =
             "Brasil API indisponível.";
+
+    private static final String INVALID_RESPONSE_MESSAGE =
+            "Resposta inválida do provedor.";
 
     @Mock
     private AddressProvider viaCepClient;
@@ -75,6 +76,7 @@ class AddressLookupServiceTests {
                     addressLookupService.findByPostalCode(POSTAL_CODE);
 
             assertEquals(expected, result);
+
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
             verifyNoInteractions(brasilApiClient);
             verifyNoMoreInteractions(viaCepClient);
@@ -102,6 +104,7 @@ class AddressLookupServiceTests {
                     addressLookupService.findByPostalCode(POSTAL_CODE);
 
             assertEquals(expected, result);
+
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
             verify(brasilApiClient).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(viaCepClient, brasilApiClient);
@@ -129,6 +132,35 @@ class AddressLookupServiceTests {
                     addressLookupService.findByPostalCode(POSTAL_CODE);
 
             assertEquals(expected, result);
+
+            verify(viaCepClient).findByPostalCode(POSTAL_CODE);
+            verify(brasilApiClient).findByPostalCode(POSTAL_CODE);
+            verifyNoMoreInteractions(viaCepClient, brasilApiClient);
+        }
+    }
+
+    @Nested
+    @DisplayName("When a provider rejects an invalid response")
+    class WhenProviderRejectsInvalidResponse {
+
+        @Test
+        @DisplayName("Should try Brasil API when ViaCEP rejects its response")
+        void shouldTryBrasilApiWhenViaCepRejectsItsResponse() {
+            AddressLookupResponse expected = expectedAddressResponse();
+
+            when(viaCepClient.findByPostalCode(POSTAL_CODE))
+                    .thenThrow(new AddressProviderUnavailableException(
+                            INVALID_RESPONSE_MESSAGE
+                    ));
+
+            when(brasilApiClient.findByPostalCode(POSTAL_CODE))
+                    .thenReturn(expected);
+
+            AddressLookupResponse result =
+                    addressLookupService.findByPostalCode(POSTAL_CODE);
+
+            assertEquals(expected, result);
+
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
             verify(brasilApiClient).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(viaCepClient, brasilApiClient);
@@ -157,7 +189,11 @@ class AddressLookupServiceTests {
                     () -> addressLookupService.findByPostalCode(POSTAL_CODE)
             );
 
-            assertEquals(POSTAL_CODE_NOT_FOUND_MESSAGE, exception.getMessage());
+            assertEquals(
+                    ApiErrorMessages.POSTAL_CODE_NOT_FOUND,
+                    exception.getMessage()
+            );
+
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
             verify(brasilApiClient).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(viaCepClient, brasilApiClient);
@@ -186,7 +222,11 @@ class AddressLookupServiceTests {
                     () -> addressLookupService.findByPostalCode(POSTAL_CODE)
             );
 
-            assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
+            assertEquals(
+                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
+                    exception.getMessage()
+            );
+
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
             verify(brasilApiClient).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(viaCepClient, brasilApiClient);
@@ -217,7 +257,11 @@ class AddressLookupServiceTests {
                     () -> addressLookupService.findByPostalCode(POSTAL_CODE)
             );
 
-            assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
+            assertEquals(
+                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
+                    exception.getMessage()
+            );
+
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
             verify(brasilApiClient).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(viaCepClient, brasilApiClient);
@@ -248,7 +292,11 @@ class AddressLookupServiceTests {
                     () -> addressLookupService.findByPostalCode(POSTAL_CODE)
             );
 
-            assertEquals(UNAVAILABLE_MESSAGE, exception.getMessage());
+            assertEquals(
+                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
+                    exception.getMessage()
+            );
+
             verify(viaCepClient).findByPostalCode(POSTAL_CODE);
             verify(brasilApiClient).findByPostalCode(POSTAL_CODE);
             verifyNoMoreInteractions(viaCepClient, brasilApiClient);

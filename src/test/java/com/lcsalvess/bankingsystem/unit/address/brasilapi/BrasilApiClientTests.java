@@ -2,11 +2,11 @@ package com.lcsalvess.bankingsystem.unit.address.brasilapi;
 
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.brasilapi.BrasilApiClient;
-import com.lcsalvess.bankingsystem.unit.address.FakeAddressServer;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.integration.address.exception.PostalCodeNotFoundException;
 import com.lcsalvess.bankingsystem.integration.address.validation.AddressLookupResponseValidator;
+import com.lcsalvess.bankingsystem.unit.address.FakeAddressServer;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.AfterEach;
@@ -27,7 +27,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 class BrasilApiClientTests {

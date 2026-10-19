@@ -1,7 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.service.address;
 
 import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.address.AddressLookupResponseDTO;
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
@@ -19,8 +18,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AddressServiceTests {
@@ -116,35 +119,6 @@ class AddressServiceTests {
             assertEquals(
                     ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
                     exception.getMessage()
-            );
-
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
-        }
-    }
-
-    @Nested
-    @DisplayName("When looking up an address for the API")
-    class LookupByPostalCode {
-
-        @Test
-        @DisplayName("Should return an API response DTO without exposing the integration DTO")
-        void shouldReturnApiResponseDtoWithoutExposingIntegrationDto() {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenReturn(lookupResponse());
-
-            AddressLookupResponseDTO result =
-                    addressService.lookupByPostalCode(POSTAL_CODE);
-
-            assertEquals(
-                    new AddressLookupResponseDTO(
-                            "Praça da Sé",
-                            "Sé",
-                            "São Paulo",
-                            "SP",
-                            POSTAL_CODE
-                    ),
-                    result
             );
 
             verify(addressLookupService).findByPostalCode(POSTAL_CODE);

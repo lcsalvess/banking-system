@@ -67,6 +67,7 @@ public class AddressLookupService {
                         "Address provider unavailable: provider={}",
                         provider.getClass().getSimpleName()
                 );
+
                 lastFailureCause = ex;
 
             } catch (PostalCodeNotFoundException ex) {

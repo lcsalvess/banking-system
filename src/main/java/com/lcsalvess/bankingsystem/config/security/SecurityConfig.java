@@ -46,83 +46,89 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Public access: login only.
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/auth/login"
-                        ).permitAll()
+                                // Public access: login only.
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v1/auth/login"
+                                ).permitAll()
 
-                        // Password change: any authenticated user.
-                        .requestMatchers(
-                                HttpMethod.PATCH,
-                                "/api/v1/auth/password"
-                        ).authenticated()
+                                // Password change: any authenticated user.
+                                .requestMatchers(
+                                        HttpMethod.PATCH,
+                                        "/api/v1/auth/password"
+                                ).authenticated()
 
-                        // OpenAPI documentation.
-                        .requestMatchers(
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/v3/api-docs/**"
-                        ).permitAll()
+                                // OpenAPI documentation.
+                                .requestMatchers(
+                                        "/swagger-ui/**",
+                                        "/swagger-ui.html",
+                                        "/v3/api-docs/**"
+                                ).permitAll()
 
-                        // Actuator: health and info.
-                        .requestMatchers("/actuator/health", "/actuator/info")
-                        .hasAnyRole("EMPLOYEE", "ADMIN")
+                                // Actuator: public liveness and readiness probes.
+                                .requestMatchers(
+                                        "/actuator/health/liveness",
+                                        "/actuator/health/readiness"
+                                ).permitAll()
 
-                        // Actuator: metrics restricted to administrators.
-                        .requestMatchers("/actuator/metrics", "/actuator/metrics/**")
-                        .hasRole("ADMIN")
+                                // Actuator: health and info.
+                                .requestMatchers("/actuator/health", "/actuator/info")
+                                .hasAnyRole("EMPLOYEE", "ADMIN")
 
-                        // User management: administrators only.
-                        .requestMatchers("/api/v1/users", "/api/v1/users/**")
-                        .hasRole("ADMIN")
+                                // Actuator: metrics restricted to administrators.
+                                .requestMatchers("/actuator/metrics", "/actuator/metrics/**")
+                                .hasRole("ADMIN")
 
-                        // Client management: employees only.
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/clients"
-                        ).hasRole("EMPLOYEE")
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/v1/clients",
-                                "/api/v1/clients/**"
-                        ).hasRole("EMPLOYEE")
-                        .requestMatchers(
-                                HttpMethod.PATCH,
-                                "/api/v1/clients/**"
-                        ).hasRole("EMPLOYEE")
+                                // User management: administrators only.
+                                .requestMatchers("/api/v1/users", "/api/v1/users/**")
+                                .hasRole("ADMIN")
 
-                        // Account management: employees only.
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/accounts"
-                        ).hasRole("EMPLOYEE")
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/v1/accounts",
-                                "/api/v1/accounts/**"
-                        ).hasRole("EMPLOYEE")
-                        .requestMatchers(
-                                HttpMethod.PATCH,
-                                "/api/v1/accounts/**"
-                        ).hasRole("EMPLOYEE")
+                                // Client management: employees only.
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v1/clients"
+                                ).hasRole("EMPLOYEE")
+                                .requestMatchers(
+                                        HttpMethod.GET,
+                                        "/api/v1/clients",
+                                        "/api/v1/clients/**"
+                                ).hasRole("EMPLOYEE")
+                                .requestMatchers(
+                                        HttpMethod.PATCH,
+                                        "/api/v1/clients/**"
+                                ).hasRole("EMPLOYEE")
 
-                        // Financial operations: employees only.
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/transactions/deposit",
-                                "/api/v1/transactions/withdraw",
-                                "/api/v1/transactions/transfer"
-                        ).hasRole("EMPLOYEE")
+                                // Account management: employees only.
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v1/accounts"
+                                ).hasRole("EMPLOYEE")
+                                .requestMatchers(
+                                        HttpMethod.GET,
+                                        "/api/v1/accounts",
+                                        "/api/v1/accounts/**"
+                                ).hasRole("EMPLOYEE")
+                                .requestMatchers(
+                                        HttpMethod.PATCH,
+                                        "/api/v1/accounts/**"
+                                ).hasRole("EMPLOYEE")
 
-                        // Transaction history and lookup: read-only access.
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/v1/transactions/**"
-                        ).hasAnyRole("EMPLOYEE", "ADMIN")
+                                // Financial operations: employees only.
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v1/transactions/deposit",
+                                        "/api/v1/transactions/withdraw",
+                                        "/api/v1/transactions/transfer"
+                                ).hasRole("EMPLOYEE")
 
-                        // Deny any endpoint not explicitly authorized above.
-                        .anyRequest().denyAll()
+                                // Transaction history and lookup: read-only access.
+                                .requestMatchers(
+                                        HttpMethod.GET,
+                                        "/api/v1/transactions/**"
+                                ).hasAnyRole("EMPLOYEE", "ADMIN")
+
+                                // Deny any endpoint not explicitly authorized above.
+                                .anyRequest().denyAll()
                 )
                 .exceptionHandling(exceptionHandling -> exceptionHandling
                         .authenticationEntryPoint(authenticationEntryPoint)

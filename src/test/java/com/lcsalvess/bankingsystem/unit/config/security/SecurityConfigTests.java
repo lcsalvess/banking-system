@@ -1,10 +1,10 @@
 package com.lcsalvess.bankingsystem.unit.config.security;
 
-import com.lcsalvess.bankingsystem.config.time.ClockConfig;
 import com.lcsalvess.bankingsystem.config.security.JwtProperties;
 import com.lcsalvess.bankingsystem.config.security.SecurityConfig;
-import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.config.time.ClockConfig;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.security.RestAccessDeniedHandler;
@@ -55,13 +55,27 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Tests {@link SecurityConfig} with the real security filter chain:
@@ -279,9 +293,9 @@ class SecurityConfigTests {
         }
 
         @ParameterizedTest(name = "GET {0}")
-        @ValueSource(strings = {"/actuator/health", "/actuator/metrics", "/api/v1/qualquer-rota"})
-        @DisplayName("Deve proteger qualquer rota não pública, inclusive /actuator/**")
-        void shouldProtectEveryNonPublicRoute(String url) throws Exception {
+        @ValueSource(strings = {"/actuator/health", "/actuator/info", "/actuator/metrics", "/api/v1/qualquer-rota"})
+        @DisplayName("Deve exigir autenticação nas rotas protegidas")
+        void shouldRequireAuthenticationOnProtectedRoutes(String url) throws Exception {
             expectUnauthorized(mockMvc.perform(get(url)));
 
             verifyNoInteractions(userDetailsService);
@@ -682,6 +696,26 @@ class SecurityConfigTests {
                     .andExpect(jsonPath("$.timestamp").exists());
 
             verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @ParameterizedTest(name = "GET {0}")
+        @ValueSource(strings = {
+                "/actuator/health/liveness",
+                "/actuator/health/readiness"
+        })
+        @DisplayName("Deve permitir as health probes sem token")
+        void shouldAllowHealthProbesWithoutToken(String url) throws Exception {
+            MvcResult result = mockMvc.perform(get(url))
+                    .andReturn();
+
+            int statusCode = result.getResponse().getStatus();
+
+            assertNotEquals(401, statusCode,
+                    "A probe não deve exigir autenticação");
+            assertNotEquals(403, statusCode,
+                    "A probe não deve ser bloqueada pela autorização");
+
+            verifyNoInteractions(userDetailsService);
         }
     }
 

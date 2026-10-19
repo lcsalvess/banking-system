@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.security;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,9 +29,6 @@ class RestAuthenticationEntryPointTests {
 
     private static final int UNAUTHORIZED_STATUS =
             HttpServletResponse.SC_UNAUTHORIZED;
-
-    private static final String EXPECTED_MESSAGE =
-            "Não foi possível autenticar o usuário.";
 
     private JsonMapper jsonMapper;
     private RestAuthenticationEntryPoint authenticationEntryPoint;
@@ -139,7 +137,7 @@ class RestAuthenticationEntryPointTests {
                             response.getCharacterEncoding()
                     ),
                     () -> assertTrue(
-                            body.contains(EXPECTED_MESSAGE)
+                            body.contains(ApiErrorMessages.AUTHENTICATION_FAILED)
                     ),
                     () -> assertFalse(
                             body.contains("NÃ£o")
@@ -185,7 +183,7 @@ class RestAuthenticationEntryPointTests {
                             body.contains(exception.getMessage())
                     ),
                     () -> assertEquals(
-                            EXPECTED_MESSAGE,
+                            ApiErrorMessages.AUTHENTICATION_FAILED,
                             readErrorResponse().message()
                     )
             );
@@ -256,7 +254,7 @@ class RestAuthenticationEntryPointTests {
                         errorResponse.status()
                 ),
                 () -> assertEquals(
-                        EXPECTED_MESSAGE,
+                        ApiErrorMessages.AUTHENTICATION_FAILED,
                         errorResponse.message()
                 ),
                 () -> assertNotNull(

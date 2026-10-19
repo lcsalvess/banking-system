@@ -5,6 +5,7 @@ import com.lcsalvess.bankingsystem.config.security.JwtProperties;
 import com.lcsalvess.bankingsystem.config.security.SecurityConfig;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.security.RestAccessDeniedHandler;
 import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
@@ -122,11 +123,7 @@ class SecurityConfigTests {
     private static final String LOGIN_URL = "/api/v1/auth/login";
     private static final String AUTH_PROBE_URL = "/api/v1/auth/probe";
     private static final String PASSWORD_URL = "/api/v1/auth/password";
-    private static final String UNAVAILABLE_MESSAGE =
-            "O serviço está temporariamente indisponível. Tente novamente.";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
-    private static final String UNAUTHORIZED_MESSAGE = "Não foi possível autenticar o usuário.";
-    private static final String FORBIDDEN_MESSAGE = "Você não tem permissão para acessar este recurso.";
 
     @Autowired
     private WebApplicationContext context;
@@ -681,7 +678,7 @@ class SecurityConfigTests {
                     .andExpect(status().isForbidden())
                     .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(403))
-                    .andExpect(jsonPath("$.message").value(FORBIDDEN_MESSAGE))
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.ACCESS_DENIED_RESOURCE))
                     .andExpect(jsonPath("$.timestamp").exists());
 
             verify(userDetailsService).loadUserByUsername(USERNAME);
@@ -852,7 +849,7 @@ class SecurityConfigTests {
         actions.andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message").value(UNAUTHORIZED_MESSAGE))
+                .andExpect(jsonPath("$.message").value(ApiErrorMessages.AUTHENTICATION_FAILED))
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
@@ -860,7 +857,7 @@ class SecurityConfigTests {
         actions.andExpect(status().isServiceUnavailable())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(503))
-                .andExpect(jsonPath("$.message").value(UNAVAILABLE_MESSAGE))
+                .andExpect(jsonPath("$.message").value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 

@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -84,7 +85,7 @@ public class Transaction {
         this.type = type;
         this.amount = amount;
         this.balanceAfter = requireValidBalanceAfter(balanceAfter);
-        this.createdAt = createdAt;
+        this.createdAt = truncateToMicros(createdAt);
         this.account = account;
         this.performedBy = requireHumanActor(performedBy);
     }
@@ -103,7 +104,7 @@ public class Transaction {
         this.type = type;
         this.amount = amount;
         this.balanceAfter = requireValidBalanceAfter(balanceAfter);
-        this.createdAt = createdAt;
+        this.createdAt = truncateToMicros(createdAt);
         this.account = account;
         this.performedBy = requireHumanActor(performedBy);
     }
@@ -121,7 +122,7 @@ public class Transaction {
         this.type = type;
         this.amount = amount;
         this.balanceAfter = requireValidBalanceAfter(balanceAfter);
-        this.createdAt = createdAt;
+        this.createdAt = truncateToMicros(createdAt);
         this.yieldDate = yieldDate;
         this.account = account;
         this.performedBy = requireHumanActor(performedBy);
@@ -151,7 +152,7 @@ public class Transaction {
         this.type = type;
         this.amount = amount;
         this.balanceAfter = requireValidBalanceAfter(balanceAfter);
-        this.createdAt = createdAt;
+        this.createdAt = truncateToMicros(createdAt);
         this.yieldDate = yieldDate;
         this.account = account;
         this.performedBy = null;
@@ -200,6 +201,15 @@ public class Transaction {
 
     public User getPerformedBy() {
         return performedBy;
+    }
+
+    /**
+     * O PostgreSQL armazena timestamps com precisão de microssegundos.
+     * Truncar aqui garante que o valor em memória seja idêntico ao persistido.
+     * Valores nulos são repassados para a validação (@NotNull) tratar.
+     */
+    private static LocalDateTime truncateToMicros(LocalDateTime value) {
+        return value == null ? null : value.truncatedTo(ChronoUnit.MICROS);
     }
 
     private static BigDecimal requireValidBalanceAfter(BigDecimal balanceAfter) {

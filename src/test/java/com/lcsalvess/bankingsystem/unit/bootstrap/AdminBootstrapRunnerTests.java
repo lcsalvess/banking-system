@@ -252,19 +252,21 @@ class AdminBootstrapRunnerTests {
             verifyNoMoreInteractions(userRepository, passwordEncoder);
         }
 
-        @Test
-        @DisplayName("Should accept a password with exactly 64 characters")
-        void shouldAcceptPasswordWithExactlyMaxCharacters() {
-            String password = "a".repeat(64);
+            @Test
+            @DisplayName("Should accept a password with exactly 64 characters")
+            void shouldAcceptPasswordWithExactlyMaxCharacters() {
+                String password = "Aa1!" + "a".repeat(60);
 
-            configure(VALID_USERNAME, VALID_EMAIL, password, false);
-            when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
-            when(passwordEncoder.encode(password)).thenReturn(ENCODED_PASSWORD);
+                assertEquals(64, password.length());
 
-            runner.run();
+                configure(VALID_USERNAME, VALID_EMAIL, password, false);
+                when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+                when(passwordEncoder.encode(password)).thenReturn(ENCODED_PASSWORD);
 
-            verify(userRepository).save(any(User.class));
-        }
+                runner.run();
+
+                verify(userRepository).save(any(User.class));
+            }
 
         @Test
         @DisplayName("Should accept a username with exactly 20 characters")

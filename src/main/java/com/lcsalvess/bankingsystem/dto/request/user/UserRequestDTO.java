@@ -3,6 +3,7 @@ package com.lcsalvess.bankingsystem.dto.request.user;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import com.lcsalvess.bankingsystem.validation.passwordbytelength.PasswordByteLength;
+import com.lcsalvess.bankingsystem.validation.passwordstrength.StrongPassword;
 import com.lcsalvess.bankingsystem.validation.reservedusername.NotReservedUsername;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
@@ -33,12 +34,13 @@ public record UserRequestDTO(
         String email,
 
         @Schema(
-                description = "User's password. Must contain between 8 and 64 characters and must not exceed 72 bytes when encoded in UTF-8.",
+                description = "User's password. Must contain between 8 and 64 characters, at least one uppercase letter, one lowercase letter, one digit, and one special character, and must not exceed 72 bytes when encoded in UTF-8.",
                 example = "SecurePass123!"
         )
         @NotBlank(message = ValidationMessages.REQUIRED_PASSWORD)
         @Size(min = 8, max = 64, message = ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG)
         @PasswordByteLength
+        @StrongPassword
         String password,
 
         @Schema(

@@ -22,6 +22,8 @@ public final class ValidationMessages {
     public static final String PASSWORD_EXCEEDS_MAX_BYTE_LENGTH =
             "A senha excede o limite de tamanho permitido.";
 
+    public static final String INVALID_PASSWORD_STRENGTH =
+            "A senha deve conter pelo menos uma letra maiúscula, uma letra minúscula, um número e um caractere especial.";
 
     // ==================== USUÁRIOS ====================
 
@@ -39,7 +41,6 @@ public final class ValidationMessages {
 
     public static final String REQUIRED_USER_ROLE =
             "O perfil do usuário é obrigatório.";
-
 
     // ==================== CLIENTES ====================
 
@@ -79,7 +80,6 @@ public final class ValidationMessages {
     public static final String INVALID_PHONE_NUMBER_FORMAT =
             "O telefone deve conter de 10 a 11 números, incluindo o DDD.";
 
-
     // ==================== ENDEREÇOS ====================
 
     public static final String REQUIRED_ADDRESS =
@@ -115,7 +115,6 @@ public final class ValidationMessages {
     public static final String INVALID_COMPLEMENT_LENGTH =
             "O complemento deve ter no máximo 100 caracteres.";
 
-
     // ==================== CONTAS ====================
 
     public static final String REQUIRED_HOLDER_ID =
@@ -132,7 +131,6 @@ public final class ValidationMessages {
 
     public static final String INVALID_ACCOUNT_CHECK_DIGIT_LENGTH =
             "O dígito verificador da conta deve conter exatamente 1 dígito.";
-
 
     // ==================== TRANSFERÊNCIAS ====================
 
@@ -154,7 +152,6 @@ public final class ValidationMessages {
     public static final String POSITIVE_TRANSFER_AMOUNT =
             "O valor da transferência deve ser maior que zero.";
 
-
     // ==================== OPERAÇÕES DE CONTA ====================
 
     public static final String REQUIRED_ACCOUNT_NUMBER =
@@ -168,7 +165,6 @@ public final class ValidationMessages {
 
     public static final String POSITIVE_OPERATION_AMOUNT =
             "O valor da operação deve ser maior que zero.";
-
 
     // ==================== VALORES MONETÁRIOS ====================
 

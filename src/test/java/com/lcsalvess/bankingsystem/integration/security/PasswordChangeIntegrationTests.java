@@ -42,8 +42,8 @@ class PasswordChangeIntegrationTests {
     private static final String LOGIN_URL = "/api/v1/auth/login";
     private static final String PASSWORD_URL = "/api/v1/auth/password";
     private static final String USERNAME = "test-user";
-    private static final String CURRENT_PASSWORD = "current-password";
-    private static final String NEW_PASSWORD = "brand-new-password";
+    private static final String CURRENT_PASSWORD = "Currentpassword123!";
+    private static final String NEW_PASSWORD = "BrandNewPassword456!";
 
     @Autowired
     private MockMvc mockMvc;
@@ -126,7 +126,7 @@ class PasswordChangeIntegrationTests {
 
         String newToken = loginAndGetToken(NEW_PASSWORD);
 
-        changePassword(newToken, NEW_PASSWORD, "another-password")
+        changePassword(newToken, NEW_PASSWORD, "Another-password123!")
                 .andExpect(status().isNoContent());
     }
 
@@ -274,8 +274,8 @@ class PasswordChangeIntegrationTests {
     void shouldSerializeConcurrentPasswordChanges() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
-        String firstNewPassword = "first-new-password";
-        String secondNewPassword = "second-new-password";
+        String firstNewPassword = "First-New-Password123!";
+        String secondNewPassword = "Second-New-Password456!";
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
 

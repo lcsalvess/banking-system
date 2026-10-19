@@ -44,39 +44,44 @@ The application follows a modular layered architecture, separating responsibilit
 
 ```text
 src/main/java/com/lcsalvess/bankingsystem
-├── bootstrap/       # Application startup and initialization
-├── config/          # Spring application configuration (Jackson, JWT properties, OpenAPI, pagination, clock, security)
-├── controller/      # REST API endpoints
-│   ├── address/     # Address lookup endpoint
-│   └── security/    # Authentication endpoint
-├── dto/             # Request and response DTOs
-├── entity/          # Domain entities and enums
-├── event/           # Application events and event listeners
-├── exception/       # Business exceptions, database constraints, centralized error messages, and global exception handling
-├── filter/          # HTTP filters (correlation ID)
+├── bootstrap/       # Application startup and initial administrator creation
+├── config/          # Jackson, JWT, OpenAPI, pagination, clock, and security configuration
+├── controller/      # REST endpoints for accounts, authentication, clients, transactions, and users
+├── dto/             # Request and response DTOs, grouped by domain
+├── entity/          # Domain entities and enums, grouped by domain
+├── event/           # Application events and post-commit operation listeners
+├── exception/          # Business exceptions, database constraints, error messages, and global handling
+├── filter/             # HTTP filters, including correlation ID propagation
 ├── integration/
-│   └── address/     # External address providers and lookup orchestration
+│   └── address/        # External address-provider clients and lookup orchestration
 │       ├── brasilapi/
 │       ├── config/
 │       ├── dto/
 │       ├── exception/
 │       ├── validation/
 │       └── viacep/
-├── repository/      # Database access through Spring Data JPA, with Specifications for dynamic filters
-├── security/        # JWT authentication filter and JSON handlers for 401/403 responses
-├── serialization/   # Custom JSON serialization
-├── util/            # Utility classes (CPF masking, text normalization, sort whitelist, pagination tie-breaker, application time zone)
-├── service/         # Business rules and application logic
-│   ├── account/     # Account operations, row locking, and account number generation
-│   ├── address/     # Address-related application logic
-│   ├── client/      # Client operations and persistence responsibilities
-│   ├── security/    # Authentication, JWT, password change, and current user
-│   ├── transaction/ # Transaction operations, daily yield scheduler, and startup recovery
-│   └── user/        # User operations
-└── validation/      # Custom constraints and validators
+├── repository/         # Persistence repositories, query specifications, and projections
+│   ├── idempotency/    # Transaction idempotency persistence
+│   ├── projection/     # Read-only query projections
+│   └── specification/ # Dynamic filters
+├── security/           # JWT authentication filter and JSON handlers for 401/403 responses
+├── serialization/      # Custom JSON serialization
+├── util/               # Normalization, CPF masking, time-zone, and pagination utilities
+├── service/            # Business rules and application logic
+│   ├── account/        # Account operations, row locking, and account number generation
+│   ├── address/        # Address-resolution application logic
+│   ├── client/         # Client operations and persistence responsibilities
+│   ├── security/       # Authentication, JWT, password changes, and current user
+│   ├── transaction/    # Financial operations and balance reconciliation
+│   │   ├── idempotency/ # Idempotency handling and scheduled cleanup
+│   │   └── yield/        # Daily yield processing and startup recovery
+│   └── user/           # User operations
+└── validation/      # Custom Bean Validation constraints and validators
     ├── accountnumber/      # Account number and check digit validation
     ├── cpf/                # CPF validation
-    └── passwordbytelength/ # Password size limit in bytes (BCrypt)
+    ├── passwordbytelength/ # BCrypt UTF-8 byte-size limit
+    ├── passwordstrength/   # Password complexity requirements
+    └── reservedusername/   # Reserved username validation
 ```
 
 ### Request Flow
@@ -144,22 +149,26 @@ Shows the full request/response cycle, including authentication and authorizatio
 - **Authentication and authorization** with JWT and role-based access: `ADMIN` manages users and metrics, `EMPLOYEE` operates clients, accounts, and transactions
 - **User management**: user creation with role assignment, paginated listing with filters, deactivation and reactivation, and secure password storage (BCrypt)
 - **Password change**: any authenticated user can change their own password, which revokes every token issued before the change
+- **Password policy**: new passwords must include uppercase and lowercase letters, a digit, and a special character, in addition to the character and UTF-8 byte limits
 - **Token revocation**: every JWT carries a credential version (`tv` claim) checked against the database, so tokens stop working after a password change or a deactivation
 - **Client management**: registration, listing, lookup, and partial update (`PATCH`), including address data
 - **Sensitive data protection**: the CPF is masked in every client response
-- **Address lookup**: automatic address lookup by postal code using ViaCEP, with BrasilAPI as a fallback provider
+- **Internal address lookup**: client creation and address updates resolve postal codes using ViaCEP, with BrasilAPI as a fallback provider
 - **Provider response validation**: addresses returned by external providers are validated before being used
 - **Versioned database schema** managed by Flyway migrations and validated by Hibernate at startup
 - **Account management**: checking and savings accounts, with generated account numbers and check digits
 - **Transactions**: deposit, withdrawal, transfer between accounts, transaction history per account, and lookup by public identifier
+- **Transaction idempotency**: a required `Idempotency-Key` UUID prevents duplicate financial operations on retries and allows the original result to be recovered
+- **Idempotency cleanup**: a scheduled job removes expired idempotency records according to a configurable retention period (7 days by default)
 - **Public transaction identifier**: every transaction has a UUID (`transactionCode`) exposed in responses, while the internal database ID is never returned
 - **Transfer traceability**: the two transactions of a transfer share a `transferCode`, so both legs can be correlated
 - **Transaction audit trail**: every transaction records who performed it: the authenticated user for operations requested through the API (`performed_by_user_id`, including both legs of a transfer), or the system for automatic yields (`performed_by_system`)
 - **Identity normalization**: usernames and e-mails are trimmed and lowercased, so `Admin` and `admin` are the same user and e-mail uniqueness is case-insensitive
 - **Concurrency control**: pessimistic row locking (`SELECT ... FOR UPDATE`) on every operation that changes a balance or an account status, with a fixed lock order in transfers to avoid deadlocks
 - **Automatic savings yield**: a scheduled job credits a compounded daily yield to savings accounts, catching up on missed days after downtime and recovering pending days at startup
+- **Balance reconciliation**: a scheduled read-only check detects and logs differences between account balances and transaction balance snapshots
 - **Account cancellation** with balance and status validation, safe against concurrent deposits
-- **Input validation** using Bean Validation, with custom constraints for CPF, account number, and check digit
+- **Input validation** using Bean Validation, with custom constraints for CPF, account number, check digit, password complexity, password byte length, and reserved usernames
 - **Strict JSON input types**: text fields reject numbers and booleans, and monetary amounts reject strings
 - **Pagination, sorting, and filtering** on list endpoints, with a whitelist of sortable fields per endpoint, a maximum page size of 100, and the `id` as tie-breaker for a stable order
 - **Global exception handling** with a consistent error response
@@ -197,6 +206,10 @@ Shows the full request/response cycle, including authentication and authorizatio
 
 ### Transactions
 - Deposits, withdrawals, and transfers require an active account and a positive amount.
+- Each deposit, withdrawal, and transfer request must include an `Idempotency-Key` header containing a UUID. The key is scoped to the authenticated user.
+- Reusing the same key with the same operation and request data returns the original transaction result without applying the financial operation again. Reusing a key with a different operation or request payload returns `409 Conflict`.
+- The idempotency reservation, financial operation, and stored transaction reference participate in the same database transaction. If the operation rolls back, the reservation rolls back too, allowing a retry.
+- Idempotency records older than the configured retention period are deleted by a scheduled job. The default retention is 7 days (`banking.idempotency.retention-days`), and the cleanup runs daily at 03:30 in `America/Sao_Paulo`. After a record is deleted, reusing its key can execute a new operation.
 - Amounts accept at most 13 integer digits and 2 decimal places. An account balance cannot exceed `9999999999999.99` (also enforced by the `ck_accounts_balance_max` constraint); a deposit or transfer that would exceed it is rejected with `409 Conflict`. A yield that would exceed it is skipped for that day (see [Savings Yield](#savings-yield)).
 - Withdrawals and transfers require sufficient balance.
 - A transfer requires distinct and active source and destination accounts, and records one `TRANSFER_SENT` and one `TRANSFER_RECEIVED` transaction. Both share the same `transferCode` (UUID), which is returned only for transfer transactions.
@@ -223,11 +236,18 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Active savings accounts are read in batches of 100, ordered by ID.
 - Yield transactions are created by the system, with no associated user, and are logged with `SYSTEM` as the actor.
 
+### Balance Reconciliation
+
+- A scheduled job compares account balances with the `balance_after` snapshot of the latest transaction and logs any mismatches, including the first transaction where the balance chain diverges when it can be identified.
+- Reconciliation is diagnostic only: it does not modify account balances or transaction history automatically.
+- The job runs daily at 03:00 by default in `America/Sao_Paulo`; its schedule can be configured with `banking.reconciliation.cron`.
+
 ### Users
 - Only `ADMIN` users can create new users.
 - Usernames have up to 20 characters and may contain only letters, digits, dot, hyphen, and underscore. They are trimmed and converted to lowercase on creation and on login, so usernames are case-insensitive.
 - E-mails can have up to 254 characters and are trimmed and stored in lowercase. Usernames and e-mails must be unique.
-- Passwords must have between 8 and 64 characters and at most 72 bytes in UTF-8, the limit supported by BCrypt. The same limits are checked at login and when changing the password.
+- When creating a user or setting a new password, the password must contain 8–64 characters, at least one uppercase ASCII letter, one lowercase ASCII letter, one digit, and one special character. It must also be no more than 72 bytes when encoded in UTF-8, the limit supported by BCrypt.
+- The complexity rule is not reapplied to the login password or the current password during a password change, so existing credentials are not rejected solely for lacking the new composition requirements. The existing character-length and UTF-8 byte-length checks still apply to these fields.
 - Passwords are stored as BCrypt hashes (strength 12).
 - An initial `ADMIN` is created at startup from environment variables when no admin exists (see [Configuration](#configuration)). In the `prod` profile the application refuses to start when no admin exists and the credentials are not configured.
 - Username uniqueness is case-insensitive and enforced by the database through a unique index on `LOWER(username)`.
@@ -242,8 +262,9 @@ Shows the full request/response cycle, including authentication and authorizatio
 - The current password must be correct, and the new password must differ from it. Otherwise the request is rejected with `400 Bad Request`.
 - A password change locks the user row, so concurrent changes are serialized. It increments the `token_version`, so every token issued before the change, including the one used in the request, is rejected with `401 Unauthorized`, and the user must log in again.
 
-### Address Lookup
+### Address Lookup Integration
 
+- Address lookup is an internal integration, not a standalone public HTTP endpoint. It is used during client creation and when a client update includes address data.
 - The postal code must contain exactly 8 digits, without a hyphen.
 - Providers are queried in order: ViaCEP first, then BrasilAPI as a fallback. New providers can be added by implementing `AddressProvider` and defining their order with `@Order`.
 - If a provider fails or does not find the postal code, the next provider is tried.
@@ -251,7 +272,7 @@ Shows the full request/response cycle, including authentication and authorizatio
 - Provider responses are validated. Required address fields include street, neighborhood, city, state, and an 8-digit postal code. An invalid response is treated as a provider failure.
 - Provider failures are handled separately from postal codes that are not found:
   - `404 Not Found` when every provider answered and none found the postal code.
-  - `503 Service Unavailable` when at least one provider failed and no other provider found the postal code.
+  - `503 Service Unavailable` when at least one provider failed and no other provider found the postal code. These responses are returned by the client endpoints that depend on the lookup.
 
 ---
 
@@ -281,10 +302,10 @@ Authorization: Bearer <token>
 
 ### Access by role
 
-| Role       | Allowed operations                                                                                                                                                                  |
-|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `ADMIN`    | Create, list, deactivate, and reactivate users; read the transaction history and look up transactions by code; `/actuator/health`, `/actuator/info`, and `/actuator/metrics`        |
-| `EMPLOYEE` | Clients, accounts, address lookup, deposit, withdrawal, and transfer; read the transaction history and look up transactions by code; `/actuator/health` and `/actuator/info`        |
+| Role       | Allowed operations                                                                                                                                                                                                     |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ADMIN`    | Create, list, deactivate, and reactivate users; read the transaction history and look up transactions by code; `/actuator/health`, `/actuator/info`, and `/actuator/metrics`                                           |
+| `EMPLOYEE` | Clients (including internal address lookup during creation/update), accounts, deposits, withdrawals, and transfers; read transaction history and look up transactions by code; `/actuator/health` and `/actuator/info` |
 
 Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Business operations require an `EMPLOYEE` user, which an `ADMIN` creates through `POST /api/v1/users`. Endpoint access is enforced with `@PreAuthorize` on the controllers and with request rules in `SecurityConfig` for the actuator. Changing one's own password is the only operation open to every authenticated user.
 
@@ -318,6 +339,8 @@ Full request and response schemas are available in Swagger UI.
 
 `accountNumber` must have between 5 and 20 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
 
+The deposit, withdrawal, and transfer endpoints require an `Idempotency-Key` header with a UUID. Repeating a request with the same key and payload returns the original result; reusing the key with a different operation or payload returns `409 Conflict`.
+
 Yield is not exposed as an endpoint: it is credited automatically (see [Savings Yield](#savings-yield)) and shows up in the transaction history as `YIELD` transactions.
 
 Request bodies are strict about JSON types: text fields reject numbers and booleans (`"accountNumber": 99999` is rejected), and monetary amounts reject strings (`"amount": "100.00"` is rejected; send `100.00`). Both return `400 Bad Request`.
@@ -335,13 +358,9 @@ List endpoints accept `page`, `size`, and `sort` (for example `sort=balance,desc
 
 On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Both must be between 2020-01-01 and the current date, and `startDate` cannot be after `endDate` (`400 Bad Request`).
 
-### Address Lookup Endpoint
+### Address Lookup Integration
 
-| Method | Endpoint                                | Description                       | Access               |
-| ------ | --------------------------------------- | --------------------------------- | -------------------- |
-| GET    | `/api/v1/addresses/lookup/{postalCode}` | Look up an address by postal code | `EMPLOYEE`           |
-
-Possible responses: `200` (address found), `400` (postal code is not 8 digits), `404` (postal code not found), and `503` (address providers unavailable).
+Address lookup is not exposed as a standalone endpoint. It is performed internally by `POST /api/v1/clients` and by `PATCH /api/v1/clients/{id}` when address data is included. The client operations can return `404 Not Found` when the postal code is not found or `503 Service Unavailable` when the address providers cannot resolve it due to failures.
 
 ### Actuator Endpoints
 
@@ -356,26 +375,27 @@ Possible responses: `200` (address found), `400` (postal code is not 8 digits), 
 ### Example
 
 ```bash
-# 1. Log in as the initial admin
+# 1. Log in as the initial admin (replace with the configured ADMIN_PASSWORD)
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "your-password"}'
+  -d '{"username": "admin", "password": "SecurePass123!"}'
 
-# 2. Create an employee (ADMIN only)
+# 2. Create an employee (ADMIN only; use a password that meets the password policy)
 curl -X POST http://localhost:8080/api/v1/users \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
-  -d '{"username": "employee", "email": "employee@example.com", "password": "your-password", "role": "EMPLOYEE"}'
+  -d '{"username": "employee", "email": "employee@example.com", "password": "SecurePass123!", "role": "EMPLOYEE"}'
 
 # 3. Log in as the employee, who operates clients, accounts, and transactions
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "employee", "password": "your-password"}'
+  -d '{"username": "employee", "password": "SecurePass123!"}'
 
-# 4. Deposit into an account
+# 4. Deposit into an account (each financial request requires an idempotency key)
 curl -X POST http://localhost:8080/api/v1/transactions/deposit \
   -H "Authorization: Bearer <employee-token>" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210" \
   -d '{"accountNumber": "00001", "digit": "<account-digit>", "amount": 150.00}'
 
 # 5. Partially update a client (only the fields sent are changed)
@@ -392,7 +412,7 @@ curl http://localhost:8080/api/v1/transactions/code/<transaction-code> \
 curl -X PATCH http://localhost:8080/api/v1/auth/password \
   -H "Authorization: Bearer <employee-token>" \
   -H "Content-Type: application/json" \
-  -d '{"currentPassword": "your-password", "newPassword": "your-new-password"}'
+  -d '{"currentPassword": "SecurePass123!", "newPassword": "EvenMoreSecure456!"}'
 
 # 8. Deactivate a user (ADMIN only)
 curl -X PATCH http://localhost:8080/api/v1/users/<user-id>/deactivate \
@@ -456,7 +476,7 @@ Validation errors also include the invalid fields. The same structure is used fo
 | Invalid credentials, invalid or revoked token, or deactivated user                                                                                 | `401 Unauthorized`          |
 | Access denied (role not allowed for the endpoint)                                                                                                  | `403 Forbidden`             |
 | Value already registered (CPF, e-mail, or username), including concurrent requests, or a state conflict such as deactivating the last active admin | `409 Conflict`              |
-| Address providers unavailable, row lock wait timeout, or authentication infrastructure unavailable                                                 | `503 Service Unavailable`   |
+| Address provider or database unavailable, row-lock wait timeout, or authentication infrastructure unavailable                                      | `503 Service Unavailable`   |
 | Unexpected error                                                                                                                                   | `500 Internal Server Error` |
 
 Database integrity violations are translated by constraint name through the `DatabaseConstraint` enum: a duplicate client CPF or e-mail, a duplicate username or user e-mail, a second active account of the same type, a balance above the limit, a reserved username, or an attempt to activate the `system_migration` user returns `409 Conflict` with a message that identifies the problem, and any other violation returns `500 Internal Server Error` with a generic message. Only the SQLState and the constraint name are logged, never the exception detail, because the database detail contains row values. The constraint is identified by the name reported by the database, never by the exception message.
@@ -499,8 +519,10 @@ Operations are logged through Spring application events:
 
 - PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
 - `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters. `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`. `V4__add_transaction_history_index.sql` creates the index `idx_transactions_account_created_id` on `transactions (account_id, created_at DESC, id DESC)`, which supports the transaction history query.
-- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing transactions to that user, and then makes the column `NOT NULL` with the foreign key `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data. `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`). `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive. `V9__add_account_balance_upper_bound.sql` adds the `ck_accounts_balance_max` check constraint (`balance <= 9999999999999.99`). `V10__add_user_token_version.sql` adds the `token_version` column to `users` (`INTEGER NOT NULL DEFAULT 0`), the credential version carried by every JWT. `V11__keep_system_migration_user_inactive.sql` adds the `ck_users_system_migration_inactive` check constraint, so the `system_migration` user can never be active. `V12__daily_yield_processing.sql` adds the `yield_date` column to `transactions` (filled from `created_at` for the existing yields), replaces the `uk_transactions_daily_yield` index so it is based on `(account_id, yield_date)` instead of the creation time, and adds the `ck_transactions_yield_date` check constraint (a `YIELD` must have a `yield_date`, and other types must not). `V13__system_transaction_attribution.sql` makes `performed_by_user_id` nullable again, adds the `performed_by_system` column (`BOOLEAN NOT NULL DEFAULT FALSE`), and adds the `ck_transactions_actor` check constraint (a system transaction must be a `YIELD` with no user, and any other transaction must reference a user). `V14__track_daily_yield_processing.sql` adds the `last_yield_processed_date` column to `savings_accounts`, the cursor of the daily yield processing. Existing accounts start from the later of their last yield date and the day before the migration (in `America/Sao_Paulo`), so no retroactive yield is granted for the historical period. `V15__reserve_system_username.sql` adds the `ck_users_username_not_system` check constraint, so no user can have the reserved username `system`. The migration fails if such a user already exists.
-- Schema changes must be added as new versioned migrations (`V16__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
+- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing transactions to that user, and then makes the column `NOT NULL` with the foreign key `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data. `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`). `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive. `V9__add_account_balance_upper_bound.sql` adds the `ck_accounts_balance_max` check constraint (`balance <= 9999999999999.99`).
+- `V10__add_user_token_version.sql` adds the `token_version` column to `users` (`INTEGER NOT NULL DEFAULT 0`), the credential version carried by every JWT. `V11__keep_system_migration_user_inactive.sql` adds the `ck_users_system_migration_inactive` check constraint, so the `system_migration` user can never be active. `V12__daily_yield_processing.sql` adds the `yield_date` column to `transactions` (filled from `created_at` for the existing yields), replaces the `uk_transactions_daily_yield` index so it is based on `(account_id, yield_date)` instead of the creation time, and adds the `ck_transactions_yield_date` check constraint (a `YIELD` must have a `yield_date`, and other types must not). `V13__system_transaction_attribution.sql` makes `performed_by_user_id` nullable again, adds the `performed_by_system` column (`BOOLEAN NOT NULL DEFAULT FALSE`), and adds the `ck_transactions_actor` check constraint (a system transaction must be a `YIELD` with no user, and any other transaction must reference a user). `V14__track_daily_yield_processing.sql` adds the `last_yield_processed_date` column to `savings_accounts`, the cursor of the daily yield processing. Existing accounts start from the later of their last yield date and the day before the migration (in `America/Sao_Paulo`), so no retroactive yield is granted for the historical period.
+- `V15__reserve_system_username.sql` adds the `ck_users_username_not_system` check constraint, so no user can have the reserved username `system`. The migration fails if such a user already exists. `V16__add_transaction_balance_after.sql` adds `balance_after` to `transactions`, backfills the running balance for existing transactions in ID order, enforces a non-null value and the `ck_transactions_balance_after_range` constraint, and creates `idx_transactions_account_id_desc` to support latest-transaction lookups. `V17__create_transaction_idempotency_requests.sql` creates `transaction_idempotency_requests` to persist idempotency keys per user, the request fingerprint, operation type, and resulting transaction reference; it adds foreign keys, uniqueness constraints, and checks for supported operation types and SHA-256 request hashes. `V18__add_created_at_index_to_transaction_idempotency_requests.sql` adds `idx_transaction_idempotency_created_at` to support efficient cleanup of expired idempotency records.
+- Schema changes must be added as new versioned migrations (`V19__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums.
 - Tables use plural snake_case names: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, and `transactions`.
 - Constraints follow a naming pattern: `uk_<table>_<column>` for unique constraints, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
 - `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`, `checking_accounts`, and `savings_accounts` tables.
@@ -559,7 +581,7 @@ Without an active profile, `DB_URL` is required, the API documentation is disabl
 | `ADMIN_EMAIL`            | No                                | E-mail of the initial admin                                     |
 | `ADMIN_PASSWORD`         | No                                | Password of the initial admin                                   |
 
-The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*` variables are set. When no admin exists and the variables are missing, the application logs a warning and starts in `local` and `test`, but fails at startup in `prod` (`app.admin.bootstrap.required=true`), so a production deployment never runs without an administrator. The initial admin can only manage users: create an `EMPLOYEE` user to operate clients, accounts, and transactions (see [Example](#example)). To generate a suitable secret:
+The initial admin is created only when no `ADMIN` exists and all three `ADMIN_*` variables are set. `ADMIN_PASSWORD` must satisfy the same password policy used for user creation, including complexity and size limits. When no admin exists and the variables are missing, the application logs a warning and starts in `local` and `test`, but fails at startup in `prod` (`app.admin.bootstrap.required=true`), so a production deployment never runs without an administrator. The initial admin can only manage users: create an `EMPLOYEE` user to operate clients, accounts, and transactions (see [Example](#example)). To generate a suitable secret:
 
 ```bash
 openssl rand -base64 32
@@ -602,7 +624,7 @@ Use the **Authorize** button and paste the JWT returned by `/api/v1/auth/login` 
 ## Testing
 
 ```bash
-./mvnw test
+./mvnw verify
 ```
 
 The test suite covers:
@@ -610,12 +632,13 @@ The test suite covers:
 - **Unit tests** for services, using JUnit and Mockito: accounts, clients (including the persistence service), transactions (deposit, withdrawal, transfer, daily yield processing, and the lock acquisition of each), the daily yield scheduler (batching, retries, isolation of per-account failures, chronological catch-up, and interrupted runs) and its startup recovery, users (including deactivation and reactivation), password change, JWT (including the credential version claim), authentication, user details loading, address data resolution, and address lookup provider orchestration.
 - **Concurrency integration tests** (`TransactionConcurrencyTests`) against PostgreSQL, running operations on parallel threads released at the same instant: concurrent withdrawals that must not overdraw an account, deposits that must not be lost, mixed deposits and withdrawals, opposite transfers without deadlock, several transfers into the same account, transfers limited by the available balance, a daily yield processed twice at once, and an account cancellation racing with deposits. The same class also checks the start-of-day balance calculation and the recovery of pending yield dates with compounded yields.
 - **User integration tests** against PostgreSQL: `PasswordChangeIntegrationTests` covers the password change flow end to end (login only with the new password, revocation of tokens issued before the change, validation failures, deactivated users, tokens that stay revoked after reactivation, and concurrent changes), and `UserDeactivationConcurrencyTests` checks that concurrent deactivations of admins always leave one active administrator and that deactivating the same admin twice at once is idempotent.
+- **Transaction idempotency integration tests** against PostgreSQL: `TransactionIdempotencyIntegrationTests` covers repeated requests, replay of the original result, conflicts when a key is reused with different data, rollback behavior, and concurrent requests; `TransactionIdempotencyCleanupIntegrationTests` verifies the retention cleanup.
 - **Database configuration tests** (`DatabaseLockTimeoutTests`): the lock timeout applied to pooled connections and the balance upper bound constraint. `ReservedUsernameConstraintTests` inserts users directly into PostgreSQL to check that the database rejects the reserved username, in any case, and accepts names that only contain it.
 - **Security tests** for JWT generation and validation (secret, issuer, expiration, credential version, and malformed version claim), the security filter chain (public routes, token validation, method security, actuator access, and correlation ID on error responses), and the authentication entry point.
-- **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), address lookup, and authentication (including password change).
+- **Controller tests** using `MockMvc` for clients, accounts (including account number and digit format validation), transactions (including lookup by public transaction code and invalid UUID handling), and authentication (including password change). Address lookup behavior is covered by service/orchestration tests and provider-client tests, not a standalone lookup endpoint.
 - **Provider client tests** for ViaCEP and Brasil API against a local HTTP server: response mapping, postal code not found, invalid responses, error statuses, timeouts, and unreachable providers.
 - **JSON coercion tests** that import `JacksonConfig` into a controller slice to check that wrongly typed fields are rejected.
-- **Validation tests** for CPF, account number, account digit, password size in bytes, and reserved username.
+- **Validation tests** for CPF, account number, account digit, password size in bytes, password complexity, and reserved username.
 - **Filter tests** for the correlation ID: generation, reuse, lowercase normalization, rejection of non-canonical values, and MDC cleanup.
 - **Other unit tests** for the global exception handler, the database constraint mapping, the pagination tie-breaker, and the admin bootstrap runner.
 - **Context test** to verify the application starts.
@@ -630,14 +653,18 @@ Tests need a local PostgreSQL instance and the `DB_USERNAME`, `DB_PASSWORD`, and
 
 - [x] Migration management with Flyway
 - [x] Integration tests for external address providers (`ViaCepClient` and `BrasilApiClient`)
-- [x] Tests for `AddressService` and `AddressLookupController`
+- [x] Tests for `AddressService` and address-provider orchestration
 - [x] Integration tests with PostgreSQL for transaction and concurrency scenarios
 - [x] Differentiated permissions for `EMPLOYEE` and `ADMIN` on business endpoints
 - [x] Separate `local`, `prod`, and `test` profiles
 - [x] Pagination and filtering on list endpoints
 - [x] Password change with JWT invalidation
+- [x] Password complexity validation on user creation and password changes
 - [x] User deactivation and reactivation
 - [x] Automatic daily savings yield with recovery after downtime
+- [x] Transaction idempotency with scheduled retention cleanup
+- [x] Scheduled balance reconciliation
+- [x] Continuous integration (CI) with GitHub Actions
 - [ ] Docker Compose for the application and database
-- [ ] CI/CD pipeline with GitHub Actions
+- [ ] Continuous deployment (CD)
 - [ ] Refresh tokens

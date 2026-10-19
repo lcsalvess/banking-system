@@ -149,7 +149,6 @@ Authenticate using the login endpoint, then click Authorize to provide your JWT 
             case "/api/v1/transactions/deposit" -> "DEPOSIT";
             case "/api/v1/transactions/withdraw" -> "WITHDRAWAL";
             case "/api/v1/transactions/transfer" -> "TRANSFER_SENT";
-            case "/api/v1/transactions/yield/{accountNumber}" -> "YIELD";
             default -> null;
         };
 

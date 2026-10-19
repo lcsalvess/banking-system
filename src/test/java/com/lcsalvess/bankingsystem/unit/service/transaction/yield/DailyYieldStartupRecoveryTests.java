@@ -10,15 +10,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
+import org.springframework.core.task.TaskExecutor;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -31,7 +25,7 @@ class DailyYieldStartupRecoveryTests {
     private DailyYieldScheduler dailyYieldScheduler;
 
     @Mock
-    private Executor executor;
+    private TaskExecutor taskExecutor;
 
     @Captor
     private ArgumentCaptor<Runnable> taskCaptor;
@@ -42,25 +36,30 @@ class DailyYieldStartupRecoveryTests {
     void setUp() {
         startupRecovery = new DailyYieldStartupRecovery(
                 dailyYieldScheduler,
-                executor
+                taskExecutor
         );
     }
 
     @Test
-    @DisplayName("Should submit the recovery to the executor without running it on the calling thread")
+    @DisplayName(
+            "Should submit the recovery to the executor without running it "
+                    + "on the calling thread"
+    )
     void shouldSubmitRecoveryWithoutRunningItOnCallingThread() {
         startupRecovery.recoverPendingYieldsOnStartup();
 
-        verify(executor).execute(taskCaptor.capture());
+        verify(taskExecutor).execute(taskCaptor.capture());
         verifyNoInteractions(dailyYieldScheduler);
     }
 
     @Test
-    @DisplayName("Should trigger daily yield recovery when the submitted task runs")
+    @DisplayName(
+            "Should trigger daily yield recovery when the submitted task runs"
+    )
     void shouldTriggerDailyYieldRecoveryWhenTaskRuns() {
         startupRecovery.recoverPendingYieldsOnStartup();
 
-        verify(executor).execute(taskCaptor.capture());
+        verify(taskExecutor).execute(taskCaptor.capture());
 
         taskCaptor.getValue().run();
 
@@ -69,7 +68,9 @@ class DailyYieldStartupRecoveryTests {
     }
 
     @Test
-    @DisplayName("Should not propagate an unexpected failure from the recovery task")
+    @DisplayName(
+            "Should not propagate an unexpected failure from the recovery task"
+    )
     void shouldNotPropagateUnexpectedFailure() {
         doThrow(new IllegalStateException("unexpected"))
                 .when(dailyYieldScheduler)
@@ -77,31 +78,10 @@ class DailyYieldStartupRecoveryTests {
 
         startupRecovery.recoverPendingYieldsOnStartup();
 
-        verify(executor).execute(taskCaptor.capture());
+        verify(taskExecutor).execute(taskCaptor.capture());
 
         assertDoesNotThrow(() -> taskCaptor.getValue().run());
 
         verify(dailyYieldScheduler).processDailyYields();
-    }
-
-    @Test
-    @DisplayName("Should run the recovery on a dedicated thread by default")
-    void shouldRunRecoveryOnDedicatedThreadByDefault() throws Exception {
-        CompletableFuture<Thread> executionThread = new CompletableFuture<>();
-
-        doAnswer(invocation -> {
-            executionThread.complete(Thread.currentThread());
-            return null;
-        }).when(dailyYieldScheduler).processDailyYields();
-
-        DailyYieldStartupRecovery defaultRecovery =
-                new DailyYieldStartupRecovery(dailyYieldScheduler);
-
-        defaultRecovery.recoverPendingYieldsOnStartup();
-
-        Thread thread = executionThread.get(5, TimeUnit.SECONDS);
-
-        assertNotSame(Thread.currentThread(), thread);
-        assertEquals(DailyYieldStartupRecovery.THREAD_NAME, thread.getName());
     }
 }

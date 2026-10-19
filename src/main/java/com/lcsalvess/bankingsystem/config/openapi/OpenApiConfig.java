@@ -30,9 +30,9 @@ public class OpenApiConfig {
                         .description("""
                             RESTful banking API built with Java 21, Spring Boot, and PostgreSQL.
 
-Features include user and client management, bank account operations, transaction processing, address lookup, and JWT-based authentication.
+Features include user and client management, bank account operations, deposits, withdrawals, transfers, transaction history, automated daily yield processing, and JWT-based authentication with role-based access control.
 
-Authenticate using the login endpoint, then click Authorize to provide your JWT and access protected endpoints.
+To access protected endpoints, authenticate through the login endpoint and click Authorize to provide the JWT returned in the response.
 """))
                 .externalDocs(new ExternalDocumentation()
                         .description("Source code on GitHub")

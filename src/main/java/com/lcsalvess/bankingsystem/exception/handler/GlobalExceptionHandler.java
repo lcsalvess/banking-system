@@ -5,17 +5,15 @@ import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
-import jakarta.validation.ConstraintViolationException;
+import org.hibernate.JDBCException;
+import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.postgresql.util.PSQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.dao.PessimisticLockingFailureException;
-import org.springframework.dao.QueryTimeoutException;
+import org.springframework.dao.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -40,6 +38,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -183,10 +182,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     //-------------- VALIDAÇÃO / REQUISIÇÃO ---------
 
 
-    @ExceptionHandler(ConstraintViolationException.class)
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiErrorResponse handleConstraintViolation(
-            ConstraintViolationException exception) {
+            jakarta.validation.ConstraintViolationException exception) {
 
         Map<String, String> errors = new LinkedHashMap<>();
         Set<String> requiredFields = new HashSet<>();
@@ -530,7 +529,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
              cause != null;
              cause = cause.getCause()) {
 
-            if (cause instanceof org.hibernate.JDBCException jdbcException) {
+            if (cause instanceof JDBCException jdbcException) {
                 java.sql.SQLException sqlException =
                         jdbcException.getSQLException();
 
@@ -540,7 +539,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 }
             }
 
-            if (cause instanceof java.sql.SQLException sqlException
+            if (cause instanceof SQLException sqlException
                     && sqlException.getSQLState() != null) {
                 return sqlException.getSQLState();
             }
@@ -550,12 +549,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private static String constraintNameOf(Throwable throwable) {
-        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
-            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation
+        for (Throwable cause = throwable;
+             cause != null;
+             cause = cause.getCause()) {
+
+            if (cause instanceof ConstraintViolationException violation
                     && violation.getConstraintName() != null) {
                 return violation.getConstraintName();
             }
+
+            if (cause instanceof PSQLException postgresException) {
+                var serverError = postgresException.getServerErrorMessage();
+
+                if (serverError != null
+                        && serverError.getConstraint() != null) {
+                    return serverError.getConstraint();
+                }
+            }
         }
+
         return "unknown";
     }
 

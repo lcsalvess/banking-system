@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.exception.database;
 
 import org.hibernate.exception.ConstraintViolationException;
+import org.postgresql.util.PSQLException;
 
 /**
  * Database constraints and indexes that the application translates into business errors.
@@ -34,14 +35,28 @@ public enum DatabaseConstraint {
      * first Hibernate {@link ConstraintViolationException} in the cause chain.
      */
     public boolean isViolatedBy(Throwable throwable) {
-        Throwable cause = throwable;
+        for (Throwable cause = throwable;
+             cause != null;
+             cause = cause.getCause()) {
 
-        while (cause != null) {
             if (cause instanceof ConstraintViolationException violation) {
-                return constraintName.equals(violation.getConstraintName());
+                String violatedConstraint = violation.getConstraintName();
+
+                if (violatedConstraint != null) {
+                    return constraintName.equals(violatedConstraint);
+                }
             }
 
-            cause = cause.getCause();
+            if (cause instanceof PSQLException postgresException) {
+                var serverError = postgresException.getServerErrorMessage();
+
+                if (serverError != null
+                        && serverError.getConstraint() != null) {
+                    return constraintName.equals(
+                            serverError.getConstraint()
+                    );
+                }
+            }
         }
 
         return false;

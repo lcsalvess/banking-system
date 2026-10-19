@@ -114,6 +114,13 @@ To access protected endpoints, authenticate through the login endpoint and click
                                 "Unexpected internal server error."
                         );
 
+                        addResponseIfAbsent(
+                                operation,
+                                "503",
+                                "Service Unavailable - A required infrastructure dependency "
+                                        + "is temporarily unavailable."
+                        );
+
                         operation.getResponses().forEach((status, response) -> {
                             if (status.matches("[45]\\d\\d")) {
                                 response.setContent(errorContent(status));

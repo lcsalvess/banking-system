@@ -57,8 +57,16 @@ public class ClientController {
                     description = "Invalid client data or request format"
             ),
             @ApiResponse(
+                    responseCode = "404",
+                    description = "Postal code not found."
+            ),
+            @ApiResponse(
                     responseCode = "409",
                     description = "CPF already registered"
+            ),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "Address lookup provider or database is temporarily unavailable."
             )
     })
     @PostMapping
@@ -147,11 +155,15 @@ public class ClientController {
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Client not found"
+                    description = "Client or postal code not found."
             ),
             @ApiResponse(
                     responseCode = "409",
                     description = "Email already registered"
+            ),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "Address lookup provider or database is temporarily unavailable."
             )
     })
     @PatchMapping("/{id}")

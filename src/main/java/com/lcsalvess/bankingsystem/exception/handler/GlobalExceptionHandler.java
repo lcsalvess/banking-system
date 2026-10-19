@@ -30,7 +30,9 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -298,6 +300,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 status,
                 request,
                 ApiErrorMessages.MISSING_REQUIRED_PARAMETER
+        );
+    }
+
+    /**
+     * Cobre, entre outros, o header obrigatório ausente (por exemplo,
+     * Idempotency-Key), que não é um MissingServletRequestParameterException.
+     * Sem este override, a resposta sairia no formato ProblemDetail do Spring.
+     */
+    @Override
+    protected @Nullable ResponseEntity<Object> handleServletRequestBindingException(
+            @NonNull ServletRequestBindingException ex,
+            @NonNull HttpHeaders headers,
+            @NonNull HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        String message = ex instanceof MissingRequestHeaderException
+                ? ApiErrorMessages.MISSING_REQUIRED_PARAMETER
+                : ApiErrorMessages.INVALID_REQUEST_PARAMETER;
+
+        return buildErrorResponse(
+                ex,
+                headers,
+                status,
+                request,
+                message
         );
     }
 

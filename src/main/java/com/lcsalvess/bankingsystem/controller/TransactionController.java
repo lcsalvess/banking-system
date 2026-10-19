@@ -5,6 +5,7 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
 import com.lcsalvess.bankingsystem.util.pagination.SortWhitelist;
 import com.lcsalvess.bankingsystem.util.pagination.SortableBy;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
@@ -45,9 +46,11 @@ public class TransactionController {
             Set.of(SORTABLE.split(","));
 
     private final TransactionService transactionService;
+    private final TransactionIdempotencyService transactionIdempotencyService;
 
-    public TransactionController(TransactionService transactionService) {
+    public TransactionController(TransactionService transactionService, TransactionIdempotencyService transactionIdempotencyService) {
         this.transactionService = transactionService;
+        this.transactionIdempotencyService = transactionIdempotencyService;
     }
 
     @Operation(
@@ -168,7 +171,7 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid deposit amount"
+                    description = "Invalid request, missing Idempotency-Key header or invalid UUID format"
             ),
             @ApiResponse(
                     responseCode = "404",
@@ -176,14 +179,25 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account is not active"
+                    description = "Account is not active or the idempotency key was reused with a different operation or payload"
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
     @PostMapping("/deposit")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO deposit(@Valid @RequestBody AccountOperationRequestDTO dto) {
-        return transactionService.deposit(dto);
+    public TransactionResponseDTO deposit(
+            @Parameter(
+                    description = "UUID usado para identificar esta operação. "
+                            + "Reutilize a mesma chave ao repetir a mesma requisição.",
+                    example = "8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210",
+                    required = true
+            )
+            @RequestHeader(name = "Idempotency-Key", required = true)
+            UUID idempotencyKey,
+
+            @Valid @RequestBody AccountOperationRequestDTO dto
+    ) {
+        return transactionIdempotencyService.deposit(idempotencyKey, dto);
     }
 
     @Operation(
@@ -197,7 +211,7 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid withdrawal amount"
+                    description = "Invalid withdrawal request, missing Idempotency-Key header or invalid UUID format"
             ),
             @ApiResponse(
                     responseCode = "404",
@@ -205,14 +219,25 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account is not active or has insufficient funds"
+                    description = "Account is not active, has insufficient funds, or the idempotency key was reused with a different operation or payload"
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
     @PostMapping("/withdraw")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO withdraw(@Valid @RequestBody AccountOperationRequestDTO dto) {
-        return transactionService.withdraw(dto);
+    public TransactionResponseDTO withdraw(
+            @Parameter(
+                    description = "UUID usado para identificar esta operação. "
+                            + "Reutilize a mesma chave ao repetir a mesma requisição.",
+                    example = "8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210",
+                    required = true
+            )
+            @RequestHeader(name = "Idempotency-Key", required = true)
+            UUID idempotencyKey,
+
+            @Valid @RequestBody AccountOperationRequestDTO dto
+    ) {
+        return transactionIdempotencyService.withdraw(idempotencyKey, dto);
     }
 
     @Operation(
@@ -226,7 +251,7 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid transfer request or account identifier"
+                    description = "Invalid transfer request or account identifier, missing Idempotency-Key header or invalid UUID format"
             ),
             @ApiResponse(
                     responseCode = "404",
@@ -234,13 +259,24 @@ public class TransactionController {
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Account is not active or has insufficient funds"
+                    description = "Account is not active, has insufficient funds, or the idempotency key was reused with a different operation or payload"
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
     @PostMapping("/transfer")
     @ResponseStatus(HttpStatus.CREATED)
-    public TransactionResponseDTO transfer(@Valid @RequestBody TransferRequestDTO dto) {
-        return transactionService.transfer(dto);
+    public TransactionResponseDTO transfer(
+            @Parameter(
+                    description = "UUID usado para identificar esta operação. "
+                            + "Reutilize a mesma chave ao repetir a mesma requisição.",
+                    example = "8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210",
+                    required = true
+            )
+            @RequestHeader(name = "Idempotency-Key", required = true)
+            UUID idempotencyKey,
+
+            @Valid @RequestBody TransferRequestDTO dto
+    ) {
+        return transactionIdempotencyService.transfer(idempotencyKey, dto);
     }
 }

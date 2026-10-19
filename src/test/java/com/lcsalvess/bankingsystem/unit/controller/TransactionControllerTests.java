@@ -14,6 +14,7 @@ import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import org.junit.jupiter.api.DisplayName;
@@ -61,6 +62,11 @@ public class TransactionControllerTests {
     private static final String PROVIDER =
             "com.lcsalvess.bankingsystem.unit.controller.TransactionControllerTests#";
 
+    private static final String IDEMPOTENCY_HEADER = "Idempotency-Key";
+
+    private static final UUID IDEMPOTENCY_KEY =
+            UUID.fromString("8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210");
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -69,6 +75,9 @@ public class TransactionControllerTests {
 
     @MockitoBean
     private TransactionService transactionService;
+
+    @MockitoBean
+    private TransactionIdempotencyService transactionIdempotencyService;
 
     @Nested
     @DisplayName("POST /api/v1/transactions/deposit")
@@ -83,9 +92,11 @@ public class TransactionControllerTests {
             TransactionResponseDTO expected =
                     mockTransaction(TransactionType.DEPOSIT);
 
-            when(transactionService.deposit(request)).thenReturn(expected);
+            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
+                    .thenReturn(expected);
 
             MvcResult result = mockMvc.perform(post(URL)
+                            .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isCreated())
@@ -94,8 +105,9 @@ public class TransactionControllerTests {
 
             assertTransactionEquals(expected, readTransaction(result));
 
-            verify(transactionService).deposit(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -109,7 +121,7 @@ public class TransactionControllerTests {
         ) throws Exception {
             performValidationError(URL, request, field, message);
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
         }
 
         @Test
@@ -117,7 +129,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
             performMissingBody(URL);
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
         }
 
         @Test
@@ -125,7 +137,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.deposit(request))
+            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
                     .thenThrow(
                             new InvalidAccountDigitException(
                                     ApiErrorMessages.INVALID_ACCOUNT_DIGIT
@@ -134,8 +146,9 @@ public class TransactionControllerTests {
 
             performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
-            verify(transactionService).deposit(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -143,15 +156,18 @@ public class TransactionControllerTests {
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.deposit(request))
+            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
                     .thenThrow(
-                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
+                            new AccountNotFoundException(
+                                    ApiErrorMessages.ACCOUNT_NOT_FOUND
+                            )
                     );
 
             performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
-            verify(transactionService).deposit(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -159,15 +175,18 @@ public class TransactionControllerTests {
         void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.deposit(request))
+            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
                     .thenThrow(
-                            new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE)
+                            new AccountIsNotActiveException(
+                                    ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
+                            )
                     );
 
             performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
 
-            verify(transactionService).deposit(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -175,13 +194,14 @@ public class TransactionControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.deposit(request))
+            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
                     .thenThrow(new RuntimeException());
 
             performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
-            verify(transactionService).deposit(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
     }
 
@@ -198,9 +218,11 @@ public class TransactionControllerTests {
             TransactionResponseDTO expected =
                     mockTransaction(TransactionType.WITHDRAWAL);
 
-            when(transactionService.withdraw(request)).thenReturn(expected);
+            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
+                    .thenReturn(expected);
 
             MvcResult result = mockMvc.perform(post(URL)
+                            .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isCreated())
@@ -209,8 +231,9 @@ public class TransactionControllerTests {
 
             assertTransactionEquals(expected, readTransaction(result));
 
-            verify(transactionService).withdraw(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -224,7 +247,7 @@ public class TransactionControllerTests {
         ) throws Exception {
             performValidationError(URL, request, field, message);
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
         }
 
         @Test
@@ -232,7 +255,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
             performMissingBody(URL);
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
         }
 
         @Test
@@ -240,7 +263,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.withdraw(request))
+            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(
                             new InvalidAccountDigitException(
                                     ApiErrorMessages.INVALID_ACCOUNT_DIGIT
@@ -249,8 +272,9 @@ public class TransactionControllerTests {
 
             performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
-            verify(transactionService).withdraw(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -258,15 +282,18 @@ public class TransactionControllerTests {
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.withdraw(request))
+            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(
-                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
+                            new AccountNotFoundException(
+                                    ApiErrorMessages.ACCOUNT_NOT_FOUND
+                            )
                     );
 
             performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
-            verify(transactionService).withdraw(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -274,7 +301,7 @@ public class TransactionControllerTests {
         void shouldReturnConflictWhenBalanceIsInsufficient() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.withdraw(request))
+            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(
                             new InsufficientBalanceException(
                                     ApiErrorMessages.INSUFFICIENT_BALANCE
@@ -283,8 +310,9 @@ public class TransactionControllerTests {
 
             performPost(URL, request, 409, ApiErrorMessages.INSUFFICIENT_BALANCE);
 
-            verify(transactionService).withdraw(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -292,15 +320,18 @@ public class TransactionControllerTests {
         void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.withdraw(request))
+            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(
-                            new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE)
+                            new AccountIsNotActiveException(
+                                    ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
+                            )
                     );
 
             performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
 
-            verify(transactionService).withdraw(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -308,13 +339,14 @@ public class TransactionControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             AccountOperationRequestDTO request = operationRequest();
 
-            when(transactionService.withdraw(request))
+            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(new RuntimeException());
 
             performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
-            verify(transactionService).withdraw(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
     }
 
@@ -331,9 +363,11 @@ public class TransactionControllerTests {
             TransactionResponseDTO expected =
                     mockTransaction(TransactionType.TRANSFER_SENT);
 
-            when(transactionService.transfer(request)).thenReturn(expected);
+            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
+                    .thenReturn(expected);
 
             MvcResult result = mockMvc.perform(post(URL)
+                            .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isCreated())
@@ -342,8 +376,9 @@ public class TransactionControllerTests {
 
             assertTransactionEquals(expected, readTransaction(result));
 
-            verify(transactionService).transfer(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -357,7 +392,7 @@ public class TransactionControllerTests {
         ) throws Exception {
             performValidationError(URL, request, field, message);
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
         }
 
         @Test
@@ -365,7 +400,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
             performMissingBody(URL);
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
         }
 
         @Test
@@ -373,7 +408,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
             TransferRequestDTO request = transferRequest();
 
-            when(transactionService.transfer(request))
+            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
                             new InvalidAccountDigitException(
                                     ApiErrorMessages.INVALID_ACCOUNT_DIGIT
@@ -382,8 +417,9 @@ public class TransactionControllerTests {
 
             performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
 
-            verify(transactionService).transfer(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -391,15 +427,18 @@ public class TransactionControllerTests {
         void shouldReturnNotFoundWhenAnAccountDoesNotExist() throws Exception {
             TransferRequestDTO request = transferRequest();
 
-            when(transactionService.transfer(request))
+            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
-                            new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
+                            new AccountNotFoundException(
+                                    ApiErrorMessages.ACCOUNT_NOT_FOUND
+                            )
                     );
 
             performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
 
-            verify(transactionService).transfer(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -407,15 +446,23 @@ public class TransactionControllerTests {
         void shouldReturnConflictWhenAccountsAreSame() throws Exception {
             TransferRequestDTO request = transferRequest();
 
-            when(transactionService.transfer(request))
+            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
-                            new AccountsAreSameException(ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT)
+                            new AccountsAreSameException(
+                                    ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT
+                            )
                     );
 
-            performPost(URL, request, 400, ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT);
+            performPost(
+                    URL,
+                    request,
+                    400,
+                    ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT
+            );
 
-            verify(transactionService).transfer(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -423,7 +470,7 @@ public class TransactionControllerTests {
         void shouldReturnConflictWhenBalanceIsInsufficient() throws Exception {
             TransferRequestDTO request = transferRequest();
 
-            when(transactionService.transfer(request))
+            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
                             new InsufficientBalanceException(
                                     ApiErrorMessages.INSUFFICIENT_BALANCE
@@ -432,8 +479,9 @@ public class TransactionControllerTests {
 
             performPost(URL, request, 409, ApiErrorMessages.INSUFFICIENT_BALANCE);
 
-            verify(transactionService).transfer(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -441,15 +489,18 @@ public class TransactionControllerTests {
         void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
             TransferRequestDTO request = transferRequest();
 
-            when(transactionService.transfer(request))
+            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
-                            new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE)
+                            new AccountIsNotActiveException(
+                                    ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
+                            )
                     );
 
             performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
 
-            verify(transactionService).transfer(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @Test
@@ -457,13 +508,14 @@ public class TransactionControllerTests {
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             TransferRequestDTO request = transferRequest();
 
-            when(transactionService.transfer(request))
+            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(new RuntimeException());
 
             performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
-            verify(transactionService).transfer(request);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
     }
 
@@ -1083,6 +1135,7 @@ public class TransactionControllerTests {
     ) throws Exception {
         ResultActions result = mockMvc.perform(
                 post(url)
+                        .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
         );
@@ -1110,6 +1163,7 @@ public class TransactionControllerTests {
     ) throws Exception {
         mockMvc.perform(
                         post(url)
+                                .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
                 )
@@ -1123,6 +1177,7 @@ public class TransactionControllerTests {
     private void performMissingBody(String url) throws Exception {
         mockMvc.perform(
                         post(url)
+                                .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
                                 .contentType(MediaType.APPLICATION_JSON)
                 )
                 .andExpect(status().isBadRequest())

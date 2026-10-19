@@ -5,7 +5,9 @@ import com.lcsalvess.bankingsystem.controller.TransactionController;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,14 +48,19 @@ class JacksonConfigTests {
     private static final String PROVIDER =
             "com.lcsalvess.bankingsystem.unit.config.jackson.JacksonConfigTests#";
 
-    private static final String INVALID_BODY_MESSAGE =
-            "Dados da requisição inválidos.";
+    private static final String IDEMPOTENCY_HEADER = "Idempotency-Key";
+
+    private static final String VALID_BODY =
+            "{\"accountNumber\": \"99999\", \"digit\": \"5\", \"amount\": 100.00}";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
     private TransactionService transactionService;
+
+    @MockitoBean
+    private TransactionIdempotencyService transactionIdempotencyService;
 
     @Nested
     @DisplayName("POST /api/v1/transactions/deposit")
@@ -64,24 +71,31 @@ class JacksonConfigTests {
         @Test
         @DisplayName("Should accept strings for identifiers and a number for the amount")
         void shouldAcceptStringsForIdentifiersAndANumberForTheAmount() throws Exception {
-            when(transactionService.deposit(any(AccountOperationRequestDTO.class)))
-                    .thenReturn(new TransactionResponseDTO(
-                            UUID.randomUUID(),
-                            null,
-                            TransactionType.DEPOSIT,
-                            new BigDecimal("100.00"),
-                            LocalDateTime.of(2026, 1, 15, 10, 30, 45),
-                            null,
-                            new BigDecimal("100.00")
-                    ));
+            when(transactionIdempotencyService.deposit(
+                    any(UUID.class),
+                    any(AccountOperationRequestDTO.class)
+            )).thenReturn(new TransactionResponseDTO(
+                    UUID.randomUUID(),
+                    null,
+                    TransactionType.DEPOSIT,
+                    new BigDecimal("100.00"),
+                    LocalDateTime.of(2026, 1, 15, 10, 30, 45),
+                    null,
+                    new BigDecimal("100.00")
+            ));
 
             mockMvc.perform(post(URL)
+                            .header(IDEMPOTENCY_HEADER, UUID.randomUUID().toString())
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"accountNumber\": \"99999\", \"digit\": \"5\", \"amount\": 100.00}"))
+                            .content(VALID_BODY))
                     .andExpect(status().isCreated());
 
-            verify(transactionService).deposit(any(AccountOperationRequestDTO.class));
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionIdempotencyService).deposit(
+                    any(UUID.class),
+                    any(AccountOperationRequestDTO.class)
+            );
+            verifyNoMoreInteractions(transactionIdempotencyService);
+            verifyNoInteractions(transactionService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -89,14 +103,46 @@ class JacksonConfigTests {
         @DisplayName("Should return 400 when a field has the wrong JSON type")
         void shouldReturnBadRequestWhenAFieldHasTheWrongJsonType(String scenario, String body) throws Exception {
             mockMvc.perform(post(URL)
+                            .header(IDEMPOTENCY_HEADER, UUID.randomUUID().toString())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isBadRequest())
                     .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.message").value(INVALID_BODY_MESSAGE));
+                    .andExpect(jsonPath("$.message").value(ApiErrorMessages.INVALID_REQUEST_DATA));
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when the Idempotency-Key header is missing")
+        void shouldReturnBadRequestWhenIdempotencyKeyIsMissing() throws Exception {
+            mockMvc.perform(post(URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(VALID_BODY))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message")
+                            .value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
+
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when the Idempotency-Key header is not a valid UUID")
+        void shouldReturnBadRequestWhenIdempotencyKeyIsNotAUuid() throws Exception {
+            mockMvc.perform(post(URL)
+                            .header(IDEMPOTENCY_HEADER, "not-a-uuid")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(VALID_BODY))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message")
+                            .value(ApiErrorMessages.INVALID_REQUEST_PARAMETER));
+
+            verifyNoInteractions(transactionIdempotencyService, transactionService);
         }
     }
 

@@ -1,16 +1,18 @@
-
 package com.lcsalvess.bankingsystem.validation.passwordstrength;
 
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
+import java.util.regex.Pattern;
+
 public class StrongPasswordValidator
         implements ConstraintValidator<StrongPassword, String> {
 
-    private static final String UPPERCASE = ".*[A-Z].*";
-    private static final String LOWERCASE = ".*[a-z].*";
-    private static final String DIGIT = ".*[0-9].*";
-    private static final String SPECIAL_CHARACTER = ".*[^\\p{L}\\p{N}\\s].*";
+    private static final Pattern UPPERCASE = Pattern.compile("[A-Z]");
+    private static final Pattern LOWERCASE = Pattern.compile("[a-z]");
+    private static final Pattern DIGIT = Pattern.compile("[0-9]");
+    private static final Pattern SPECIAL_CHARACTER =
+            Pattern.compile("[^\\p{L}\\p{N}\\s]");
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
@@ -18,9 +20,9 @@ public class StrongPasswordValidator
             return true;
         }
 
-        return value.matches(UPPERCASE)
-                && value.matches(LOWERCASE)
-                && value.matches(DIGIT)
-                && value.matches(SPECIAL_CHARACTER);
+        return UPPERCASE.matcher(value).find()
+                && LOWERCASE.matcher(value).find()
+                && DIGIT.matcher(value).find()
+                && SPECIAL_CHARACTER.matcher(value).find();
     }
 }

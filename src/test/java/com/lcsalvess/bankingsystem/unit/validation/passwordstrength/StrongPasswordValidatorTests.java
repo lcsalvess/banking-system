@@ -60,6 +60,10 @@ class StrongPasswordValidatorTests {
                     Arguments.of(
                             "contains accented letters and a valid special character",
                             "SênhaÁbc123!"
+                    ),
+                    Arguments.of(
+                            "contains a newline and all required character classes",
+                            "Secure\nPass123!"
                     )
             );
         }

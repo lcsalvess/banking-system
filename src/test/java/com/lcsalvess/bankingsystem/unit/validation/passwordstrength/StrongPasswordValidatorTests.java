@@ -64,6 +64,18 @@ class StrongPasswordValidatorTests {
                     Arguments.of(
                             "contains a newline and all required character classes",
                             "Secure\nPass123!"
+                    ),
+                    Arguments.of(
+                            "accented uppercase is the only uppercase letter",
+                            "áÁ1!áááá"
+                    ),
+                    Arguments.of(
+                            "accented lowercase is the only lowercase letter",
+                            "ÁÉÍ1!ÓÚá"
+                    ),
+                    Arguments.of(
+                            "underscore as the special character",
+                            "Secure_Pass123"
                     )
             );
         }
@@ -141,6 +153,14 @@ class StrongPasswordValidatorTests {
                     Arguments.of(
                             "contains accented letters but no special character",
                             "SênhaAbc123"
+                    ),
+                    Arguments.of(
+                            "control character is not a special character",
+                            "SecurePass123\u0001"
+                    ),
+                    Arguments.of(
+                            "tab is not a special character",
+                            "Secure\tPass123"
                     )
             );
         }

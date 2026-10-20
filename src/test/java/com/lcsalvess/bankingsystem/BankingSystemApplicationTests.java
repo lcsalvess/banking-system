@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
@@ -62,6 +63,68 @@ class BankingSystemApplicationTests {
 
             assertTrue(
                     thread.getName().startsWith("daily-yield-recovery-"),
+                    () -> "Unexpected thread name: " + thread.getName()
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Application task executor")
+    class ApplicationTaskExecutorTests {
+
+        @Autowired
+        private ThreadPoolTaskExecutor defaultExecutor;
+
+        @Autowired
+        @Qualifier("applicationTaskExecutor")
+        private ThreadPoolTaskExecutor applicationTaskExecutor;
+
+        @Autowired
+        @Qualifier("taskExecutor")
+        private ThreadPoolTaskExecutor taskExecutor;
+
+        @Autowired
+        @Qualifier(YieldExecutorConfig.YIELD_EXECUTOR)
+        private ThreadPoolTaskExecutor yieldExecutor;
+
+        @Test
+        @DisplayName("Should be configured correctly")
+        void shouldBeConfiguredCorrectly() {
+            assertEquals(8, applicationTaskExecutor.getCorePoolSize());
+
+            assertEquals(
+                    "task-",
+                    applicationTaskExecutor.getThreadNamePrefix()
+            );
+        }
+
+        @Test
+        @DisplayName(
+                "Should expose the default executor and alias as the same bean"
+        )
+        void shouldExposeDefaultExecutorAndAliasAsSameBean() {
+            assertSame(applicationTaskExecutor, defaultExecutor);
+            assertSame(applicationTaskExecutor, taskExecutor);
+
+            assertNotSame(applicationTaskExecutor, yieldExecutor);
+        }
+
+        @Test
+        @DisplayName("Should run tasks on a dedicated thread")
+        void shouldRunTasksOnDedicatedThread() throws Exception {
+            CompletableFuture<Thread> executionThread =
+                    new CompletableFuture<>();
+
+            applicationTaskExecutor.execute(
+                    () -> executionThread.complete(Thread.currentThread())
+            );
+
+            Thread thread = executionThread.get(5, TimeUnit.SECONDS);
+
+            assertNotSame(Thread.currentThread(), thread);
+
+            assertTrue(
+                    thread.getName().startsWith("task-"),
                     () -> "Unexpected thread name: " + thread.getName()
             );
         }

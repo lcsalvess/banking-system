@@ -31,6 +31,7 @@
         <logback.version>1.6.3</logback.version>
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <tomcat.version>11.0.26</tomcat.version>
+        <asm.version>9.11.1</asm.version>
         <!-- Permite a substituição tardia do argLine pelo Maven Surefire. -->
         <argLine/>
     </properties>
@@ -44,37 +45,36 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-
             <!--
-    Overrides the Spring Boot-managed ASM version to address known security
-    vulnerabilities reported by Mend (CVE-2026-110257, CVE-2026-110258,
-    CVE-2026-110260, CVE-2026-110261, CVE-2026-110263 and CVE-2026-110591).
-    Keep ASM modules aligned to prevent vulnerable transitive versions.
--->
+            Overrides the Spring Boot-managed ASM version to address known security
+            vulnerabilities reported by Mend (CVE-2026-110257, CVE-2026-110258,
+            CVE-2026-110260, CVE-2026-110261, CVE-2026-110263, CVE-2026-110591 and CVE-2026-112046).
+            Keep ASM modules aligned to prevent vulnerable transitive versions.
+            -->
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm</artifactId>
-                <version>9.11</version>
+                <version>${asm.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm-tree</artifactId>
-                <version>9.11</version>
+                <version>${asm.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm-analysis</artifactId>
-                <version>9.11</version>
+                <version>${asm.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm-util</artifactId>
-                <version>9.11</version>
+                <version>${asm.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm-commons</artifactId>
-                <version>9.11</version>
+                <version>${asm.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

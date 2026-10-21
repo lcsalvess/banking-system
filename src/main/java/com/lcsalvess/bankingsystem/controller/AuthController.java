@@ -6,6 +6,8 @@ import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.PasswordChangeService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -55,7 +57,16 @@ public class AuthController {
             ),
             @ApiResponse(
                     responseCode = "429",
-                    description = "Too many login attempts. Retry after the indicated delay."
+                    description = "Too many login attempts. Retry after the indicated delay.",
+                    headers = @Header(
+                            name = "Retry-After",
+                            description = "Number of seconds to wait before retrying.",
+                            schema = @Schema(
+                                    type = "integer",
+                                    format = "int64",
+                                    example = "300"
+                            )
+                    )
             )
     })
     @SecurityRequirements

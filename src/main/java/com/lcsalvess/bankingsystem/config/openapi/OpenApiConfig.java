@@ -232,6 +232,7 @@ To access protected endpoints, authenticate through the login endpoint and click
             case "405" -> "The HTTP method is not supported.";
             case "409" -> "The request conflicts with the current resource state.";
             case "415" -> "The request content type is not supported.";
+            case "429" -> "Too many login attempts. Please wait before trying again.";
             case "503" -> "Service temporarily unavailable.";
             default -> "Unexpected internal server error.";
         };

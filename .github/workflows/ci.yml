@@ -1,4 +1,3 @@
-
 name: CI
 
 on:
@@ -53,3 +52,12 @@ jobs:
 
       - name: Run tests
         run: ./mvnw --batch-mode --no-transfer-progress verify
+
+      - name: Upload JaCoCo coverage report
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-coverage-report
+          path: target/site/jacoco/
+          if-no-files-found: error
+          retention-days: 14

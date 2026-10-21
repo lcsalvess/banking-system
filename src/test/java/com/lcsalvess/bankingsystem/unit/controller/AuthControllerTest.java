@@ -1,10 +1,11 @@
 package com.lcsalvess.bankingsystem.unit.controller;
 
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.service.security.LoginAttemptProtectionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,6 +17,9 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -24,7 +28,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
-public class AuthControllerTest {
+class AuthControllerTest {
+
+    private static final AtomicInteger TEST_IP_COUNTER =
+            new AtomicInteger(1);
+
     @Autowired
     private UserRepository userRepository;
 
@@ -37,10 +45,17 @@ public class AuthControllerTest {
     @Autowired
     private TransactionRepository transactionRepository;
 
+    @Autowired
+    private LoginAttemptProtectionService loginAttemptProtectionService;
+
     @BeforeEach
     void setUp() {
         transactionRepository.deleteAll();
         userRepository.deleteAll();
+
+        // Limpa falhas de autenticação dos usuários utilizados nos testes.
+        loginAttemptProtectionService.recordSuccessfulLogin("test-user");
+        loginAttemptProtectionService.recordSuccessfulLogin("test-invalid-user");
 
         User user = new User(
                 "test-user",
@@ -52,6 +67,21 @@ public class AuthControllerTest {
         userRepository.save(user);
     }
 
+    private String nextTestIp() {
+        int lastOctet = TEST_IP_COUNTER.getAndUpdate(
+                current -> current >= 254 ? 1 : current + 1
+        );
+
+        return "192.0.2." + lastOctet;
+    }
+
+    private RequestPostProcessor withNextTestIp() {
+        return request -> {
+            request.setRemoteAddr(nextTestIp());
+            return request;
+        };
+    }
+
     @Nested
     @DisplayName("Ao tentar autenticar")
     class AuthTest {
@@ -61,12 +91,15 @@ public class AuthControllerTest {
         @Test
         @DisplayName("Deve autenticar com credenciais válidas")
         void shouldAuthenticateWithValidCredentials() throws Exception {
-            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
-                    {
-                        "username": "test-user",
-                        "password": "test-password"
-                    }
-                    """))
+            mockMvc.perform(post(URL)
+                            .with(withNextTestIp())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "username": "test-user",
+                                        "password": "test-password"
+                                    }
+                                    """))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.token").isNotEmpty())
                     .andExpect(jsonPath("$.username").value("test-user"));
@@ -75,66 +108,82 @@ public class AuthControllerTest {
         @Test
         @DisplayName("Deve rejeitar senha inválida")
         void shouldRejectInvalidPassword() throws Exception {
-            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
-                    {
-                        "username": "test-user",
-                        "password": "test-invalid-password"
-                    }
-                    """))
+            mockMvc.perform(post(URL)
+                            .with(withNextTestIp())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "username": "test-user",
+                                        "password": "test-invalid-password"
+                                    }
+                                    """))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("Deve rejeitar usuário inexistente")
         void shouldRejectNonexistentUser() throws Exception {
-            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
-                    {
-                        "username": "test-invalid-user",
-                        "password": "test-invalid-password"
-                    }
-                    """))
+            mockMvc.perform(post(URL)
+                            .with(withNextTestIp())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "username": "test-invalid-user",
+                                        "password": "test-invalid-password"
+                                    }
+                                    """))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("Deve rejeitar username em branco")
         void shouldRejectBlankUsername() throws Exception {
-            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
-                    {
-                        "username": "",
-                        "password": "test-invalid-password"
-                    }
-                    """)).andExpect(status().isBadRequest());
+            mockMvc.perform(post(URL)
+                            .with(withNextTestIp())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "username": "",
+                                        "password": "test-invalid-password"
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest());
         }
 
         @Test
         @DisplayName("Deve rejeitar senha em branco")
         void shouldRejectBlankPassword() throws Exception {
-            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("""
-                    {
-                        "username": "test-user",
-                        "password": ""
-                    }
-                    """)).andExpect(status().isBadRequest());
+            mockMvc.perform(post(URL)
+                            .with(withNextTestIp())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                        "username": "test-user",
+                                        "password": ""
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest());
         }
 
         @Test
         @DisplayName("Deve rejeitar usuário inativo")
         void shouldRejectDisabledUser() throws Exception {
-            User user = userRepository.findByUsernameIgnoreCase("test-user")
+            User user = userRepository
+                    .findByUsernameIgnoreCase("test-user")
                     .orElseThrow();
 
             user.deactivate();
             userRepository.save(user);
 
             mockMvc.perform(post(URL)
+                            .with(withNextTestIp())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
-                    {
-                        "username": "test-user",
-                        "password": "test-password"
-                    }
-                    """))
+                                    {
+                                        "username": "test-user",
+                                        "password": "test-password"
+                                    }
+                                    """))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.status").value(401))
                     .andExpect(jsonPath("$.message")
@@ -142,4 +191,3 @@ public class AuthControllerTest {
         }
     }
 }
-

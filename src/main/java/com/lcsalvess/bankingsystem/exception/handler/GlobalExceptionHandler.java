@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitExceededException;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import org.hibernate.JDBCException;
 import org.hibernate.exception.ConstraintViolationException;
@@ -106,6 +107,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.UNAUTHORIZED.value(),
                 ApiErrorMessages.AUTHENTICATION_FAILED
         );
+    }
+
+    @ExceptionHandler(LoginRateLimitExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleLoginRateLimitExceeded(
+            LoginRateLimitExceededException exception
+    ) {
+        log.warn("Login rejected: rate limit exceeded.");
+
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(
+                        HttpHeaders.RETRY_AFTER,
+                        Long.toString(exception.getRetryAfterSeconds())
+                )
+                .body(new ApiErrorResponse(
+                        HttpStatus.TOO_MANY_REQUESTS.value(),
+                        ApiErrorMessages.LOGIN_RATE_LIMIT_EXCEEDED
+                ));
     }
 
     //-------------- AUTORIZAÇÃO ---------

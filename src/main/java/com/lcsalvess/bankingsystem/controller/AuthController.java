@@ -6,10 +6,13 @@ import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.PasswordChangeService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -51,12 +54,28 @@ public class AuthController {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid request body or validation errors."
+            ),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many login attempts. Retry after the indicated delay.",
+                    headers = @Header(
+                            name = "Retry-After",
+                            description = "Number of seconds to wait before retrying.",
+                            schema = @Schema(
+                                    type = "integer",
+                                    format = "int64",
+                                    example = "300"
+                            )
+                    )
             )
     })
     @SecurityRequirements
     @PostMapping("/login")
-    public LoginResponseDTO login(@Valid @RequestBody LoginRequestDTO dto) {
-        return authService.authenticate(dto);
+    public LoginResponseDTO login(
+            @Valid @RequestBody LoginRequestDTO dto,
+            HttpServletRequest request
+    ) {
+        return authService.authenticate(dto, request.getRemoteAddr());
     }
 
     @Operation(

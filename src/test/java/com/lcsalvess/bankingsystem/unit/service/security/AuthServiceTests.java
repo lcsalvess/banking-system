@@ -1,12 +1,14 @@
+
 package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import com.lcsalvess.bankingsystem.service.security.LoginAttemptProtectionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,6 +48,8 @@ class AuthServiceTests {
     private static final String PROVIDER =
             "com.lcsalvess.bankingsystem.unit.service.security.AuthServiceTests#";
 
+    private static final String TEST_CLIENT_IP = "192.0.2.1";
+
     @Mock
     private AuthenticationManager authManager;
 
@@ -58,6 +62,9 @@ class AuthServiceTests {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private LoginAttemptProtectionService loginAttemptProtectionService;
+
     private AuthService authService;
 
     @BeforeEach
@@ -68,7 +75,8 @@ class AuthServiceTests {
         authService = new AuthService(
                 authManager,
                 jwtService,
-                passwordEncoder
+                passwordEncoder,
+                loginAttemptProtectionService
         );
     }
 
@@ -90,17 +98,27 @@ class AuthServiceTests {
             when(authentication.getPrincipal()).thenReturn(user);
             when(jwtService.generateToken(user)).thenReturn(jwtToken);
 
-            LoginResponseDTO response = authService.authenticate(dto);
+            LoginResponseDTO response =
+                    authService.authenticate(dto, TEST_CLIENT_IP);
 
             assertEquals(jwtToken, response.token());
             assertEquals(user.getUsername(), response.username());
             assertEquals(user.getEmail(), response.email());
             assertEquals(user.getRole(), response.role());
 
+            verify(loginAttemptProtectionService)
+                    .checkClientIp(TEST_CLIENT_IP);
+            verify(loginAttemptProtectionService)
+                    .checkUsername(dto.username());
+
             verify(authManager).authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
             );
+
             verify(jwtService).generateToken(user);
+
+            verify(loginAttemptProtectionService)
+                    .recordSuccessfulLogin(user.getUsername());
         }
 
         @Test
@@ -118,12 +136,21 @@ class AuthServiceTests {
 
             assertThrows(
                     BadCredentialsException.class,
-                    () -> authService.authenticate(dto)
+                    () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
+
+            verify(loginAttemptProtectionService)
+                    .checkClientIp(TEST_CLIENT_IP);
+            verify(loginAttemptProtectionService)
+                    .checkUsername(dto.username());
 
             verify(authManager).authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
             );
+
+            verify(loginAttemptProtectionService)
+                    .recordFailedLogin(dto.username());
+
             verifyNoInteractions(jwtService);
         }
 
@@ -144,14 +171,20 @@ class AuthServiceTests {
 
             BadCredentialsException exception = assertThrows(
                     BadCredentialsException.class,
-                    () -> authService.authenticate(dto)
+                    () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
 
             assertEquals(
                     ApiErrorMessages.INVALID_CREDENTIALS,
                     exception.getMessage()
             );
+
             assertSame(original, exception.getCause());
+
+            verify(loginAttemptProtectionService)
+                    .checkClientIp(TEST_CLIENT_IP);
+            verify(loginAttemptProtectionService)
+                    .checkUsername(dto.username());
 
             verify(authManager).authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
@@ -162,17 +195,23 @@ class AuthServiceTests {
                     "dummy-hash"
             );
 
+            verify(loginAttemptProtectionService)
+                    .recordFailedLogin(dto.username());
+
             verifyNoInteractions(jwtService);
         }
 
         @Test
         @DisplayName(
-                "Não deve mascarar falhas de infraestrutura como credenciais inválidas"
+                "Não deve contabilizar falhas de infraestrutura como credenciais inválidas"
         )
-        void shouldNotMaskInfrastructureFailures() {
+        void shouldNotCountInfrastructureFailuresAsInvalidCredentials() {
             LoginRequestDTO dto = createLoginRequestDTO();
+
             AuthenticationServiceException original =
-                    new AuthenticationServiceException("database unavailable");
+                    new AuthenticationServiceException(
+                            "database unavailable"
+                    );
 
             when(authManager.authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
@@ -180,10 +219,16 @@ class AuthServiceTests {
 
             AuthenticationServiceException exception = assertThrows(
                     AuthenticationServiceException.class,
-                    () -> authService.authenticate(dto)
+                    () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
 
             assertSame(original, exception);
+
+            verify(loginAttemptProtectionService)
+                    .checkClientIp(TEST_CLIENT_IP);
+            verify(loginAttemptProtectionService)
+                    .checkUsername(dto.username());
+
             verifyNoInteractions(jwtService);
         }
 
@@ -191,6 +236,7 @@ class AuthServiceTests {
         @DisplayName("Deve propagar exceções inesperadas sem alterá-las")
         void shouldPropagateUnexpectedExceptions() {
             LoginRequestDTO dto = createLoginRequestDTO();
+
             IllegalStateException original =
                     new IllegalStateException("unexpected");
 
@@ -200,10 +246,16 @@ class AuthServiceTests {
 
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> authService.authenticate(dto)
+                    () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
 
             assertSame(original, exception);
+
+            verify(loginAttemptProtectionService)
+                    .checkClientIp(TEST_CLIENT_IP);
+            verify(loginAttemptProtectionService)
+                    .checkUsername(dto.username());
+
             verifyNoInteractions(jwtService);
         }
 
@@ -224,7 +276,7 @@ class AuthServiceTests {
         }
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource
+    @SuppressWarnings("unused") // Usado via @MethodSource.
     static Stream<Arguments> accountStatusExceptions() {
         return Stream.of(
                 Arguments.of(
@@ -237,7 +289,9 @@ class AuthServiceTests {
                 ),
                 Arguments.of(
                         "conta expirada",
-                        new AccountExpiredException("User account has expired")
+                        new AccountExpiredException(
+                                "User account has expired"
+                        )
                 ),
                 Arguments.of(
                         "credenciais expiradas",

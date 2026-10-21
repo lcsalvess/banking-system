@@ -2,42 +2,69 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.1.1</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <relativePath/> <!-- Resolve the parent from Maven repositories. -->
     </parent>
+
     <groupId>com.lcsalvess</groupId>
     <artifactId>banking-system</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <name>Banking System</name>
     <description>RESTful banking system developed with Java and Spring Boot</description>
-    <url/>
+    <url>https://github.com/lcsalvess/banking-system</url>
     <licenses>
-        <license/>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/license/mit</url>
+            <distribution>repo</distribution>
+        </license>
     </licenses>
     <developers>
-        <developer/>
+        <developer>
+            <id>lcsalvess</id>
+            <name>Lucas Alves Sardinha Mineiro</name>
+            <url>https://github.com/lcsalvess</url>
+            <roles>
+                <role>Developer</role>
+            </roles>
+        </developer>
     </developers>
     <scm>
-        <connection/>
-        <developerConnection/>
-        <tag/>
-        <url/>
+        <connection>scm:git:https://github.com/lcsalvess/banking-system.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/lcsalvess/banking-system.git</developerConnection>
+        <url>https://github.com/lcsalvess/banking-system</url>
+        <tag>HEAD</tag>
     </scm>
+
     <properties>
         <java.version>21</java.version>
         <logback.version>1.6.3</logback.version>
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <tomcat.version>11.0.26</tomcat.version>
         <asm.version>9.11.1</asm.version>
-        <!-- Permite a substituição tardia do argLine pelo Maven Surefire. -->
+        <jjwt.version>0.13.0</jjwt.version>
+        <springdoc-openapi.version>3.1.1</springdoc-openapi.version>
+        <postgresql.version>42.7.14</postgresql.version>
+        <!-- Allows Maven Surefire to replace argLine during late configuration. -->
         <argLine/>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!--
+                Spring Boot 4 uses Jackson 3 (tools.jackson) by default.
+                Some dependencies, including jjwt-jackson and Swagger Core
+                used by springdoc-openapi, still rely on Jackson 2
+                (com.fasterxml.jackson).
+
+                This BOM keeps Jackson 2 module versions aligned while
+                allowing Jackson 2 and Jackson 3 to coexist on the
+                runtime classpath.
+            -->
             <dependency>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
@@ -45,11 +72,16 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
             <!--
-            Overrides the Spring Boot-managed ASM version to address known security
-            vulnerabilities reported by Mend (CVE-2026-110257, CVE-2026-110258,
-            CVE-2026-110260, CVE-2026-110261, CVE-2026-110263, CVE-2026-110591 and CVE-2026-112046).
-            Keep ASM modules aligned to prevent vulnerable transitive versions.
+                Override the Spring Boot-managed ASM version to address
+                security vulnerabilities reported by Mend:
+                CVE-2026-110257, CVE-2026-110258, CVE-2026-110260,
+                CVE-2026-110261, CVE-2026-110263, CVE-2026-110591,
+                and CVE-2026-112046.
+
+                Keep all ASM modules aligned to prevent vulnerable
+                transitive versions from being resolved.
             -->
             <dependency>
                 <groupId>org.ow2.asm</groupId>
@@ -100,27 +132,27 @@
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
-            <version>0.13.0</version>
+            <version>${jjwt.version}</version>
         </dependency>
 
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
-            <version>0.13.0</version>
+            <version>${jjwt.version}</version>
             <scope>runtime</scope>
         </dependency>
 
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
-            <version>0.13.0</version>
+            <version>${jjwt.version}</version>
             <scope>runtime</scope>
         </dependency>
 
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>3.1.1</version>
+            <version>${springdoc-openapi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -143,7 +175,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.14</version>
+            <version>${postgresql.version}</version>
         </dependency>
 
         <dependency>
@@ -170,14 +202,42 @@
 
     <build>
         <plugins>
+            <!--
+                Ensures the build runs with the required Java and Maven versions.
+                Fails early if the build environment does not meet these requirements.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.6.3</version>
+                <executions>
+                    <execution>
+                        <id>enforce-build-environment</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[21,22)</version>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.10.0,)</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
 
             <!--
-                Generates Maven properties containing the resolved paths of
-                dependency JARs, including transitive test dependencies.
+                Generates Maven properties containing the resolved paths
+                of dependency JARs, including transitive test dependencies.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -193,8 +253,9 @@
             </plugin>
 
             <!--
-                Loads Mockito as a Java agent before test execution to avoid
-                dynamic self-attachment and prepare for future JDK restrictions.
+                Loads Mockito as a Java agent before test execution to
+                avoid dynamic self-attachment and prepare for future
+                JDK restrictions on dynamic agent loading.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

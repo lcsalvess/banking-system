@@ -24,21 +24,39 @@ public class AuthService {
     private final AuthenticationManager authManager;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAttemptProtectionService loginAttemptProtectionService;
     private final String dummyPasswordHash;
 
-    public AuthService(AuthenticationManager authManager, JwtService jwtService, PasswordEncoder passwordEncoder) {
+    public AuthService(AuthenticationManager authManager, JwtService jwtService, PasswordEncoder passwordEncoder, LoginAttemptProtectionService loginAttemptProtectionService) {
         this.authManager = authManager;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.loginAttemptProtectionService = loginAttemptProtectionService;
         this.dummyPasswordHash = passwordEncoder.encode(
                 UUID.randomUUID().toString()
         );
     }
 
-    public LoginResponseDTO authenticate(LoginRequestDTO dto) {
-        Authentication auth = authenticateCredentials(dto);
+    public LoginResponseDTO authenticate(
+            LoginRequestDTO dto,
+            String clientIp
+    ) {
+        loginAttemptProtectionService.checkClientIp(clientIp);
+        loginAttemptProtectionService.checkUsername(dto.username());
+
+        Authentication auth;
+
+        try {
+            auth = authenticateCredentials(dto);
+        } catch (BadCredentialsException exception) {
+            loginAttemptProtectionService.recordFailedLogin(dto.username());
+            throw exception;
+        }
+
         User user = (User) auth.getPrincipal();
         String token = jwtService.generateToken(user);
+
+        loginAttemptProtectionService.recordSuccessfulLogin(user.getUsername());
 
         return new LoginResponseDTO(
                 token,

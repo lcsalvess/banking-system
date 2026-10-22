@@ -113,7 +113,7 @@ public class TransactionService {
                 account,
                 performedBy
         );
-        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount(), username));
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.DEPOSIT, account.getAccountNumber(), dto.amount(), username, transaction.getTransactionCode()));
 
         return TransactionResponseDTO.fromEntity(transaction);
     }
@@ -138,7 +138,7 @@ public class TransactionService {
                 account,
                 performedBy
         );
-        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.WITHDRAWAL, account.getAccountNumber(), dto.amount(), username));
+        eventPublisher.publishEvent(new TransactionOperationEvent(TransactionType.WITHDRAWAL, account.getAccountNumber(), dto.amount(), username, transaction.getTransactionCode()));
 
         return TransactionResponseDTO.fromEntity(transaction);
     }
@@ -198,7 +198,8 @@ public class TransactionService {
                         fromAccount.getAccountNumber(),
                         toAccount.getAccountNumber(),
                         dto.amount(),
-                        username
+                        username,
+                        transferCode
                 )
         );
 

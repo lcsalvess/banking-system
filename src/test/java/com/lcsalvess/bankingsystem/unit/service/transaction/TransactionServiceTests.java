@@ -520,7 +520,8 @@ public class TransactionServiceTests {
                             TransactionType.DEPOSIT,
                             ACCOUNT_NUMBER,
                             OPERATION_AMOUNT,
-                            USERNAME
+                            USERNAME,
+                            transactionCaptor.getValue().getTransactionCode()
                     )
             );
 
@@ -648,7 +649,8 @@ public class TransactionServiceTests {
                             TransactionType.WITHDRAWAL,
                             ACCOUNT_NUMBER,
                             amount,
-                            USERNAME
+                            USERNAME,
+                            transactionCaptor.getValue().getTransactionCode()
                     )
             );
 
@@ -764,7 +766,8 @@ public class TransactionServiceTests {
                             ACCOUNT_NUMBER,
                             DESTINATION_NUMBER,
                             amount,
-                            USERNAME
+                            USERNAME,
+                            transactionCaptor.getAllValues().getFirst().getTransferCode()
                     )
             );
 

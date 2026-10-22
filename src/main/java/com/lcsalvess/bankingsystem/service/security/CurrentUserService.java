@@ -8,10 +8,24 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 public class CurrentUserService {
 
     public User getCurrentUser() {
+        return findCurrentUser().orElseThrow(() ->
+                new AuthenticationCredentialsNotFoundException(
+                        ApiErrorMessages.AUTHENTICATED_USER_NOT_FOUND
+                )
+        );
+    }
+
+    /**
+     * Versão que não lança exceção: devolve vazio quando não há usuário
+     * autenticado.
+     */
+    public Optional<User> findCurrentUser() {
         Authentication auth = SecurityContextHolder
                 .getContext()
                 .getAuthentication();
@@ -21,12 +35,10 @@ public class CurrentUserService {
                 || auth instanceof AnonymousAuthenticationToken
                 || !(auth.getPrincipal() instanceof User user)) {
 
-            throw new AuthenticationCredentialsNotFoundException(
-                    ApiErrorMessages.AUTHENTICATED_USER_NOT_FOUND
-            );
+            return Optional.empty();
         }
 
-        return user;
+        return Optional.of(user);
     }
 
     public String getUsername() {

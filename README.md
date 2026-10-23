@@ -54,7 +54,7 @@ see [Architecture](docs/ARCHITECTURE.md).
 - **Password change**: any authenticated user can change their own password, which revokes every token issued before the change
 - **Password policy**: new passwords must include uppercase and lowercase letters, a digit, and a special character, in addition to the character and UTF-8 byte limits
 - **Token revocation**: every JWT carries a credential version (`tv` claim) checked against the database, so tokens stop working after a password change or a deactivation
-- **Login rate limiting**: limits login requests by IP and temporarily blocks usernames after repeated failed attempts, returning `429 Too Many Requests` with a `Retry-After` header
+- **Login rate limiting**: limits login requests per IP and temporarily blocks a username per client IP, and globally at a higher threshold, after repeated failed attempts, returning `429 Too Many Requests` with a `Retry-After` header
 - **Client management**: registration, listing, lookup, and partial update (`PATCH`), including address data
 - **Sensitive data protection**: the CPF is masked in every client response
 - **Internal address lookup**: client creation and address updates resolve postal codes using ViaCEP, with BrasilAPI as a fallback provider

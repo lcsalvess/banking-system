@@ -5,6 +5,8 @@ import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.handler.GlobalExceptionHandler;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitExceededException;
+import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitReason;
 import com.lcsalvess.bankingsystem.exception.user.InvalidCurrentPasswordException;
 import com.lcsalvess.bankingsystem.exception.user.PasswordUnchangedException;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -25,6 +28,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.QueryTimeoutException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
@@ -170,6 +174,37 @@ class GlobalExceptionHandlerTests {
                 .andExpect(content().string(
                         not(containsString("Internal auth detail"))
                 ));
+    }
+
+    @ParameterizedTest
+    @EnumSource(LoginRateLimitReason.class)
+    void shouldReturnTooManyRequestsWithRetryAfterWhenLoginRateLimitIsExceeded(
+            LoginRateLimitReason reason
+    ) throws Exception {
+
+        performThrowing(new LoginRateLimitExceededException(42L, reason))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "42"))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.LOGIN_RATE_LIMIT_EXCEEDED))
+                .andExpect(content().string(
+                        not(containsString(reason.name()))
+                ));
+    }
+
+    @Test
+    void shouldReturnAtLeastOneSecondInRetryAfterWhenWaitIsNotPositive()
+            throws Exception {
+
+        performThrowing(
+                new LoginRateLimitExceededException(
+                        0L,
+                        LoginRateLimitReason.CLIENT_IP
+                )
+        )
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"));
     }
 
     // -------------------------------------------------------------------------

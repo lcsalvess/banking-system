@@ -31,6 +31,13 @@ when running with the `local` profile.
 
 The deposit, withdrawal, and transfer endpoints require an `Idempotency-Key` header with a UUID. Repeating a request with the same key and payload returns the original result; reusing the key with a different operation or payload returns `409 Conflict`.
 
+`POST /api/v1/auth/login` is rate limited per client IP, per username and IP, and per username (see [Login Rate Limiting](SECURITY.md#login-rate-limiting)). When a limit is reached, it returns `429 Too Many Requests` with a `Retry-After` header holding the number of seconds to wait:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 900
+```
+
 Yield is not exposed as an endpoint: it is credited automatically (see [Savings Yield](BUSINESS_RULES.md#savings-yield)) and shows up in the transaction history as `YIELD` transactions.
 
 Request bodies are strict about JSON types: text fields reject numbers and booleans (`"accountNumber": 99999` is rejected), and monetary amounts reject strings (`"amount": "100.00"` is rejected; send `100.00`). Both return `400 Bad Request`.

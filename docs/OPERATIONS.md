@@ -30,6 +30,7 @@ Validation errors also include the invalid fields. The same structure is used fo
 | Business rule violation                                                                                                                 | Defined by each exception   |
 | Bean Validation failure, invalid parameters, malformed body, or wrong JSON type                                                         | `400 Bad Request`           |
 | Invalid credentials, invalid or revoked token, or deactivated user                                                                      | `401 Unauthorized`          |
+| Login rate limit reached, with a `Retry-After` header                                                                                   | `429 Too Many Requests`     |
 | Access denied because the role is not allowed for the endpoint                                                                          | `403 Forbidden`             |
 | Duplicate CPF, email, or username, including concurrent requests, or state conflicts such as deactivating the last active administrator | `409 Conflict`              |
 | Address provider or database unavailable, row-lock wait timeout, or authentication infrastructure unavailable                           | `503 Service Unavailable`   |
@@ -46,6 +47,7 @@ Operations are logged through Spring application events:
 - Services publish events after creating or changing data: client `CREATED`/`UPDATED`, account `CREATED`/`CANCELLED`, user `CREATED`/`DEACTIVATED`/`REACTIVATED`/`PASSWORD_CHANGED`, and transactions (deposit, withdrawal, transfer, and yield, with `SYSTEM` as the actor for yield).
 - Listeners use `@TransactionalEventListener` in the `AFTER_COMMIT` phase, so an operation is logged as successful only after its database transaction commits.
 - The daily yield job logs the start and end of each run, including a summary of the results (`attempted`, `applied`, `alreadyProcessed`, `notEligible`, `noYield`, `balanceLimitReached`, `skippedAccounts`, and `failed`) and a status of `completed`, `completed with failures`, or `aborted`.
+- The login rate limiter logs each rejection with its reason and the client IP, never the username (see [Login Rate Limiting](SECURITY.md#login-rate-limiting)).
 - The global exception handler logs business errors, authentication and authorization failures, data integrity violations, address provider failures, and unexpected errors.
 - The application log level is controlled by `logging.level.com.lcsalvess.bankingsystem` (`INFO` by default). SQL logging is disabled.
 
@@ -68,3 +70,9 @@ Operations are logged through Spring application events:
 | `address.provider.lookup`   | Time of each provider query, tagged by `provider`            |
 | `client.persistence.create` | Client creation inside the transaction, excluding the commit |
 | `client.persistence.update` | Client update inside the transaction, excluding the commit   |
+
+- Custom Micrometer counter:
+
+| Counter                       | Description                                                                                                       |
+|-------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `login.rate_limit.rejected`   | Login requests rejected by the rate limiter, tagged by `reason`: `client_ip`, `username_ip`, or `username`        |

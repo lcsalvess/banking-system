@@ -35,13 +35,45 @@ Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Bus
 
 ## Login Rate Limiting
 
-Login attempts are subject to in-memory rate limiting:
+Every login attempt goes through three independent controls, checked in this order. Any of them answers `429 Too Many Requests` with a `Retry-After` header.
 
-- **IP-based limit:** 20-token bucket capacity, replenished at a rate of 20 tokens per minute.
-- **Successful login:** clears the recorded failed attempts for that username.
-- **Failed authentication attempts:** 5 failures within a 15-minute window.
-- **Temporary lockout:** 15 minutes after the failed-attempt threshold is reached.
-- **Rate-limit response:** HTTP `429 Too Many Requests`, with a `Retry-After` header.
+| Control            | Default                                                         | Key                     | Purpose                                                          |
+|--------------------|-----------------------------------------------------------------|-------------------------|------------------------------------------------------------------|
+| IP bucket          | 20 tokens, refilled at 20 per minute                            | Client IP               | Limits the request rate of one client                            |
+| Username + IP      | 5 attempts per 15-minute window, then a 15-minute lock          | Username and client IP  | Stops password guessing from one address                         |
+| Username (any IP)  | 50 attempts per 15-minute window, then a 15-minute lock         | Username                | Contains guessing distributed across many addresses              |
 
-The rate-limit state is stored locally in Caffeine caches. It is not shared
-between application instances and is cleared when the application restarts.
+How it behaves:
+
+- **Atomic counting:** an attempt is counted *before* the password is checked, so parallel requests cannot exceed the limit while BCrypt is still running. The attempt that reaches the limit is still evaluated; the next one is rejected.
+- **What counts:** wrong passwords, unknown usernames, and inactive accounts, all with the same response. Unknown usernames are tracked like existing ones, so the limiter does not reveal which usernames exist.
+- **What does not count:** an attempt that cannot be evaluated because of an infrastructure failure (for example, the database is down) is released and not counted against the user.
+- **Successful login:** clears the counters of that username, for that IP and across all IPs.
+- **Requests that fail validation** (`400 Bad Request`, such as a blank username) never reach the limiter. The IP bucket, on the other hand, is consumed by every login request that reaches it, successful or not.
+- **While locked,** even the correct password is rejected until the lock ends. A lock is never extended by further attempts.
+
+### Design trade-offs
+
+- **Why the lock includes the IP.** A lock keyed only by username lets anyone who knows a username (for example `admin`) lock that user out indefinitely. Keyed by username and IP, a wrong-password attacker only locks their own address, and the legitimate user can still sign in from another one. The higher per-username limit still stops distributed guessing. An attacker with many addresses can reach it and lock a username for 15 minutes, which is the accepted cost; the `username` rejection metric makes this visible.
+- **Client IP.** The limiter uses `request.getRemoteAddr()`. Behind a reverse proxy or load balancer, every client appears with the proxy's address and they all share one IP bucket (20 requests per minute in total). To use the original address, set `PROXY_IP_HEADER` (for example `X-Forwarded-For`) and `TRUSTED_PROXIES` (a regular expression with the proxy IPs). The header is only honored for requests coming from a trusted proxy; without `TRUSTED_PROXIES` it is ignored. Never trust the header without restricting the proxies, or any client can forge its address.
+- **IPv6.** Each address is limited individually, so a client holding a whole IPv6 prefix can rotate addresses. The per-username limit still applies. Values that are not a well-formed IP text are grouped in a single `invalid` bucket.
+- **Memory and eviction.** State is kept in Caffeine caches limited to `banking.security.login.maximum-tracked-keys` entries (100000 by default). When a cache is full, Caffeine may evict entries, which ends a lock earlier than expected. This needs a flood of distinct usernames or addresses; size the limit accordingly and rate-limit at the edge when the API is exposed to the internet.
+- **Local state.** The state is not shared between application instances and is cleared when the application restarts.
+
+### Configuration
+
+| Property                                                    | Default  | Description                                                                              |
+|-------------------------------------------------------------|----------|------------------------------------------------------------------------------------------|
+| `banking.security.login.ip-capacity`                        | `20`     | Capacity of the IP bucket                                                                |
+| `banking.security.login.ip-refill-period`                   | `1m`     | Period in which the IP bucket is fully refilled                                          |
+| `banking.security.login.max-failed-attempts`                | `5`      | Attempts per username and IP before the lock                                             |
+| `banking.security.login.max-failed-attempts-per-username`   | `50`     | Attempts per username, all IPs, before the lock (must be at least `max-failed-attempts`) |
+| `banking.security.login.failure-window`                     | `15m`    | Window in which attempts are added up                                                    |
+| `banking.security.login.lock-duration`                      | `15m`    | Duration of a lock                                                                       |
+| `banking.security.login.maximum-tracked-keys`               | `100000` | Maximum entries kept per cache                                                           |
+
+Invalid values stop the application at startup.
+
+### Monitoring
+
+Each rejection increments the `login.rate_limit.rejected` counter, tagged by `reason` (`client_ip`, `username_ip`, or `username`), and logs a warning with the reason and the client IP. Usernames are not logged. A rise in `username` rejections indicates a distributed attack or a locked-out account.

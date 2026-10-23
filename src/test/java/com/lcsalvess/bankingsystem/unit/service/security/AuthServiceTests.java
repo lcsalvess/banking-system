@@ -1,4 +1,3 @@
-
 package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
@@ -6,8 +5,11 @@ import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitExceededException;
+import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitReason;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import com.lcsalvess.bankingsystem.service.security.LoginAttempt;
 import com.lcsalvess.bankingsystem.service.security.LoginAttemptProtectionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +34,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Instant;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -49,6 +54,14 @@ class AuthServiceTests {
             "com.lcsalvess.bankingsystem.unit.service.security.AuthServiceTests#";
 
     private static final String TEST_CLIENT_IP = "192.0.2.1";
+    private static final String TEST_USERNAME = "test.user";
+
+    private static final LoginAttempt TEST_ATTEMPT = new LoginAttempt(
+            "username-ip:test.user|192.0.2.1",
+            Instant.parse("2026-01-01T12:00:00Z"),
+            "username:test.user",
+            Instant.parse("2026-01-01T12:00:00Z")
+    );
 
     @Mock
     private AuthenticationManager authManager;
@@ -91,6 +104,8 @@ class AuthServiceTests {
             LoginRequestDTO dto = createLoginRequestDTO();
             User user = createEntityUser();
 
+            allowAttempt();
+
             when(authManager.authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
             )).thenReturn(authentication);
@@ -107,9 +122,7 @@ class AuthServiceTests {
             assertEquals(user.getRole(), response.role());
 
             verify(loginAttemptProtectionService)
-                    .checkClientIp(TEST_CLIENT_IP);
-            verify(loginAttemptProtectionService)
-                    .checkUsername(dto.username());
+                    .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(authManager).authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
@@ -118,13 +131,17 @@ class AuthServiceTests {
             verify(jwtService).generateToken(user);
 
             verify(loginAttemptProtectionService)
-                    .recordSuccessfulLogin(user.getUsername());
+                    .recordSuccessfulLogin(TEST_ATTEMPT);
+            verify(loginAttemptProtectionService, never())
+                    .cancelAttempt(any(LoginAttempt.class));
         }
 
         @Test
-        @DisplayName("Deve lançar exceção quando as credenciais são inválidas")
+        @DisplayName("Deve lançar exceção e manter a tentativa contabilizada quando as credenciais são inválidas")
         void shouldThrowWhenCredentialsAreInvalid() {
             LoginRequestDTO dto = createLoginRequestDTO();
+
+            allowAttempt();
 
             when(authManager.authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
@@ -140,16 +157,16 @@ class AuthServiceTests {
             );
 
             verify(loginAttemptProtectionService)
-                    .checkClientIp(TEST_CLIENT_IP);
-            verify(loginAttemptProtectionService)
-                    .checkUsername(dto.username());
+                    .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(authManager).authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
             );
 
-            verify(loginAttemptProtectionService)
-                    .recordFailedLogin(dto.username());
+            verify(loginAttemptProtectionService, never())
+                    .cancelAttempt(any(LoginAttempt.class));
+            verify(loginAttemptProtectionService, never())
+                    .recordSuccessfulLogin(any(LoginAttempt.class));
 
             verifyNoInteractions(jwtService);
         }
@@ -164,6 +181,8 @@ class AuthServiceTests {
                 AuthenticationException original
         ) {
             LoginRequestDTO dto = createLoginRequestDTO();
+
+            allowAttempt();
 
             when(authManager.authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
@@ -182,9 +201,7 @@ class AuthServiceTests {
             assertSame(original, exception.getCause());
 
             verify(loginAttemptProtectionService)
-                    .checkClientIp(TEST_CLIENT_IP);
-            verify(loginAttemptProtectionService)
-                    .checkUsername(dto.username());
+                    .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(authManager).authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
@@ -195,18 +212,22 @@ class AuthServiceTests {
                     "dummy-hash"
             );
 
-            verify(loginAttemptProtectionService)
-                    .recordFailedLogin(dto.username());
+            verify(loginAttemptProtectionService, never())
+                    .cancelAttempt(any(LoginAttempt.class));
+            verify(loginAttemptProtectionService, never())
+                    .recordSuccessfulLogin(any(LoginAttempt.class));
 
             verifyNoInteractions(jwtService);
         }
 
         @Test
         @DisplayName(
-                "Não deve contabilizar falhas de infraestrutura como credenciais inválidas"
+                "Deve desfazer a contagem quando ocorre falha de infraestrutura"
         )
-        void shouldNotCountInfrastructureFailuresAsInvalidCredentials() {
+        void shouldCancelAttemptOnInfrastructureFailure() {
             LoginRequestDTO dto = createLoginRequestDTO();
+
+            allowAttempt();
 
             AuthenticationServiceException original =
                     new AuthenticationServiceException(
@@ -225,17 +246,21 @@ class AuthServiceTests {
             assertSame(original, exception);
 
             verify(loginAttemptProtectionService)
-                    .checkClientIp(TEST_CLIENT_IP);
+                    .beginAttempt(TEST_CLIENT_IP, dto.username());
             verify(loginAttemptProtectionService)
-                    .checkUsername(dto.username());
+                    .cancelAttempt(TEST_ATTEMPT);
+            verify(loginAttemptProtectionService, never())
+                    .recordSuccessfulLogin(any(LoginAttempt.class));
 
             verifyNoInteractions(jwtService);
         }
 
         @Test
-        @DisplayName("Deve propagar exceções inesperadas sem alterá-las")
-        void shouldPropagateUnexpectedExceptions() {
+        @DisplayName("Deve propagar exceções inesperadas sem alterá-las e desfazer a contagem")
+        void shouldPropagateUnexpectedExceptionsAndCancelAttempt() {
             LoginRequestDTO dto = createLoginRequestDTO();
+
+            allowAttempt();
 
             IllegalStateException original =
                     new IllegalStateException("unexpected");
@@ -252,28 +277,94 @@ class AuthServiceTests {
             assertSame(original, exception);
 
             verify(loginAttemptProtectionService)
-                    .checkClientIp(TEST_CLIENT_IP);
+                    .beginAttempt(TEST_CLIENT_IP, dto.username());
             verify(loginAttemptProtectionService)
-                    .checkUsername(dto.username());
+                    .cancelAttempt(TEST_ATTEMPT);
+            verify(loginAttemptProtectionService, never())
+                    .recordSuccessfulLogin(any(LoginAttempt.class));
 
             verifyNoInteractions(jwtService);
         }
+    }
 
-        private LoginRequestDTO createLoginRequestDTO() {
-            return new LoginRequestDTO(
-                    "usuario.teste",
-                    "teste123456"
+    @Nested
+    @DisplayName("Ao exceder o limite de tentativas de login")
+    class RateLimitTests {
+
+        @ParameterizedTest(name = "motivo: {0}")
+        @EnumSource(LoginRateLimitReason.class)
+        @DisplayName("Deve propagar a exceção sem verificar credenciais nem emitir token")
+        void shouldRejectBeforeCheckingCredentials(
+                LoginRateLimitReason reason
+        ) {
+            LoginRequestDTO dto = createLoginRequestDTO();
+
+            LoginRateLimitExceededException original =
+                    new LoginRateLimitExceededException(60L, reason);
+
+            when(loginAttemptProtectionService.beginAttempt(
+                    TEST_CLIENT_IP,
+                    dto.username()
+            )).thenThrow(original);
+
+            LoginRateLimitExceededException exception = assertThrows(
+                    LoginRateLimitExceededException.class,
+                    () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
+
+            assertSame(original, exception);
+
+            verifyNoInteractions(authManager, jwtService);
+
+            verify(loginAttemptProtectionService, never())
+                    .recordSuccessfulLogin(any(LoginAttempt.class));
+            verify(loginAttemptProtectionService, never())
+                    .cancelAttempt(any(LoginAttempt.class));
         }
 
-        private User createEntityUser() {
-            return new User(
-                    "usuario.teste",
-                    "teste@teste.com.br",
-                    "encoded-password",
-                    Role.EMPLOYEE
+        @Test
+        @DisplayName("Não deve comparar a senha com o hash fictício ao rejeitar")
+        void shouldNotRunPasswordCheckWhenRejected() {
+            LoginRequestDTO dto = createLoginRequestDTO();
+
+            when(loginAttemptProtectionService.beginAttempt(
+                    TEST_CLIENT_IP,
+                    dto.username()
+            )).thenThrow(new LoginRateLimitExceededException(
+                    1L,
+                    LoginRateLimitReason.CLIENT_IP
+            ));
+
+            assertThrows(
+                    LoginRateLimitExceededException.class,
+                    () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
+
+            verify(passwordEncoder, never()).matches(any(), any());
         }
+    }
+
+    private void allowAttempt() {
+        when(loginAttemptProtectionService.beginAttempt(
+                TEST_CLIENT_IP,
+                TEST_USERNAME
+        )).thenReturn(TEST_ATTEMPT);
+    }
+
+    private static LoginRequestDTO createLoginRequestDTO() {
+        return new LoginRequestDTO(
+                TEST_USERNAME,
+                "teste123456"
+        );
+    }
+
+    private static User createEntityUser() {
+        return new User(
+                TEST_USERNAME,
+                "teste@teste.com.br",
+                "encoded-password",
+                Role.EMPLOYEE
+        );
     }
 
     @SuppressWarnings("unused") // Usado via @MethodSource.

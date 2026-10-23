@@ -113,8 +113,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleLoginRateLimitExceeded(
             LoginRateLimitExceededException exception
     ) {
-        log.warn("Login rejected: rate limit exceeded.");
-
+        // O motivo e o IP já são registrados por LoginAttemptProtectionService.
         return ResponseEntity
                 .status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(

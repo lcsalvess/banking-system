@@ -18,6 +18,30 @@ CREATE DATABASE banking_system;
 CREATE DATABASE banking_system_test;
 ```
 
+#### Provision the local application and migration roles
+
+From the repository root, run `scripts/db/bootstrap-roles.sql` as a PostgreSQL administrator against the `banking_system` database. The script creates or hardens the login roles `banking_app` and `banking_migrator`, grants database connection and schema privileges, and prevents the runtime role from creating schema objects. It intentionally does not set or store passwords.
+
+If `psql` is installed and available in `PATH`, run:
+
+```powershell
+psql -h localhost -U postgres -d banking_system -v ON_ERROR_STOP=1 -f scripts/db/bootstrap-roles.sql
+```
+
+Alternatively, in pgAdmin, connect to `banking_system` as a PostgreSQL administrator, open **Query Tool**, paste the full contents of `scripts/db/bootstrap-roles.sql`, and execute it. Run this bootstrap script before the first application startup. It is safe to rerun for the same roles; existing passwords are not changed by the script.
+
+Set passwords separately and securely. For example, use pgAdmin's login-role properties, or connect with `psql` as an administrator and run `\password banking_app` and `\password banking_migrator` to set them through password prompts. Do not put real passwords in this script or commit them to source control.
+
+For an **existing application database** whose objects were created by a previous database user, and which has successfully applied V19 but not V20, run `scripts/db/transfer-existing-ownership.sql` as a PostgreSQL administrator against that application database, after the bootstrap script and before starting the new application version. It transfers the existing tables, sequences, and audit trigger function to `banking_migrator` so V20 can apply the least-privilege grants. The script refuses to run against `banking_system_test` and refuses to run once V20 is recorded as successful. Use it only for an existing pre-V20 database; do not run it on a new, empty database.
+
+If `psql` is available, run:
+
+```powershell
+psql -h localhost -U postgres -d banking_system -v ON_ERROR_STOP=1 -f scripts/db/transfer-existing-ownership.sql
+```
+
+Alternatively, connect to the existing application database as an administrator in pgAdmin, open **Query Tool**, paste the full contents of the script, and execute it. The script runs its ownership changes in a transaction.
+
 ### 2. Choose the Spring profile
 
 Set the `SPRING_PROFILES_ACTIVE` environment variable to select the active profile.
@@ -54,7 +78,9 @@ The application and Flyway use separate database credentials in the `local` and 
 - `DB_USERNAME` and `DB_PASSWORD` identify the runtime database user (`banking_app`). This user performs application operations and should receive only the table and sequence privileges required by the application. It should not own database objects or have privileges to change the database schema.
 - `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD` identify the Flyway migration user (`banking_migrator`). This user applies schema migrations and owns the database objects managed by Flyway.
 
-The PostgreSQL roles, database access, schema privileges, and table/sequence privileges must be provisioned before starting the application. Database passwords must be provided through environment variables or the run configuration and must not be committed to source control.
+Before starting the application in `local` or `prod`, provision the roles and schema access with `scripts/db/bootstrap-roles.sql`, set both role passwords securely, and configure all four database environment variables. Flyway applies `V20__configure_application_privileges.sql` as `banking_migrator` to configure the runtime role's table, sequence, and default privileges. The migration intentionally skips those grants when Flyway connects as another user, as it does in the `test` profile. Therefore, a `Skipping banking_app grants` notice in `local` or `prod` indicates a configuration problem: verify `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD` before treating startup as correctly configured.
+
+Database passwords must be provided through environment variables or the run configuration and must not be committed to source control.
 
 The initial administrator is created only when no `ADMIN` user exists and all three `ADMIN_*` variables are configured. `ADMIN_PASSWORD` must satisfy the same password policy used for user creation, including complexity and size limits.
 
@@ -128,7 +154,7 @@ For request examples, see the [API reference](API.md).
 
 The test suite runs against PostgreSQL using the `test` profile and the `banking_system_test` database. Flyway applies the same migrations used by the application, and Hibernate validates the resulting schema.
 
-The `test` profile uses `DB_USERNAME` and `DB_PASSWORD` for both the application datasource and Flyway. For local test execution, these credentials must belong to a dedicated test database user with permission to apply migrations to `banking_system_test`. Do not use the runtime `banking_app` credentials for this purpose. The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database.
+The `test` profile uses `DB_USERNAME` and `DB_PASSWORD` for both the application datasource and Flyway. For local test execution, these credentials must belong to a dedicated test database user with permission to apply migrations and clean up integration-test fixtures in `banking_system_test`. Do not use the runtime `banking_app` credentials for this purpose: its production-style grants intentionally prohibit physical deletion from business tables and transaction history. The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. In tests, V20 records as applied but skips the runtime-role grants when the connected user is not `banking_migrator`; this keeps test fixture permissions separate from local/production privileges.
 
 ### Running the tests
 

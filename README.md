@@ -60,6 +60,7 @@ see [Architecture](docs/ARCHITECTURE.md).
 - **Internal address lookup**: client creation and address updates resolve postal codes using ViaCEP, with BrasilAPI as a fallback provider
 - **Provider response validation**: addresses returned by external providers are validated before being used
 - **Versioned database schema** managed by Flyway migrations and validated by Hibernate at startup
+- **Database privilege separation**: separate PostgreSQL roles for application runtime (`banking_app`) and Flyway migrations (`banking_migrator`), with least-privilege table and sequence grants and restricted access to migration metadata
 - **Account management**: checking and savings accounts, with generated account numbers and check digits
 - **Transactions**: deposit, withdrawal, transfer between accounts, transaction history per account, and lookup by public identifier
 - **Transaction idempotency**: a required `Idempotency-Key` UUID prevents duplicate financial operations on retries and allows the original result to be recovered
@@ -129,12 +130,9 @@ Error handling, application logging, correlation IDs, Actuator endpoints, and cu
 
 ## Database
 
-The application uses PostgreSQL for persistence and Flyway for versioned
-schema migrations. Database constraints and indexes help enforce business
-invariants and support consistent financial operations.
+The application uses PostgreSQL for persistence and Flyway for versioned schema migrations. In the `local` and `prod` profiles, the application runtime and Flyway use separate database roles: `banking_app` for application operations and `banking_migrator` for schema migrations. Least-privilege grants restrict access to tables and sequences, while migration metadata remains reserved for the migration role.
 
-For database design, migrations, indexes, and integrity constraints,
-see [Database](docs/DATABASE.md).
+For database design, migrations, indexes, integrity constraints, and database role privileges, see the [Database](docs/DATABASE.md) and [Development Guide](docs/DEVELOPMENT.md) documentation.
 
 ---
 
@@ -153,7 +151,9 @@ The [Development Guide](docs/DEVELOPMENT.md) explains how to configure the envir
    cd banking-system
    ```
 
-2. Create the databases and configure the required environment variables (`DB_USERNAME`, `DB_PASSWORD`, and `JWT_SECRET`). To create the initial administrator, also set `ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`. See the [Development Guide](docs/DEVELOPMENT.md#configuration) for details.
+2. Create the `banking_system` and `banking_system_test` databases, then provision the PostgreSQL roles and schema permissions using [`scripts/db/bootstrap-roles.sql`](scripts/db/bootstrap-roles.sql) as a PostgreSQL administrator. Configure the required environment variables: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `DB_MIGRATOR_USERNAME`, `DB_MIGRATOR_PASSWORD`, and `JWT_SECRET`. The runtime datasource uses `banking_app`, while Flyway uses `banking_migrator` in the `local` and `prod` profiles. See the [Development Guide](docs/DEVELOPMENT.md#configuration) for database setup and profile-specific configuration.
+
+To create the initial administrator, also set `ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`.
 
 3. Start the application using the `local` profile.
 

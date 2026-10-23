@@ -41,22 +41,30 @@ public class AuthService {
             LoginRequestDTO dto,
             String clientIp
     ) {
-        loginAttemptProtectionService.checkClientIp(clientIp);
-        loginAttemptProtectionService.checkUsername(dto.username());
+        // A tentativa é contabilizada antes de verificar a senha, para que
+        // requisições paralelas não ultrapassem o limite.
+        LoginAttempt attempt = loginAttemptProtectionService.beginAttempt(
+                clientIp,
+                dto.username()
+        );
 
         Authentication auth;
 
         try {
             auth = authenticateCredentials(dto);
         } catch (BadCredentialsException exception) {
-            loginAttemptProtectionService.recordFailedLogin(dto.username());
+            // Credenciais inválidas (ou conta inativa) já estão contabilizadas.
+            throw exception;
+        } catch (RuntimeException exception) {
+            // Falhas de infraestrutura ou inesperadas não são senha incorreta.
+            loginAttemptProtectionService.cancelAttempt(attempt);
             throw exception;
         }
 
+        loginAttemptProtectionService.recordSuccessfulLogin(attempt);
+
         User user = (User) auth.getPrincipal();
         String token = jwtService.generateToken(user);
-
-        loginAttemptProtectionService.recordSuccessfulLogin(user.getUsername());
 
         return new LoginResponseDTO(
                 token,

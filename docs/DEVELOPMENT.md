@@ -34,16 +34,18 @@ Use the `local` profile for development.
 
 ### 3. Configure environment variables
 
-| Variable                 | Required                          | Description                                                                     |
-|--------------------------|-----------------------------------|---------------------------------------------------------------------------------|
-| `SPRING_PROFILES_ACTIVE` | No                                | Active profile (`local`, `prod`, or `test`)                                     |
-| `DB_URL`                 | Yes, except in `local` and `test` | JDBC URL of the PostgreSQL database                                             |
-| `DB_USERNAME`            | Yes                               | PostgreSQL username                                                             |
-| `DB_PASSWORD`            | Yes                               | PostgreSQL password                                                             |
-| `JWT_SECRET`             | Yes                               | Base64-encoded secret used to sign JWTs, with at least 256 bits of key material |
-| `ADMIN_USERNAME`         | No                                | Username of the initial administrator                                           |
-| `ADMIN_EMAIL`            | No                                | Email address of the initial administrator                                      |
-| `ADMIN_PASSWORD`         | No                                | Password of the initial administrator                                           |
+| Variable                 | Required                          | Description                                                                               |
+|--------------------------|-----------------------------------|-------------------------------------------------------------------------------------------|
+| `SPRING_PROFILES_ACTIVE` | No                                | Active profile (`local`, `prod`, or `test`)                                               |
+| `DB_URL`                 | Yes, except in `local` and `test` | JDBC URL of the PostgreSQL database                                                       |
+| `DB_USERNAME`            | Yes                               | PostgreSQL username                                                                       |
+| `DB_PASSWORD`            | Yes                               | PostgreSQL password                                                                       |
+| `JWT_SECRET`             | Yes                               | Base64-encoded secret used to sign JWTs, with at least 256 bits of key material           |
+| `ADMIN_USERNAME`         | No                                | Username of the initial administrator                                                     |
+| `ADMIN_EMAIL`            | No                                | Email address of the initial administrator                                                |
+| `ADMIN_PASSWORD`         | No                                | Password of the initial administrator                                                     |
+| `PROXY_IP_HEADER`        | No                                | Header with the original client IP behind a reverse proxy (for example `X-Forwarded-For`) |
+| `TRUSTED_PROXIES`        | No                                | Regular expression with the IPs of the trusted proxies; without it the header is ignored  |
 
 The initial administrator is created only when no `ADMIN` user exists and all three `ADMIN_*` variables are configured. `ADMIN_PASSWORD` must satisfy the same password policy used for user creation, including complexity and size limits.
 
@@ -144,7 +146,7 @@ The test suite contains more than 450 test methods, including parameterized test
 - **Transaction idempotency integration tests** against PostgreSQL. `TransactionIdempotencyIntegrationTests` covers repeated requests, replay of the original result, conflicts when a key is reused with different data, rollback behavior, and concurrent requests. `TransactionIdempotencyCleanupIntegrationTests` verifies retention cleanup.
 - **Database tests** (`DatabaseLockTimeoutTests`) for lock timeouts applied to pooled connections and the maximum balance constraint. `ReservedUsernameConstraintTests` verifies that PostgreSQL rejects reserved usernames regardless of case and accepts names that merely contain the reserved term.
 - **Security tests** for JWT generation and validation, secret and issuer validation, token expiration, credential version, malformed version claims, public routes, token validation, method security, Actuator access, public liveness and readiness probes, correlation IDs on error responses, and the authentication entry point.
-- **Login rate-limiting unit tests** for IP-based token consumption and refill, failed authentication attempt tracking, and temporary lockouts.
+- **Login rate-limiting tests** at three levels. Unit tests for the protection service cover IP token consumption and refill, malformed IPs, attempt counting per username and IP and per username, lock expiry without extension, window reset, successful-login reset, attempt cancellation, isolation between IPs and users, `Retry-After` rounding, metrics, and parallel requests that must not exceed the limit. Unit tests for `AuthService`, the global exception handler, and `LoginRateLimitProperties` cover the rejection path, the `429` response with `Retry-After`, and configuration validation. `AuthControllerTest` exercises the limits end to end against PostgreSQL, including that a legitimate user can still sign in from another IP while an attacker's IP is locked.
 - **Controller tests** using `MockMvc` for clients, accounts, transactions, and authentication. They include account number and digit validation, transaction lookup by public transaction code, invalid UUID handling, and password changes. Address lookup is covered by service, orchestration, and provider-client tests rather than a standalone lookup endpoint.
 - **Provider client tests** for ViaCEP and Brasil API using a local HTTP server. These cover response mapping, postal codes not found, invalid responses, error statuses, timeouts, and unreachable providers.
 - **JSON coercion tests** that import `JacksonConfig` into a controller test slice and verify that wrongly typed fields are rejected.

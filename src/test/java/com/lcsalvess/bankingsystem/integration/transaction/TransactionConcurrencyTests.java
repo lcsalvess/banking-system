@@ -344,7 +344,7 @@ class TransactionConcurrencyTests {
             LocalDate referenceDate = LocalDate.now(clock);
 
             transactionRepository.saveAndFlush(
-                    new Transaction(
+                    Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("1000.00"),
                             referenceDate.minusDays(1).atTime(12, 0),
@@ -463,7 +463,7 @@ class TransactionConcurrencyTests {
             UUID incomingTransferCode = UUID.randomUUID();
 
             transactionRepository.saveAllAndFlush(List.of(
-                    new Transaction(
+                    Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("100.00"),
                             LocalDateTime.of(2026, 1, 10, 10, 0),
@@ -471,7 +471,7 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("100.00")
                     ),
-                    new Transaction(
+                    Transaction.create(
                             TransactionType.WITHDRAWAL,
                             new BigDecimal("10.00"),
                             LocalDateTime.of(2026, 1, 11, 10, 0),
@@ -479,7 +479,7 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("90.00")
                     ),
-                    new Transaction(
+                    Transaction.createTransfer(
                             TransactionType.TRANSFER_SENT,
                             new BigDecimal("20.00"),
                             LocalDateTime.of(2026, 1, 12, 10, 0),
@@ -488,7 +488,7 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("70.00")
                     ),
-                    new Transaction(
+                    Transaction.createTransfer(
                             TransactionType.TRANSFER_RECEIVED,
                             new BigDecimal("30.00"),
                             LocalDateTime.of(2026, 1, 13, 10, 0),
@@ -497,15 +497,14 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("100.00")
                     ),
-                    new Transaction(
-                            TransactionType.YIELD,
+                    Transaction.createSystemYield(
                             new BigDecimal("2.50"),
                             LocalDateTime.of(2026, 1, 16, 0, 5),
                             LocalDate.of(2026, 1, 15),
                             account,
                             new BigDecimal("102.50")
                     ),
-                    new Transaction(
+                    Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("999.00"),
                             LocalDateTime.of(2026, 1, 16, 10, 0),
@@ -557,7 +556,7 @@ class TransactionConcurrencyTests {
             // yield (1100.17) includes a deposit that is not part of the
             // balance at the start of 2026-01-16 (1000.17).
             transactionRepository.saveAllAndFlush(List.of(
-                    new Transaction(
+                    Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("1000.00"),
                             LocalDateTime.of(2026, 1, 14, 9, 0),
@@ -565,7 +564,7 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("1000.00")
                     ),
-                    new Transaction(
+                    Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("100.00"),
                             LocalDateTime.of(2026, 1, 16, 12, 0),
@@ -573,8 +572,7 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("1100.00")
                     ),
-                    new Transaction(
-                            TransactionType.YIELD,
+                    Transaction.createSystemYield(
                             new BigDecimal("0.17"),
                             LocalDateTime.of(2026, 1, 16, 13, 0),
                             LocalDate.of(2026, 1, 15),
@@ -711,7 +709,7 @@ class TransactionConcurrencyTests {
                             .orElseThrow();
 
             transactionRepository.saveAndFlush(
-                    new Transaction(
+                    Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("1000.00"),
                             lastProcessedDate.minusDays(1).atTime(12, 0),

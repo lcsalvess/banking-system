@@ -144,7 +144,7 @@ public class TransactionServiceTests {
         void shouldReturnThePageOfAccountTransactions() {
             CheckingAccount account = account();
 
-            Transaction deposit = new Transaction(
+            Transaction deposit = Transaction.create(
                     TransactionType.DEPOSIT,
                     new BigDecimal("10.00"),
                     CREATED_AT,
@@ -153,7 +153,7 @@ public class TransactionServiceTests {
                     new BigDecimal("10.00")
             );
 
-            Transaction withdrawal = new Transaction(
+            Transaction withdrawal = Transaction.create(
                     TransactionType.WITHDRAWAL,
                     new BigDecimal("5.00"),
                     CREATED_AT,
@@ -224,7 +224,7 @@ public class TransactionServiceTests {
         void shouldApplyTypeAndDateFilters() {
             CheckingAccount account = account();
 
-            Transaction deposit = new Transaction(
+            Transaction deposit = Transaction.create(
                     TransactionType.DEPOSIT,
                     OPERATION_AMOUNT,
                     CREATED_AT,
@@ -443,7 +443,7 @@ public class TransactionServiceTests {
         @Test
         @DisplayName("Should return the transaction when code exists")
         void shouldReturnTheTransactionWhenCodeExists() {
-            Transaction transaction = new Transaction(
+            Transaction transaction = Transaction.create(
                     TransactionType.DEPOSIT,
                     OPERATION_AMOUNT,
                     CREATED_AT,

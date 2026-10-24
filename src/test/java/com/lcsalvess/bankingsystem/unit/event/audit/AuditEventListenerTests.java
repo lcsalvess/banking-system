@@ -4,6 +4,10 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.event.audit.AuditEventListener;
+import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
+import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
+import com.lcsalvess.bankingsystem.event.client.ClientOperationEvent;
+import com.lcsalvess.bankingsystem.event.client.ClientOperationType;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
@@ -60,6 +64,50 @@ class AuditEventListenerTests {
                 expectedType,
                 AuditEntityType.USER,
                 "42"
+        );
+        verifyNoMoreInteractions(auditService);
+    }
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource({
+            "CREATED, CLIENT_CREATED",
+            "UPDATED, CLIENT_UPDATED"
+    })
+    @DisplayName("Should audit client operations with the client id as the entity")
+    void shouldAuditClientOperations(
+            ClientOperationType operation,
+            AuditEventType expectedType
+    ) {
+        listener.handleClientOperation(
+                new ClientOperationEvent(7L, operation, USERNAME)
+        );
+
+        verify(auditService).recordSuccess(
+                expectedType,
+                AuditEntityType.CLIENT,
+                "7"
+        );
+        verifyNoMoreInteractions(auditService);
+    }
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource({
+            "CREATED, ACCOUNT_CREATED",
+            "CANCELLED, ACCOUNT_CANCELLED"
+    })
+    @DisplayName("Should audit account operations with the account id as the entity")
+    void shouldAuditAccountOperations(
+            AccountOperationType operation,
+            AuditEventType expectedType
+    ) {
+        listener.handleAccountOperation(
+                new AccountOperationEvent(9L, operation, USERNAME)
+        );
+
+        verify(auditService).recordSuccess(
+                expectedType,
+                AuditEntityType.ACCOUNT,
+                "9"
         );
         verifyNoMoreInteractions(auditService);
     }

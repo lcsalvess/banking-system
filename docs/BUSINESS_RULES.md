@@ -1,6 +1,7 @@
 # Business Rules
 
 ## Clients
+
 - CPF must be unique and contain exactly 11 digits.
 - E-mail must be unique, ignoring case, and can have up to 254 characters. It is trimmed and stored in lowercase.
 - CPF validation includes format checks and verification digit calculation.
@@ -12,8 +13,10 @@
 - When an update includes an address, the postal code is looked up again through the providers, and the street number and complement are updated along with it.
 - Client creation checks whether the CPF already exists. Concurrent requests are also handled: if another request saves the same CPF or e-mail first, the unique constraint violation is translated into `409 Conflict` with a message that identifies the field. E-mail uniqueness is enforced by the database.
 - The postal code lookup (external calls) happens before the database transaction starts, so no database connection is held while waiting for the providers.
+- Client creation and update are recorded in the audit trail (see [Audit Trail](#audit-trail)).
 
 ## Accounts
+
 - A client can have at most one active checking account and one active savings account. A new account of the same type can be opened after the previous one is canceled.
 - Account numbers are generated from a database sequence, padded to at least 5 digits (for example `00001`), followed by a check digit (modulo 11). The `account_number` column holds up to 20 digits.
 - Every operation that receives an account number also requires the check digit.
@@ -21,8 +24,10 @@
 - The check digit is then validated against the account number before the account lookup, and a mismatch also returns `400 Bad Request`.
 - An account can only be canceled if it is active and has a zero balance.
 - Cancellation takes the same row lock as deposits, withdrawals, transfers, and yield. A deposit that runs at the same time cannot be lost: the operations are serialized, and the cancellation is rejected if the deposit commits first.
+- Account creation and cancellation are recorded in the audit trail (see [Audit Trail](#audit-trail)).
 
 ## Transactions
+
 - Deposits, withdrawals, and transfers require an active account and a positive amount.
 - Each deposit, withdrawal, and transfer request must include an `Idempotency-Key` header containing a UUID. The key is scoped to the authenticated user.
 - Reusing the same key with the same operation and request data returns the original transaction result without applying the financial operation again. Reusing a key with a different operation or request payload returns `409 Conflict`.
@@ -41,6 +46,7 @@
 - The transaction history of an account is returned from the newest to the oldest transaction.
 
 ## Savings Yield
+
 - Yield is credited automatically by a scheduled job (`DailyYieldScheduler`). It cannot be applied manually through the API.
 - The job runs every day at 00:05 (`America/Sao_Paulo`). The schedule can be changed through `banking.yield.cron` (see [Configuration](DEVELOPMENT.md#configuration)).
 - The daily rate is equivalent to 0.5% per month compounded over 30 days, `(1 + 0.005)^(1/30) - 1`, about 0.0166% per day. It is stored as the decimal constant `0.000166265204228477063643`, so the credited value does not depend on floating-point arithmetic. The yield is the rate applied to the balance at the start of the reference date, rounded to 2 decimal places (`HALF_UP`).
@@ -61,6 +67,7 @@
 - The job runs daily at 03:00 by default in `America/Sao_Paulo`; its schedule can be configured with `banking.reconciliation.cron`.
 
 ## Users
+
 - Only `ADMIN` users can create new users.
 - Usernames have up to 20 characters and may contain only letters, digits, dot, hyphen, and underscore. They are trimmed and converted to lowercase on creation and on login, so usernames are case-insensitive.
 - E-mails can have up to 254 characters and are trimmed and stored in lowercase. Usernames and e-mails must be unique.
@@ -91,3 +98,9 @@
 - Provider failures are handled separately from postal codes that are not found:
     - `404 Not Found` when every provider answered and none found the postal code.
     - `503 Service Unavailable` when at least one provider failed and no other provider found the postal code. These responses are returned by the client endpoints that depend on the lookup.
+
+## Audit Trail
+- Successful operations are recorded in `audit_events`, in the same database transaction as the change: if the operation rolls back, so does its record, and no committed operation lacks one.
+- Audited operations: user creation, deactivation, reactivation, and password change; client creation and update; account creation and cancellation; deposits, withdrawals, and transfers. The system-generated daily yield is not audited here, because the ledger already flags it with `performed_by_system`.
+- Each record stores the event type, outcome, actor (user id and username snapshot, or `ANONYMOUS`), entity type and identifier (user, client, and account database ids; transaction and transfer codes), the correlation ID, and the timestamp. No personal data is stored.
+- Database triggers reject `UPDATE`, `DELETE`, and `TRUNCATE` on the table, so the application can only append records.

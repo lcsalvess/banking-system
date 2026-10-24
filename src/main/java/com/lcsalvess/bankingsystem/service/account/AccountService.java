@@ -131,7 +131,7 @@ public class AccountService {
                     accountNumber.digit()
             );
         }
-        return new SavingsAccount(
+        return SavingsAccount.create(
                 client,
                 accountNumber.number(),
                 accountNumber.digit(),

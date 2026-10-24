@@ -13,7 +13,7 @@ import jakarta.persistence.Table;
         foreignKey = @ForeignKey(name = "fk_checking_accounts_account")
 )
 public class CheckingAccount extends Account {
-    public CheckingAccount() {
+    protected CheckingAccount() {
     }
 
     public CheckingAccount(Client client, String accountNumber, String accountDigit) {

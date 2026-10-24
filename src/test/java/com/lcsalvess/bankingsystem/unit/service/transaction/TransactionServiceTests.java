@@ -1564,7 +1564,7 @@ public class TransactionServiceTests {
             String balance,
             LocalDate lastYieldDate
     ) {
-        SavingsAccount account = new SavingsAccount(
+        SavingsAccount account = SavingsAccount.create(
                 null,
                 SAVINGS_NUMBER,
                 SAVINGS_DIGIT,

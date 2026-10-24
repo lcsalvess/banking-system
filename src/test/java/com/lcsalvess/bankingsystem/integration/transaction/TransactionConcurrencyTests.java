@@ -957,7 +957,7 @@ class TransactionConcurrencyTests {
         // Both yield dates begin yesterday, making the account eligible today.
         LocalDate initialYieldDate = LocalDate.now(clock).minusDays(1);
 
-        SavingsAccount account = new SavingsAccount(
+        SavingsAccount account = SavingsAccount.create(
                 client,
                 generated.number(),
                 generated.digit(),

@@ -473,7 +473,7 @@ class DailyYieldSchedulerTests {
             String accountNumber,
             String digit
     ) {
-        SavingsAccount account = new SavingsAccount(
+        SavingsAccount account = SavingsAccount.create(
                 null,
                 accountNumber,
                 digit,

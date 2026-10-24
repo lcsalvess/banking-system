@@ -11,7 +11,7 @@ src/main/java/com/lcsalvess/bankingsystem
 ├── controller/      # REST endpoints for accounts, authentication, clients, transactions, and users
 ├── dto/             # Request and response DTOs, grouped by domain
 ├── entity/          # Domain entities and enums, grouped by domain
-├── event/           # Application events and post-commit operation listeners
+├── event/           # Application events, post-commit log listeners, and the in-transaction audit listener
 ├── exception/          # Business exceptions, database constraints, error messages, and global handling
 ├── filter/             # HTTP filters, including correlation ID propagation
 ├── integration/

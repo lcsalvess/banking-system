@@ -1,5 +1,9 @@
 package com.lcsalvess.bankingsystem.integration.audit;
 
+import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
+import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
+import com.lcsalvess.bankingsystem.event.client.ClientOperationEvent;
+import com.lcsalvess.bankingsystem.event.client.ClientOperationType;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
 import org.junit.jupiter.api.AfterEach;
@@ -137,6 +141,87 @@ class AuditEventIntegrationTests {
         assertEquals("ANONYMOUS", row.get("actor_type"));
         assertNull(row.get("actor_user_id"));
         assertEquals("USER", row.get("entity_type"));
+    }
+
+    @Test
+    @DisplayName("Should write the audit row when a client creation commits")
+    void shouldWriteAuditRowWhenClientCreationCommits() {
+        long clientId = randomUserId();
+
+        transactionTemplate.executeWithoutResult(status ->
+                eventPublisher.publishEvent(
+                        new ClientOperationEvent(
+                                clientId,
+                                ClientOperationType.CREATED,
+                                "lucas"
+                        )
+                )
+        );
+
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT event_type, outcome, entity_type FROM audit_events WHERE entity_id = ?",
+                String.valueOf(clientId)
+        );
+
+        assertEquals("CLIENT_CREATED", row.get("event_type"));
+        assertEquals("SUCCESS", row.get("outcome"));
+        assertEquals("CLIENT", row.get("entity_type"));
+    }
+
+    @Test
+    @DisplayName("Should write the audit row when an account creation commits")
+    void shouldWriteAuditRowWhenAccountCreationCommits() {
+        long accountId = randomUserId();
+
+        transactionTemplate.executeWithoutResult(status ->
+                eventPublisher.publishEvent(
+                        new AccountOperationEvent(
+                                accountId,
+                                AccountOperationType.CREATED,
+                                "lucas"
+                        )
+                )
+        );
+
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT event_type, outcome, entity_type FROM audit_events WHERE entity_id = ?",
+                String.valueOf(accountId)
+        );
+
+        assertEquals("ACCOUNT_CREATED", row.get("event_type"));
+        assertEquals("SUCCESS", row.get("outcome"));
+        assertEquals("ACCOUNT", row.get("entity_type"));
+    }
+
+    @Test
+    @DisplayName("Should not write the audit row when a client or account operation rolls back")
+    void shouldNotWriteAuditRowWhenClientOrAccountOperationRollsBack() {
+        long clientId = randomUserId();
+        long accountId = randomUserId();
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> transactionTemplate.executeWithoutResult(status -> {
+                    eventPublisher.publishEvent(
+                            new ClientOperationEvent(
+                                    clientId,
+                                    ClientOperationType.UPDATED,
+                                    "lucas"
+                            )
+                    );
+                    eventPublisher.publishEvent(
+                            new AccountOperationEvent(
+                                    accountId,
+                                    AccountOperationType.CANCELLED,
+                                    "lucas"
+                            )
+                    );
+                    throw new IllegalStateException("forced rollback");
+                })
+        );
+
+        assertEquals(0, countByEntityId(String.valueOf(clientId)));
+        assertEquals(0, countByEntityId(String.valueOf(accountId)));
     }
 
     @Test

@@ -3,6 +3,10 @@ package com.lcsalvess.bankingsystem.event.audit;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
+import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
+import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
+import com.lcsalvess.bankingsystem.event.client.ClientOperationEvent;
+import com.lcsalvess.bankingsystem.event.client.ClientOperationType;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
@@ -36,6 +40,24 @@ public class AuditEventListener {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void handleClientOperation(ClientOperationEvent event) {
+        auditService.recordSuccess(
+                toAuditType(event.type()),
+                AuditEntityType.CLIENT,
+                String.valueOf(event.clientId())
+        );
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void handleAccountOperation(AccountOperationEvent event) {
+        auditService.recordSuccess(
+                toAuditType(event.type()),
+                AuditEntityType.ACCOUNT,
+                String.valueOf(event.accountId())
+        );
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void handleTransactionOperation(TransactionOperationEvent event) {
         // O rendimento é uma transação por conta por dia, e o próprio
         // ledger já o marca com performed_by_system.
@@ -65,6 +87,20 @@ public class AuditEventListener {
             case DEACTIVATED -> AuditEventType.USER_DEACTIVATED;
             case REACTIVATED -> AuditEventType.USER_REACTIVATED;
             case PASSWORD_CHANGED -> AuditEventType.USER_PASSWORD_CHANGED;
+        };
+    }
+
+    private AuditEventType toAuditType(ClientOperationType type) {
+        return switch (type) {
+            case CREATED -> AuditEventType.CLIENT_CREATED;
+            case UPDATED -> AuditEventType.CLIENT_UPDATED;
+        };
+    }
+
+    private AuditEventType toAuditType(AccountOperationType type) {
+        return switch (type) {
+            case CREATED -> AuditEventType.ACCOUNT_CREATED;
+            case CANCELLED -> AuditEventType.ACCOUNT_CANCELLED;
         };
     }
 

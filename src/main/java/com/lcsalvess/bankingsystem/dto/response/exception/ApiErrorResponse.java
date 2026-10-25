@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -36,7 +38,9 @@ public record ApiErrorResponse(
 ) {
 
     public ApiErrorResponse {
-        errors = errors == null ? null : Map.copyOf(errors);
+        errors = errors == null
+                ? null
+                : Collections.unmodifiableMap(new LinkedHashMap<>(errors));
     }
 
     public ApiErrorResponse(int status, String message) {

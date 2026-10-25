@@ -24,56 +24,81 @@ import java.util.UUID;
         }
 )
 public class Transaction {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @NotNull
     @Column(name = "transaction_code", nullable = false, updatable = false)
     private UUID transactionCode;
+
     @Column(name = "transfer_code", updatable = false)
     private UUID transferCode;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false, length = 30)
     private TransactionType type;
+
     @NotNull
     @Positive
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
+
     /**
-     * Saldo da conta imediatamente após esta transação. É gravado na mesma
-     * transação de banco da alteração do saldo, com a linha da conta travada,
-     * então, para uma conta, as linhas ordenadas por id são o histórico exato
-     * do saldo.
+     * Saldo da conta imediatamente após esta transação.
+     * É gravado na mesma transação de banco da alteração do saldo,
+     * com a linha da conta travada.
      */
     @NotNull
-    @Column(name = "balance_after", nullable = false, updatable = false,
-            precision = 19, scale = 2)
+    @Column(
+            name = "balance_after",
+            nullable = false,
+            updatable = false,
+            precision = 19,
+            scale = 2
+    )
     private BigDecimal balanceAfter;
+
     @NotNull
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
     @Column(name = "yield_date")
     private LocalDate yieldDate;
+
     @NotNull
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_transactions_account"))
+    @JoinColumn(
+            name = "account_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_transactions_account")
+    )
     private Account account;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "performed_by_user_id",
-            foreignKey = @ForeignKey(name = "fk_transactions_performed_by_user")
+            foreignKey = @ForeignKey(
+                    name = "fk_transactions_performed_by_user"
+            )
     )
     private User performedBy;
 
     @Column(name = "performed_by_system", nullable = false)
     private boolean performedBySystem;
 
+    /**
+     * Construtor exigido pelo JPA.
+     */
     public Transaction() {
     }
 
-    public Transaction(
+    /**
+     * Cria uma transação realizada por um usuário.
+     */
+    public static Transaction create(
             TransactionType type,
             BigDecimal amount,
             LocalDateTime createdAt,
@@ -81,16 +106,29 @@ public class Transaction {
             User performedBy,
             BigDecimal balanceAfter
     ) {
-        this.transactionCode = UUID.randomUUID();
-        this.type = type;
-        this.amount = amount;
-        this.balanceAfter = requireValidBalanceAfter(balanceAfter);
-        this.createdAt = truncateToMicros(createdAt);
-        this.account = account;
-        this.performedBy = requireHumanActor(performedBy);
+        BigDecimal validatedBalance =
+                requireValidBalanceAfter(balanceAfter);
+
+        User validatedActor = requireHumanActor(performedBy);
+
+        return new Transaction(
+                UUID.randomUUID(),
+                null,
+                type,
+                amount,
+                validatedBalance,
+                truncateToMicros(createdAt),
+                null,
+                account,
+                validatedActor,
+                false
+        );
     }
 
-    public Transaction(
+    /**
+     * Cria uma transação de transferência realizada por um usuário.
+     */
+    public static Transaction createTransfer(
             TransactionType type,
             BigDecimal amount,
             LocalDateTime createdAt,
@@ -99,64 +137,80 @@ public class Transaction {
             User performedBy,
             BigDecimal balanceAfter
     ) {
-        this.transactionCode = UUID.randomUUID();
-        this.transferCode = transferCode;
-        this.type = type;
-        this.amount = amount;
-        this.balanceAfter = requireValidBalanceAfter(balanceAfter);
-        this.createdAt = truncateToMicros(createdAt);
-        this.account = account;
-        this.performedBy = requireHumanActor(performedBy);
+        BigDecimal validatedBalance =
+                requireValidBalanceAfter(balanceAfter);
+
+        User validatedActor = requireHumanActor(performedBy);
+
+        return new Transaction(
+                UUID.randomUUID(),
+                transferCode,
+                type,
+                amount,
+                validatedBalance,
+                truncateToMicros(createdAt),
+                null,
+                account,
+                validatedActor,
+                false
+        );
     }
 
-    public Transaction(
+    /**
+     * Cria uma transação de rendimento gerada pelo sistema.
+     */
+    public static Transaction createSystemYield(
+            BigDecimal amount,
+            LocalDateTime createdAt,
+            LocalDate yieldDate,
+            Account account,
+            BigDecimal balanceAfter
+    ) {
+        validateSystemYieldDate(yieldDate);
+
+        BigDecimal validatedBalance =
+                requireValidBalanceAfter(balanceAfter);
+
+        return new Transaction(
+                UUID.randomUUID(),
+                null,
+                TransactionType.YIELD,
+                amount,
+                validatedBalance,
+                truncateToMicros(createdAt),
+                yieldDate,
+                account,
+                null,
+                true
+        );
+    }
+
+    /**
+     * Construtor interno sem validações ou operações que lancem
+     * exceções durante a inicialização do objeto.
+     */
+    private Transaction(
+            UUID transactionCode,
+            UUID transferCode,
             TransactionType type,
             BigDecimal amount,
+            BigDecimal balanceAfter,
             LocalDateTime createdAt,
             LocalDate yieldDate,
             Account account,
             User performedBy,
-            BigDecimal balanceAfter
+            boolean performedBySystem
     ) {
-        this.transactionCode = UUID.randomUUID();
+        this.transactionCode = transactionCode;
+        this.transferCode = transferCode;
         this.type = type;
         this.amount = amount;
-        this.balanceAfter = requireValidBalanceAfter(balanceAfter);
-        this.createdAt = truncateToMicros(createdAt);
+        this.balanceAfter = balanceAfter;
+        this.createdAt = createdAt;
         this.yieldDate = yieldDate;
         this.account = account;
-        this.performedBy = requireHumanActor(performedBy);
-    }
-
-    public Transaction(
-            TransactionType type,
-            BigDecimal amount,
-            LocalDateTime createdAt,
-            LocalDate yieldDate,
-            Account account,
-            BigDecimal balanceAfter
-    ) {
-        if (type != TransactionType.YIELD) {
-            throw new IllegalArgumentException(
-                    "System-generated transactions must be of type YIELD."
-            );
-        }
-
-        if (yieldDate == null) {
-            throw new IllegalArgumentException(
-                    "System-generated yield transactions require a yield date."
-            );
-        }
-
-        this.transactionCode = UUID.randomUUID();
-        this.type = type;
-        this.amount = amount;
-        this.balanceAfter = requireValidBalanceAfter(balanceAfter);
-        this.createdAt = truncateToMicros(createdAt);
-        this.yieldDate = yieldDate;
-        this.account = account;
-        this.performedBy = null;
-        this.performedBySystem = true;
+        this.performedBy = performedBy;
+        this.performedBySystem = performedBySystem;
     }
 
     public Long getId() {
@@ -205,14 +259,20 @@ public class Transaction {
 
     /**
      * O PostgreSQL armazena timestamps com precisão de microssegundos.
-     * Truncar aqui garante que o valor em memória seja idêntico ao persistido.
-     * Valores nulos são repassados para a validação (@NotNull) tratar.
+     * A truncagem garante que o valor em memória seja compatível
+     * com a precisão persistida.
      */
-    private static LocalDateTime truncateToMicros(LocalDateTime value) {
-        return value == null ? null : value.truncatedTo(ChronoUnit.MICROS);
+    private static LocalDateTime truncateToMicros(
+            LocalDateTime value
+    ) {
+        return value == null
+                ? null
+                : value.truncatedTo(ChronoUnit.MICROS);
     }
 
-    private static BigDecimal requireValidBalanceAfter(BigDecimal balanceAfter) {
+    private static BigDecimal requireValidBalanceAfter(
+            BigDecimal balanceAfter
+    ) {
         Objects.requireNonNull(
                 balanceAfter,
                 "The balance after the transaction is required."
@@ -228,10 +288,19 @@ public class Transaction {
         return balanceAfter;
     }
 
-    private User requireHumanActor(User performedBy) {
+    private static User requireHumanActor(User performedBy) {
         return Objects.requireNonNull(
                 performedBy,
                 "Human transactions must have an associated user."
+        );
+    }
+
+    private static void validateSystemYieldDate(
+            LocalDate yieldDate
+    ) {
+        Objects.requireNonNull(
+                yieldDate,
+                "System-generated yield transactions require a yield date."
         );
     }
 }

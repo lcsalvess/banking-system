@@ -3,11 +3,8 @@ package com.lcsalvess.bankingsystem.service.transaction.idempotency;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
 
-@Component
 public class TransactionIdempotencyCleanupJob {
 
     private static final Logger log =
@@ -16,9 +13,12 @@ public class TransactionIdempotencyCleanupJob {
     private final TransactionIdempotencyRepository idempotencyRepository;
     private final int retentionDays;
 
-    public TransactionIdempotencyCleanupJob(
+    /**
+     * Cria o job após validar o período de retenção.
+     */
+    public static TransactionIdempotencyCleanupJob create(
             TransactionIdempotencyRepository idempotencyRepository,
-            @Value("${banking.idempotency.retention-days:7}") int retentionDays
+            int retentionDays
     ) {
         if (retentionDays < 1) {
             throw new IllegalArgumentException(
@@ -26,6 +26,19 @@ public class TransactionIdempotencyCleanupJob {
             );
         }
 
+        return new TransactionIdempotencyCleanupJob(
+                idempotencyRepository,
+                retentionDays
+        );
+    }
+
+    /**
+     * Construtor privado que apenas atribui os valores recebidos.
+     */
+    private TransactionIdempotencyCleanupJob(
+            TransactionIdempotencyRepository idempotencyRepository,
+            int retentionDays
+    ) {
         this.idempotencyRepository = idempotencyRepository;
         this.retentionDays = retentionDays;
     }

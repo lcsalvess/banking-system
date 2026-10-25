@@ -744,7 +744,7 @@ public class AccountServiceTests {
     }
 
     private static SavingsAccount savingsAccount() {
-        SavingsAccount account = new SavingsAccount(client(), SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
+        SavingsAccount account = SavingsAccount.create(client(), SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
         ReflectionTestUtils.setField(account, "id", 2L);
         return account;
     }

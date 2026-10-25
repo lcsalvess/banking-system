@@ -19,8 +19,10 @@ public class SavingsAccount extends Account {
     /**
      * Taxa diária equivalente a 0,5% ao mês composto em 30 dias:
      * (1 + 0,005)^(1/30) - 1.
-     * É uma constante decimal, e não um cálculo com {@code Math.pow}, para que
-     * o valor creditado não dependa da aritmética de ponto flutuante da JVM.
+     * <p>
+     * É uma constante decimal, e não um cálculo com {@code Math.pow},
+     * para que o valor creditado não dependa da aritmética de ponto
+     * flutuante da JVM.
      */
     private static final BigDecimal DAILY_YIELD_RATE =
             new BigDecimal("0.000166265204228477063643");
@@ -35,21 +37,44 @@ public class SavingsAccount extends Account {
     @Column(name = "last_yield_processed_date", nullable = false)
     private LocalDate lastYieldProcessedDate;
 
+    /**
+     * Construtor exigido pelo JPA.
+     */
     protected SavingsAccount() {
     }
 
-    public SavingsAccount(
+    /**
+     * Cria uma conta poupança após validar a data inicial do rendimento.
+     */
+    public static SavingsAccount create(
+            Client client,
+            String accountNumber,
+            String accountDigit,
+            LocalDate initialYieldDate
+    ) {
+        validateDateNotNull(
+                initialYieldDate,
+                "A data inicial do rendimento é obrigatória."
+        );
+
+        return new SavingsAccount(
+                client,
+                accountNumber,
+                accountDigit,
+                initialYieldDate
+        );
+    }
+
+    /**
+     * Construtor interno que recebe os argumentos previamente validados.
+     */
+    private SavingsAccount(
             Client client,
             String accountNumber,
             String accountDigit,
             LocalDate initialYieldDate
     ) {
         super(client, accountNumber, accountDigit, AccountType.SAVINGS);
-
-        validateDateNotNull(
-                initialYieldDate,
-                "A data inicial do rendimento é obrigatória."
-        );
 
         this.lastYieldDate = initialYieldDate;
         this.lastYieldProcessedDate = initialYieldDate;

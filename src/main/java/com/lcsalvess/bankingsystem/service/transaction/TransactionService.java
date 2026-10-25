@@ -381,7 +381,7 @@ public class TransactionService {
     }
 
     private Transaction registerTransaction(TransactionType type, BigDecimal amount, Account account, User performedBy) {
-        Transaction transaction = new Transaction(
+        Transaction transaction = Transaction.create(
                 type,
                 amount,
                 LocalDateTime.now(clock),
@@ -399,8 +399,7 @@ public class TransactionService {
             UUID transferCode,
             User performedBy
     ) {
-        Transaction transaction =
-                new Transaction(
+        Transaction transaction = Transaction.createTransfer (
                         type,
                         amount,
                         LocalDateTime.now(clock),
@@ -418,8 +417,7 @@ public class TransactionService {
             LocalDate referenceDate,
             SavingsAccount account
     ) {
-        Transaction transaction = new Transaction(
-                TransactionType.YIELD,
+        Transaction transaction = Transaction.createSystemYield(
                 amount,
                 LocalDateTime.now(clock),
                 referenceDate,

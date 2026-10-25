@@ -10,13 +10,11 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.io.DecodingException;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.WeakKeyException;
-import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.time.Clock;
 import java.util.Date;
 
-@Service
 public class JwtService {
 
     /**
@@ -30,16 +28,40 @@ public class JwtService {
     private final String issuer;
     private final Clock clock;
 
-    public JwtService(JwtProperties jwtProperties, Clock clock) {
-        this.signingKey = createSigningKey(jwtProperties.secret());
-        this.expirationInSeconds = jwtProperties.expiration();
-        this.issuer = jwtProperties.issuer();
+    /**
+     * Cria o serviço após validar a chave de assinatura.
+     */
+    public static JwtService create(JwtProperties jwtProperties, Clock clock) {
+        SecretKey signingKey = createSigningKey(jwtProperties.secret());
+
+        return new JwtService(
+                signingKey,
+                jwtProperties.expiration(),
+                jwtProperties.issuer(),
+                clock
+        );
+    }
+
+    /**
+     * Construtor privado que apenas atribui os valores recebidos.
+     */
+    private JwtService(
+            SecretKey signingKey,
+            long expirationInSeconds,
+            String issuer,
+            Clock clock
+    ) {
+        this.signingKey = signingKey;
+        this.expirationInSeconds = expirationInSeconds;
+        this.issuer = issuer;
         this.clock = clock;
     }
 
-    private SecretKey createSigningKey(String secret) {
+    private static SecretKey createSigningKey(String secret) {
         if (secret == null || secret.isBlank()) {
-            throw new IllegalStateException(ApiErrorMessages.JWT_SECRET_REQUIRED);
+            throw new IllegalStateException(
+                    ApiErrorMessages.JWT_SECRET_REQUIRED
+            );
         }
 
         try {
@@ -48,13 +70,16 @@ public class JwtService {
         } catch (DecodingException | WeakKeyException exception) {
             throw new IllegalStateException(
                     ApiErrorMessages.JWT_SECRET_INVALID_CONFIGURATION,
-                    exception);
+                    exception
+            );
         }
     }
 
     public String generateToken(User user) {
         Date issuedAt = Date.from(clock.instant());
-        Date expiration = new Date(issuedAt.getTime() + expirationInSeconds * 1000);
+        Date expiration = new Date(
+                issuedAt.getTime() + expirationInSeconds * 1000
+        );
 
         return Jwts.builder()
                 .subject(user.getUsername())
@@ -101,7 +126,8 @@ public class JwtService {
                 || number.longValue() > Integer.MAX_VALUE
                 || number.doubleValue() != number.intValue()) {
             throw new JwtException(
-                    ApiErrorMessages.JWT_TOKEN_VERSION_INVALID);
+                    ApiErrorMessages.JWT_TOKEN_VERSION_INVALID
+            );
         }
 
         return number.intValue();

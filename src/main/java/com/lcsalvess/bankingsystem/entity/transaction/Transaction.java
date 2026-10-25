@@ -90,9 +90,11 @@ public class Transaction {
     private boolean performedBySystem;
 
     /**
-     * Construtor exigido pelo JPA.
+     * Construtor exigido pelo JPA. Não é público para que nenhuma outra
+     * parte do código consiga criar uma transação sem passar pelas
+     * factories, que validam os dados.
      */
-    public Transaction() {
+    protected Transaction() {
     }
 
     /**
@@ -106,6 +108,8 @@ public class Transaction {
             User performedBy,
             BigDecimal balanceAfter
     ) {
+        requireHumanType(type);
+
         BigDecimal validatedBalance =
                 requireValidBalanceAfter(balanceAfter);
 
@@ -137,6 +141,8 @@ public class Transaction {
             User performedBy,
             BigDecimal balanceAfter
     ) {
+        requireHumanType(type);
+
         BigDecimal validatedBalance =
                 requireValidBalanceAfter(balanceAfter);
 
@@ -286,6 +292,20 @@ public class Transaction {
         }
 
         return balanceAfter;
+    }
+
+    /**
+     * O rendimento é gerado pelo sistema e deve ser criado apenas por
+     * {@link #createSystemYield}. O banco também barra a combinação
+     * (ck_transactions_actor), mas a regra é validada aqui antes.
+     */
+    private static void requireHumanType(TransactionType type) {
+        if (type == TransactionType.YIELD) {
+            throw new IllegalArgumentException(
+                    "YIELD transactions are system-generated; "
+                            + "use createSystemYield."
+            );
+        }
     }
 
     private static User requireHumanActor(User performedBy) {

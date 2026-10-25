@@ -32,7 +32,7 @@ Alternatively, in pgAdmin, connect to `banking_system` as a PostgreSQL administr
 
 Set passwords separately and securely. For example, use pgAdmin's login-role properties, or connect with `psql` as an administrator and run `\password banking_app` and `\password banking_migrator` to set them through password prompts. Do not put real passwords in this script or commit them to source control.
 
-For an **existing application database** whose objects were created by a previous database user, and which has successfully applied V19 but not V20, run `scripts/db/transfer-existing-ownership.sql` as a PostgreSQL administrator against that application database, after the bootstrap script and before starting the new application version. It transfers the existing tables, sequences, and audit trigger function to `banking_migrator` so V20 can apply the least-privilege grants. The script refuses to run against `banking_system_test` and refuses to run once V20 is recorded as successful. Use it only for an existing pre-V20 database; do not run it on a new, empty database.
+For an **existing application database** whose objects were created by a previous database user, and which has successfully applied V19 (before or after V20/V21), run `scripts/db/transfer-existing-ownership.sql` as a PostgreSQL administrator against that application database, after the bootstrap script and before starting the new application version. It transfers the existing tables, sequences, and audit trigger function to `banking_migrator`, which the privilege callback requires in order to apply the least-privilege grants. If the application already fails at startup because `banking_migrator` cannot revoke privileges on these tables, run the script and start the application again. The script is idempotent and refuses to run against `banking_system_test`. Do not run it on a new, empty database.
 
 If `psql` is available, run:
 
@@ -154,14 +154,7 @@ For request examples, see the [API reference](API.md).
 
 The test suite runs against PostgreSQL using the `test` profile and the `banking_system_test` database. Flyway applies the same migrations used by the application, and Hibernate validates the resulting schema.
 
-The `test` profile uses `DB_USERNAME` and `DB_PASSWORD` for both the application datasource and Flyway. For local test execution, these credentials must belong to a dedicated test database user with permission to apply migrations and clean up integration-test fixtures in `banking_system_test`. Do not use the runtime `banking_app` credentials for this purpose: its production-style grants intentionally prohibit physical deletion from business tables and transaction history. The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The privilege callback is not loaded in the `test` profile, which keeps test fixture permissions separate from local/production privileges. That separation is covered by `LeastPrivilegeSmokeTests`, which runs only when the `PRIVILEGE_TEST_*` environment variables are set (the `least-privilege` job in GitHub Actions sets them). It needs an empty database with the roles from `scripts/db/bootstrap-roles.sql`:
-
-```bash
-PRIVILEGE_TEST_DB_URL=jdbc:postgresql://localhost:5432/banking_privilege_test \
-PRIVILEGE_TEST_MIGRATOR_USER=banking_migrator PRIVILEGE_TEST_MIGRATOR_PASSWORD=... \
-PRIVILEGE_TEST_APP_USER=banking_app PRIVILEGE_TEST_APP_PASSWORD=... \
-./mvnw test -Dtest=LeastPrivilegeSmokeTests
-```
+The `test` profile uses `DB_USERNAME` and `DB_PASSWORD` for both the application datasource and Flyway. For local test execution, these credentials must belong to a dedicated test database user with permission to apply migrations and clean up integration-test fixtures in `banking_system_test`. Do not use the runtime `banking_app` credentials for this purpose: its production-style grants intentionally prohibit physical deletion from business tables and transaction history. The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The privilege callback is not loaded in the `test` profile, which keeps test fixture permissions separate from local/production privileges.
 
 ### Running the tests
 

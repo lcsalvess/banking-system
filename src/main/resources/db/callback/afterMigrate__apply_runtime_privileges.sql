@@ -1,97 +1,83 @@
--- Source of truth for the runtime role (banking_app) privileges.
---
--- Flyway runs this callback after every successful migrate, so the policy is
--- re-applied on each startup and does not depend on the one-shot, conditional
--- V20/V21 migrations (which Flyway never retries once recorded as applied).
---
--- It is registered through spring.flyway.locations in the local and prod
--- profiles only. The test profile runs Flyway as the fixture owner and does
--- not load it. If Flyway runs as any other user, startup fails instead of
--- silently leaving the runtime role without (or with excess) privileges.
---
--- The whole policy is one DO block, so it is applied atomically: there is no
--- window in which banking_app has lost its grants but not yet received them.
+-- Transfer existing application database objects to the Flyway migration role.
+-- Run as a PostgreSQL administrator against the existing application database.
+-- Preconditions: V19 is successfully applied. It can run before V20 or after it
+-- (for example, when V20/V21 were recorded while Flyway ran as another user and the
+-- afterMigrate privilege callback now fails because banking_migrator does not own
+-- the objects). It is idempotent: objects already owned by banking_migrator are unchanged.
+-- Do not run this script against banking_system_test or a new, empty database.
+-- It changes ownership only; it does not modify application data or migration files.
+
+BEGIN;
 
 DO
 $$
     BEGIN
-        IF current_user <> 'banking_migrator' THEN
+        IF current_database() = 'banking_system_test' THEN
             RAISE EXCEPTION
-                'Runtime privileges must be applied by banking_migrator, but Flyway is running as %. Check DB_MIGRATOR_USERNAME and DB_MIGRATOR_PASSWORD.',
-                current_user;
+                'Refusing to transfer application ownership in the test database banking_system_test';
         END IF;
 
-        -- Start from a clean slate so the result is deterministic on existing databases.
-        REVOKE ALL PRIVILEGES ON TABLE
-            public.accounts,
-            public.addresses,
-            public.audit_events,
-            public.checking_accounts,
-            public.clients,
-            public.flyway_schema_history,
-            public.savings_accounts,
-            public.transaction_idempotency_requests,
-            public.transactions,
-            public.users
-            FROM banking_app;
+        IF NOT EXISTS (SELECT 1
+                       FROM pg_roles
+                       WHERE rolname = 'banking_migrator') THEN
+            RAISE EXCEPTION
+                'Role banking_migrator does not exist; run scripts/db/bootstrap-roles.sql first';
+        END IF;
 
-        -- Core business data: read, create, and update; never physically deleted.
-        GRANT SELECT, INSERT, UPDATE ON TABLE
-            public.accounts,
-            public.addresses,
-            public.clients,
-            public.savings_accounts,
-            public.users
-            TO banking_app;
+        IF NOT has_schema_privilege('banking_migrator', 'public', 'CREATE') THEN
+            RAISE EXCEPTION
+                'banking_migrator lacks CREATE on schema public; run scripts/db/bootstrap-roles.sql first';
+        END IF;
 
-        -- Financial history is append-only for the runtime role.
-        GRANT SELECT, INSERT ON TABLE public.transactions TO banking_app;
+        IF to_regclass('public.flyway_schema_history') IS NULL THEN
+            RAISE EXCEPTION
+                'flyway_schema_history was not found; this script is only for an existing database migrated through at least V19';
+        END IF;
 
-        -- Audit history can only be read and appended.
-        GRANT SELECT, INSERT ON TABLE public.audit_events TO banking_app;
-
-        -- Joined-inheritance child table of accounts. Hibernate's pessimistic lock
-        -- (SELECT ... FOR UPDATE over the joined tables) requires UPDATE on at least
-        -- one column of every table it locks. checking_accounts only has the id
-        -- column, so the grant is limited to it instead of the whole table.
-        GRANT SELECT, INSERT ON TABLE public.checking_accounts TO banking_app;
-        GRANT UPDATE (id) ON TABLE public.checking_accounts TO banking_app;
-
-        -- Idempotency records are updated and deleted by the scheduled cleanup.
-        GRANT SELECT, INSERT, UPDATE, DELETE
-            ON TABLE public.transaction_idempotency_requests TO banking_app;
-
-        -- Sequences: only what the runtime needs. flyway_schema_history stays reserved.
-        REVOKE ALL PRIVILEGES ON SEQUENCE
-            public.account_number_seq,
-            public.accounts_id_seq,
-            public.addresses_id_seq,
-            public.audit_events_id_seq,
-            public.clients_id_seq,
-            public.transaction_idempotency_requests_id_seq,
-            public.transactions_id_seq,
-            public.users_id_seq
-            FROM banking_app;
-
-        GRANT USAGE, SELECT ON SEQUENCE
-            public.account_number_seq,
-            public.accounts_id_seq,
-            public.addresses_id_seq,
-            public.audit_events_id_seq,
-            public.clients_id_seq,
-            public.transaction_idempotency_requests_id_seq,
-            public.transactions_id_seq,
-            public.users_id_seq
-            TO banking_app;
-
-        -- Defaults for future objects created by banking_migrator in public.
-        ALTER DEFAULT PRIVILEGES FOR ROLE banking_migrator IN SCHEMA public
-            REVOKE ALL PRIVILEGES ON TABLES FROM banking_app;
-        ALTER DEFAULT PRIVILEGES FOR ROLE banking_migrator IN SCHEMA public
-            GRANT SELECT, INSERT ON TABLES TO banking_app;
-        ALTER DEFAULT PRIVILEGES FOR ROLE banking_migrator IN SCHEMA public
-            REVOKE ALL PRIVILEGES ON SEQUENCES FROM banking_app;
-        ALTER DEFAULT PRIVILEGES FOR ROLE banking_migrator IN SCHEMA public
-            GRANT USAGE, SELECT ON SEQUENCES TO banking_app;
+        IF NOT EXISTS (SELECT 1
+                       FROM public.flyway_schema_history
+                       WHERE version = '19'
+                         AND success) THEN
+            RAISE EXCEPTION
+                'Flyway migration V19 is not recorded as successful; this script requires an existing schema at V19 or later';
+        END IF;
     END
 $$;
+
+-- Transfer table ownership first. Associated indexes and table constraints remain
+-- attached to their tables; ownership of owned identity sequences may follow the table.
+ALTER TABLE public.accounts
+    OWNER TO banking_migrator;
+ALTER TABLE public.addresses
+    OWNER TO banking_migrator;
+ALTER TABLE public.audit_events
+    OWNER TO banking_migrator;
+ALTER TABLE public.checking_accounts
+    OWNER TO banking_migrator;
+ALTER TABLE public.clients
+    OWNER TO banking_migrator;
+ALTER TABLE public.flyway_schema_history
+    OWNER TO banking_migrator;
+ALTER TABLE public.savings_accounts
+    OWNER TO banking_migrator;
+ALTER TABLE public.transaction_idempotency_requests
+    OWNER TO banking_migrator;
+ALTER TABLE public.transactions
+    OWNER TO banking_migrator;
+ALTER TABLE public.users
+    OWNER TO banking_migrator;
+
+-- Explicitly align every sequence used by this schema, including account numbers.
+ALTER SEQUENCE public.account_number_seq OWNER TO banking_migrator;
+ALTER SEQUENCE public.accounts_id_seq OWNER TO banking_migrator;
+ALTER SEQUENCE public.addresses_id_seq OWNER TO banking_migrator;
+ALTER SEQUENCE public.audit_events_id_seq OWNER TO banking_migrator;
+ALTER SEQUENCE public.clients_id_seq OWNER TO banking_migrator;
+ALTER SEQUENCE public.transaction_idempotency_requests_id_seq OWNER TO banking_migrator;
+ALTER SEQUENCE public.transactions_id_seq OWNER TO banking_migrator;
+ALTER SEQUENCE public.users_id_seq OWNER TO banking_migrator;
+
+-- The audit triggers call this function; keep its ownership aligned with Flyway.
+    ALTER FUNCTION public.audit_events_reject_change() OWNER TO banking_migrator;
+
+COMMIT;

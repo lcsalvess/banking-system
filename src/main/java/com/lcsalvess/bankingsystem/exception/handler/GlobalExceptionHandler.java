@@ -4,7 +4,7 @@ import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitExceededException;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import org.hibernate.JDBCException;
 import org.hibernate.exception.ConstraintViolationException;
@@ -109,11 +109,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         );
     }
 
-    @ExceptionHandler(LoginRateLimitExceededException.class)
-    public ResponseEntity<ApiErrorResponse> handleLoginRateLimitExceeded(
-            LoginRateLimitExceededException exception
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleRateLimitExceeded(
+            RateLimitExceededException exception
     ) {
-        // O motivo e o IP já são registrados por LoginAttemptProtectionService.
+        // A operação, o escopo e o sujeito já são registrados por RateLimitProtectionService.
         return ResponseEntity
                 .status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(
@@ -122,7 +122,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 )
                 .body(new ApiErrorResponse(
                         HttpStatus.TOO_MANY_REQUESTS.value(),
-                        ApiErrorMessages.LOGIN_RATE_LIMIT_EXCEEDED
+                        exception.getMessage()
                 ));
     }
 

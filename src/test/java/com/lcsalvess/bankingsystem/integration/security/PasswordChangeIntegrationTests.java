@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.security;
 
+import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -59,6 +61,9 @@ class PasswordChangeIntegrationTests {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private LoginRateLimitProperties rateLimitProperties;
 
     @BeforeEach
     void setUp() {
@@ -144,6 +149,31 @@ class PasswordChangeIntegrationTests {
         login(CURRENT_PASSWORD).andExpect(status().isOk());
         changePassword(token, CURRENT_PASSWORD, NEW_PASSWORD)
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("Deve responder 429 após tentativas repetidas com a senha atual incorreta, sem bloquear o login")
+    void shouldRateLimitRepeatedWrongCurrentPassword() throws Exception {
+        String token = loginAndGetToken(CURRENT_PASSWORD);
+
+        for (int i = 0; i < rateLimitProperties.maxFailedAttempts(); i++) {
+            changePassword(token, "wrong-password", NEW_PASSWORD)
+                    .andExpect(status().isBadRequest());
+        }
+
+        changePassword(token, "wrong-password", NEW_PASSWORD)
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.PASSWORD_CHANGE_RATE_LIMIT_EXCEEDED));
+
+        // Enquanto durar o bloqueio, nem a senha correta é avaliada.
+        changePassword(token, CURRENT_PASSWORD, NEW_PASSWORD)
+                .andExpect(status().isTooManyRequests());
+
+        // O bloqueio da troca de senha não afeta o login.
+        login(CURRENT_PASSWORD).andExpect(status().isOk());
     }
 
     @Test

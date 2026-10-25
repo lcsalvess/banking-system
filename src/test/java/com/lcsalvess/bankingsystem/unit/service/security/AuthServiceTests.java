@@ -5,12 +5,13 @@ import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitExceededException;
-import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitReason;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitOperation;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
-import com.lcsalvess.bankingsystem.service.security.LoginAttempt;
-import com.lcsalvess.bankingsystem.service.security.LoginAttemptProtectionService;
+import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;
+import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -76,7 +77,7 @@ class AuthServiceTests {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private LoginAttemptProtectionService loginAttemptProtectionService;
+    private RateLimitProtectionService rateLimitProtectionService;
 
     private AuthService authService;
 
@@ -89,7 +90,7 @@ class AuthServiceTests {
                 authManager,
                 jwtService,
                 passwordEncoder,
-                loginAttemptProtectionService
+                rateLimitProtectionService
         );
     }
 
@@ -121,7 +122,7 @@ class AuthServiceTests {
             assertEquals(user.getEmail(), response.email());
             assertEquals(user.getRole(), response.role());
 
-            verify(loginAttemptProtectionService)
+            verify(rateLimitProtectionService)
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(authManager).authenticate(
@@ -130,9 +131,9 @@ class AuthServiceTests {
 
             verify(jwtService).generateToken(user);
 
-            verify(loginAttemptProtectionService)
+            verify(rateLimitProtectionService)
                     .recordSuccessfulLogin(TEST_ATTEMPT);
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
         }
 
@@ -156,16 +157,16 @@ class AuthServiceTests {
                     () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
 
-            verify(loginAttemptProtectionService)
+            verify(rateLimitProtectionService)
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(authManager).authenticate(
                     any(UsernamePasswordAuthenticationToken.class)
             );
 
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
 
             verifyNoInteractions(jwtService);
@@ -200,7 +201,7 @@ class AuthServiceTests {
 
             assertSame(original, exception.getCause());
 
-            verify(loginAttemptProtectionService)
+            verify(rateLimitProtectionService)
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(authManager).authenticate(
@@ -212,9 +213,9 @@ class AuthServiceTests {
                     "dummy-hash"
             );
 
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
 
             verifyNoInteractions(jwtService);
@@ -245,11 +246,11 @@ class AuthServiceTests {
 
             assertSame(original, exception);
 
-            verify(loginAttemptProtectionService)
+            verify(rateLimitProtectionService)
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
-            verify(loginAttemptProtectionService)
+            verify(rateLimitProtectionService)
                     .cancelAttempt(TEST_ATTEMPT);
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
 
             verifyNoInteractions(jwtService);
@@ -276,11 +277,11 @@ class AuthServiceTests {
 
             assertSame(original, exception);
 
-            verify(loginAttemptProtectionService)
+            verify(rateLimitProtectionService)
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
-            verify(loginAttemptProtectionService)
+            verify(rateLimitProtectionService)
                     .cancelAttempt(TEST_ATTEMPT);
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
 
             verifyNoInteractions(jwtService);
@@ -291,24 +292,32 @@ class AuthServiceTests {
     @DisplayName("Ao exceder o limite de tentativas de login")
     class RateLimitTests {
 
-        @ParameterizedTest(name = "motivo: {0}")
-        @EnumSource(LoginRateLimitReason.class)
+        @ParameterizedTest(name = "escopo: {0}")
+        @EnumSource(
+                value = RateLimitScope.class,
+                mode = EnumSource.Mode.EXCLUDE,
+                names = "USER_ID"
+        )
         @DisplayName("Deve propagar a exceção sem verificar credenciais nem emitir token")
         void shouldRejectBeforeCheckingCredentials(
-                LoginRateLimitReason reason
+                RateLimitScope scope
         ) {
             LoginRequestDTO dto = createLoginRequestDTO();
 
-            LoginRateLimitExceededException original =
-                    new LoginRateLimitExceededException(60L, reason);
+            RateLimitExceededException original =
+                    new RateLimitExceededException(
+                            60L,
+                            RateLimitOperation.LOGIN,
+                            scope
+                    );
 
-            when(loginAttemptProtectionService.beginAttempt(
+            when(rateLimitProtectionService.beginAttempt(
                     TEST_CLIENT_IP,
                     dto.username()
             )).thenThrow(original);
 
-            LoginRateLimitExceededException exception = assertThrows(
-                    LoginRateLimitExceededException.class,
+            RateLimitExceededException exception = assertThrows(
+                    RateLimitExceededException.class,
                     () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
 
@@ -316,9 +325,9 @@ class AuthServiceTests {
 
             verifyNoInteractions(authManager, jwtService);
 
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
-            verify(loginAttemptProtectionService, never())
+            verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
         }
 
@@ -327,16 +336,17 @@ class AuthServiceTests {
         void shouldNotRunPasswordCheckWhenRejected() {
             LoginRequestDTO dto = createLoginRequestDTO();
 
-            when(loginAttemptProtectionService.beginAttempt(
+            when(rateLimitProtectionService.beginAttempt(
                     TEST_CLIENT_IP,
                     dto.username()
-            )).thenThrow(new LoginRateLimitExceededException(
+            )).thenThrow(new RateLimitExceededException(
                     1L,
-                    LoginRateLimitReason.CLIENT_IP
+                    RateLimitOperation.LOGIN,
+                    RateLimitScope.CLIENT_IP
             ));
 
             assertThrows(
-                    LoginRateLimitExceededException.class,
+                    RateLimitExceededException.class,
                     () -> authService.authenticate(dto, TEST_CLIENT_IP)
             );
 
@@ -345,7 +355,7 @@ class AuthServiceTests {
     }
 
     private void allowAttempt() {
-        when(loginAttemptProtectionService.beginAttempt(
+        when(rateLimitProtectionService.beginAttempt(
                 TEST_CLIENT_IP,
                 TEST_USERNAME
         )).thenReturn(TEST_ATTEMPT);

@@ -5,8 +5,9 @@ import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.handler.GlobalExceptionHandler;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitExceededException;
-import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitReason;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitOperation;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
 import com.lcsalvess.bankingsystem.exception.user.InvalidCurrentPasswordException;
 import com.lcsalvess.bankingsystem.exception.user.PasswordUnchangedException;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
@@ -177,19 +178,50 @@ class GlobalExceptionHandlerTests {
     }
 
     @ParameterizedTest
-    @EnumSource(LoginRateLimitReason.class)
+    @EnumSource(
+            value = RateLimitScope.class,
+            mode = EnumSource.Mode.EXCLUDE,
+            names = "USER_ID"
+    )
     void shouldReturnTooManyRequestsWithRetryAfterWhenLoginRateLimitIsExceeded(
-            LoginRateLimitReason reason
+            RateLimitScope scope
     ) throws Exception {
 
-        performThrowing(new LoginRateLimitExceededException(42L, reason))
+        performThrowing(
+                new RateLimitExceededException(
+                        42L,
+                        RateLimitOperation.LOGIN,
+                        scope
+                )
+        )
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string(HttpHeaders.RETRY_AFTER, "42"))
                 .andExpect(jsonPath("$.status").value(429))
                 .andExpect(jsonPath("$.message")
                         .value(ApiErrorMessages.LOGIN_RATE_LIMIT_EXCEEDED))
                 .andExpect(content().string(
-                        not(containsString(reason.name()))
+                        not(containsString(scope.name()))
+                ));
+    }
+
+    @Test
+    void shouldReturnPasswordChangeMessageWhenPasswordChangeRateLimitIsExceeded()
+            throws Exception {
+
+        performThrowing(
+                new RateLimitExceededException(
+                        42L,
+                        RateLimitOperation.PASSWORD_CHANGE,
+                        RateLimitScope.USER_ID
+                )
+        )
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "42"))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.PASSWORD_CHANGE_RATE_LIMIT_EXCEEDED))
+                .andExpect(content().string(
+                        not(containsString(RateLimitOperation.PASSWORD_CHANGE.name()))
                 ));
     }
 
@@ -198,9 +230,10 @@ class GlobalExceptionHandlerTests {
             throws Exception {
 
         performThrowing(
-                new LoginRateLimitExceededException(
+                new RateLimitExceededException(
                         0L,
-                        LoginRateLimitReason.CLIENT_IP
+                        RateLimitOperation.LOGIN,
+                        RateLimitScope.CLIENT_IP
                 )
         )
                 .andExpect(status().isTooManyRequests())

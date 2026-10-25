@@ -4,6 +4,8 @@ import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;
+import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AccountStatusException;
@@ -24,14 +26,14 @@ public class AuthService {
     private final AuthenticationManager authManager;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
-    private final LoginAttemptProtectionService loginAttemptProtectionService;
+    private final RateLimitProtectionService rateLimitProtectionService;
     private final String dummyPasswordHash;
 
-    public AuthService(AuthenticationManager authManager, JwtService jwtService, PasswordEncoder passwordEncoder, LoginAttemptProtectionService loginAttemptProtectionService) {
+    public AuthService(AuthenticationManager authManager, JwtService jwtService, PasswordEncoder passwordEncoder, RateLimitProtectionService rateLimitProtectionService) {
         this.authManager = authManager;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
-        this.loginAttemptProtectionService = loginAttemptProtectionService;
+        this.rateLimitProtectionService = rateLimitProtectionService;
         this.dummyPasswordHash = passwordEncoder.encode(
                 UUID.randomUUID().toString()
         );
@@ -43,7 +45,7 @@ public class AuthService {
     ) {
         // A tentativa é contabilizada antes de verificar a senha, para que
         // requisições paralelas não ultrapassem o limite.
-        LoginAttempt attempt = loginAttemptProtectionService.beginAttempt(
+        LoginAttempt attempt = rateLimitProtectionService.beginAttempt(
                 clientIp,
                 dto.username()
         );
@@ -57,11 +59,11 @@ public class AuthService {
             throw exception;
         } catch (RuntimeException exception) {
             // Falhas de infraestrutura ou inesperadas não são senha incorreta.
-            loginAttemptProtectionService.cancelAttempt(attempt);
+            rateLimitProtectionService.cancelAttempt(attempt);
             throw exception;
         }
 
-        loginAttemptProtectionService.recordSuccessfulLogin(attempt);
+        rateLimitProtectionService.recordSuccessfulLogin(attempt);
 
         User user = (User) auth.getPrincipal();
         String token = jwtService.generateToken(user);

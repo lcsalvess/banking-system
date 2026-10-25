@@ -1,9 +1,9 @@
-package com.lcsalvess.bankingsystem.service.security;
+package com.lcsalvess.bankingsystem.service.security.ratelimit;
 
 import java.time.Instant;
 
 /**
- * Tentativa de login admitida pelo {@link LoginAttemptProtectionService}.
+ * Tentativa de login admitida pelo {@link RateLimitProtectionService}.
  *
  * <p>A tentativa já está contabilizada quando este objeto é criado. Ele serve
  * para desfazer a contagem ({@code cancelAttempt}) ou zerá-la após um login

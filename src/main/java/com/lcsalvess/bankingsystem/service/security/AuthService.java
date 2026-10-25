@@ -4,7 +4,6 @@ import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AccountStatusException;
@@ -28,10 +27,6 @@ public class AuthService {
     private final LoginAttemptProtectionService loginAttemptProtectionService;
     private final String dummyPasswordHash;
 
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP2",
-            justification = "LoginAttemptProtectionService is a Spring-managed collaborator intentionally retained for authentication operations."
-    )
     public AuthService(AuthenticationManager authManager, JwtService jwtService, PasswordEncoder passwordEncoder, LoginAttemptProtectionService loginAttemptProtectionService) {
         this.authManager = authManager;
         this.jwtService = jwtService;

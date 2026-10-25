@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.repository.idempotency;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -50,6 +51,10 @@ public class TransactionIdempotencyRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "JdbcTemplate is a Spring-managed collaborator intentionally retained for repository operations."
+    )
     public TransactionIdempotencyRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }

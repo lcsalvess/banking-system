@@ -42,6 +42,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -85,18 +86,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Only {@link CustomUserDetailsService} is replaced with a mock to avoid
  * database access. The real {@link JwtProperties} configuration is used.
  *
+ * <p>This test uses the {@code test} profile to verify that OpenAPI routes
+ * are not public outside the explicitly permitted local profile.
+ *
  * <p>This test uses a restricted {@code @WebMvcTest} slice. The security
  * configuration and its required dependencies are imported explicitly.
- * MVC-supported filters and exception handlers are included in the slice
- * according to Spring Boot's test configuration.
  *
  * <p>{@code SecurityProbeController} is explicitly selected by
  * {@code @WebMvcTest(controllers = SecurityProbeController.class)}.
  * It resides outside the application's component-scan package so test-only
  * request mappings are not registered in the full application context.
- *
- * <p>{@code WebMvcTestSecurityConfig} is intentionally not imported because
- * this test exercises the real security configuration.
  *
  * <p>The test builds {@link MockMvc} with the actual
  * {@code springSecurityFilterChain} to preserve the configured filter order.
@@ -113,7 +112,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         RestAccessDeniedHandler.class,
         SecurityProbeController.class
 })
+@ActiveProfiles("test")
 @TestPropertySource(properties = {
+        "spring.datasource.url=jdbc:postgresql://localhost:5432/banking_system_test",
+        "spring.datasource.username=test",
+        "spring.datasource.password=test",
+        "spring.flyway.enabled=false",
+
+        // Enable Springdoc deliberately: security must still deny access
+        // when the documentation endpoints are enabled outside local.
+        "springdoc.api-docs.enabled=true",
+        "springdoc.swagger-ui.enabled=true",
+
         "jwt.secret=" + SecurityConfigTests.SECRET,
         "jwt.expiration=3600",
         "jwt.issuer=" + SecurityConfigTests.ISSUER
@@ -172,8 +182,9 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Rotas públicas")
-    class PublicRoutesTests {
+    @DisplayName("Proteção da documentação OpenAPI")
+    class OpenApiAuthorizationTests {
+
         @ParameterizedTest(name = "GET {0}")
         @ValueSource(strings = {
                 "/swagger-ui/index.html",
@@ -181,16 +192,17 @@ class SecurityConfigTests {
                 "/v3/api-docs",
                 "/v3/api-docs/swagger-config"
         })
-        @DisplayName("Deve permitir a documentação OpenAPI sem token")
-        void shouldAllowSwaggerRoutesWithoutToken(String url) throws Exception {
-            MvcResult result = mockMvc.perform(get(url)).andReturn();
-
-            int statusCode = result.getResponse().getStatus();
-            assertNotEquals(401, statusCode, "A rota deveria ser pública");
-            assertNotEquals(403, statusCode, "A rota deveria ser pública");
+        @DisplayName("Deve negar acesso à documentação sem autenticação fora do perfil local")
+        void shouldDenyOpenApiRoutesWithoutToken(String url) throws Exception {
+            expectUnauthorized(mockMvc.perform(get(url)));
 
             verifyNoInteractions(userDetailsService);
         }
+    }
+
+    @Nested
+    @DisplayName("Rotas públicas")
+    class PublicRoutesTests {
 
         @Test
         @DisplayName("Deve permitir POST /api/v1/auth/login sem token e sem CSRF")
@@ -294,7 +306,12 @@ class SecurityConfigTests {
         }
 
         @ParameterizedTest(name = "GET {0}")
-        @ValueSource(strings = {"/actuator/health", "/actuator/info", "/actuator/metrics", "/api/v1/qualquer-rota"})
+        @ValueSource(strings = {
+                "/actuator/health",
+                "/actuator/info",
+                "/actuator/metrics",
+                "/api/v1/qualquer-rota"
+        })
         @DisplayName("Deve exigir autenticação nas rotas protegidas")
         void shouldRequireAuthenticationOnProtectedRoutes(String url) throws Exception {
             expectUnauthorized(mockMvc.perform(get(url)));
@@ -312,7 +329,11 @@ class SecurityConfigTests {
         }
 
         @ParameterizedTest(name = "Authorization: {0}")
-        @ValueSource(strings = {"Bearer token-invalido", "Bearer a.b.c", "Bearer abc.def"})
+        @ValueSource(strings = {
+                "Bearer token-invalido",
+                "Bearer a.b.c",
+                "Bearer abc.def"
+        })
         @DisplayName("Deve responder 401 em JSON para token malformado")
         void shouldReturn401ForMalformedToken(String authorization) throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
@@ -322,7 +343,10 @@ class SecurityConfigTests {
         }
 
         @ParameterizedTest(name = "Authorization: \"{0}\"")
-        @ValueSource(strings = {"Bearer ", "Bearer    "})
+        @ValueSource(strings = {
+                "Bearer ",
+                "Bearer    "
+        })
         @DisplayName("Deve responder 401 em JSON quando o Bearer vem sem token")
         void shouldReturn401WhenBearerHasNoToken(String authorization) throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
@@ -713,6 +737,7 @@ class SecurityConfigTests {
     @Nested
     @DisplayName("Correlation ID na cadeia de filtros")
     class CorrelationIdTests {
+
         @Test
         @DisplayName("Deve gerar o header quando a requisição não o envia")
         void shouldGenerateCorrelationIdWhenMissing() throws Exception {

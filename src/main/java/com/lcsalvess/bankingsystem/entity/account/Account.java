@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.entity.client.Client;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 @Entity
 @Table(
@@ -42,7 +43,7 @@ public abstract class Account {
     @Column(name = "account_type", nullable = false, length = 20)
     private AccountType type;
 
-    public Account() {
+    protected Account() {
     }
 
     public Account(Client client, String accountNumber, String digit, AccountType type) {
@@ -76,20 +77,90 @@ public abstract class Account {
         return balance;
     }
 
+    /**
+     * Returns whether the amount can be credited without violating the
+     * account's status, monetary precision, or maximum balance.
+     */
     public boolean canCredit(BigDecimal amount) {
-        return this.balance.add(amount).compareTo(MAX_BALANCE) <= 0;
+        return status == AccountStatus.ACTIVE
+                && isValidAmount(amount)
+                && balance.add(amount).compareTo(MAX_BALANCE) <= 0;
     }
 
+    /**
+     * Credits the account only when the operation preserves its invariants.
+     * Application services still validate first to return API-specific errors.
+     */
     public void credit(BigDecimal amount) {
-        this.balance = this.balance.add(amount);
+        requireActive();
+        BigDecimal validatedAmount = requireValidAmount(amount);
+
+        if (!canCredit(validatedAmount)) {
+            throw new IllegalStateException(
+                    "Crediting this amount would exceed the account balance limit."
+            );
+        }
+
+        this.balance = this.balance.add(validatedAmount);
     }
 
+    /**
+     * Debits the account only when the amount is positive and the balance
+     * remains non-negative.
+     */
     public void debit(BigDecimal amount) {
-        this.balance = this.balance.subtract(amount);
+        requireActive();
+        BigDecimal validatedAmount = requireValidAmount(amount);
+
+        if (balance.compareTo(validatedAmount) < 0) {
+            throw new IllegalStateException(
+                    "The account has insufficient balance for this debit."
+            );
+        }
+
+        this.balance = this.balance.subtract(validatedAmount);
     }
 
+    /**
+     * Cancellation is only valid for an active account with no remaining funds.
+     */
     public void cancel() {
+        requireActive();
+
+        if (balance.signum() != 0) {
+            throw new IllegalStateException(
+                    "An account can only be cancelled with a zero balance."
+            );
+        }
+
         this.status = AccountStatus.CANCELLED;
+    }
+
+    private void requireActive() {
+        if (status != AccountStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Operations are not allowed on an inactive account."
+            );
+        }
+    }
+
+    private static BigDecimal requireValidAmount(BigDecimal amount) {
+        Objects.requireNonNull(amount, "The operation amount is required.");
+
+        if (!isValidAmount(amount)) {
+            throw new IllegalArgumentException(
+                    "The operation amount must be positive and within the supported monetary range."
+            );
+        }
+
+        return amount;
+    }
+
+    private static boolean isValidAmount(BigDecimal amount) {
+        return amount != null
+                && amount.signum() > 0
+                && amount.scale() <= 2
+                && amount.compareTo(MAX_BALANCE) <= 0;
     }
 
     public AccountStatus getStatus() {

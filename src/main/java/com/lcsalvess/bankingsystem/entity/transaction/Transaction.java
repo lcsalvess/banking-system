@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.entity.transaction;
 
 import com.lcsalvess.bankingsystem.entity.account.Account;
+import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -110,20 +111,21 @@ public class Transaction {
     ) {
         requireOrdinaryOperationType(type);
 
-        BigDecimal validatedBalance =
-                requireValidBalanceAfter(balanceAfter);
-
+        BigDecimal validatedAmount = requireValidAmount(amount);
+        LocalDateTime validatedCreatedAt = truncateToMicros(createdAt);
+        Account validatedAccount = requireAccount(account);
+        BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
         User validatedActor = requireHumanActor(performedBy);
 
         return new Transaction(
                 UUID.randomUUID(),
                 null,
                 type,
-                amount,
+                validatedAmount,
                 validatedBalance,
-                truncateToMicros(createdAt),
+                validatedCreatedAt,
                 null,
-                account,
+                validatedAccount,
                 validatedActor,
                 false
         );
@@ -148,20 +150,21 @@ public class Transaction {
                 "Transfer transactions must have a transfer code."
         );
 
-        BigDecimal validatedBalance =
-                requireValidBalanceAfter(balanceAfter);
-
+        BigDecimal validatedAmount = requireValidAmount(amount);
+        LocalDateTime validatedCreatedAt = truncateToMicros(createdAt);
+        Account validatedAccount = requireAccount(account);
+        BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
         User validatedActor = requireHumanActor(performedBy);
 
         return new Transaction(
                 UUID.randomUUID(),
                 validatedTransferCode,
                 type,
-                amount,
+                validatedAmount,
                 validatedBalance,
-                truncateToMicros(createdAt),
+                validatedCreatedAt,
                 null,
-                account,
+                validatedAccount,
                 validatedActor,
                 false
         );
@@ -179,18 +182,20 @@ public class Transaction {
     ) {
         validateSystemYieldDate(yieldDate);
 
-        BigDecimal validatedBalance =
-                requireValidBalanceAfter(balanceAfter);
+        BigDecimal validatedAmount = requireValidAmount(amount);
+        LocalDateTime validatedCreatedAt = truncateToMicros(createdAt);
+        SavingsAccount validatedAccount = requireSavingsAccount(account);
+        BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
 
         return new Transaction(
                 UUID.randomUUID(),
                 null,
                 TransactionType.YIELD,
-                amount,
+                validatedAmount,
                 validatedBalance,
-                truncateToMicros(createdAt),
+                validatedCreatedAt,
                 yieldDate,
-                account,
+                validatedAccount,
                 null,
                 true
         );
@@ -276,9 +281,46 @@ public class Transaction {
     private static LocalDateTime truncateToMicros(
             LocalDateTime value
     ) {
-        return value == null
-                ? null
-                : value.truncatedTo(ChronoUnit.MICROS);
+        return Objects.requireNonNull(
+                value,
+                "The transaction creation timestamp is required."
+        ).truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private static Account requireAccount(Account account) {
+        return Objects.requireNonNull(
+                account,
+                "The transaction account is required."
+        );
+    }
+
+    private static SavingsAccount requireSavingsAccount(Account account) {
+        Account validatedAccount = requireAccount(account);
+
+        if (!(validatedAccount instanceof SavingsAccount savingsAccount)) {
+            throw new IllegalArgumentException(
+                    "System-generated yield transactions require a savings account."
+            );
+        }
+
+        return savingsAccount;
+    }
+
+    private static BigDecimal requireValidAmount(BigDecimal amount) {
+        Objects.requireNonNull(
+                amount,
+                "The transaction amount is required."
+        );
+
+        if (amount.signum() <= 0
+                || amount.scale() > 2
+                || amount.compareTo(Account.MAX_BALANCE) > 0) {
+            throw new IllegalArgumentException(
+                    "The transaction amount must be positive and within the supported monetary range."
+            );
+        }
+
+        return amount;
     }
 
     private static BigDecimal requireValidBalanceAfter(
@@ -290,6 +332,7 @@ public class Transaction {
         );
 
         if (balanceAfter.signum() < 0
+                || balanceAfter.scale() > 2
                 || balanceAfter.compareTo(Account.MAX_BALANCE) > 0) {
             throw new IllegalArgumentException(
                     "The balance after the transaction is out of range."

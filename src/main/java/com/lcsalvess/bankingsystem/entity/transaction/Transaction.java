@@ -108,7 +108,7 @@ public class Transaction {
             User performedBy,
             BigDecimal balanceAfter
     ) {
-        requireHumanType(type);
+        requireOrdinaryOperationType(type);
 
         BigDecimal validatedBalance =
                 requireValidBalanceAfter(balanceAfter);
@@ -141,7 +141,12 @@ public class Transaction {
             User performedBy,
             BigDecimal balanceAfter
     ) {
-        requireHumanType(type);
+        requireTransferType(type);
+
+        UUID validatedTransferCode = Objects.requireNonNull(
+                transferCode,
+                "Transfer transactions must have a transfer code."
+        );
 
         BigDecimal validatedBalance =
                 requireValidBalanceAfter(balanceAfter);
@@ -150,7 +155,7 @@ public class Transaction {
 
         return new Transaction(
                 UUID.randomUUID(),
-                transferCode,
+                validatedTransferCode,
                 type,
                 amount,
                 validatedBalance,
@@ -295,15 +300,29 @@ public class Transaction {
     }
 
     /**
-     * O rendimento é gerado pelo sistema e deve ser criado apenas por
-     * {@link #createSystemYield}. O banco também barra a combinação
-     * (ck_transactions_actor), mas a regra é validada aqui antes.
+     * Deposits and withdrawals do not carry transfer metadata. Transfers
+     * must be created through {@link #createTransfer}.
      */
-    private static void requireHumanType(TransactionType type) {
-        if (type == TransactionType.YIELD) {
+    private static void requireOrdinaryOperationType(TransactionType type) {
+        if (type != TransactionType.DEPOSIT
+                && type != TransactionType.WITHDRAWAL) {
             throw new IllegalArgumentException(
-                    "YIELD transactions are system-generated; "
-                            + "use createSystemYield."
+                    "Only DEPOSIT and WITHDRAWAL transactions can be created "
+                            + "with create()."
+            );
+        }
+    }
+
+    /**
+     * Transfer factories accept only the two sides of a transfer. Requiring
+     * a transfer code ensures both records can be correlated as one operation.
+     */
+    private static void requireTransferType(TransactionType type) {
+        if (type != TransactionType.TRANSFER_SENT
+                && type != TransactionType.TRANSFER_RECEIVED) {
+            throw new IllegalArgumentException(
+                    "Only TRANSFER_SENT and TRANSFER_RECEIVED transactions "
+                            + "can be created with createTransfer()."
             );
         }
     }

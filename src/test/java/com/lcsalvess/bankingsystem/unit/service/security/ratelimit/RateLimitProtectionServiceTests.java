@@ -1,10 +1,12 @@
-package com.lcsalvess.bankingsystem.unit.service.security;
+package com.lcsalvess.bankingsystem.unit.service.security.ratelimit;
 
 import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
-import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitExceededException;
-import com.lcsalvess.bankingsystem.exception.security.LoginRateLimitReason;
-import com.lcsalvess.bankingsystem.service.security.LoginAttempt;
-import com.lcsalvess.bankingsystem.service.security.LoginAttemptProtectionService;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitOperation;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
+import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;
+import com.lcsalvess.bankingsystem.service.security.ratelimit.PasswordChangeAttempt;
+import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,13 +34,13 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@DisplayName("LoginAttemptProtectionService")
-class LoginAttemptProtectionServiceTests {
+@DisplayName("RateLimitProtectionService")
+class RateLimitProtectionServiceTests {
 
     private static final Instant INITIAL_INSTANT =
             Instant.parse("2026-01-01T12:00:00Z");
 
-    private static final String REJECTION_METRIC = "login.rate_limit.rejected";
+    private static final String REJECTION_METRIC = "security.rate_limit.rejected";
 
     private static final String TEST_IP = "192.0.2.10";
     private static final String OTHER_IP = "192.0.2.11";
@@ -55,7 +57,7 @@ class LoginAttemptProtectionServiceTests {
 
     private MutableClock clock;
     private SimpleMeterRegistry meterRegistry;
-    private LoginAttemptProtectionService service;
+    private RateLimitProtectionService service;
 
     @BeforeEach
     void setUp() {
@@ -104,12 +106,12 @@ class LoginAttemptProtectionServiceTests {
             service.beginAttempt(TEST_IP, TEST_USERNAME);
             service.beginAttempt(TEST_IP, TEST_USERNAME);
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
                     );
 
-            assertEquals(LoginRateLimitReason.CLIENT_IP, exception.getReason());
+            assertRejection(exception, RateLimitOperation.LOGIN, RateLimitScope.CLIENT_IP);
             assertEquals(5L, exception.getRetryAfterSeconds());
         }
 
@@ -128,7 +130,7 @@ class LoginAttemptProtectionServiceTests {
             service.beginAttempt(null, TEST_USERNAME);
             service.beginAttempt("   ", TEST_USERNAME);
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt("unknown", TEST_USERNAME)
                     );
@@ -199,15 +201,12 @@ class LoginAttemptProtectionServiceTests {
 
             clock.advance(Duration.ofSeconds(10));
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
                     );
 
-            assertEquals(
-                    LoginRateLimitReason.USERNAME_AND_IP,
-                    exception.getReason()
-            );
+            assertRejection(exception, RateLimitOperation.LOGIN, RateLimitScope.USERNAME_AND_IP);
         }
     }
 
@@ -228,15 +227,12 @@ class LoginAttemptProtectionServiceTests {
         void shouldBlockAfterMaximumAttempts() {
             beginAttempts(TEST_IP, TEST_USERNAME, MAX_FAILED_ATTEMPTS);
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
                     );
 
-            assertEquals(
-                    LoginRateLimitReason.USERNAME_AND_IP,
-                    exception.getReason()
-            );
+            assertRejection(exception, RateLimitOperation.LOGIN, RateLimitScope.USERNAME_AND_IP);
             assertEquals(300L, exception.getRetryAfterSeconds());
         }
 
@@ -296,7 +292,7 @@ class LoginAttemptProtectionServiceTests {
 
             clock.advance(Duration.ofMinutes(1));
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
                     );
@@ -422,7 +418,7 @@ class LoginAttemptProtectionServiceTests {
 
             beginAttempts(TEST_IP, TEST_USERNAME, MAX_FAILED_ATTEMPTS);
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
                     );
@@ -437,7 +433,7 @@ class LoginAttemptProtectionServiceTests {
 
             beginAttempts(TEST_IP, TEST_USERNAME, MAX_FAILED_ATTEMPTS);
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
                     );
@@ -452,7 +448,7 @@ class LoginAttemptProtectionServiceTests {
 
             beginAttempts(TEST_IP, TEST_USERNAME, MAX_FAILED_ATTEMPTS);
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
                     );
@@ -460,7 +456,7 @@ class LoginAttemptProtectionServiceTests {
             assertEquals(15L, exception.getRetryAfterSeconds());
         }
 
-        private LoginAttemptProtectionService createServiceWithLock(Duration lock) {
+        private RateLimitProtectionService createServiceWithLock(Duration lock) {
             return createService(
                     HIGH_IP_CAPACITY,
                     IP_REFILL_PERIOD,
@@ -481,7 +477,7 @@ class LoginAttemptProtectionServiceTests {
         void shouldBlockUsernameAcrossDifferentIps() {
             beginAttemptsFromDistinctIps(1, MAX_FAILED_ATTEMPTS_PER_USERNAME);
 
-            LoginRateLimitExceededException exception =
+            RateLimitExceededException exception =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(
                                     ipNumber(MAX_FAILED_ATTEMPTS_PER_USERNAME + 1),
@@ -489,7 +485,7 @@ class LoginAttemptProtectionServiceTests {
                             )
                     );
 
-            assertEquals(LoginRateLimitReason.USERNAME, exception.getReason());
+            assertRejection(exception, RateLimitOperation.LOGIN, RateLimitScope.USERNAME);
             assertEquals(300L, exception.getRetryAfterSeconds());
         }
 
@@ -528,12 +524,12 @@ class LoginAttemptProtectionServiceTests {
             clock.advance(Duration.ofMinutes(1));
 
             // Rejeitada pelo limite do usuário: não pode somar na combinação usuário e IP.
-            LoginRateLimitExceededException rejected =
+            RateLimitExceededException rejected =
                     assertRateLimitedAndGetException(
                             () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
                     );
 
-            assertEquals(LoginRateLimitReason.USERNAME, rejected.getReason());
+            assertRejection(rejected, RateLimitOperation.LOGIN, RateLimitScope.USERNAME);
 
             // O bloqueio do usuário termina; a combinação deve estar livre.
             clock.advance(Duration.ofMinutes(4));
@@ -602,15 +598,104 @@ class LoginAttemptProtectionServiceTests {
     }
 
     @Nested
+    @DisplayName("Ao limitar tentativas de troca de senha")
+    class PasswordChangeTests {
+
+        private static final long USER_ID = 1L;
+        private static final long OTHER_USER_ID = 2L;
+
+        private void beginPasswordChangeAttempts(long userId, int attempts) {
+            for (int attempt = 0; attempt < attempts; attempt++) {
+                service.beginPasswordChangeAttempt(userId);
+            }
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar a tentativa seguinte ao limite, com o motivo PASSWORD_CHANGE")
+        void shouldRejectAttemptAfterLimit() {
+            beginPasswordChangeAttempts(USER_ID, MAX_FAILED_ATTEMPTS);
+
+            RateLimitExceededException exception =
+                    assertRateLimitedAndGetException(
+                            () -> service.beginPasswordChangeAttempt(USER_ID)
+                    );
+
+            assertRejection(exception, RateLimitOperation.PASSWORD_CHANGE, RateLimitScope.USER_ID);
+            assertEquals(LOCK_DURATION.toSeconds(), exception.getRetryAfterSeconds());
+        }
+
+        @Test
+        @DisplayName("Deve manter contadores independentes por usuário")
+        void shouldKeepIndependentCountersPerUser() {
+            beginPasswordChangeAttempts(USER_ID, MAX_FAILED_ATTEMPTS);
+
+            assertRateLimited(() -> service.beginPasswordChangeAttempt(USER_ID));
+            assertDoesNotThrow(() -> service.beginPasswordChangeAttempt(OTHER_USER_ID));
+        }
+
+        @Test
+        @DisplayName("Não deve bloquear o login do usuário nem ser bloqueada por ele")
+        void shouldBeIndependentFromLoginLimits() {
+            beginPasswordChangeAttempts(USER_ID, MAX_FAILED_ATTEMPTS);
+            assertRateLimited(() -> service.beginPasswordChangeAttempt(USER_ID));
+
+            assertDoesNotThrow(() -> service.beginAttempt(TEST_IP, TEST_USERNAME));
+
+            beginAttempts(OTHER_IP, "other.user", MAX_FAILED_ATTEMPTS);
+            assertRateLimited(() -> service.beginAttempt(OTHER_IP, "other.user"));
+
+            assertDoesNotThrow(() -> service.beginPasswordChangeAttempt(OTHER_USER_ID));
+        }
+
+        @Test
+        @DisplayName("Deve zerar o contador após a confirmação da senha atual")
+        void shouldResetCounterAfterSuccessfulPasswordChange() {
+            service.beginPasswordChangeAttempt(USER_ID);
+            service.beginPasswordChangeAttempt(USER_ID);
+            PasswordChangeAttempt last = service.beginPasswordChangeAttempt(USER_ID);
+
+            service.recordSuccessfulCurrentPasswordVerification(last);
+
+            beginPasswordChangeAttempts(USER_ID, MAX_FAILED_ATTEMPTS);
+            assertRateLimited(() -> service.beginPasswordChangeAttempt(USER_ID));
+        }
+
+        @Test
+        @DisplayName("Deve desfazer a contagem de uma tentativa cancelada")
+        void shouldReleaseCancelledAttempt() {
+            service.beginPasswordChangeAttempt(USER_ID);
+            service.beginPasswordChangeAttempt(USER_ID);
+            PasswordChangeAttempt third = service.beginPasswordChangeAttempt(USER_ID);
+
+            service.cancelPasswordChangeAttempt(third);
+
+            assertDoesNotThrow(() -> service.beginPasswordChangeAttempt(USER_ID));
+            assertRateLimited(() -> service.beginPasswordChangeAttempt(USER_ID));
+        }
+
+        @Test
+        @DisplayName("Deve liberar novas tentativas quando o bloqueio termina")
+        void shouldAllowAttemptsAfterLockDuration() {
+            beginPasswordChangeAttempts(USER_ID, MAX_FAILED_ATTEMPTS);
+            assertRateLimited(() -> service.beginPasswordChangeAttempt(USER_ID));
+
+            clock.advance(LOCK_DURATION);
+
+            assertDoesNotThrow(() -> service.beginPasswordChangeAttempt(USER_ID));
+        }
+    }
+
+    @Nested
     @DisplayName("Ao registrar métricas")
     class MetricsTests {
 
         @Test
         @DisplayName("Deve iniciar todos os contadores de rejeição em zero")
         void shouldStartCountersAtZero() {
-            for (LoginRateLimitReason reason : LoginRateLimitReason.values()) {
-                assertEquals(0.0, rejectionCount(reason));
-            }
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.CLIENT_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME_AND_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.PASSWORD_CHANGE, RateLimitScope.USER_ID));
         }
 
         @Test
@@ -631,9 +716,9 @@ class LoginAttemptProtectionServiceTests {
                     () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
             );
 
-            assertEquals(1.0, rejectionCount(LoginRateLimitReason.CLIENT_IP));
-            assertEquals(0.0, rejectionCount(LoginRateLimitReason.USERNAME_AND_IP));
-            assertEquals(0.0, rejectionCount(LoginRateLimitReason.USERNAME));
+            assertEquals(1.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.CLIENT_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME_AND_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME));
         }
 
         @Test
@@ -648,9 +733,9 @@ class LoginAttemptProtectionServiceTests {
                     () -> service.beginAttempt(TEST_IP, TEST_USERNAME)
             );
 
-            assertEquals(2.0, rejectionCount(LoginRateLimitReason.USERNAME_AND_IP));
-            assertEquals(0.0, rejectionCount(LoginRateLimitReason.CLIENT_IP));
-            assertEquals(0.0, rejectionCount(LoginRateLimitReason.USERNAME));
+            assertEquals(2.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME_AND_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.CLIENT_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME));
         }
 
         @Test
@@ -664,14 +749,33 @@ class LoginAttemptProtectionServiceTests {
                     () -> service.beginAttempt(ipNumber(100), TEST_USERNAME)
             );
 
-            assertEquals(1.0, rejectionCount(LoginRateLimitReason.USERNAME));
-            assertEquals(0.0, rejectionCount(LoginRateLimitReason.USERNAME_AND_IP));
-            assertEquals(0.0, rejectionCount(LoginRateLimitReason.CLIENT_IP));
+            assertEquals(1.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME_AND_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.CLIENT_IP));
         }
 
-        private double rejectionCount(LoginRateLimitReason reason) {
+        @Test
+        @DisplayName("Deve contar rejeições de troca de senha")
+        void shouldCountPasswordChangeRejections() {
+            for (int i = 0; i < MAX_FAILED_ATTEMPTS; i++) {
+                service.beginPasswordChangeAttempt(1L);
+            }
+
+            assertRateLimited(() -> service.beginPasswordChangeAttempt(1L));
+
+            assertEquals(1.0, rejectionCount(RateLimitOperation.PASSWORD_CHANGE, RateLimitScope.USER_ID));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.CLIENT_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME_AND_IP));
+            assertEquals(0.0, rejectionCount(RateLimitOperation.LOGIN, RateLimitScope.USERNAME));
+        }
+
+        private double rejectionCount(
+                RateLimitOperation operation,
+                RateLimitScope scope
+        ) {
             return meterRegistry.get(REJECTION_METRIC)
-                    .tag("reason", reason.metricTag())
+                    .tag("operation", operation.metricTag())
+                    .tag("scope", scope.metricTag())
                     .counter()
                     .count();
         }
@@ -744,7 +848,7 @@ class LoginAttemptProtectionServiceTests {
                         try {
                             service.beginAttempt(ip, TEST_USERNAME);
                             admitted.incrementAndGet();
-                        } catch (LoginRateLimitExceededException exception) {
+                        } catch (RateLimitExceededException exception) {
                             rejected.incrementAndGet();
                         }
 
@@ -770,7 +874,7 @@ class LoginAttemptProtectionServiceTests {
         }
     }
 
-    private LoginAttemptProtectionService createService(
+    private RateLimitProtectionService createService(
             int ipCapacity,
             Duration ipRefillPeriod,
             int maxFailedAttempts,
@@ -788,7 +892,7 @@ class LoginAttemptProtectionServiceTests {
                 MAXIMUM_TRACKED_KEYS
         );
 
-        return new LoginAttemptProtectionService(
+        return new RateLimitProtectionService(
                 properties,
                 clock,
                 meterRegistry
@@ -807,16 +911,25 @@ class LoginAttemptProtectionServiceTests {
 
     private void assertRateLimited(Executable action) {
         assertThrows(
-                LoginRateLimitExceededException.class,
+                RateLimitExceededException.class,
                 action
         );
     }
 
-    private LoginRateLimitExceededException assertRateLimitedAndGetException(
+    private static void assertRejection(
+            RateLimitExceededException exception,
+            RateLimitOperation expectedOperation,
+            RateLimitScope expectedScope
+    ) {
+        assertEquals(expectedOperation, exception.getOperation());
+        assertEquals(expectedScope, exception.getScope());
+    }
+
+    private RateLimitExceededException assertRateLimitedAndGetException(
             Executable action
     ) {
         return assertThrows(
-                LoginRateLimitExceededException.class,
+                RateLimitExceededException.class,
                 action
         );
     }

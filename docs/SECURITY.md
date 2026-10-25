@@ -76,4 +76,17 @@ Invalid values stop the application at startup.
 
 ### Monitoring
 
-Each rejection increments the `login.rate_limit.rejected` counter, tagged by `reason` (`client_ip`, `username_ip`, or `username`), and logs a warning with the reason and the client IP. Usernames are not logged. A rise in `username` rejections indicates a distributed attack or a locked-out account.
+Each rejection increments the `security.rate_limit.rejected` counter, tagged by `operation` (`login` or `password_change`) and `scope` (`client_ip`, `username_ip`, `username`, or `user_id`), and logs a warning with the operation, the scope, and the subject (the client IP, or `user:<id>` for password changes). Usernames are not logged. A rise in `username` rejections indicates a distributed attack or a locked-out account; a rise in `password_change` rejections (scope `user_id`) indicates someone guessing the current password with a valid token.
+
+This counter replaces the former `login.rate_limit.rejected`, which was tagged by `reason`. Update dashboards and alerts accordingly.
+
+## Password Change Rate Limiting
+
+`PATCH /api/v1/auth/password` confirms the current password, so a stolen or left-open token could otherwise be used to guess it without limit. The endpoint therefore reuses the login limiter with a separate counter per authenticated user.
+
+- **Same limits as the login.** It uses `max-failed-attempts`, `failure-window`, and `lock-duration` from the table above: 5 wrong current passwords per 15-minute window, then a 15-minute lock answered with `429 Too Many Requests` and a `Retry-After` header.
+- **Independent from the login.** The counter has its own key (`password-change:<user id>`). Wrong current passwords do not lock the user out of the login, and login failures do not block a password change.
+- **Atomic counting.** As in the login, the attempt is counted *before* the password is checked, so parallel requests cannot exceed the limit while BCrypt is still running. The attempt that reaches the limit is still evaluated; the next one is rejected.
+- **Reset and cancellation.** A failed current-password verification remains counted. If the user lookup or current-password verification cannot be completed because of an exception, the reserved attempt is cancelled. Once the current password is confirmed, the counter is reset; a later transaction rollback does not restore the previous in-memory counter state.
+- **Accepted cost.** Someone holding the token can lock the owner's password change for 15 minutes. The login is not affected.
+- **Local state.** Like the login limiter, the state is in memory, is not shared between instances, and is cleared on restart.

@@ -58,6 +58,9 @@ public final class ApiErrorMessages {
     public static final String LOGIN_RATE_LIMIT_EXCEEDED =
             "Muitas tentativas de login. Aguarde antes de tentar novamente.";
 
+    public static final String PASSWORD_CHANGE_RATE_LIMIT_EXCEEDED =
+            "Muitas tentativas de troca de senha. Aguarde antes de tentar novamente.";
+
     // Address integration
     public static final String POSTAL_CODE_NOT_FOUND =
             "CEP não encontrado em nenhum provedor.";

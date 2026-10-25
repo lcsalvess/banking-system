@@ -47,7 +47,7 @@ Operations are logged through Spring application events:
 - Services publish events after creating or changing data: client `CREATED`/`UPDATED`, account `CREATED`/`CANCELLED`, user `CREATED`/`DEACTIVATED`/`REACTIVATED`/`PASSWORD_CHANGED`, and transactions (deposit, withdrawal, transfer, and yield, with `SYSTEM` as the actor for yield).
 - Listeners use `@TransactionalEventListener` in the `AFTER_COMMIT` phase, so an operation is logged as successful only after its database transaction commits.
 - The daily yield job logs the start and end of each run, including a summary of the results (`attempted`, `applied`, `alreadyProcessed`, `notEligible`, `noYield`, `balanceLimitReached`, `skippedAccounts`, and `failed`) and a status of `completed`, `completed with failures`, or `aborted`.
-- The login rate limiter logs each rejection with its reason and the client IP, never the username (see [Login Rate Limiting](SECURITY.md#login-rate-limiting)).
+- The rate limiter logs each rejection with its operation, scope, and subject (the client IP for login rejections by IP, or `user:<id>` for password changes), never the username (see [Login Rate Limiting](SECURITY.md#login-rate-limiting) and [Password Change Rate Limiting](SECURITY.md#password-change-rate-limiting)).
 - The global exception handler logs business errors, authentication and authorization failures, data integrity violations, address provider failures, and unexpected errors.
 - The application log level is controlled by `logging.level.com.lcsalvess.bankingsystem` (`INFO` by default). SQL logging is disabled.
 
@@ -73,6 +73,6 @@ Operations are logged through Spring application events:
 
 - Custom Micrometer counter:
 
-| Counter                       | Description                                                                                                       |
-|-------------------------------|-------------------------------------------------------------------------------------------------------------------|
-| `login.rate_limit.rejected`   | Login requests rejected by the rate limiter, tagged by `reason`: `client_ip`, `username_ip`, or `username`        |
+| Counter                        | Description                                                                                                                                                             |
+|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `security.rate_limit.rejected` | Requests rejected by the security rate limiter, tagged by `operation` (`login` or `password_change`) and `scope` (`client_ip`, `username_ip`, `username`, or `user_id`) |

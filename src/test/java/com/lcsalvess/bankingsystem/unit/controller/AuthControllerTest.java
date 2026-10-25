@@ -6,7 +6,7 @@ import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
-import com.lcsalvess.bankingsystem.service.security.LoginAttemptProtectionService;
+import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -52,7 +52,7 @@ class AuthControllerTest {
     private TransactionRepository transactionRepository;
 
     @Autowired
-    private LoginAttemptProtectionService loginAttemptProtectionService;
+    private RateLimitProtectionService rateLimitProtectionService;
 
     @Autowired
     private LoginRateLimitProperties rateLimitProperties;
@@ -63,8 +63,8 @@ class AuthControllerTest {
         userRepository.deleteAll();
 
         // Limpa as tentativas de login dos usuários utilizados nos testes.
-        loginAttemptProtectionService.clearFailures("test-user");
-        loginAttemptProtectionService.clearFailures("test-invalid-user");
+        rateLimitProtectionService.clearFailures("test-user");
+        rateLimitProtectionService.clearFailures("test-invalid-user");
 
         User user = new User(
                 "test-user",

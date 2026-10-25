@@ -98,6 +98,20 @@ public class AuthController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or revoked access token."
+            ),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many failed password change attempts. "
+                            + "Retry after the indicated delay.",
+                    headers = @Header(
+                            name = "Retry-After",
+                            description = "Number of seconds to wait before retrying.",
+                            schema = @Schema(
+                                    type = "integer",
+                                    format = "int64",
+                                    example = "900"
+                            )
+                    )
             )
     })
     @PatchMapping("/password")

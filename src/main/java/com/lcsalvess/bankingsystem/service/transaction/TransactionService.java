@@ -399,15 +399,15 @@ public class TransactionService {
             UUID transferCode,
             User performedBy
     ) {
-        Transaction transaction = Transaction.createTransfer (
-                        type,
-                        amount,
-                        LocalDateTime.now(clock),
-                        account,
-                        transferCode,
-                        performedBy,
-                        account.getBalance()
-                );
+        Transaction transaction = Transaction.createTransfer(
+                type,
+                amount,
+                LocalDateTime.now(clock),
+                account,
+                transferCode,
+                performedBy,
+                account.getBalance()
+        );
 
         return transactionRepository.save(transaction);
     }

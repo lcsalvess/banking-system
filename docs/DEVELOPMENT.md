@@ -78,7 +78,7 @@ The application and Flyway use separate database credentials in the `local` and 
 - `DB_USERNAME` and `DB_PASSWORD` identify the runtime database user (`banking_app`). This user performs application operations and should receive only the table and sequence privileges required by the application. It should not own database objects or have privileges to change the database schema.
 - `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD` identify the Flyway migration user (`banking_migrator`). This user applies schema migrations and owns the database objects managed by Flyway.
 
-Before starting the application in `local` or `prod`, provision the roles and schema access with `scripts/db/bootstrap-roles.sql`, set both role passwords securely, and configure all four database environment variables. Flyway applies `V20__configure_application_privileges.sql` as `banking_migrator` to configure the runtime role's table, sequence, and default privileges. The migration intentionally skips those grants when Flyway connects as another user, as it does in the `test` profile. Therefore, a `Skipping banking_app grants` notice in `local` or `prod` indicates a configuration problem: verify `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD` before treating startup as correctly configured.
+Before starting the application in `local` or `prod`, provision the roles and schema access with `scripts/db/bootstrap-roles.sql`, set both role passwords securely, and configure all four database environment variables. After each migration run, Flyway executes the callback `db/callback/afterMigrate__apply_runtime_privileges.sql` as `banking_migrator` to configure the runtime role's table, sequence, and default privileges. If Flyway connects as any other user, the callback fails the startup with an explicit error: verify `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD`. The `test` profile does not load this callback.
 
 Database passwords must be provided through environment variables or the run configuration and must not be committed to source control.
 
@@ -154,7 +154,14 @@ For request examples, see the [API reference](API.md).
 
 The test suite runs against PostgreSQL using the `test` profile and the `banking_system_test` database. Flyway applies the same migrations used by the application, and Hibernate validates the resulting schema.
 
-The `test` profile uses `DB_USERNAME` and `DB_PASSWORD` for both the application datasource and Flyway. For local test execution, these credentials must belong to a dedicated test database user with permission to apply migrations and clean up integration-test fixtures in `banking_system_test`. Do not use the runtime `banking_app` credentials for this purpose: its production-style grants intentionally prohibit physical deletion from business tables and transaction history. The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. In tests, V20 records as applied but skips the runtime-role grants when the connected user is not `banking_migrator`; this keeps test fixture permissions separate from local/production privileges.
+The `test` profile uses `DB_USERNAME` and `DB_PASSWORD` for both the application datasource and Flyway. For local test execution, these credentials must belong to a dedicated test database user with permission to apply migrations and clean up integration-test fixtures in `banking_system_test`. Do not use the runtime `banking_app` credentials for this purpose: its production-style grants intentionally prohibit physical deletion from business tables and transaction history. The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The privilege callback is not loaded in the `test` profile, which keeps test fixture permissions separate from local/production privileges. That separation is covered by `LeastPrivilegeSmokeTests`, which runs only when the `PRIVILEGE_TEST_*` environment variables are set (the `least-privilege` job in GitHub Actions sets them). It needs an empty database with the roles from `scripts/db/bootstrap-roles.sql`:
+
+```bash
+PRIVILEGE_TEST_DB_URL=jdbc:postgresql://localhost:5432/banking_privilege_test \
+PRIVILEGE_TEST_MIGRATOR_USER=banking_migrator PRIVILEGE_TEST_MIGRATOR_PASSWORD=... \
+PRIVILEGE_TEST_APP_USER=banking_app PRIVILEGE_TEST_APP_PASSWORD=... \
+./mvnw test -Dtest=LeastPrivilegeSmokeTests
+```
 
 ### Running the tests
 

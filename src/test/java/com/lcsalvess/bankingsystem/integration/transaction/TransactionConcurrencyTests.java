@@ -945,7 +945,14 @@ class TransactionConcurrencyTests {
                 generated.digit()
         );
 
-        account.credit(new BigDecimal(initialBalance));
+        BigDecimal balance = new BigDecimal(initialBalance);
+        if (balance.signum() > 0) {
+            account.credit(balance);
+        } else if (balance.signum() < 0) {
+            throw new IllegalArgumentException(
+                    "An initial account balance cannot be negative."
+            );
+        }
 
         return accountRepository.saveAndFlush(account);
     }
@@ -964,7 +971,14 @@ class TransactionConcurrencyTests {
                 initialYieldDate
         );
 
-        account.credit(new BigDecimal(initialBalance));
+        BigDecimal balance = new BigDecimal(initialBalance);
+        if (balance.signum() > 0) {
+            account.credit(balance);
+        } else if (balance.signum() < 0) {
+            throw new IllegalArgumentException(
+                    "An initial account balance cannot be negative."
+            );
+        }
 
         return accountRepository.saveAndFlush(account);
     }

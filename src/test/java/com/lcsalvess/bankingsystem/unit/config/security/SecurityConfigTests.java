@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.config.security;
 
 import com.lcsalvess.bankingsystem.config.security.JwtProperties;
+import com.lcsalvess.bankingsystem.config.security.JwtServiceConfiguration;
 import com.lcsalvess.bankingsystem.config.security.SecurityConfig;
 import com.lcsalvess.bankingsystem.config.time.ClockConfig;
 import com.lcsalvess.bankingsystem.entity.user.Role;
@@ -107,9 +108,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         ClockConfig.class,
         SecurityConfig.class,
+        JwtServiceConfiguration.class,
         RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class,
-        JwtService.class,
         SecurityProbeController.class
 })
 @TestPropertySource(properties = {
@@ -910,8 +911,15 @@ class SecurityConfigTests {
         return "Bearer " + jwtService.generateToken(user);
     }
 
-    private static JwtService serviceOf(String secret, long expirationInSeconds, String issuer) {
-        return new JwtService(new JwtProperties(secret, expirationInSeconds, issuer), Clock.systemUTC());
+    private static JwtService serviceOf(
+            String secret,
+            long expirationInSeconds,
+            String issuer
+    ) {
+        return JwtService.create(
+                new JwtProperties(secret, expirationInSeconds, issuer),
+                Clock.systemUTC()
+        );
     }
 
     private static User createUser(Role role) {

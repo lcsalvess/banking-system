@@ -436,8 +436,16 @@ class JwtServiceTests {
         return serviceOf(secret, expirationInSeconds, issuer, Clock.systemUTC());
     }
 
-    private static JwtService serviceOf(String secret, long expirationInSeconds, String issuer, Clock clock) {
-        return new JwtService(new JwtProperties(secret, expirationInSeconds, issuer), clock);
+    private static JwtService serviceOf(
+            String secret,
+            long expirationInSeconds,
+            String issuer,
+            Clock clock
+    ) {
+        return JwtService.create(
+                new JwtProperties(secret, expirationInSeconds, issuer),
+                clock
+        );
     }
 
     private static Clock fixedClock(Instant instant) {

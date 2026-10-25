@@ -10,7 +10,6 @@ import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotency
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRepository;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,10 +24,6 @@ public class TransactionIdempotencyService {
     private final TransactionService transactionService;
     private final CurrentUserService currentUserService;
 
-    @SuppressFBWarnings(
-            value = "EI_EXPOSE_REP2",
-            justification = "TransactionIdempotencyRepository is a Spring-managed collaborator intentionally retained for idempotency operations."
-    )
     public TransactionIdempotencyService(
             TransactionIdempotencyRepository idempotencyRepository,
             TransactionRepository transactionRepository,

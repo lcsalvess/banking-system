@@ -1,6 +1,9 @@
 -- Transfer existing application database objects to the Flyway migration role.
 -- Run as a PostgreSQL administrator against the existing application database.
--- Preconditions: V19 is successfully applied and V20 has not been applied yet.
+-- Preconditions: V19 is successfully applied. It can run before V20 or after it
+-- (for example, when V20/V21 were recorded while Flyway ran as another user and the
+-- afterMigrate privilege callback now fails because banking_migrator does not own
+-- the objects). It is idempotent: objects already owned by banking_migrator are unchanged.
 -- Do not run this script against banking_system_test or a new, empty database.
 -- It changes ownership only; it does not modify application data or migration files.
 
@@ -28,7 +31,7 @@ $$
 
         IF to_regclass('public.flyway_schema_history') IS NULL THEN
             RAISE EXCEPTION
-                'flyway_schema_history was not found; this script is only for an existing database migrated through V19';
+                'flyway_schema_history was not found; this script is only for an existing database migrated through at least V19';
         END IF;
 
         IF NOT EXISTS (SELECT 1
@@ -36,15 +39,7 @@ $$
                        WHERE version = '19'
                          AND success) THEN
             RAISE EXCEPTION
-                'Flyway migration V19 is not recorded as successful; this script requires an existing schema at V19';
-        END IF;
-
-        IF EXISTS (SELECT 1
-                   FROM public.flyway_schema_history
-                   WHERE version = '20'
-                     AND success) THEN
-            RAISE EXCEPTION
-                'V20 is already recorded as successful; this ownership-transfer script is intended to run before V20';
+                'Flyway migration V19 is not recorded as successful; this script requires an existing schema at V19 or later';
         END IF;
     END
 $$;

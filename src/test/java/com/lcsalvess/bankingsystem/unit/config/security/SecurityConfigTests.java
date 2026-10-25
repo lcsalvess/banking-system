@@ -544,25 +544,15 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve aceitar token sem o claim de versão enquanto o usuário está na versão 0")
-        void shouldAcceptLegacyTokenWhileUserIsAtVersionZero() throws Exception {
-            User user = createUser(Role.EMPLOYEE);
-            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
-
-            mockMvc.perform(get(PROTECTED_URL)
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + legacyToken()))
-                    .andExpect(status().isOk());
-        }
-
-        @Test
-        @DisplayName("Deve responder 401 para token sem o claim de versão depois da troca de senha")
-        void shouldReturn401ForLegacyTokenAfterPasswordChange() throws Exception {
-            User user = createUser(Role.EMPLOYEE);
-            user.changePassword("novo-hash");
-            when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
-
+        @DisplayName("Deve responder 401 para token sem o claim de versão")
+        void shouldReturn401ForTokenWithoutVersionClaim() throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + legacyToken())));
+                    .header(
+                            HttpHeaders.AUTHORIZATION,
+                            "Bearer " + tokenWithoutVersion()
+                    )));
+
+            verifyNoInteractions(userDetailsService);
         }
 
         @Test
@@ -896,8 +886,8 @@ class SecurityConfigTests {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
-    /** Token como os emitidos antes da introdução do claim de versão (sem "tv"). */
-    private static String legacyToken() {
+    /** Builds a signed token without the required "tv" claim. */
+    private static String tokenWithoutVersion() {
         return Jwts.builder()
                 .subject(USERNAME)
                 .issuer(ISSUER)

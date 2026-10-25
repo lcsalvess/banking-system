@@ -367,9 +367,9 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve tratar token sem o claim de versão como versão 0")
-        void shouldTreatTokenWithoutVersionAsZero() {
-            String legacyToken = Jwts.builder()
+        @DisplayName("Deve rejeitar token sem o claim de versão")
+        void shouldRejectTokenWithoutVersionClaim() {
+            String tokenWithoutVersion = Jwts.builder()
                     .subject(USERNAME)
                     .issuer(ISSUER)
                     .issuedAt(new Date())
@@ -377,10 +377,10 @@ class JwtServiceTests {
                     .signWith(key(SECRET))
                     .compact();
 
-            JwtClaims claims = jwtService.parse(legacyToken);
-
-            assertEquals(USERNAME, claims.username());
-            assertEquals(0, claims.tokenVersion());
+            assertThrows(
+                    JwtException.class,
+                    () -> jwtService.parse(tokenWithoutVersion)
+            );
         }
 
         @Test

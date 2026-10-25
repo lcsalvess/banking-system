@@ -116,11 +116,6 @@ public class JwtService {
     private int extractTokenVersion(Claims claims) {
         Object version = claims.get(TOKEN_VERSION_CLAIM);
 
-        if (version == null) {
-            // Compatibilidade com tokens emitidos antes da versão de credenciais.
-            return 0;
-        }
-
         if (!(version instanceof Number number)
                 || number.longValue() < 0
                 || number.longValue() > Integer.MAX_VALUE

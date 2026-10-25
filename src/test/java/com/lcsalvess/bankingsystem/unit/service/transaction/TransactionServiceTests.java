@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.account.Account;
+import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
@@ -557,7 +558,7 @@ public class TransactionServiceTests {
         @DisplayName("Should throw when account is not active")
         void shouldThrowWhenAccountIsNotActive() {
             CheckingAccount account = account();
-            account.cancel();
+            ReflectionTestUtils.setField(account, "status", AccountStatus.CANCELLED);
 
             stubAccountOperationLookup(account);
 
@@ -709,7 +710,7 @@ public class TransactionServiceTests {
         @DisplayName("Should throw when account is not active")
         void shouldThrowWhenAccountIsNotActive() {
             CheckingAccount account = account();
-            account.cancel();
+            ReflectionTestUtils.setField(account, "status", AccountStatus.CANCELLED);
 
             stubAccountOperationLookup(account);
 
@@ -860,7 +861,7 @@ public class TransactionServiceTests {
             CheckingAccount source = account();
             CheckingAccount destination = destinationAccount();
 
-            source.cancel();
+            ReflectionTestUtils.setField(source, "status", AccountStatus.CANCELLED);
 
             stubTransferAccountLookup(source, destination);
 
@@ -883,7 +884,7 @@ public class TransactionServiceTests {
             CheckingAccount source = account();
             CheckingAccount destination = destinationAccount();
 
-            destination.cancel();
+            ReflectionTestUtils.setField(destination, "status", AccountStatus.CANCELLED);
 
             stubTransferAccountLookup(source, destination);
 
@@ -1127,7 +1128,7 @@ public class TransactionServiceTests {
         @DisplayName("Should reject an inactive savings account")
         void shouldRejectInactiveSavingsAccount() {
             SavingsAccount account = eligibleSavingsAccount("1000.00");
-            account.cancel();
+            ReflectionTestUtils.setField(account, "status", AccountStatus.CANCELLED);
 
             stubAccountOperationLookup(account);
 

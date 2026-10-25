@@ -474,7 +474,9 @@ public class AccountServiceTests {
         @DisplayName("Should throw when account has balance")
         void shouldThrowWhenAccountHasBalance(String scenario, BigDecimal balance) {
             Account account = checkingAccount();
-            account.credit(balance);
+            // This includes a negative-balance fixture to prove the service rejects every
+            // non-zero balance. Such a state is not reachable through domain methods.
+            ReflectionTestUtils.setField(account, "balance", balance);
             stubAccountLookupForUpdate(account);
 
             assertThrowsWithMessage(
@@ -494,8 +496,10 @@ public class AccountServiceTests {
         @DisplayName("Should throw when account is not active")
         void shouldThrowWhenAccountIsNotActive(String scenario, BigDecimal balance) {
             Account account = checkingAccount();
-            account.credit(balance);
-            account.cancel();
+            // Simulate a pre-existing inconsistent row to verify validation precedence:
+            // inactivity must be reported before the balance check.
+            ReflectionTestUtils.setField(account, "balance", balance);
+            ReflectionTestUtils.setField(account, "status", AccountStatus.CANCELLED);
             stubAccountLookupForUpdate(account);
 
             assertThrowsWithMessage(
@@ -750,7 +754,9 @@ public class AccountServiceTests {
     }
 
     private static <T extends Account> T withBalance(T account, String balance) {
-        account.credit(new BigDecimal(balance));
+        // Fixture helper: represent persisted edge cases without invoking an operation
+        // that intentionally rejects those values.
+        ReflectionTestUtils.setField(account, "balance", new BigDecimal(balance));
         return account;
     }
 

@@ -70,3 +70,60 @@ jobs:
           path: target/spotbugsXml.xml
           if-no-files-found: error
           retention-days: 14
+
+  least-privilege:
+    name: Least-privilege database roles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18
+
+        env:
+          POSTGRES_DB: banking_privilege_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_admin_password
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U postgres -d banking_privilege_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PGPASSWORD: postgres_admin_password
+      PRIVILEGE_TEST_DB_URL: jdbc:postgresql://localhost:5432/banking_privilege_test
+      PRIVILEGE_TEST_MIGRATOR_USER: banking_migrator
+      PRIVILEGE_TEST_MIGRATOR_PASSWORD: migrator_test_password
+      PRIVILEGE_TEST_APP_USER: banking_app
+      PRIVILEGE_TEST_APP_PASSWORD: app_test_password
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Provision database roles
+        run: |
+          psql -h localhost -U postgres -d banking_privilege_test \
+            -v ON_ERROR_STOP=1 -f scripts/db/bootstrap-roles.sql
+          psql -h localhost -U postgres -d banking_privilege_test \
+            -v ON_ERROR_STOP=1 \
+            -c "ALTER ROLE banking_migrator PASSWORD '${PRIVILEGE_TEST_MIGRATOR_PASSWORD}'" \
+            -c "ALTER ROLE banking_app PASSWORD '${PRIVILEGE_TEST_APP_PASSWORD}'"
+
+      - name: Run least-privilege smoke tests
+        run: >-
+          ./mvnw --batch-mode --no-transfer-progress test
+          -Dtest=LeastPrivilegeSmokeTests
+          -Dsurefire.failIfNoSpecifiedTests=false

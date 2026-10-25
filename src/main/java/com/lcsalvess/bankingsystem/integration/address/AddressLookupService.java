@@ -29,13 +29,13 @@ public class AddressLookupService {
             List<AddressProvider> providers,
             MeterRegistry meterRegistry
     ) {
-        this.providers = providers;
+        this.providers = List.copyOf(providers);
 
         this.addressLookupTimer = Timer.builder("address.lookup")
                 .description("Total address lookup duration")
                 .register(meterRegistry);
 
-        this.providerTimers = providers.stream()
+        this.providerTimers = this.providers.stream()
                 .collect(Collectors.toMap(
                         Function.identity(),
                         provider -> Timer.builder("address.provider.lookup")

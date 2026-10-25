@@ -34,6 +34,11 @@ public record ApiErrorResponse(
         )
         Map<String, String> errors
 ) {
+
+    public ApiErrorResponse {
+        errors = errors == null ? null : Map.copyOf(errors);
+    }
+
     public ApiErrorResponse(int status, String message) {
         this(status, message, Instant.now(), null);
     }

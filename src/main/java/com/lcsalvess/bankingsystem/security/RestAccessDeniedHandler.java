@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.security;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -30,6 +31,10 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
     private final JsonMapper jsonMapper;
 
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "JsonMapper is a Spring-managed collaborator intentionally retained for JSON serialization."
+    )
     public RestAccessDeniedHandler(JsonMapper jsonMapper) {
         this.jsonMapper = jsonMapper;
     }

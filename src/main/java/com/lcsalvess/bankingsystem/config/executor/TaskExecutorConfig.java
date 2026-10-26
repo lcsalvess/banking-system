@@ -17,16 +17,17 @@ public class TaskExecutorConfig {
 
     /**
      * Executor dedicado às tarefas de recuperação executadas após a
-     * inicialização da aplicação, com uma thread e fila de uma tarefa.
-     *
-     * <p>Declarar qualquer bean {@code Executor} desativa o
+     * inicialização da aplicação, com uma thread e capacidade para duas
+     * tarefas na fila.
+     * <p>
+     * Declarar qualquer bean {@code Executor} desativa o
      * {@code applicationTaskExecutor} auto-configurado do Spring Boot
      * ({@code @ConditionalOnMissingBean(Executor.class)}). Sem ele, o suporte
      * assíncrono do MVC pode recorrer ao {@code SimpleAsyncTaskExecutor},
      * criando threads sem um pool limitado, e um eventual {@code @Async}
      * pode acabar usando este executor dedicado.
-     *
-     * <p>Por isso, o executor padrão da aplicação é declarado explicitamente
+     * <p>
+     * Por isso, o executor padrão da aplicação é declarado explicitamente
      * abaixo, preservando sua configuração independente.
      */
     @Bean(name = STARTUP_RECOVERY_EXECUTOR)

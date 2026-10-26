@@ -96,8 +96,8 @@ public class JwtService {
     }
 
     /**
-     * Valida assinatura, issuer e expiração e devolve os claims usados na autenticação.
-     * Tokens emitidos antes da introdução do claim de versão valem como versão 0.
+     * Valida assinatura, issuer, expiração e a claim obrigatória de versão do token.
+     * A claim "tv" deve conter um inteiro não negativo dentro do intervalo suportado.
      */
     public JwtClaims parse(String jwt) {
         Claims claims = Jwts.parser()

@@ -35,7 +35,7 @@ public class TaskExecutorConfig {
 
         executor.setCorePoolSize(1);
         executor.setMaxPoolSize(1);
-        executor.setQueueCapacity(1);
+        executor.setQueueCapacity(2);
 
         executor.setThreadNamePrefix("startup-recovery-");
 

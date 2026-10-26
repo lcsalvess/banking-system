@@ -33,8 +33,7 @@ public final class AuditEventSpecifications {
 
         String usernamePattern = normalizedUsername == null
                 ? null
-                : "%"
-                + escapeLike(
+                : escapeLike(
                 normalizedUsername.toLowerCase(Locale.ROOT)
         )
                 + "%";

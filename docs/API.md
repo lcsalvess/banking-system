@@ -49,7 +49,7 @@ Request bodies are strict about JSON types: text fields reject numbers and boole
 
 ## Pagination, Sorting, and Filtering
 
-List endpoints accept `page`, `size`, and `sort` (for example `sort=balance,desc`). The maximum page size is 100, and larger values are capped. Sorting by a property outside the list of an endpoint returns `400 Bad Request`. 
+List endpoints accept `page`, `size`, and `sort` (for example `sort=balance,desc`). The maximum page size is 100, and larger values are capped. Sorting by a property outside the list of an endpoint returns `400 Bad Request`.
 
 When the requested sort does not include `id`, it is appended as a tie-breaker to provide a stable order across pages.
 If `id` is explicitly included, its requested direction and position are preserved.
@@ -72,11 +72,12 @@ The endpoint supports the following optional filters:
 
 - `startDate` and `endDate`: inclusive dates in `yyyy-MM-dd` format.
   Dates must be between 2020-01-01 and the current date, and the start
-  date cannot be after the end date.
+  date cannot be after the end date. When both dates are informed, the
+  range cannot exceed 366 days.
 - `eventType`: exact event type.
 - `outcome`: recorded outcome (`SUCCESS`, `FAILURE`, or `DENIED`).
 - `actorUserId`: positive numeric ID of the actor.
-- `actorUsername`: partial, case-insensitive username search.
+- `actorUsername`: case-insensitive search by the beginning of the username.
 - `entityType`: exact type of the affected entity.
 - `entityId`: exact affected entity ID.
 

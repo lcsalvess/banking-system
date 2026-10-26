@@ -19,6 +19,11 @@ import java.time.LocalDate;
 @Service
 public class AuditEventQueryService {
 
+    /**
+     * Maior intervalo (inclusivo) aceito quando início e fim são informados.
+     */
+    public static final int MAX_RANGE_DAYS = 366;
+
     private final AuditEventQueryRepository auditEventQueryRepository;
     private final Clock clock;
 
@@ -42,7 +47,12 @@ public class AuditEventQueryService {
             String entityId,
             Pageable pageable
     ) {
-        QueryDateRangeValidator.validate(startDate, endDate, clock);
+        QueryDateRangeValidator.validate(
+                startDate,
+                endDate,
+                clock,
+                MAX_RANGE_DAYS
+        );
 
         return auditEventQueryRepository.findAll(
                         AuditEventSpecifications.byFilters(

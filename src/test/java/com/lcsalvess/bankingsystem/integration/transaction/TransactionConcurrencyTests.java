@@ -640,9 +640,8 @@ class TransactionConcurrencyTests {
                     "A consistent ledger must not produce mismatches."
             );
             assertTrue(
-                    transactionRepository
-                            .findFirstBalanceChainBreak(source.getId())
-                            .isEmpty()
+                    transactionRepository.findBalanceChainBreaks().isEmpty(),
+                    "A consistent ledger must not contain balance chain breaks."
             );
         }
 
@@ -656,6 +655,98 @@ class TransactionConcurrencyTests {
             jdbcTemplate.update(
                     "UPDATE accounts SET balance = balance + 1 WHERE id = ?",
                     account.getId()
+            );
+
+            assertEquals(1, balanceReconciliationJob.reconcile());
+        }
+
+        @Test
+        @DisplayName(
+                "Should detect a broken historical chain when the final balance matches the last snapshot"
+        )
+        void shouldDetectBrokenHistoricalChainWhenFinalBalanceMatchesLastSnapshot() {
+            CheckingAccount account = createCheckingAccount("0.00");
+
+            transactionService.deposit(operation(account, "100.00"));
+            transactionService.withdraw(operation(account, "30.00"));
+            transactionService.deposit(operation(account, "10.00"));
+
+            // Corrupt the intermediate snapshot without changing the account balance
+            // or the final transaction snapshot.
+            jdbcTemplate.update(
+                    """
+                    UPDATE transactions
+                    SET balance_after = 69.00
+                    WHERE id = (
+                        SELECT id
+                        FROM transactions
+                        WHERE account_id = ?
+                        ORDER BY id
+                        OFFSET 1 LIMIT 1
+                    )
+                    """,
+                    account.getId()
+            );
+
+            assertBalance("80.00", account);
+
+            assertTrue(
+                    transactionRepository.findBalanceMismatches().isEmpty(),
+                    "The current balance must still match the last transaction snapshot."
+            );
+
+            assertEquals(
+                    1,
+                    balanceReconciliationJob.reconcile(),
+                    "Reconciliation must detect a broken intermediate snapshot "
+                            + "even when the current balance matches the last snapshot."
+            );
+        }
+
+        @Test
+        @DisplayName("Should detect a corrupted first transaction snapshot against zero")
+        void shouldDetectCorruptedFirstTransactionSnapshot() {
+            CheckingAccount account = createCheckingAccount("0.00");
+
+            transactionService.deposit(operation(account, "100.00"));
+            transactionService.withdraw(operation(account, "30.00"));
+
+            Long firstTransactionId = jdbcTemplate.queryForObject(
+                    """
+                    SELECT id
+                    FROM transactions
+                    WHERE account_id = ?
+                    ORDER BY id
+                    LIMIT 1
+                    """,
+                    Long.class,
+                    account.getId()
+            );
+
+            jdbcTemplate.update(
+                    "UPDATE transactions SET balance_after = 99.00 WHERE id = ?",
+                    firstTransactionId
+            );
+
+            assertBalance("70.00", account);
+
+            assertTrue(
+                    transactionRepository.findBalanceMismatches().isEmpty(),
+                    "The current balance must still match the last snapshot."
+            );
+
+            var firstBreak = transactionRepository.findBalanceChainBreaks()
+                    .stream()
+                    .filter(chainBreak ->
+                            chainBreak.getAccountId().equals(account.getId()))
+                    .findFirst()
+                    .orElseThrow(() ->
+                            new AssertionError("The broken chain should be detected."));
+
+            assertEquals(
+                    firstTransactionId,
+                    firstBreak.getTransactionId(),
+                    "The first transaction must be validated against an opening balance of zero."
             );
 
             assertEquals(1, balanceReconciliationJob.reconcile());

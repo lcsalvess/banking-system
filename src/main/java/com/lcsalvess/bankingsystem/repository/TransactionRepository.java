@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.repository;
 
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
+import com.lcsalvess.bankingsystem.repository.projection.BalanceChainBreak;
 import com.lcsalvess.bankingsystem.repository.projection.BalanceMismatch;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -152,31 +153,40 @@ public interface TransactionRepository extends
     List<BalanceMismatch> findBalanceMismatches();
 
     /**
-     * Id da primeira transação da conta cujo balance_after não é o
-     * balance_after anterior mais/menos o valor. Diagnóstico para quando
-     * {@link #findBalanceMismatches()} aponta uma conta.
+     * Identifica a primeira quebra da cadeia de saldos históricos de cada conta.
+     *
+     * <p>A primeira transação é validada contra o saldo inicial zero.
+     * As transações seguintes são validadas contra o saldo da transação anterior.
      */
     @Query(value = """
-        SELECT s.id
-        FROM (
-            SELECT t.id,
-                   t.balance_after,
-                   LAG(t.balance_after, 1, CAST(0 AS numeric))
-                       OVER (ORDER BY t.id)
-                   + CASE
-                         WHEN t.transaction_type IN (
-                             'DEPOSIT', 'TRANSFER_RECEIVED', 'YIELD'
-                         ) THEN t.amount
-                         ELSE -t.amount
-                     END AS expected
-            FROM transactions t
-            WHERE t.account_id = :accountId
-        ) s
-        WHERE s.balance_after <> s.expected
-        ORDER BY s.id
-        LIMIT 1
-        """, nativeQuery = true)
-    Optional<Long> findFirstBalanceChainBreak(
-            @Param("accountId") Long accountId
-    );
+    WITH transaction_chain AS (
+        SELECT
+            t.account_id,
+            t.id,
+            t.balance_after,
+            t.amount,
+            t.transaction_type,
+            LAG(t.balance_after, 1, CAST(0 AS numeric)) OVER (
+                PARTITION BY t.account_id
+                ORDER BY t.id
+            ) AS previous_balance
+        FROM transactions t
+    )
+    SELECT
+        account_id AS "accountId",
+        MIN(id) AS "transactionId"
+    FROM transaction_chain
+    WHERE balance_after <> previous_balance
+        + CASE
+            WHEN transaction_type IN (
+                'DEPOSIT',
+                'TRANSFER_RECEIVED',
+                'YIELD'
+            ) THEN amount
+            ELSE -amount
+        END
+    GROUP BY account_id
+    ORDER BY account_id
+    """, nativeQuery = true)
+    List<BalanceChainBreak> findBalanceChainBreaks();
 }

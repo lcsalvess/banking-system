@@ -111,7 +111,7 @@ public class AuditEventController {
             @Positive
             Long actorUserId,
 
-            @Parameter(description = "Search by part of the actor's username")
+            @Parameter(description = "Search by the beginning of the actor's username (case-insensitive)")
             @RequestParam(required = false)
             @Size(max = 20)
             String actorUsername,

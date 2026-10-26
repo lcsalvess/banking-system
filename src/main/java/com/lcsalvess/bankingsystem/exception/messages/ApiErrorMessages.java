@@ -131,6 +131,9 @@ public final class ApiErrorMessages {
     public static final String INVALID_QUERY_DATE =
             "As datas da consulta devem estar entre 01/01/2020 e a data atual.";
 
+    public static final String DATE_RANGE_TOO_WIDE =
+            "O intervalo entre as datas não pode exceder %d dias.";
+
     public static final String IDEMPOTENCY_KEY_CONFLICT =
             "A chave de idempotência já foi utilizada com uma operação ou dados diferentes.";
 

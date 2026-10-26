@@ -251,6 +251,23 @@ class AuditEventQueryServiceTests {
             assertInvalidDateRange(filters);
         }
 
+        @Test
+        @DisplayName("Should reject a range wider than the maximum allowed")
+        void shouldRejectRangeWiderThanMaximum() {
+            Filters filters = new Filters(
+                    TODAY.minusDays(AuditEventQueryService.MAX_RANGE_DAYS),
+                    TODAY,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+
+            assertInvalidDateRange(filters);
+        }
+
         private void assertInvalidDateRange(Filters filters) {
             assertThrows(
                     InvalidDateRangeException.class,

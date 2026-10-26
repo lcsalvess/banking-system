@@ -239,8 +239,8 @@ class AuditEventSpecificationsIntegrationTests {
     class ActorUsernameFilterTests {
 
         @Test
-        @DisplayName("Should match a partial username case-insensitively")
-        void shouldMatchPartialUsernameIgnoringCase() {
+        @DisplayName("Should match the beginning of a username case-insensitively")
+        void shouldMatchUsernamePrefixIgnoringCase() {
             Long actorUserId = uniqueActorUserId();
             String matchingEntityId = uniqueEntityId();
             String otherEntityId = uniqueEntityId();
@@ -272,12 +272,44 @@ class AuditEventSpecificationsIntegrationTests {
                     null,
                     null,
                     actorUserId,
-                    "  AUDITOR  ",
+                    "  LUCAS  ",
                     null,
                     null
             );
 
             assertEquals(Set.of(matchingEntityId), entityIds(result));
+        }
+
+        @Test
+        @DisplayName("Should not match a term found only in the middle of a username")
+        void shouldNotMatchUsernameSubstring() {
+            Long actorUserId = uniqueActorUserId();
+            String entityId = uniqueEntityId();
+
+            persistEvents(
+                    event(
+                            AuditEventType.USER_CREATED,
+                            AuditOutcome.SUCCESS,
+                            actorUserId,
+                            "lucas-auditor",
+                            AuditEntityType.USER,
+                            entityId,
+                            LocalDateTime.of(2025, 3, 10, 10, 0)
+                    )
+            );
+
+            Page<AuditEvent> result = findEvents(
+                    null,
+                    null,
+                    null,
+                    null,
+                    actorUserId,
+                    "AUDITOR",
+                    null,
+                    null
+            );
+
+            assertEquals(Set.of(), entityIds(result));
         }
 
         @Test

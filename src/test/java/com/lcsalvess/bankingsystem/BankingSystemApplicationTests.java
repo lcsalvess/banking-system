@@ -39,7 +39,7 @@ class BankingSystemApplicationTests {
         void shouldBeConfiguredCorrectly() {
             assertEquals(1, startupRecoveryExecutor.getCorePoolSize());
             assertEquals(1, startupRecoveryExecutor.getMaxPoolSize());
-            assertEquals(1, startupRecoveryExecutor.getQueueCapacity());
+            assertEquals(2, startupRecoveryExecutor.getQueueCapacity());
 
             assertEquals(
                     "startup-recovery-",

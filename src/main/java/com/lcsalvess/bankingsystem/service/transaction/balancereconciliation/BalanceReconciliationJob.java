@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.service.transaction;
+package com.lcsalvess.bankingsystem.service.transaction.balancereconciliation;
 
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.projection.BalanceChainBreak;
@@ -35,35 +35,24 @@ public class BalanceReconciliationJob {
         this.transactionRepository = transactionRepository;
     }
 
-    @Scheduled(
-            cron = "${banking.reconciliation.cron}",
-            zone = AppTimeZone.ID
-    )
+    @Scheduled(cron = "${banking.reconciliation.cron}", zone = AppTimeZone.ID)
     public void run() {
-        reconcile();
+        try {
+            reconcile();
+        } catch (RuntimeException ex) {
+            log.error("Scheduled balance reconciliation failed.", ex);
+        }
     }
 
     /**
      * @return quantidade de contas com divergências de saldo ou histórico.
      */
     public int reconcile() {
-        List<BalanceMismatch> mismatches;
+        List<BalanceMismatch> mismatches =
+                transactionRepository.findBalanceMismatches();
 
-        try {
-            mismatches = transactionRepository.findBalanceMismatches();
-        } catch (RuntimeException ex) {
-            log.error("Balance reconciliation could not be executed.", ex);
-            return 0;
-        }
-
-        List<BalanceChainBreak> chainBreaks;
-
-        try {
-            chainBreaks = transactionRepository.findBalanceChainBreaks();
-        } catch (RuntimeException ex) {
-            log.error("Balance chain reconciliation could not be executed.", ex);
-            return 0;
-        }
+        List<BalanceChainBreak> chainBreaks =
+                transactionRepository.findBalanceChainBreaks();
 
         Map<Long, BalanceMismatch> mismatchesByAccount = new TreeMap<>();
         for (BalanceMismatch mismatch : mismatches) {

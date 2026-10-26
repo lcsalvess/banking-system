@@ -75,7 +75,7 @@ public class TransactionController {
                     description = "Account not found"
             )
     })
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN')")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @GetMapping("/accounts/{accountNumber}")
     public Page<TransactionResponseDTO> findByAccountNumber(
             @Parameter(
@@ -152,7 +152,7 @@ public class TransactionController {
                     description = "Transaction not found"
             )
     })
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'ADMIN')")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     @GetMapping("/code/{transactionCode}")
     public TransactionResponseDTO findByTransactionCode(
             @PathVariable UUID transactionCode

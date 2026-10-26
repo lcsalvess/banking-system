@@ -4,26 +4,30 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.account.Account;
+import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
-import com.lcsalvess.bankingsystem.entity.user.User;
-import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lcsalvess.bankingsystem.exception.account.AccountsAreSameException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.exception.transaction.*;
+import com.lcsalvess.bankingsystem.exception.transaction.BalanceLimitExceededException;
+import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
+import com.lcsalvess.bankingsystem.exception.transaction.InvalidAmountException;
+import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
-import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
 import com.lcsalvess.bankingsystem.util.actor.SystemActor;
+import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
+import com.lcsalvess.bankingsystem.validation.daterange.QueryDateRangeValidator;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,9 +42,6 @@ import java.util.UUID;
 
 @Service
 public class TransactionService {
-
-    private static final LocalDate MIN_QUERY_DATE =
-            LocalDate.of(2020, 1, 1);
 
     private final TransactionRepository transactionRepository;
     private final AccountService accountService;
@@ -65,7 +66,7 @@ public class TransactionService {
             LocalDate endDate,
             Pageable pageable
     ) {
-        validateDateRange(startDate, endDate);
+        QueryDateRangeValidator.validate(startDate, endDate, clock);
 
         Account account = accountService.findEntityByAccountNumber(
                 accountNumber,
@@ -347,24 +348,6 @@ public class TransactionService {
         if (!account.canCredit(amount)) {
             throw new BalanceLimitExceededException(ApiErrorMessages.BALANCE_LIMIT_EXCEEDED);
         }
-    }
-
-    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
-        LocalDate today = LocalDate.now(clock);
-
-        if (isInvalidQueryDate(startDate, today)
-                || isInvalidQueryDate(endDate, today)) {
-            throw new InvalidDateRangeException(ApiErrorMessages.INVALID_QUERY_DATE);
-        }
-
-        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
-            throw new InvalidDateRangeException(ApiErrorMessages.INVALID_DATE_RANGE);
-        }
-    }
-
-    private boolean isInvalidQueryDate(LocalDate date, LocalDate today) {
-        return date != null
-                && (date.isBefore(MIN_QUERY_DATE) || date.isAfter(today));
     }
 
     private void validateDistinctAccounts(String fromAccountNumber, String toAccountNumber) {

@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.exception.transaction;
+package com.lcsalvess.bankingsystem.exception.validation.daterange;
 
 import com.lcsalvess.bankingsystem.exception.BusinessException;
 import org.springframework.http.HttpStatus;

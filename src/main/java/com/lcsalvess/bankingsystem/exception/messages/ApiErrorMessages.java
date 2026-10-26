@@ -42,6 +42,9 @@ public final class ApiErrorMessages {
     public static final String SYSTEM_USER_CANNOT_BE_REACTIVATED =
             "Não é permitido reativar o usuário técnico do sistema.";
 
+    public static final String SELF_DEACTIVATION_NOT_ALLOWED =
+            "Um administrador não pode desativar a própria conta.";
+
     // Authentication and authorization
     public static final String INVALID_CREDENTIALS =
             "Usuário ou senha inválidos.";

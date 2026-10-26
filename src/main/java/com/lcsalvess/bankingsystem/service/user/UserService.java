@@ -11,6 +11,7 @@ import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.user.*;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.UserSpecifications;
+import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.util.normalization.EmailNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.OptionalTextNormalizer;
 import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
@@ -33,15 +34,18 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
+    private final CurrentUserService currentUserService;
 
     public UserService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            CurrentUserService currentUserService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.eventPublisher = eventPublisher;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional(readOnly = true)
@@ -123,6 +127,7 @@ public class UserService {
 
     @Transactional
     public UserResponseDTO deactivate(Long userId) {
+        validateNotSelfDeactivation(userId);
         // O lock vem ANTES de carregar o alvo. Assim, as entidades de admin
         // entram no contexto de persistência já com o estado commitado mais
         // recente, e uma desativação concorrente do mesmo usuário é vista como
@@ -196,6 +201,18 @@ public class UserService {
                     ApiErrorMessages.LAST_ADMIN_CANNOT_BE_DEACTIVATED
             );
         }
+    }
+
+    private void validateNotSelfDeactivation(Long userId) {
+        currentUserService.findCurrentUser()
+                .filter(currentUser -> currentUser.getRole() == Role.ADMIN)
+                .filter(currentUser -> currentUser.getId() != null
+                        && currentUser.getId().equals(userId))
+                .ifPresent(currentUser -> {
+                    throw new SelfDeactivationNotAllowedException(
+                            ApiErrorMessages.SELF_DEACTIVATION_NOT_ALLOWED
+                    );
+                });
     }
 
     private UserSummaryResponseDTO toSummaryResponse(User user) {

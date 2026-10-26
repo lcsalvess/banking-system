@@ -148,6 +148,7 @@ class SecurityConfigTests {
     private static final String LOGIN_URL = "/api/v1/auth/login";
     private static final String AUTH_PROBE_URL = "/api/v1/auth/probe";
     private static final String PASSWORD_URL = "/api/v1/auth/password";
+    private static final String AUDIT_EVENTS_URL = "/api/v1/audit-events/probe";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
 
     @Autowired
@@ -474,6 +475,97 @@ class SecurityConfigTests {
 
             assertNull(result.getRequest().getSession(false), "Nenhuma sessão deve ser criada");
             assertNull(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        }
+
+        @Test
+        @DisplayName("Deve negar consulta de transações para ADMIN")
+        void shouldForbidAdminFromTransactionHistory() throws Exception {
+            User admin = createUser(Role.ADMIN);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(admin);
+
+            mockMvc.perform(get(PROTECTED_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(admin)
+                            ))
+                    .andExpect(status().isForbidden());
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Deve negar consulta de transações para AUDITOR")
+        void shouldForbidAuditorFromTransactionHistory() throws Exception {
+            User auditor = createUser(Role.AUDITOR);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(auditor);
+
+            mockMvc.perform(get(PROTECTED_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(auditor)
+                            ))
+                    .andExpect(status().isForbidden());
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Deve permitir AUDITOR na consulta de auditoria")
+        void shouldAllowAuditorOnAuditEventsRoute() throws Exception {
+            User auditor = createUser(Role.AUDITOR);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(auditor);
+
+            mockMvc.perform(get(AUDIT_EVENTS_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(auditor)
+                            ))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("audit-events"));
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Deve negar EMPLOYEE na consulta de auditoria")
+        void shouldForbidEmployeeOnAuditEventsRoute() throws Exception {
+            User employee = createUser(Role.EMPLOYEE);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(employee);
+
+            mockMvc.perform(get(AUDIT_EVENTS_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(employee)
+                            ))
+                    .andExpect(status().isForbidden());
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Deve negar ADMIN na consulta de auditoria")
+        void shouldForbidAdminOnAuditEventsRoute() throws Exception {
+            User admin = createUser(Role.ADMIN);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(admin);
+
+            mockMvc.perform(get(AUDIT_EVENTS_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(admin)
+                            ))
+                    .andExpect(status().isForbidden());
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
         }
     }
 

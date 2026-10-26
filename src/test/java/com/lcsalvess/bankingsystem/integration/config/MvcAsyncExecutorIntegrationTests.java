@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.config;
 
-import com.lcsalvess.bankingsystem.config.yield.YieldExecutorConfig;
+import com.lcsalvess.bankingsystem.config.executor.TaskExecutorConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,14 +41,14 @@ class MvcAsyncExecutorIntegrationTests {
     private ThreadPoolTaskExecutor applicationTaskExecutor;
 
     @Autowired
-    @Qualifier(YieldExecutorConfig.YIELD_EXECUTOR)
-    private ThreadPoolTaskExecutor yieldExecutor;
+    @Qualifier(TaskExecutorConfig.STARTUP_RECOVERY_EXECUTOR)
+    private ThreadPoolTaskExecutor startupRecoveryExecutor;
 
     @Test
     @DisplayName(
-            "Should use application task executor for MVC asynchronous requests"
+            "Should use application task executor and not the startup recovery executor"
     )
-    void shouldUseApplicationTaskExecutorForMvcAsyncRequests()
+    void shouldUseApplicationTaskExecutorAndNotStartupRecoveryExecutor()
             throws Exception {
 
         MvcResult initialResult = mockMvc.perform(
@@ -74,10 +74,13 @@ class MvcAsyncExecutorIntegrationTests {
                         + executingThreadName
         );
 
-        assertFalse(executingThreadName.startsWith(
-                yieldExecutor.getThreadNamePrefix()
-        ), () -> "MVC asynchronous request used the yield executor: "
-                + executingThreadName);
+        assertFalse(
+                executingThreadName.startsWith(
+                        startupRecoveryExecutor.getThreadNamePrefix()
+                ),
+                () -> "MVC asynchronous request used the startup recovery executor: "
+                        + executingThreadName
+        );
     }
 
     @TestConfiguration(proxyBeanMethods = false)

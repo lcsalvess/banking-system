@@ -61,7 +61,8 @@ Operations are logged through Spring application events:
 
 - Spring Boot Actuator exposes `health`, `info`, and `metrics`. The `health` and `info` endpoints require an `EMPLOYEE` or `ADMIN` token, while `metrics` requires `ADMIN`. Health details are shown only to authorized users.
 - The liveness (`/actuator/health/liveness`) and readiness (`/actuator/health/readiness`) probes are explicitly enabled and publicly accessible, allowing infrastructure health checks without authentication. They never expose health details. Other `/actuator/health/**` paths remain denied.
-- Readiness becomes `ACCEPTING_TRAFFIC` only after the startup listeners return. The daily yield recovery therefore runs in a background thread so it does not block application readiness.
+- Readiness becomes `ACCEPTING_TRAFFIC` only after the startup listeners return. Daily yield recovery and transaction idempotency cleanup submit their work to the dedicated `startupRecoveryExecutor`, so neither task blocks application readiness. The executor runs these tasks on a single background thread.
+- **Transaction idempotency cleanup:** runs daily at 03:30 in the `America/Sao_Paulo` time zone and once after application startup. The startup execution recovers cleanup missed while the application was offline. The job removes records older than the configured retention period (`banking.idempotency.retention-days`, 7 days by default) and logs the number of deleted records and the retention period.
 - Custom Micrometer timers:
 
 | Timer                       | Description                                                  |

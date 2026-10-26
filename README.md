@@ -11,28 +11,28 @@ The main goal is to build a realistic backend system while exploring software en
 
 ## Technologies
 
-| Technology            | Version | Description                              |
-| --------------------- | ------- | ---------------------------------------- |
-| Java                  | 21      | Programming language                     |
-| Spring Boot           | 4.1.2   | Backend framework                        |
-| Spring Web MVC        | -       | REST API development                     |
-| Spring RestClient     | -       | HTTP communication with external APIs    |
-| Bean Validation       | -       | Request and parameter validation         |
-| Spring Data JPA       | -       | Data access and persistence              |
-| Hibernate             | -       | JPA implementation and ORM               |
-| Spring Security       | -       | Authentication and authorization         |
-| Spring Events         | -       | Decoupled operation logging              |
-| Spring Scheduling     | -       | Automatic daily yield processing         |
-| Spring Boot Actuator  | -       | Health, info, metrics, and probes        |
-| Micrometer            | -       | Metrics and observability                |
-| JWT (JJWT)            | 0.13.0  | Stateless authentication                 |
-| BCrypt                | -       | Password hashing                         |
-| PostgreSQL            | 18      | Relational database                      |
-| Flyway                | -       | Versioned database migrations            |
-| springdoc-openapi     | 3.1.1   | OpenAPI / Swagger UI documentation       |
-| Maven                 | -       | Dependency management and build          |
-| JUnit                 | 6       | Unit and integration testing             |
-| Mockito               | 5       | Mocking for tests                        |
+| Technology           | Version | Description                                                                 |
+|----------------------|---------|-----------------------------------------------------------------------------|
+| Java                 | 21      | Programming language                                                        |
+| Spring Boot          | 4.1.2   | Backend framework                                                           |
+| Spring Web MVC       | -       | REST API development                                                        |
+| Spring RestClient    | -       | HTTP communication with external APIs                                       |
+| Bean Validation      | -       | Request and parameter validation                                            |
+| Spring Data JPA      | -       | Data access and persistence                                                 |
+| Hibernate            | -       | JPA implementation and ORM                                                  |
+| Spring Security      | -       | Authentication and authorization                                            |
+| Spring Events        | -       | Decoupled operation logging                                                 |
+| Spring Scheduling    | -       | Scheduled yield processing, balance reconciliation, and idempotency cleanup |
+| Spring Boot Actuator | -       | Health, info, metrics, and probes                                           |
+| Micrometer           | -       | Metrics and observability                                                   |
+| JWT (JJWT)           | 0.13.0  | Stateless authentication                                                    |
+| BCrypt               | -       | Password hashing                                                            |
+| PostgreSQL           | 18      | Relational database                                                         |
+| Flyway               | -       | Versioned database migrations                                               |
+| springdoc-openapi    | 3.1.1   | OpenAPI / Swagger UI documentation                                          |
+| Maven                | -       | Dependency management and build                                             |
+| JUnit                | 6       | Unit and integration testing                                                |
+| Mockito              | 5       | Mocking for tests                                                           |
 
 ---
 
@@ -64,7 +64,7 @@ see [Architecture](docs/ARCHITECTURE.md).
 - **Account management**: checking and savings accounts, with generated account numbers and check digits
 - **Transactions**: deposit, withdrawal, transfer between accounts, transaction history per account, and lookup by public identifier
 - **Transaction idempotency**: a required `Idempotency-Key` UUID prevents duplicate financial operations on retries and allows the original result to be recovered
-- **Idempotency cleanup**: a scheduled job removes expired idempotency records according to a configurable retention period (7 days by default)
+- **Idempotency cleanup**: removes expired idempotency records daily at 03:30 (`America/Sao_Paulo`) and after application startup, recovering cleanup missed while the application was offline (7-day retention by default)
 - **Public transaction identifier**: every transaction has a UUID (`transactionCode`) exposed in responses, while the internal database ID is never returned
 - **Transfer traceability**: the two transactions of a transfer share a `transferCode`, so both legs can be correlated
 - **Transaction actor attribution**: every transaction records who performed it: the authenticated user for API operations (`performed_by_user_id`, including both legs of a transfer), or the system for automatic yields (`performed_by_system`)
@@ -212,7 +212,7 @@ Tests run against PostgreSQL using the `test` profile. See the [Development Guid
 - [x] Password complexity validation on user creation and password changes
 - [x] User deactivation and reactivation
 - [x] Automatic daily savings yield with recovery after downtime
-- [x] Transaction idempotency with scheduled retention cleanup
+- [x] Transaction idempotency with scheduled retention cleanup and startup recovery
 - [x] Scheduled balance reconciliation
 - [x] Continuous integration (CI) with GitHub Actions
 - [ ] Docker Compose for the application and database

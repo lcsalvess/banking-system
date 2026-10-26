@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.service.transaction.yield;
 
-import com.lcsalvess.bankingsystem.config.yield.YieldExecutorConfig;
+import com.lcsalvess.bankingsystem.config.executor.TaskExecutorConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -32,7 +32,7 @@ public class DailyYieldStartupRecovery {
 
     public DailyYieldStartupRecovery(
             DailyYieldScheduler dailyYieldScheduler,
-            @Qualifier(YieldExecutorConfig.YIELD_EXECUTOR)
+            @Qualifier(TaskExecutorConfig.STARTUP_RECOVERY_EXECUTOR)
             TaskExecutor taskExecutor
     ) {
         this.dailyYieldScheduler = dailyYieldScheduler;

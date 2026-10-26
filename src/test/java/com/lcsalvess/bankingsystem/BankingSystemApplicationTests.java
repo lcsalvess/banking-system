@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem;
 
-import com.lcsalvess.bankingsystem.config.yield.YieldExecutorConfig;
+import com.lcsalvess.bankingsystem.config.executor.TaskExecutorConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -27,23 +27,23 @@ class BankingSystemApplicationTests {
     }
 
     @Nested
-    @DisplayName("Yield executor")
-    class YieldExecutorTests {
+    @DisplayName("Startup recovery executor")
+    class StartupRecoveryExecutorTests {
 
         @Autowired
-        @Qualifier(YieldExecutorConfig.YIELD_EXECUTOR)
-        private ThreadPoolTaskExecutor yieldExecutor;
+        @Qualifier(TaskExecutorConfig.STARTUP_RECOVERY_EXECUTOR)
+        private ThreadPoolTaskExecutor startupRecoveryExecutor;
 
         @Test
         @DisplayName("Should be configured correctly")
         void shouldBeConfiguredCorrectly() {
-            assertEquals(1, yieldExecutor.getCorePoolSize());
-            assertEquals(1, yieldExecutor.getMaxPoolSize());
-            assertEquals(1, yieldExecutor.getQueueCapacity());
+            assertEquals(1, startupRecoveryExecutor.getCorePoolSize());
+            assertEquals(1, startupRecoveryExecutor.getMaxPoolSize());
+            assertEquals(1, startupRecoveryExecutor.getQueueCapacity());
 
             assertEquals(
-                    "daily-yield-recovery-",
-                    yieldExecutor.getThreadNamePrefix()
+                    "startup-recovery-",
+                    startupRecoveryExecutor.getThreadNamePrefix()
             );
         }
 
@@ -53,7 +53,7 @@ class BankingSystemApplicationTests {
             CompletableFuture<Thread> executionThread =
                     new CompletableFuture<>();
 
-            yieldExecutor.execute(
+            startupRecoveryExecutor.execute(
                     () -> executionThread.complete(Thread.currentThread())
             );
 
@@ -62,7 +62,7 @@ class BankingSystemApplicationTests {
             assertNotSame(Thread.currentThread(), thread);
 
             assertTrue(
-                    thread.getName().startsWith("daily-yield-recovery-"),
+                    thread.getName().startsWith("startup-recovery-"),
                     () -> "Unexpected thread name: " + thread.getName()
             );
         }
@@ -84,8 +84,8 @@ class BankingSystemApplicationTests {
         private ThreadPoolTaskExecutor taskExecutor;
 
         @Autowired
-        @Qualifier(YieldExecutorConfig.YIELD_EXECUTOR)
-        private ThreadPoolTaskExecutor yieldExecutor;
+        @Qualifier(TaskExecutorConfig.STARTUP_RECOVERY_EXECUTOR)
+        private ThreadPoolTaskExecutor startupRecoveryExecutor;
 
         @Test
         @DisplayName("Should be configured correctly")
@@ -106,7 +106,10 @@ class BankingSystemApplicationTests {
             assertSame(applicationTaskExecutor, defaultExecutor);
             assertSame(applicationTaskExecutor, taskExecutor);
 
-            assertNotSame(applicationTaskExecutor, yieldExecutor);
+            assertNotSame(
+                    applicationTaskExecutor,
+                    startupRecoveryExecutor
+            );
         }
 
         @Test

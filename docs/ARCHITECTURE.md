@@ -7,7 +7,7 @@ The application follows a modular layered architecture, separating responsibilit
 ```text
 src/main/java/com/lcsalvess/bankingsystem
 ├── bootstrap/       # Application startup and initial administrator creation
-├── config/          # Jackson, JWT, OpenAPI, pagination, clock, and security configuration
+├── config/          # Jackson, JWT, OpenAPI, pagination, clock, security, and executor configuration
 ├── controller/      # REST endpoints for accounts, authentication, audit events, clients, transactions, and users
 ├── dto/             # Request and response DTOs, grouped by domain
 ├── entity/          # Domain entities and enums, grouped by domain, including audit events
@@ -37,7 +37,7 @@ src/main/java/com/lcsalvess/bankingsystem
 │   ├── client/         # Client operations and persistence responsibilities
 │   ├── security/       # Authentication, JWT, password changes, and current user
 │   ├── transaction/    # Financial operations and balance reconciliation
-│   │   ├── idempotency/ # Idempotency handling and scheduled cleanup
+│   │   ├── idempotency/ # Idempotency handling, scheduled cleanup, and startup recovery
 │   │   └── yield/        # Daily yield processing and startup recovery
 │   └── user/           # User operations
 └── validation/      # Custom Bean Validation constraints and validators
@@ -47,6 +47,8 @@ src/main/java/com/lcsalvess/bankingsystem
     ├── passwordstrength/   # Password complexity requirements
     └── reservedusername/   # Reserved username validation
 ```
+
+Startup recovery tasks for daily yield processing and transaction idempotency cleanup use the dedicated `startupRecoveryExecutor`, keeping them separate from the `applicationTaskExecutor` used for MVC asynchronous requests. The shared recovery executor runs one task at a time on a dedicated background thread.
 
 ## Request Flow
 

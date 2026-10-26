@@ -125,11 +125,18 @@ public class SecurityConfig {
                             "/api/v1/transactions/transfer"
                     ).hasRole("EMPLOYEE");
 
-                    // Transaction history and lookup: read-only access.
+                    // Transaction history and lookup: employees only.
                     auth.requestMatchers(
                             HttpMethod.GET,
                             "/api/v1/transactions/**"
-                    ).hasAnyRole("EMPLOYEE", "ADMIN");
+                    ).hasRole("EMPLOYEE");
+
+                    // Audit trail: read-only access for auditors.
+                    auth.requestMatchers(
+                            HttpMethod.GET,
+                            "/api/v1/audit-events",
+                            "/api/v1/audit-events/**"
+                    ).hasRole("AUDITOR");
 
                     // Deny any endpoint not explicitly authorized above.
                     auth.anyRequest().denyAll();

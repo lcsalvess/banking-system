@@ -5,31 +5,36 @@
 Full request and response schemas are available in Swagger UI
 when running with the `local` profile.
 
-| Method | Endpoint                                               | Description                                   | Access              |
-|--------|--------------------------------------------------------|-----------------------------------------------|---------------------|
-| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT                | Public              |
-| PATCH  | `/api/v1/auth/password`                                | Change the password of the authenticated user | Authenticated       |
-| POST   | `/api/v1/users`                                        | Create a user                                 | `ADMIN`             |
-| GET    | `/api/v1/users`                                        | Retrieve a paginated list of users            | `ADMIN`             |
-| PATCH  | `/api/v1/users/{userId}/deactivate`                    | Deactivate a user account                     | `ADMIN`             |
-| PATCH  | `/api/v1/users/{userId}/reactivate`                    | Reactivate a user account                     | `ADMIN`             |
-| POST   | `/api/v1/clients`                                      | Register a client                             | `EMPLOYEE`          |
-| GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients          | `EMPLOYEE`          |
-| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                            | `EMPLOYEE`          |
-| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client                     | `EMPLOYEE`          |
-| POST   | `/api/v1/accounts`                                     | Create a checking or savings account          | `EMPLOYEE`          |
-| GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts         | `EMPLOYEE`          |
-| GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                                | `EMPLOYEE`          |
-| PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                             | `EMPLOYEE`          |
-| POST   | `/api/v1/transactions/deposit`                         | Deposit                                       | `EMPLOYEE`          |
-| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                                      | `EMPLOYEE`          |
-| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts                     | `EMPLOYEE`          |
-| GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account             | `EMPLOYEE`, `ADMIN` |
-| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID          | `EMPLOYEE`, `ADMIN` |
+| Method | Endpoint                                               | Description                                         | Access        |
+|--------|--------------------------------------------------------|-----------------------------------------------------|---------------|
+| POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT                      | Public        |
+| PATCH  | `/api/v1/auth/password`                                | Change the password of the authenticated user       | Authenticated |
+| POST   | `/api/v1/users`                                        | Create a user                                       | `ADMIN`       |
+| GET    | `/api/v1/users`                                        | Retrieve a paginated list of users                  | `ADMIN`       |
+| PATCH  | `/api/v1/users/{userId}/deactivate`                    | Deactivate a user account                           | `ADMIN`       |
+| PATCH  | `/api/v1/users/{userId}/reactivate`                    | Reactivate a user account                           | `ADMIN`       |
+| POST   | `/api/v1/clients`                                      | Register a client                                   | `EMPLOYEE`    |
+| GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients                | `EMPLOYEE`    |
+| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                                  | `EMPLOYEE`    |
+| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client                           | `EMPLOYEE`    |
+| POST   | `/api/v1/accounts`                                     | Create a checking or savings account                | `EMPLOYEE`    |
+| GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts               | `EMPLOYEE`    |
+| GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                                      | `EMPLOYEE`    |
+| PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                                   | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/deposit`                         | Deposit                                             | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                                            | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts                           | `EMPLOYEE`    |
+| GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account                   | `EMPLOYEE`    |
+| GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID                | `EMPLOYEE`    |
+| GET    | `/api/v1/audit-events`                                 | Search the audit trail using filters and pagination | `AUDITOR`     |
 
 `accountNumber` must have between 5 and 20 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
 
 The deposit, withdrawal, and transfer endpoints require an `Idempotency-Key` header with a UUID. Repeating a request with the same key and payload returns the original result; reusing the key with a different operation or payload returns `409 Conflict`.
+
+An administrator can deactivate other users but cannot deactivate
+their own account. Such a request returns `403 Forbidden`.
+The last active administrator also cannot be deactivated.
 
 `POST /api/v1/auth/login` is rate limited per client IP, per username and IP, and per username (see [Login Rate Limiting](SECURITY.md#login-rate-limiting)). When a limit is reached, it returns `429 Too Many Requests` with a `Retry-After` header holding the number of seconds to wait:
 
@@ -44,16 +49,44 @@ Request bodies are strict about JSON types: text fields reject numbers and boole
 
 ## Pagination, Sorting, and Filtering
 
-List endpoints accept `page`, `size`, and `sort` (for example `sort=balance,desc`). The maximum page size is 100, and larger values are capped. Sorting by a property outside the list of an endpoint returns `400 Bad Request`. The `id` is always added as a final tie-breaker, so pages keep a stable order.
+List endpoints accept `page`, `size`, and `sort` (for example `sort=balance,desc`). The maximum page size is 100, and larger values are capped. Sorting by a property outside the list of an endpoint returns `400 Bad Request`. 
 
-| Endpoint                                            | Filters                        | Sortable fields                              | Default sort                                 | Default size |
-|-----------------------------------------------------|--------------------------------|----------------------------------------------|----------------------------------------------|--------------|
-| `GET /api/v1/users`                                 | `search`, `role`, `active`     | `id`, `username`, `email`, `role`, `active`  | `id` ascending                               | 20           |
-| `GET /api/v1/clients`                               | `name`                         | `id`, `name`                                 | `id` ascending                               | 10           |
-| `GET /api/v1/accounts`                              | -                              | `accountNumber`, `balance`, `status`, `type` | `accountNumber` ascending                    | 10           |
-| `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate` | `createdAt`, `id`, `type`, `amount`          | `createdAt` descending, then `id` descending | 10           |
+When the requested sort does not include `id`, it is appended as a tie-breaker to provide a stable order across pages.
+If `id` is explicitly included, its requested direction and position are preserved.
 
+| Endpoint                                            | Filters                                                                                                  | Sortable fields                                                                                                                   | Default sort                                 | Default size |
+|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------|--------------|
+| `GET /api/v1/users`                                 | `search`, `role`, `active`                                                                               | `id`, `username`, `email`, `role`, `active`                                                                                       | `id` ascending                               | 20           |
+| `GET /api/v1/clients`                               | `name`                                                                                                   | `id`, `name`                                                                                                                      | `id` ascending                               | 10           |
+| `GET /api/v1/accounts`                              | -                                                                                                        | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
+| `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate`                                                                           | `createdAt`, `id`, `type`, `amount`                                                                                               | `createdAt` descending, then `id` descending | 10           |
+| `GET /api/v1/audit-events`                          | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
 On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Both must be between 2020-01-01 and the current date, and `startDate` cannot be after `endDate` (`400 Bad Request`).
+
+### Audit Event Queries
+
+`GET /api/v1/audit-events` is restricted to users with the `AUDITOR`
+role. It returns a paginated, read-only view of the audit trail.
+
+The endpoint supports the following optional filters:
+
+- `startDate` and `endDate`: inclusive dates in `yyyy-MM-dd` format.
+  Dates must be between 2020-01-01 and the current date, and the start
+  date cannot be after the end date.
+- `eventType`: exact event type.
+- `outcome`: recorded outcome (`SUCCESS`, `FAILURE`, or `DENIED`).
+- `actorUserId`: positive numeric ID of the actor.
+- `actorUsername`: partial, case-insensitive username search.
+- `entityType`: exact type of the affected entity.
+- `entityId`: exact affected entity ID.
+
+Blank optional text filters are ignored. Invalid filters, dates,
+pagination, or sorting parameters return `400 Bad Request`.
+
+The default page size is 20, and the maximum is 100. The response
+contains the event records in `content` and pagination metadata in
+`page`. Sorting uses `id` as a deterministic tie-breaker when it is
+not already included in the requested sort.
 
 ## Address Lookup Integration
 
@@ -118,6 +151,10 @@ curl -X PATCH http://localhost:8080/api/v1/auth/password \
 # 8. Deactivate a user (ADMIN only)
 curl -X PATCH 'http://localhost:8080/api/v1/users/<user-id>/deactivate' \
   -H "Authorization: Bearer <admin-token>"
+
+# 9. Search audit events (AUDITOR only)
+curl 'http://localhost:8080/api/v1/audit-events?startDate=2026-10-01&endDate=2026-10-26&eventType=TRANSFER&outcome=SUCCESS&page=0&size=20&sort=createdAt,desc' \
+-H "Authorization: Bearer <auditor-token>"
 ```
 
 Transactions are returned with their public identifier, and the internal database ID is not exposed:

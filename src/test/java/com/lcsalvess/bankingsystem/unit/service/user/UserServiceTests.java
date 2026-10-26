@@ -8,6 +8,7 @@ import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
 import com.lcsalvess.bankingsystem.exception.user.*;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.user.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +45,9 @@ class UserServiceTests {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private CurrentUserService currentUserService;
 
     @InjectMocks
     private UserService userService;
@@ -392,6 +397,27 @@ class UserServiceTests {
                             UserOperationType.DEACTIVATED
                     )
             );
+        }
+
+        @Test
+        @DisplayName("Não deve permitir que o administrador desative a própria conta")
+        void shouldNotAllowAdminToDeactivateOwnAccount() {
+            User admin = createUser(Role.ADMIN, true);
+            ReflectionTestUtils.setField(admin, "id", 1L);
+
+            when(currentUserService.findCurrentUser())
+                    .thenReturn(Optional.of(admin));
+
+            assertThrows(
+                    SelfDeactivationNotAllowedException.class,
+                    () -> userService.deactivate(1L)
+            );
+
+            assertTrue(admin.isActive());
+            assertEquals(0, admin.getTokenVersion());
+
+            verify(currentUserService).findCurrentUser();
+            verifyNoInteractions(userRepository, eventPublisher);
         }
     }
 

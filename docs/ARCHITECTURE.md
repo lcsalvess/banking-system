@@ -8,9 +8,9 @@ The application follows a modular layered architecture, separating responsibilit
 src/main/java/com/lcsalvess/bankingsystem
 ├── bootstrap/       # Application startup and initial administrator creation
 ├── config/          # Jackson, JWT, OpenAPI, pagination, clock, and security configuration
-├── controller/      # REST endpoints for accounts, authentication, clients, transactions, and users
+├── controller/      # REST endpoints for accounts, authentication, audit events, clients, transactions, and users
 ├── dto/             # Request and response DTOs, grouped by domain
-├── entity/          # Domain entities and enums, grouped by domain
+├── entity/          # Domain entities and enums, grouped by domain, including audit events
 ├── event/           # Application events, post-commit log listeners, and the in-transaction audit listener
 ├── exception/          # Business exceptions, database constraints, error messages, and global handling
 ├── filter/             # HTTP filters, including correlation ID propagation
@@ -23,13 +23,15 @@ src/main/java/com/lcsalvess/bankingsystem
 │       ├── validation/
 │       └── viacep/
 ├── repository/         # Persistence repositories, query specifications, and projections
+│   ├── audit/          # Append-only audit event writing and read-only audit queries   
 │   ├── idempotency/    # Transaction idempotency persistence
 │   ├── projection/     # Read-only query projections
-│   └── specification/ # Dynamic filters
+│   └── specification/  # Dynamic filters
 ├── security/           # JWT authentication filter and JSON handlers for 401/403 responses
 ├── serialization/      # Custom JSON serialization
 ├── util/               # Normalization, CPF masking, time-zone, and pagination utilities
 ├── service/            # Business rules and application logic
+│   ├── audit/          # Audit event recording and read-only audit queries
 │   ├── account/        # Account operations, row locking, and account number generation
 │   ├── address/        # Address-resolution application logic
 │   ├── client/         # Client operations and persistence responsibilities

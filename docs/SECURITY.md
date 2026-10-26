@@ -28,10 +28,28 @@ Authorization: Bearer <token>
 
 | Role       | Allowed operations                                                                                                                                                                                                     |
 |------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `ADMIN`    | Create, list, deactivate, and reactivate users; read the transaction history and look up transactions by code; `/actuator/health`, `/actuator/info`, and `/actuator/metrics`                                           |
-| `EMPLOYEE` | Clients (including internal address lookup during creation/update), accounts, deposits, withdrawals, and transfers; read transaction history and look up transactions by code; `/actuator/health` and `/actuator/info` |
+| `ADMIN`    | Create, list, deactivate, and reactivate other users; `/actuator/health`, `/actuator/info`, and `/actuator/metrics`. An administrator cannot deactivate their own account                                              |
+| `EMPLOYEE` | Client and account management, deposits, withdrawals, transfers, and transaction history; `/actuator/health` and `/actuator/info`.                                                                                     |
+| `AUDITOR`  | Read-only access to the audit trail through `GET /api/v1/audit-events`, including filtering, pagination, and sorting. No user administration, financial operations, or transaction history access.                     |
 
-Roles are not hierarchical: `ADMIN` does not inherit `EMPLOYEE` permissions. Business operations require an `EMPLOYEE` user, which an `ADMIN` creates through `POST /api/v1/users`. Endpoint access is enforced with `@PreAuthorize` on the controllers and with request rules in `SecurityConfig` for the actuator. Changing one's own password is the only operation open to every authenticated user. The only unauthenticated routes are the login, the liveness and readiness probes, and, when enabled, the OpenAPI documentation; every other route is denied by default.
+Roles are not hierarchical: `ADMIN`, `EMPLOYEE`, and `AUDITOR`
+have separate permissions.
+
+`ADMIN` is responsible for user administration and cannot perform
+business operations or access transaction history. An administrator
+cannot deactivate their own account, but may change their own password.
+
+`EMPLOYEE` performs business operations and may access transaction
+history, but cannot administer users or read the audit trail.
+
+`AUDITOR` can read the audit trail through the dedicated audit endpoint,
+but cannot perform business operations, access transaction history,
+or administer users.
+
+Changing one's own password is available to every authenticated user.
+The audit API is read-only, and the database enforces the append-only
+nature of audit records. All requests without an explicit authorization
+rule are denied by default.
 
 ## Login Rate Limiting
 

@@ -40,4 +40,10 @@ public class SecurityProbeController {
     public String passwordRoute() {
         return "password-probe";
     }
+
+    @PreAuthorize("hasRole('AUDITOR')")
+    @GetMapping("/api/v1/audit-events/probe")
+    public String auditEvents() {
+        return "audit-events";
+    }
 }

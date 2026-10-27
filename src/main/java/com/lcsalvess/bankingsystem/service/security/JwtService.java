@@ -5,6 +5,7 @@ import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.io.DecodingException;
@@ -12,6 +13,7 @@ import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.WeakKeyException;
 
 import javax.crypto.SecretKey;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.Date;
 
@@ -24,6 +26,7 @@ public class JwtService {
     static final String TOKEN_VERSION_CLAIM = "tv";
 
     private final SecretKey signingKey;
+    private final JwtParser jwtParser;
     private final long expirationInSeconds;
     private final String issuer;
     private final Clock clock;
@@ -43,7 +46,7 @@ public class JwtService {
     }
 
     /**
-     * Construtor privado que apenas atribui os valores recebidos.
+     * Inicializa a configuração e constrói o parser JWT uma única vez.
      */
     private JwtService(
             SecretKey signingKey,
@@ -55,6 +58,12 @@ public class JwtService {
         this.expirationInSeconds = expirationInSeconds;
         this.issuer = issuer;
         this.clock = clock;
+
+        this.jwtParser = Jwts.parser()
+                .verifyWith(signingKey)
+                .requireIssuer(issuer)
+                .clock(() -> Date.from(clock.instant()))
+                .build();
     }
 
     private static SecretKey createSigningKey(String secret) {
@@ -100,11 +109,7 @@ public class JwtService {
      * A claim "tv" deve conter um inteiro não negativo dentro do intervalo suportado.
      */
     public JwtClaims parse(String jwt) {
-        Claims claims = Jwts.parser()
-                .verifyWith(signingKey)
-                .requireIssuer(issuer)
-                .clock(() -> Date.from(clock.instant()))
-                .build()
+        Claims claims = jwtParser
                 .parseSignedClaims(jwt)
                 .getPayload();
 
@@ -116,15 +121,27 @@ public class JwtService {
     private int extractTokenVersion(Claims claims) {
         Object version = claims.get(TOKEN_VERSION_CLAIM);
 
-        if (!(version instanceof Number number)
-                || number.longValue() < 0
-                || number.longValue() > Integer.MAX_VALUE
-                || number.doubleValue() != number.intValue()) {
+        if (!(version instanceof Number number)) {
             throw new JwtException(
                     ApiErrorMessages.JWT_TOKEN_VERSION_INVALID
             );
         }
 
-        return number.intValue();
+        try {
+            int tokenVersion = new BigDecimal(number.toString()).intValueExact();
+
+            if (tokenVersion < 0) {
+                throw new JwtException(
+                        ApiErrorMessages.JWT_TOKEN_VERSION_INVALID
+                );
+            }
+
+            return tokenVersion;
+        } catch (NumberFormatException | ArithmeticException exception) {
+            throw new JwtException(
+                    ApiErrorMessages.JWT_TOKEN_VERSION_INVALID,
+                    exception
+            );
+        }
     }
 }

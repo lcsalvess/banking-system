@@ -11,17 +11,22 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DisplayName("Transaction factories")
 class TransactionFactoryTests {
 
-    private static final LocalDateTime CREATED_AT =
-            LocalDateTime.of(2026, 10, 25, 12, 30, 45);
+    private static final Instant CREATED_AT =
+            Instant.parse("2026-10-25T15:30:45Z");
     private static final LocalDate YIELD_DATE = LocalDate.of(2026, 10, 24);
     private static final BigDecimal AMOUNT = new BigDecimal("10.00");
     private static final BigDecimal BALANCE = new BigDecimal("90.00");

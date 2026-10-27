@@ -49,6 +49,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -101,8 +102,11 @@ public class TransactionServiceTests {
     private static final Clock CLOCK =
             Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE);
 
-    private static final LocalDateTime CREATED_AT =
-            LocalDateTime.of(2026, 1, 15, 10, 30, 45);
+    private static final Instant DAY_START =
+            TODAY.atStartOfDay(ZONE).toInstant();
+
+    private static final Instant CREATED_AT =
+            Instant.parse("2026-01-15T13:30:45Z");
 
     @Mock
     private TransactionRepository transactionRepository;
@@ -243,9 +247,13 @@ public class TransactionServiceTests {
             LocalDate startDate = LocalDate.of(2026, 1, 1);
             LocalDate endDate = LocalDate.of(2026, 1, 15);
 
-            LocalDateTime expectedStart = startDate.atStartOfDay();
-            LocalDateTime expectedEndExclusive =
-                    endDate.plusDays(1).atStartOfDay();
+            Instant expectedStart =
+                    startDate.atStartOfDay(ZONE).toInstant();
+
+            Instant expectedEndExclusive =
+                    endDate.plusDays(1)
+                            .atStartOfDay(ZONE)
+                            .toInstant();
 
             stubAccountLookup(account);
 
@@ -995,7 +1003,7 @@ public class TransactionServiceTests {
             when(transactionRepository.calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             )).thenReturn(new BigDecimal("1000.00"));
 
             stubSaveReturningArgument();
@@ -1021,12 +1029,12 @@ public class TransactionServiceTests {
             verify(transactionRepository).findBalanceAtStartOfDayFromSnapshot(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             );
             verify(transactionRepository).save(any(Transaction.class));
             verify(eventPublisher).publishEvent(
@@ -1057,7 +1065,7 @@ public class TransactionServiceTests {
             when(transactionRepository.calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             )).thenReturn(new BigDecimal("40.00"));
 
             stubSaveReturningArgument();
@@ -1083,12 +1091,12 @@ public class TransactionServiceTests {
             verify(transactionRepository).findBalanceAtStartOfDayFromSnapshot(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             );
             verify(transactionRepository).save(any(Transaction.class));
             verify(eventPublisher).publishEvent(
@@ -1219,7 +1227,7 @@ public class TransactionServiceTests {
             when(transactionRepository.calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             )).thenReturn(new BigDecimal("0.99"));
 
             DailyYieldProcessingResult result =
@@ -1246,12 +1254,12 @@ public class TransactionServiceTests {
             verify(transactionRepository).findBalanceAtStartOfDayFromSnapshot(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             );
 
             verifyNoMoreInteractionsOnMocks();
@@ -1275,7 +1283,7 @@ public class TransactionServiceTests {
             when(transactionRepository.calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             )).thenReturn(Account.MAX_BALANCE);
 
             DailyYieldProcessingResult result =
@@ -1302,12 +1310,12 @@ public class TransactionServiceTests {
             verify(transactionRepository).findBalanceAtStartOfDayFromSnapshot(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             );
             verify(transactionRepository).calculateBalanceAtStartOfDay(
                     SAVINGS_ID,
                     TODAY,
-                    TODAY.atStartOfDay()
+                    DAY_START
             );
 
             verifyNoMoreInteractionsOnMocks();
@@ -1486,7 +1494,7 @@ public class TransactionServiceTests {
         assertSame(account, transaction.getAccount());
         assertSame(TEST_USER, transaction.getPerformedBy());
         assertFalse(transaction.isPerformedBySystem());
-        assertEquals(NOW, transaction.getCreatedAt());
+        assertEquals(CLOCK.instant(), transaction.getCreatedAt());
     }
 
     private static TransactionResponseDTO response(Transaction transaction) {

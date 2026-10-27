@@ -1,16 +1,25 @@
 package com.lcsalvess.bankingsystem.entity.user;
 
-import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import com.lcsalvess.bankingsystem.util.normalization.EmailNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.UsernameNormalizer;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.io.Serial;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
 
@@ -50,21 +59,21 @@ public class User implements UserDetails {
     private int tokenVersion;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant  updatedAt;
 
     @PrePersist
     public void prePersist() {
-        LocalDateTime now = LocalDateTime.now(AppTimeZone.ZONE);
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = LocalDateTime.now(AppTimeZone.ZONE);
+        this.updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     protected User() {
@@ -137,11 +146,11 @@ public class User implements UserDetails {
         return active;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 }

@@ -24,14 +24,19 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Controller slices do not scan {@code @Configuration} classes, so {@link JacksonConfig}
@@ -79,7 +84,7 @@ class JacksonConfigTests {
                     null,
                     TransactionType.DEPOSIT,
                     new BigDecimal("100.00"),
-                    LocalDateTime.of(2026, 1, 15, 10, 30, 45),
+                    Instant.parse("2026-01-15T13:30:45Z"),
                     null,
                     new BigDecimal("100.00")
             ));

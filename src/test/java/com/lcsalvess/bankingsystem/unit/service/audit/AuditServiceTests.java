@@ -24,7 +24,7 @@ import org.slf4j.MDC;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,10 +39,8 @@ import static org.mockito.Mockito.when;
 class AuditServiceTests {
 
     private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
-    private static final LocalDateTime NOW =
-            LocalDateTime.of(2026, 10, 21, 10, 30);
-    private static final Clock CLOCK =
-            Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE);
+    private static final Instant NOW = Instant.parse("2026-10-21T13:30:00Z");
+    private static final Clock CLOCK = Clock.fixed(NOW, ZONE);
 
     private static final String CORRELATION_ID =
             "2f9f7c1e-3b8a-4d55-9a53-0c8f1e6b7a10";

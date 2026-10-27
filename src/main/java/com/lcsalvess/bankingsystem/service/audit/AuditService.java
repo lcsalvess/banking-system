@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -62,7 +61,7 @@ public class AuditService {
                         entityType,
                         entityId,
                         currentCorrelationId(),
-                        LocalDateTime.now(clock)
+                        clock.instant()
                 )
         );
     }

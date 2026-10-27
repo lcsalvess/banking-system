@@ -3,7 +3,7 @@ package com.lcsalvess.bankingsystem.dto.response.user;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record UserResponseDTO(
         @Schema(
@@ -32,14 +32,14 @@ public record UserResponseDTO(
 
         @Schema(
                 description = "Date and time when the user was created.",
-                example = "2026-10-16T14:30:00"
+                example = "2026-10-16T17:30:00Z"
         )
-        LocalDateTime createdAt,
+        Instant createdAt,
 
         @Schema(
                 description = "Date and time when the user was last updated.",
-                example = "2026-10-16T15:45:00"
+                example = "2026-10-16T17:31:00Z"
         )
-        LocalDateTime updatedAt
+        Instant updatedAt
 ) {
 }

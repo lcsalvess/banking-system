@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -40,6 +41,9 @@ class AuditEventSpecificationsIntegrationTests {
 
     private static final LocalDate END_DATE =
             LocalDate.of(2025, 3, 11);
+
+    private static final ZoneId SAO_PAULO_ZONE =
+            ZoneId.of("America/Sao_Paulo");
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -449,7 +453,7 @@ class AuditEventSpecificationsIntegrationTests {
                 entityType,
                 entityId,
                 UUID.randomUUID(),
-                createdAt
+                createdAt.atZone(SAO_PAULO_ZONE).toInstant()
         );
     }
 

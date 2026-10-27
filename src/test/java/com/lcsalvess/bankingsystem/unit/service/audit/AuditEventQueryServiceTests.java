@@ -27,15 +27,19 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuditEventQueryService tests")
@@ -346,7 +350,7 @@ class AuditEventQueryServiceTests {
                 AuditEntityType.USER,
                 "42",
                 UUID.randomUUID(),
-                LocalDateTime.of(2026, 10, 25, 10, 30)
+                Instant.parse("2026-10-25T13:30:00Z")
         );
 
         ReflectionTestUtils.setField(event, "id", id);

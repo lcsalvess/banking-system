@@ -1,9 +1,18 @@
 package com.lcsalvess.bankingsystem.entity.audit;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -53,7 +62,7 @@ public class AuditEvent {
 
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     protected AuditEvent() {
     }
@@ -67,7 +76,7 @@ public class AuditEvent {
             AuditEntityType entityType,
             String entityId,
             UUID correlationId,
-            LocalDateTime createdAt
+            Instant createdAt
     ) {
         this.eventType = eventType;
         this.outcome = outcome;
@@ -77,7 +86,10 @@ public class AuditEvent {
         this.entityType = entityType;
         this.entityId = entityId;
         this.correlationId = correlationId;
-        this.createdAt = createdAt;
+        this.createdAt = Objects.requireNonNull(
+                createdAt,
+                "The audit event creation timestamp is required."
+        ).truncatedTo(ChronoUnit.MICROS);
     }
 
     public Long getId() {
@@ -116,7 +128,7 @@ public class AuditEvent {
         return correlationId;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 }

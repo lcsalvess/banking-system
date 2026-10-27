@@ -5,10 +5,11 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditEvent;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
 import com.lcsalvess.bankingsystem.util.normalization.OptionalTextNormalizer;
+import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Locale;
 
 public final class AuditEventSpecifications {
@@ -41,13 +42,15 @@ public final class AuditEventSpecifications {
         String normalizedEntityId =
                 OptionalTextNormalizer.normalize(entityId);
 
-        LocalDateTime startDateTime = startDate == null
+        Instant startDateTime = startDate == null
                 ? null
-                : startDate.atStartOfDay();
+                : startDate.atStartOfDay(AppTimeZone.ZONE).toInstant();
 
-        LocalDateTime endDateTimeExclusive = endDate == null
+        Instant endDateTimeExclusive = endDate == null
                 ? null
-                : endDate.plusDays(1).atStartOfDay();
+                : endDate.plusDays(1)
+                .atStartOfDay(AppTimeZone.ZONE)
+                .toInstant();
 
         return (root, query, cb) -> cb.and(
                 startDateTime == null

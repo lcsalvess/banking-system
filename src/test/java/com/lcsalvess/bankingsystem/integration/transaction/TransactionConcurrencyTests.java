@@ -3,28 +3,32 @@ package com.lcsalvess.bankingsystem.integration.transaction;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.entity.account.Account;
+import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
-import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.address.Address;
+import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
-import com.lcsalvess.bankingsystem.entity.user.Role;
-import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.account.AccountHasBalanceException;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
-import com.lcsalvess.bankingsystem.repository.*;
+import com.lcsalvess.bankingsystem.repository.AccountRepository;
+import com.lcsalvess.bankingsystem.repository.AddressRepository;
+import com.lcsalvess.bankingsystem.repository.ClientRepository;
+import com.lcsalvess.bankingsystem.repository.TransactionRepository;
+import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
-import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
-import com.lcsalvess.bankingsystem.service.transaction.balancereconciliation.BalanceReconciliationJob;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.service.transaction.balancereconciliation.BalanceReconciliationJob;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,16 +42,24 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ActiveProfiles("test")
@@ -57,6 +69,9 @@ class TransactionConcurrencyTests {
     // Keep at or below the Hikari default pool size (10).
     private static final int THREADS = 10;
     private static final int TIMEOUT_SECONDS = 30;
+
+    private static final ZoneId SAO_PAULO_ZONE =
+            ZoneId.of("America/Sao_Paulo");
 
     @Autowired
     private TransactionRepository transactionRepository;
@@ -347,7 +362,7 @@ class TransactionConcurrencyTests {
                     Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("1000.00"),
-                            referenceDate.minusDays(1).atTime(12, 0),
+                            atSaoPaulo(referenceDate.minusDays(1), 12, 0),
                             account,
                             findTestUser(),
                             new BigDecimal("1000.00")
@@ -466,7 +481,7 @@ class TransactionConcurrencyTests {
                     Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("100.00"),
-                            LocalDateTime.of(2026, 1, 10, 10, 0),
+                            atSaoPaulo(LocalDate.of(2026, 1, 10), 10, 0),
                             account,
                             actor,
                             new BigDecimal("100.00")
@@ -474,7 +489,7 @@ class TransactionConcurrencyTests {
                     Transaction.create(
                             TransactionType.WITHDRAWAL,
                             new BigDecimal("10.00"),
-                            LocalDateTime.of(2026, 1, 11, 10, 0),
+                            atSaoPaulo(LocalDate.of(2026, 1, 11), 10, 0),
                             account,
                             actor,
                             new BigDecimal("90.00")
@@ -482,7 +497,7 @@ class TransactionConcurrencyTests {
                     Transaction.createTransfer(
                             TransactionType.TRANSFER_SENT,
                             new BigDecimal("20.00"),
-                            LocalDateTime.of(2026, 1, 12, 10, 0),
+                            atSaoPaulo(LocalDate.of(2026, 1, 12), 10, 0),
                             account,
                             outgoingTransferCode,
                             actor,
@@ -491,7 +506,7 @@ class TransactionConcurrencyTests {
                     Transaction.createTransfer(
                             TransactionType.TRANSFER_RECEIVED,
                             new BigDecimal("30.00"),
-                            LocalDateTime.of(2026, 1, 13, 10, 0),
+                            atSaoPaulo(LocalDate.of(2026, 1, 13), 10, 0),
                             account,
                             incomingTransferCode,
                             actor,
@@ -499,7 +514,7 @@ class TransactionConcurrencyTests {
                     ),
                     Transaction.createSystemYield(
                             new BigDecimal("2.50"),
-                            LocalDateTime.of(2026, 1, 16, 0, 5),
+                            atSaoPaulo(LocalDate.of(2026, 1, 16), 0, 5),
                             LocalDate.of(2026, 1, 15),
                             account,
                             new BigDecimal("102.50")
@@ -507,7 +522,7 @@ class TransactionConcurrencyTests {
                     Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("999.00"),
-                            LocalDateTime.of(2026, 1, 16, 10, 0),
+                            atSaoPaulo(LocalDate.of(2026, 1, 16), 10, 0),
                             account,
                             actor,
                             new BigDecimal("1101.50")
@@ -518,7 +533,7 @@ class TransactionConcurrencyTests {
                     transactionRepository.calculateBalanceAtStartOfDay(
                             account.getId(),
                             referenceDate,
-                            referenceDate.atStartOfDay()
+                            referenceDate.atStartOfDay(SAO_PAULO_ZONE).toInstant()
                     );
 
             assertEquals(
@@ -532,7 +547,7 @@ class TransactionConcurrencyTests {
                     transactionRepository.findBalanceAtStartOfDayFromSnapshot(
                             account.getId(),
                             referenceDate,
-                            referenceDate.atStartOfDay()
+                            referenceDate.atStartOfDay(SAO_PAULO_ZONE).toInstant()
                     ).orElseThrow();
 
             assertEquals(
@@ -559,7 +574,7 @@ class TransactionConcurrencyTests {
                     Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("1000.00"),
-                            LocalDateTime.of(2026, 1, 14, 9, 0),
+                            atSaoPaulo(LocalDate.of(2026, 1, 14), 9, 0),
                             account,
                             actor,
                             new BigDecimal("1000.00")
@@ -567,14 +582,14 @@ class TransactionConcurrencyTests {
                     Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("100.00"),
-                            LocalDateTime.of(2026, 1, 16, 12, 0),
+                            atSaoPaulo(LocalDate.of(2026, 1, 16), 12, 0),
                             account,
                             actor,
                             new BigDecimal("1100.00")
                     ),
                     Transaction.createSystemYield(
                             new BigDecimal("0.17"),
-                            LocalDateTime.of(2026, 1, 16, 13, 0),
+                            atSaoPaulo(LocalDate.of(2026, 1, 16), 13, 0),
                             LocalDate.of(2026, 1, 15),
                             account,
                             new BigDecimal("1100.17")
@@ -585,7 +600,7 @@ class TransactionConcurrencyTests {
                     transactionRepository.findBalanceAtStartOfDayFromSnapshot(
                             account.getId(),
                             referenceDate,
-                            referenceDate.atStartOfDay()
+                            referenceDate.atStartOfDay(SAO_PAULO_ZONE).toInstant()
                     ).isEmpty(),
                     "The snapshot must not be used when the history is out of order."
             );
@@ -594,7 +609,7 @@ class TransactionConcurrencyTests {
                     transactionRepository.calculateBalanceAtStartOfDay(
                             account.getId(),
                             referenceDate,
-                            referenceDate.atStartOfDay()
+                            referenceDate.atStartOfDay(SAO_PAULO_ZONE).toInstant()
                     );
 
             assertEquals(
@@ -803,7 +818,7 @@ class TransactionConcurrencyTests {
                     Transaction.create(
                             TransactionType.DEPOSIT,
                             new BigDecimal("1000.00"),
-                            lastProcessedDate.minusDays(1).atTime(12, 0),
+                            atSaoPaulo(lastProcessedDate.minusDays(1), 12, 0),
                             persistedAccount,
                             findTestUser(),
                             new BigDecimal("1000.00")
@@ -1025,6 +1040,16 @@ class TransactionConcurrencyTests {
     // ---------------------------------------------------------------------
     // Fixtures and assertions
     // ---------------------------------------------------------------------
+
+    private static Instant atSaoPaulo(
+            LocalDate date,
+            int hour,
+            int minute
+    ) {
+        return date.atTime(hour, minute)
+                .atZone(SAO_PAULO_ZONE)
+                .toInstant();
+    }
 
     private CheckingAccount createCheckingAccount(String initialBalance) {
         Client client = createClient();

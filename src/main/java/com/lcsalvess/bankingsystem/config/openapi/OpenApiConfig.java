@@ -241,9 +241,9 @@ public class OpenApiConfig {
             responseSchema = isolatedSchema;
         }
 
-        Object candidate = responseSchema.getProperties().get("page");
+        Schema<?> pageProperty = responseSchema.getProperties().get("page");
 
-        if (!(candidate instanceof Schema<?> pageProperty)) {
+        if (pageProperty == null) {
             return;
         }
 
@@ -327,12 +327,14 @@ public class OpenApiConfig {
             String description,
             Object example
     ) {
-        Object candidate = parent.getProperties().get(propertyName);
+        Schema<?> property = parent.getProperties().get(propertyName);
 
-        if (candidate instanceof Schema<?> property) {
-            property.setDescription(description);
-            property.setExample(example);
+        if (property == null) {
+            return;
         }
+
+        property.setDescription(description);
+        property.setExample(example);
     }
 
     private void setTransactionExample(

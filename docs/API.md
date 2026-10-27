@@ -61,6 +61,7 @@ If `id` is explicitly included, its requested direction and position are preserv
 | `GET /api/v1/accounts`                              | -                                                                                                        | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
 | `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate`                                                                           | `createdAt`, `id`, `type`, `amount`                                                                                               | `createdAt` descending, then `id` descending | 10           |
 | `GET /api/v1/audit-events`                          | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
+
 On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Both must be between 2020-01-01 and the current date, and `startDate` cannot be after `endDate` (`400 Bad Request`).
 
 ### Audit Event Queries

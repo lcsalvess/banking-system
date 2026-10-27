@@ -286,6 +286,41 @@ class AuthServiceTests {
 
             verifyNoInteractions(jwtService);
         }
+
+        @Test
+        @DisplayName("Deve cancelar a tentativa quando o principal da autenticação é nulo")
+        void shouldCancelAttemptWhenAuthenticationPrincipalIsNull() {
+            LoginRequestDTO dto = createLoginRequestDTO();
+
+            allowAttempt();
+
+            when(authManager.authenticate(
+                    any(UsernamePasswordAuthenticationToken.class)
+            )).thenReturn(authentication);
+
+            when(authentication.getPrincipal()).thenReturn(null);
+
+            AuthenticationServiceException exception = assertThrows(
+                    AuthenticationServiceException.class,
+                    () -> authService.authenticate(dto, TEST_CLIENT_IP)
+            );
+
+            assertEquals(
+                    ApiErrorMessages.AUTHENTICATION_FAILED,
+                    exception.getMessage()
+            );
+
+            verify(rateLimitProtectionService)
+                    .beginAttempt(TEST_CLIENT_IP, dto.username());
+
+            verify(rateLimitProtectionService)
+                    .cancelAttempt(TEST_ATTEMPT);
+
+            verify(rateLimitProtectionService, never())
+                    .recordSuccessfulLogin(any(LoginAttempt.class));
+
+            verifyNoInteractions(jwtService);
+        }
     }
 
     @Nested

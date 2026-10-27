@@ -67,22 +67,21 @@ class TransactionIdempotencyCleanupIntegrationTests {
     private void insertRequest(long userId, int ageInDays) {
         jdbcTemplate.update(
                 """
-                INSERT INTO transaction_idempotency_requests (
-                    user_id,
-                    idempotency_key,
-                    operation_type,
-                    request_hash,
-                    created_at
-                )
-                VALUES (
-                    ?,
-                    gen_random_uuid(),
-                    'DEPOSIT',
-                    repeat('0', 64),
-                    (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')
-                        - make_interval(days => ?)
-                )
-                """,
+                                        INSERT INTO transaction_idempotency_requests (
+                                            user_id,
+                                            idempotency_key,
+                                            operation_type,
+                                            request_hash,
+                                            created_at
+                                        )
+                        VALUES (
+                            ?,
+                            gen_random_uuid(),
+                            'DEPOSIT',
+                            repeat('0', 64),
+                            CURRENT_TIMESTAMP - make_interval(days => ?)
+                        )
+                        """,
                 userId,
                 ageInDays
         );

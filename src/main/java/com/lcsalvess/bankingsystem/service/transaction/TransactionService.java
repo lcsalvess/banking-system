@@ -27,6 +27,7 @@ import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.util.actor.SystemActor;
 import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
+import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import com.lcsalvess.bankingsystem.validation.daterange.QueryDateRangeValidator;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -36,8 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -77,8 +78,14 @@ public class TransactionService {
                 TransactionSpecifications.byAccountAndFilters(
                         account.getId(),
                         type,
-                        startDate != null ? startDate.atStartOfDay() : null,
-                        endDate != null ? endDate.plusDays(1).atStartOfDay() : null
+                        startDate != null
+                                ? startDate.atStartOfDay(AppTimeZone.ZONE).toInstant()
+                                : null,
+                        endDate != null
+                                ? endDate.plusDays(1)
+                                .atStartOfDay(AppTimeZone.ZONE)
+                                .toInstant()
+                                : null
                 ),
                 PageableTieBreaker.withIdTieBreaker(pageable)
         ).map(TransactionResponseDTO::fromEntity);
@@ -271,6 +278,10 @@ public class TransactionService {
             return DailyYieldProcessingResult.NOT_ELIGIBLE;
         }
 
+        Instant dayStart = referenceDate
+                .atStartOfDay(AppTimeZone.ZONE)
+                .toInstant();
+
         // Caminho rápido: lê o balance_after da última transação anterior ao
         // dia. Se o histórico não estiver em ordem (rendimento retroativo
         // gravado depois de movimentações mais novas), a consulta não retorna
@@ -279,13 +290,13 @@ public class TransactionService {
                 transactionRepository.findBalanceAtStartOfDayFromSnapshot(
                                 savingsAccount.getId(),
                                 referenceDate,
-                                referenceDate.atStartOfDay()
+                                dayStart
                         )
                         .orElseGet(() ->
                                 transactionRepository.calculateBalanceAtStartOfDay(
                                         savingsAccount.getId(),
                                         referenceDate,
-                                        referenceDate.atStartOfDay()
+                                        dayStart
                                 )
                         );
 
@@ -367,7 +378,7 @@ public class TransactionService {
         Transaction transaction = Transaction.create(
                 type,
                 amount,
-                LocalDateTime.now(clock),
+                clock.instant(),
                 account,
                 performedBy,
                 account.getBalance()
@@ -385,7 +396,7 @@ public class TransactionService {
         Transaction transaction = Transaction.createTransfer(
                 type,
                 amount,
-                LocalDateTime.now(clock),
+                clock.instant(),
                 account,
                 transferCode,
                 performedBy,
@@ -402,7 +413,7 @@ public class TransactionService {
     ) {
         Transaction transaction = Transaction.createSystemYield(
                 amount,
-                LocalDateTime.now(clock),
+                clock.instant(),
                 referenceDate,
                 account,
                 account.getBalance()

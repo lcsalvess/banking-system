@@ -1,15 +1,15 @@
 package com.lcsalvess.bankingsystem.dto.response.transaction;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.lcsalvess.bankingsystem.serialization.MoneySerializer;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
+import com.lcsalvess.bankingsystem.serialization.MoneySerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -41,9 +41,9 @@ public record TransactionResponseDTO(
 
         @Schema(
                 description = "Date and time when the transaction was created.",
-                example = "2026-10-15T14:30:00"
+                example = "2026-10-15T17:30:00Z"
         )
-        LocalDateTime createdAt,
+        Instant createdAt,
 
         @Schema(
                 description = "Reference date used for the yield. Omitted for transactions other than YIELD.",

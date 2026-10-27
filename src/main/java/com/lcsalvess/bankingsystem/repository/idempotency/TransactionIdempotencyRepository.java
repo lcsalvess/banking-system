@@ -40,13 +40,13 @@ public class TransactionIdempotencyRepository {
               AND transaction_code IS NULL
             """;
 
-    // Usa a mesma expressão do DEFAULT de created_at (horário local de
-    // America/Sao_Paulo), então a comparação não depende do fuso da JVM.
+    // created_at é um instante (TIMESTAMPTZ), portanto a retenção é
+    // calculada diretamente a partir do instante atual do banco.
     private static final String DELETE_OLDER_THAN_SQL = """
-            DELETE FROM transaction_idempotency_requests
-            WHERE created_at < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')
-                               - make_interval(days => ?)
-            """;
+        DELETE FROM transaction_idempotency_requests
+        WHERE created_at < CURRENT_TIMESTAMP
+                           - make_interval(days => ?)
+        """;
 
     private final JdbcTemplate jdbcTemplate;
 

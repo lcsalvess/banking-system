@@ -3,13 +3,25 @@ package com.lcsalvess.bankingsystem.entity.transaction;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.UUID;
@@ -64,7 +76,7 @@ public class Transaction {
 
     @NotNull
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "yield_date")
     private LocalDate yieldDate;
@@ -104,7 +116,7 @@ public class Transaction {
     public static Transaction create(
             TransactionType type,
             BigDecimal amount,
-            LocalDateTime createdAt,
+            Instant createdAt,
             Account account,
             User performedBy,
             BigDecimal balanceAfter
@@ -112,7 +124,7 @@ public class Transaction {
         requireOrdinaryOperationType(type);
 
         BigDecimal validatedAmount = requireValidAmount(amount);
-        LocalDateTime validatedCreatedAt = truncateToMicros(createdAt);
+        Instant validatedCreatedAt = truncateToMicros(createdAt);
         Account validatedAccount = requireAccount(account);
         BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
         User validatedActor = requireHumanActor(performedBy);
@@ -137,7 +149,7 @@ public class Transaction {
     public static Transaction createTransfer(
             TransactionType type,
             BigDecimal amount,
-            LocalDateTime createdAt,
+            Instant createdAt,
             Account account,
             UUID transferCode,
             User performedBy,
@@ -151,7 +163,7 @@ public class Transaction {
         );
 
         BigDecimal validatedAmount = requireValidAmount(amount);
-        LocalDateTime validatedCreatedAt = truncateToMicros(createdAt);
+        Instant validatedCreatedAt = truncateToMicros(createdAt);
         Account validatedAccount = requireAccount(account);
         BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
         User validatedActor = requireHumanActor(performedBy);
@@ -175,7 +187,7 @@ public class Transaction {
      */
     public static Transaction createSystemYield(
             BigDecimal amount,
-            LocalDateTime createdAt,
+            Instant createdAt,
             LocalDate yieldDate,
             Account account,
             BigDecimal balanceAfter
@@ -183,7 +195,7 @@ public class Transaction {
         validateSystemYieldDate(yieldDate);
 
         BigDecimal validatedAmount = requireValidAmount(amount);
-        LocalDateTime validatedCreatedAt = truncateToMicros(createdAt);
+        Instant validatedCreatedAt = truncateToMicros(createdAt);
         SavingsAccount validatedAccount = requireSavingsAccount(account);
         BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
 
@@ -211,7 +223,7 @@ public class Transaction {
             TransactionType type,
             BigDecimal amount,
             BigDecimal balanceAfter,
-            LocalDateTime createdAt,
+            Instant createdAt,
             LocalDate yieldDate,
             Account account,
             User performedBy,
@@ -253,7 +265,7 @@ public class Transaction {
         return balanceAfter;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
@@ -278,9 +290,7 @@ public class Transaction {
      * A truncagem garante que o valor em memória seja compatível
      * com a precisão persistida.
      */
-    private static LocalDateTime truncateToMicros(
-            LocalDateTime value
-    ) {
+    private static Instant truncateToMicros(Instant value) {
         return Objects.requireNonNull(
                 value,
                 "The transaction creation timestamp is required."

@@ -7,7 +7,7 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditEvent;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -21,7 +21,7 @@ public record AuditEventResponseDTO(
         AuditEntityType entityType,
         String entityId,
         UUID correlationId,
-        LocalDateTime createdAt
+        Instant createdAt
 ) {
 
     public static AuditEventResponseDTO fromEntity(AuditEvent event) {

@@ -1,0 +1,88 @@
+name: OWASP Dependency-Check
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - pom.xml
+      - .mvn/**
+      - mvnw
+      - mvnw.cmd
+      - .github/workflows/dependency-check.yml
+
+  pull_request:
+    branches: [ master ]
+    paths:
+      - pom.xml
+      - .mvn/**
+      - mvnw
+      - mvnw.cmd
+      - .github/workflows/dependency-check.yml
+
+  schedule:
+    - cron: '17 6 * * 1'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-check:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Get UTC date for cache key
+        id: cache-date
+        run: echo "date=$(date -u +'%Y%m%d')" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Restore Dependency-Check database cache
+        id: odc-cache-restore
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.dependency-check-data
+          key: ${{ runner.os }}-odc-13.0.0-${{ steps.cache-date.outputs.date }}
+          restore-keys: |
+            ${{ runner.os }}-odc-13.0.0-
+
+      - name: Scan dependencies
+        run: >-
+          ./mvnw --batch-mode --no-transfer-progress
+          org.owasp:dependency-check-maven:13.0.0:check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+      - name: Save updated Dependency-Check database
+        if: success() && steps.odc-cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.dependency-check-data
+          key: ${{ steps.odc-cache-restore.outputs.cache-primary-key }}
+
+      - name: Upload Dependency-Check reports
+        if: always() && hashFiles('target/dependency-check-report.html', 'target/dependency-check-report.json') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-check-report
+          path: |
+            target/dependency-check-report.html
+            target/dependency-check-report.json
+          if-no-files-found: warn
+          retention-days: 14

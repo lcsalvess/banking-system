@@ -62,7 +62,7 @@ If `id` is explicitly included, its requested direction and position are preserv
 | `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate`                                                                           | `createdAt`, `id`, `type`, `amount`                                                                                               | `createdAt` descending, then `id` descending | 10           |
 | `GET /api/v1/audit-events`                          | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
 
-On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Both must be between 2020-01-01 and the current date, and `startDate` cannot be after `endDate` (`400 Bad Request`).
+On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Dates are interpreted in the `America/Sao_Paulo` timezone: `startDate` includes transactions from the beginning of that local calendar day, and `endDate` includes the entire day, implemented using an exclusive upper bound at the beginning of the following day. Both dates must be between `2020-01-01` and the current date in the application timezone, and `startDate` cannot be after `endDate` (`400 Bad Request`).
 
 ### Audit Event Queries
 
@@ -71,10 +71,7 @@ role. It returns a paginated, read-only view of the audit trail.
 
 The endpoint supports the following optional filters:
 
-- `startDate` and `endDate`: inclusive dates in `yyyy-MM-dd` format.
-  Dates must be between 2020-01-01 and the current date, and the start
-  date cannot be after the end date. When both dates are informed, the
-  range cannot exceed 366 days.
+- `startDate` and `endDate`: inclusive dates in `yyyy-MM-dd` format, interpreted in the `America/Sao_Paulo` timezone. The start date includes the beginning of that local calendar day; the end date includes the entire day, using an exclusive upper bound at the beginning of the following local calendar day. Dates must be between `2020-01-01` and the current date in the application timezone, and the start date cannot be after the end date. When both dates are provided, the inclusive range cannot exceed 366 calendar days. The 366-day limit does not apply when only one date is provided.
 - `eventType`: exact event type.
 - `outcome`: recorded outcome (`SUCCESS`, `FAILURE`, or `DENIED`).
 - `actorUserId`: positive numeric ID of the actor.
@@ -161,12 +158,15 @@ curl 'http://localhost:8080/api/v1/audit-events?startDate=2026-10-01&endDate=202
 
 Transactions are returned with their public identifier, and the internal database ID is not exposed:
 
+Timestamp fields such as `createdAt` represent instants and are returned in ISO 8601 format in UTC, using the `Z` suffix. Clients should convert these instants to the appropriate timezone for display.
+
 ```json
 {
   "transactionCode": "3f6c1d52-8a0e-4b7d-9c41-2e5a7b9d0f13",
   "type": "DEPOSIT",
   "amount": 150.00,
-  "createdAt": "2026-09-30T14:32:10"
+  "createdAt": "2026-09-30T14:32:10Z",
+  "balanceAfter": 150.00
 }
 ```
 
@@ -180,6 +180,7 @@ Transfer transactions also include the `transferCode` shared by both legs of the
   "transferCode": "c4d8f2a6-19b3-4e57-a0d2-6f81b5e3c790",
   "type": "TRANSFER_SENT",
   "amount": 100.00,
-  "createdAt": "2026-10-09T14:20:45"
+  "createdAt": "2026-10-09T14:20:45Z",
+  "balanceAfter": 100.00
 }
 ```

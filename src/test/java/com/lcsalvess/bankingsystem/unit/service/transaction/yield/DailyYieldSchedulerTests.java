@@ -6,7 +6,6 @@ import ch.qos.logback.core.read.ListAppender;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldScheduler;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +57,7 @@ class DailyYieldSchedulerTests {
     private AccountRepository accountRepository;
 
     @Mock
-    private TransactionService transactionService;
+    private DailyYieldService dailyYieldService;
 
     private DailyYieldScheduler scheduler;
 
@@ -66,7 +65,7 @@ class DailyYieldSchedulerTests {
     void setUp() {
         scheduler = new DailyYieldScheduler(
                 accountRepository,
-                transactionService,
+                dailyYieldService,
                 CLOCK
         );
     }
@@ -96,7 +95,7 @@ class DailyYieldSchedulerTests {
             verifyYieldCall(first, TODAY);
             verifyYieldCall(second, TODAY);
 
-            verifyNoMoreInteractions(accountRepository, transactionService);
+            verifyNoMoreInteractions(accountRepository, dailyYieldService);
         }
 
         @Test
@@ -109,7 +108,7 @@ class DailyYieldSchedulerTests {
             verifyBatchLookups();
 
             verifyNoMoreInteractions(accountRepository);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(dailyYieldService);
         }
 
         @Test
@@ -125,7 +124,7 @@ class DailyYieldSchedulerTests {
 
             givenAccounts(first, second);
 
-            when(transactionService.processDailyYieldForDate(
+            when(dailyYieldService.processDailyYieldForDate(
                     first.getAccountNumber(),
                     first.getDigit(),
                     TODAY
@@ -145,7 +144,7 @@ class DailyYieldSchedulerTests {
             verifyYieldCall(first, TODAY);
             verifyYieldCall(second, TODAY);
 
-            verifyNoMoreInteractions(accountRepository, transactionService);
+            verifyNoMoreInteractions(accountRepository, dailyYieldService);
         }
 
         @Test
@@ -179,7 +178,7 @@ class DailyYieldSchedulerTests {
             verifyYieldCall(first, TODAY);
             verifyYieldCall(second, TODAY);
 
-            verifyNoMoreInteractions(accountRepository, transactionService);
+            verifyNoMoreInteractions(accountRepository, dailyYieldService);
         }
     }
 
@@ -240,7 +239,7 @@ class DailyYieldSchedulerTests {
                 verifyYieldCall(first, TODAY);
                 verifyYieldCall(second, TODAY);
 
-                verifyNoMoreInteractions(accountRepository, transactionService);
+                verifyNoMoreInteractions(accountRepository, dailyYieldService);
 
             } finally {
                 schedulerLogger.detachAppender(logAppender);
@@ -257,7 +256,7 @@ class DailyYieldSchedulerTests {
 
             givenAccounts(account);
 
-            when(transactionService.processDailyYieldForDate(
+            when(dailyYieldService.processDailyYieldForDate(
                     account.getAccountNumber(),
                     account.getDigit(),
                     TODAY
@@ -273,13 +272,13 @@ class DailyYieldSchedulerTests {
 
             verifyBatchLookups(1L);
 
-            verify(transactionService, times(2)).processDailyYieldForDate(
+            verify(dailyYieldService, times(2)).processDailyYieldForDate(
                     account.getAccountNumber(),
                     account.getDigit(),
                     TODAY
             );
 
-            verifyNoMoreInteractions(accountRepository, transactionService);
+            verifyNoMoreInteractions(accountRepository, dailyYieldService);
         }
 
         @Test
@@ -295,7 +294,7 @@ class DailyYieldSchedulerTests {
 
             givenAccounts(first, second);
 
-            when(transactionService.processDailyYieldForDate(
+            when(dailyYieldService.processDailyYieldForDate(
                     first.getAccountNumber(),
                     first.getDigit(),
                     TODAY
@@ -311,7 +310,7 @@ class DailyYieldSchedulerTests {
 
             verifyBatchLookups(2L);
 
-            verify(transactionService, times(3)).processDailyYieldForDate(
+            verify(dailyYieldService, times(3)).processDailyYieldForDate(
                     first.getAccountNumber(),
                     first.getDigit(),
                     TODAY
@@ -319,7 +318,7 @@ class DailyYieldSchedulerTests {
 
             verifyYieldCall(second, TODAY);
 
-            verifyNoMoreInteractions(accountRepository, transactionService);
+            verifyNoMoreInteractions(accountRepository, dailyYieldService);
         }
     }
 
@@ -365,21 +364,21 @@ class DailyYieldSchedulerTests {
 
             scheduler.processDailyYields();
 
-            InOrder inOrder = inOrder(transactionService);
+            InOrder inOrder = inOrder(dailyYieldService);
 
-            inOrder.verify(transactionService).processDailyYieldForDate(
+            inOrder.verify(dailyYieldService).processDailyYieldForDate(
                     account.getAccountNumber(),
                     account.getDigit(),
                     firstDate
             );
 
-            inOrder.verify(transactionService).processDailyYieldForDate(
+            inOrder.verify(dailyYieldService).processDailyYieldForDate(
                     account.getAccountNumber(),
                     account.getDigit(),
                     secondDate
             );
 
-            inOrder.verify(transactionService).processDailyYieldForDate(
+            inOrder.verify(dailyYieldService).processDailyYieldForDate(
                     account.getAccountNumber(),
                     account.getDigit(),
                     TODAY
@@ -387,7 +386,7 @@ class DailyYieldSchedulerTests {
 
             verifyBatchLookups(1L);
 
-            verifyNoMoreInteractions(accountRepository, transactionService);
+            verifyNoMoreInteractions(accountRepository, dailyYieldService);
         }
     }
 
@@ -434,7 +433,7 @@ class DailyYieldSchedulerTests {
             LocalDate referenceDate,
             DailyYieldProcessingResult result
     ) {
-        when(transactionService.processDailyYieldForDate(
+        when(dailyYieldService.processDailyYieldForDate(
                 account.getAccountNumber(),
                 account.getDigit(),
                 referenceDate
@@ -445,7 +444,7 @@ class DailyYieldSchedulerTests {
             SavingsAccount account,
             LocalDate referenceDate
     ) {
-        verify(transactionService).processDailyYieldForDate(
+        verify(dailyYieldService).processDailyYieldForDate(
                 account.getAccountNumber(),
                 account.getDigit(),
                 referenceDate

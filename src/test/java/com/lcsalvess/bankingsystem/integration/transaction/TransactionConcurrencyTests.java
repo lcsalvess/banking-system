@@ -29,6 +29,7 @@ import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.service.transaction.balancereconciliation.BalanceReconciliationJob;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -87,6 +88,9 @@ class TransactionConcurrencyTests {
 
     @Autowired
     private TransactionService transactionService;
+
+    @Autowired
+    private DailyYieldService dailyYieldService;
 
     @Autowired
     private AccountNumberGenerator accountNumberGenerator;
@@ -829,7 +833,7 @@ class TransactionConcurrencyTests {
             LocalDate firstDate = lastProcessedDate.plusDays(1);
 
             DailyYieldProcessingResult firstResult =
-                    transactionService.processDailyYieldForDate(
+                    dailyYieldService.processDailyYieldForDate(
                             account.getAccountNumber(),
                             account.getDigit(),
                             firstDate
@@ -860,7 +864,7 @@ class TransactionConcurrencyTests {
                     referenceDate = referenceDate.plusDays(1)
             ) {
                 DailyYieldProcessingResult result =
-                        transactionService.processDailyYieldForDate(
+                        dailyYieldService.processDailyYieldForDate(
                                 account.getAccountNumber(),
                                 account.getDigit(),
                                 referenceDate
@@ -946,7 +950,7 @@ class TransactionConcurrencyTests {
             SavingsAccount account,
             LocalDate referenceDate
     ) {
-        return () -> transactionService.processDailyYieldForDate(
+        return () -> dailyYieldService.processDailyYieldForDate(
                 account.getAccountNumber(),
                 account.getDigit(),
                 referenceDate

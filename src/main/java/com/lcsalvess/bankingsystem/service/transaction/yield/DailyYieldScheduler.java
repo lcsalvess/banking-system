@@ -4,7 +4,6 @@ import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,16 +28,16 @@ public class DailyYieldScheduler {
     private static final long RETRY_DELAY_MILLIS = 200;
 
     private final AccountRepository accountRepository;
-    private final TransactionService transactionService;
+    private final DailyYieldService dailyYieldService;
     private final Clock clock;
 
     public DailyYieldScheduler(
             AccountRepository accountRepository,
-            TransactionService transactionService,
+            DailyYieldService dailyYieldService,
             Clock clock
     ) {
         this.accountRepository = accountRepository;
-        this.transactionService = transactionService;
+        this.dailyYieldService = dailyYieldService;
         this.clock = clock;
     }
 
@@ -161,7 +160,7 @@ public class DailyYieldScheduler {
 
         for (int attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
             try {
-                return transactionService.processDailyYieldForDate(
+                return dailyYieldService.processDailyYieldForDate(
                         account.getAccountNumber(),
                         account.getDigit(),
                         referenceDate
@@ -187,7 +186,7 @@ public class DailyYieldScheduler {
         }
 
         // Última tentativa: se falhar, a exceção será propagada.
-        return transactionService.processDailyYieldForDate(
+        return dailyYieldService.processDailyYieldForDate(
                 account.getAccountNumber(),
                 account.getDigit(),
                 referenceDate

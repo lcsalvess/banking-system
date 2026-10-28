@@ -7,6 +7,7 @@ import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldScheduler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

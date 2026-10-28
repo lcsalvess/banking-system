@@ -296,6 +296,31 @@
                 </executions>
             </plugin>
 
+            <!--
+                Scans Maven dependencies for publicly disclosed
+                vulnerabilities.
+                Vulnerability-based build gating will be enabled
+                after the initial report has been reviewed.
+            -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>13.0.0</version>
+                <configuration>
+                    <dataDirectory>${user.home}/.dependency-check-data</dataDirectory>
+
+                    <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+
+                    <formats>
+                        <format>HTML</format>
+                        <format>JSON</format>
+                    </formats>
+
+                    <failBuildOnCVSS>11</failBuildOnCVSS>
+                    <failOnError>true</failOnError>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

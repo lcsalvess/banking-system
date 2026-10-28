@@ -29,7 +29,7 @@ The main goal is to build a realistic backend system while exploring software en
 | BCrypt               | -       | Password hashing                                                            |
 | PostgreSQL           | 18      | Relational database                                                         |
 | Flyway               | -       | Versioned database migrations                                               |
-| springdoc-openapi    | 3.1.1   | OpenAPI / Swagger UI documentation                                          |
+| springdoc-openapi    | 3.2.0   | OpenAPI / Swagger UI documentation                                          |
 | Maven                | -       | Dependency management and build                                             |
 | JUnit                | 6       | Unit and integration testing                                                |
 | Mockito              | 5       | Mocking for tests                                                           |

@@ -3,8 +3,8 @@ package com.lcsalvess.bankingsystem.util.time;
 import java.time.ZoneId;
 
 /**
- * Fonte única do fuso horário da aplicação. Usada pelo {@code Clock} e pelos
- * callbacks de entidade, que não conseguem receber o Clock por injeção.
+ * Fonte única do fuso horário da aplicação. Usada pelo {@code Clock} e pelas
+ * conversões de data local para instante (filtros de período e início do dia).
  */
 public final class AppTimeZone {
 

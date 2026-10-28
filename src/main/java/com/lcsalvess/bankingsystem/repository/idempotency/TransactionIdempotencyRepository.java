@@ -43,10 +43,10 @@ public class TransactionIdempotencyRepository {
     // created_at é um instante (TIMESTAMPTZ), portanto a retenção é
     // calculada diretamente a partir do instante atual do banco.
     private static final String DELETE_OLDER_THAN_SQL = """
-        DELETE FROM transaction_idempotency_requests
-        WHERE created_at < CURRENT_TIMESTAMP
-                           - make_interval(days => ?)
-        """;
+            DELETE FROM transaction_idempotency_requests
+            WHERE created_at < CURRENT_TIMESTAMP
+                               - make_interval(days => ?)
+            """;
 
     private final JdbcTemplate jdbcTemplate;
 

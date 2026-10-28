@@ -4,13 +4,12 @@ import com.lcsalvess.bankingsystem.util.normalization.EmailNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.UsernameNormalizer;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.GrantedAuthority;
@@ -19,11 +18,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.io.Serial;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
 
 @Entity
+@EntityListeners(UserTimestampListener.class)
 @Table(name = "users")
 public class User implements UserDetails {
 
@@ -62,18 +61,23 @@ public class User implements UserDetails {
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
-    private Instant  updatedAt;
+    private Instant updatedAt;
 
-    @PrePersist
-    public void prePersist() {
-        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    /**
+     * Define os timestamps de criação a partir do relógio da aplicação.
+     * Chamado pelo {@link UserTimestampListener} antes do INSERT.
+     */
+    void initializeTimestamps(Instant now) {
         this.createdAt = now;
         this.updatedAt = now;
     }
 
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    /**
+     * Atualiza o timestamp de modificação a partir do relógio da aplicação.
+     * Chamado pelo {@link UserTimestampListener} antes do UPDATE.
+     */
+    void refreshUpdatedAt(Instant now) {
+        this.updatedAt = now;
     }
 
     protected User() {

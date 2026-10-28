@@ -106,6 +106,14 @@ The transaction idempotency cleanup runs daily at 03:30 by default, using the Sp
 
 The retention period is configured by `banking.idempotency.retention-days` and defaults to 7 days. Expired records are also cleaned up asynchronously after application startup, so cleanup missed while the application was offline does not have to wait until the next scheduled run.
 
+Balance reconciliation runs daily at 03:00 by default, using the Spring
+cron expression configured by `banking.reconciliation.cron`. Its time
+zone is `America/Sao_Paulo`. The job checks account balances against
+the latest transaction snapshots and detects breaks in the historical
+balance chain. It is diagnostic only and does not modify balances or
+transaction history. It also runs asynchronously after application
+startup, except in the `test` profile.
+
 The base URLs for the address lookup providers are defined in `application.properties`:
 
 - `integration.address.viacep.base-url`
@@ -156,14 +164,55 @@ For request examples, see the [API reference](API.md).
 
 ## Testing
 
-The test suite runs against PostgreSQL using the `test` profile and the `banking_system_test` database. Flyway applies the same migrations used by the application, and Hibernate validates the resulting schema.
+The test suite runs against PostgreSQL using the `test` profile and the
+`banking_system_test` database. Flyway applies the same migrations used
+by the application, and Hibernate validates the resulting schema.
 
-The `test` profile uses `DB_USERNAME` and `DB_PASSWORD` for both the application datasource and Flyway. For local test execution, these credentials must belong to a dedicated test database user with permission to apply migrations and clean up integration-test fixtures in `banking_system_test`. Do not use the runtime `banking_app` credentials for this purpose: its production-style grants intentionally prohibit physical deletion from business tables and transaction history. The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The privilege callback is not loaded in the `test` profile, which keeps test fixture permissions separate from local/production privileges. That separation is covered by `LeastPrivilegeSmokeTests`, which runs only when the `PRIVILEGE_TEST_*` environment variables are set (the `least-privilege` job in GitHub Actions sets them). It needs an empty database with the roles from `scripts/db/bootstrap-roles.sql`:
+For a fresh local setup, create a dedicated database role for tests and
+make it the owner of `banking_system_test`. Run the following commands
+as a PostgreSQL administrator, replacing the example password with a
+secure local value:
+
+```sql
+CREATE ROLE banking_test LOGIN PASSWORD 'replace-with-a-local-secret';
+ALTER DATABASE banking_system_test OWNER TO banking_test;
+```
+
+Set `DB_USERNAME=banking_test` and `DB_PASSWORD` to the configured
+password when running tests. The `test` profile uses these credentials
+for both the application datasource and Flyway. The role must be able
+to apply migrations and clean up integration-test fixtures. Do not use
+the runtime `banking_app` credentials, whose production-style grants
+intentionally prohibit physical deletion from business tables and
+transaction history.
+
+The GitHub Actions workflow uses a dedicated `banking_test` user and a
+separate `banking_system_test` database. The privilege callback is not
+loaded in the `test` profile, keeping test fixture permissions separate
+from local and production privileges.
+
+The runtime role's least-privilege grants are verified by
+`LeastPrivilegeSmokeTests`, which runs only when the
+`PRIVILEGE_TEST_*` environment variables are set. The
+`least-privilege` job in GitHub Actions configures them.
+
+For local execution, create an empty `banking_privilege_test` database.
+Run `scripts/db/bootstrap-roles.sql` as a PostgreSQL administrator
+against that database, then set the passwords for `banking_migrator`
+and `banking_app` to match the corresponding `PRIVILEGE_TEST_*`
+environment variables. The smoke test applies the database migrations
+itself.
+
+Run the following command from the repository root:
+
+#### Linux / macOS / Git Bash
 
 ```bash
 PRIVILEGE_TEST_DB_URL=jdbc:postgresql://localhost:5432/banking_privilege_test \
-PRIVILEGE_TEST_MIGRATOR_USER=banking_migrator PRIVILEGE_TEST_MIGRATOR_PASSWORD=... \
-PRIVILEGE_TEST_APP_USER=banking_app PRIVILEGE_TEST_APP_PASSWORD=... \
+PRIVILEGE_TEST_MIGRATOR_USER=banking_migrator \
+PRIVILEGE_TEST_MIGRATOR_PASSWORD=... \
+PRIVILEGE_TEST_APP_USER=banking_app \
+PRIVILEGE_TEST_APP_PASSWORD=... \
 ./mvnw test -Dtest=LeastPrivilegeSmokeTests
 ```
 

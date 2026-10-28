@@ -36,9 +36,10 @@ src/main/java/com/lcsalvess/bankingsystem
 │   ├── address/        # Address-resolution application logic
 │   ├── client/         # Client operations and persistence responsibilities
 │   ├── security/       # Authentication, JWT, password changes, and current user
-│   ├── transaction/    # Financial operations and balance reconciliation
-│   │   ├── idempotency/ # Idempotency handling, scheduled cleanup, and startup recovery
-│   │   └── yield/        # Daily yield processing and startup recovery
+│   ├── transaction/    # Financial operations
+│   │   ├── balancereconciliation/ # Balance checks and startup recovery
+│   │   ├── idempotency/ # Idempotency handling, cleanup, and startup recovery
+│   │   └── yield/       # Daily yield processing and startup recovery
 │   └── user/           # User operations
 └── validation/      # Custom Bean Validation constraints and validators
     ├── accountnumber/      # Account number and check digit validation
@@ -48,62 +49,58 @@ src/main/java/com/lcsalvess/bankingsystem
     └── reservedusername/   # Reserved username validation
 ```
 
-Startup recovery tasks for daily yield processing and transaction idempotency cleanup use the dedicated `startupRecoveryExecutor`, keeping them separate from the `applicationTaskExecutor` used for MVC asynchronous requests. The shared recovery executor runs one task at a time on a dedicated background thread.
+Startup recovery tasks for daily yield processing, transaction idempotency
+cleanup, and balance reconciliation use the dedicated
+`startupRecoveryExecutor`, keeping them separate from the
+`applicationTaskExecutor` used for Spring MVC asynchronous request handling.
+The recovery executor has a single worker thread and a queue capacity of two
+tasks. These startup recovery tasks run asynchronously after
+`ApplicationReadyEvent` and are disabled in the `test` profile.
 
 ## Request Flow
 
-Shows the full request/response cycle, including authentication and authorization before business logic executes.
+The diagram below illustrates the simplified request/response flow, from authentication and authorization through controller and service execution to persistence, external integrations, and response generation.
 
-```text
-┌─────────────────┐
-│     Client      │
-│   Postman/API   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Spring Security │
-│ Authentication  │
-│ Authorization   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│    Controller   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│     Service     │
-│ Business Rules  │
-└────────┬────────┘
-         │
-         ├──────────────► Persistence
-         │                     │
-         │                     ▼
-         │                Repository
-         │                     │
-         │                     ▼
-         │                PostgreSQL
-         │                     │
-         │◄────────────────────┘
-         │
-         ├──────────────► Integration
-         │                     │
-         │                     ▼
-         │              External APIs
-         │              ViaCEP / BrasilAPI
-         │
-         ├──────────────► Events
-         │
-         │
-         ▼
-┌─────────────────┐
-│  Response DTO   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│     Client      │
-└─────────────────┘
+```mermaid
+flowchart TB
+    client["Client<br/>HTTP request"]
+    security["Filters and Spring Security<br/>Correlation ID, JWT authentication<br/>and authorization"]
+    controller["REST Controller<br/>Request binding and validation"]
+    service["Service Layer<br/>Business rules and transaction management"]
+
+    client --> security --> controller --> service
+
+    service --> repositories["Persistence<br/>Repositories"]
+    repositories --> database[("PostgreSQL")]
+
+    service --> integration["Address Integration"]
+    integration --> providers["ViaCEP / BrasilAPI"]
+
+    service --> events["Application Events<br/>Audit and logging"]
+
+    service --> result["Business Operation Result<br/>Returned by the Service"]
+```
+
+On successful execution, the service returns the operation result to the
+controller, which maps it to a response DTO and produces the HTTP response.
+
+### Error Handling
+
+The following diagram summarizes how authentication, authorization,
+request validation, and application errors are converted into HTTP
+error responses.
+
+```mermaid
+flowchart TB
+    security["Filters and Spring Security"]
+    controller["REST Controller"]
+    service["Service Layer"]
+
+    security --> securityHandlers["RestAuthenticationEntryPoint<br/>RestAccessDeniedHandler<br/>401 Unauthorized / 403 Forbidden"]
+
+    controller --> exceptionHandler["GlobalExceptionHandler"]
+    service --> exceptionHandler
+
+    securityHandlers --> response["Structured HTTP error response"]
+    exceptionHandler --> response
 ```

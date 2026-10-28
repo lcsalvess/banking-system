@@ -9,7 +9,6 @@ import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotSavingsException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.exception.transaction.BalanceLimitExceededException;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.util.actor.SystemActor;
@@ -175,12 +174,6 @@ public class DailyYieldService {
     private void validateActiveAccount(Account account) {
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_NOT_ACTIVE);
-        }
-    }
-
-    private void validateBalanceLimit(Account account, BigDecimal amount) {
-        if (!account.canCredit(amount)) {
-            throw new BalanceLimitExceededException(ApiErrorMessages.BALANCE_LIMIT_EXCEEDED);
         }
     }
 

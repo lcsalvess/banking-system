@@ -6,7 +6,7 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.service.transaction.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import org.junit.jupiter.api.DisplayName;
@@ -62,7 +62,7 @@ class JacksonConfigTests {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private TransactionService transactionService;
+    private TransactionQueryService transactionQueryService;
 
     @MockitoBean
     private TransactionIdempotencyService transactionIdempotencyService;
@@ -100,7 +100,7 @@ class JacksonConfigTests {
                     any(AccountOperationRequestDTO.class)
             );
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -116,7 +116,7 @@ class JacksonConfigTests {
                     .andExpect(jsonPath("$.status").value(400))
                     .andExpect(jsonPath("$.message").value(ApiErrorMessages.INVALID_REQUEST_DATA));
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
 
         @Test
@@ -131,7 +131,7 @@ class JacksonConfigTests {
                     .andExpect(jsonPath("$.message")
                             .value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
 
         @Test
@@ -147,7 +147,7 @@ class JacksonConfigTests {
                     .andExpect(jsonPath("$.message")
                             .value(ApiErrorMessages.INVALID_REQUEST_PARAMETER));
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
     }
 

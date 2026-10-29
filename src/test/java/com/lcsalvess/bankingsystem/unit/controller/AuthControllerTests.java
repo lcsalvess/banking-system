@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
-class AuthControllerTest {
+class AuthControllerTests {
 
     private static final AtomicInteger TEST_IP_COUNTER =
             new AtomicInteger(1);

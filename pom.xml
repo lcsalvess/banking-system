@@ -299,8 +299,9 @@
             <!--
                 Scans Maven dependencies for publicly disclosed
                 vulnerabilities.
-                Vulnerability-based build gating will be enabled
-                after the initial report has been reviewed.
+                Fails the build for vulnerabilities with a CVSS score
+                of 7.0 or higher (High and Critical severity).
+                Scanner errors also fail the build.
             -->
             <plugin>
                 <groupId>org.owasp</groupId>
@@ -316,7 +317,7 @@
                         <format>JSON</format>
                     </formats>
 
-                    <failBuildOnCVSS>11</failBuildOnCVSS>
+                    <failBuildOnCVSS>7.0</failBuildOnCVSS>
                     <failOnError>true</failOnError>
                 </configuration>
             </plugin>

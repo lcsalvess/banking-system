@@ -13,8 +13,9 @@ import com.lcsalvess.bankingsystem.exception.account.InvalidAccountDigitExceptio
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionPageResult;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import org.junit.jupiter.api.DisplayName;
@@ -60,6 +61,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -78,6 +80,11 @@ public class TransactionControllerTests {
 
     private static final UUID IDEMPOTENCY_KEY =
             UUID.fromString("8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210");
+
+    private static final String SNAPSHOT_HEADER = "X-Transaction-Snapshot";
+
+    private static final String SNAPSHOT_TOKEN =
+            "v1:123e4567-e89b-12d3-a456-426614174000";
 
     @Autowired
     private MockMvc mockMvc;
@@ -564,6 +571,7 @@ public class TransactionControllerTests {
                     .andExpect(jsonPath("$.page.number").value(0))
                     .andExpect(jsonPath("$.page.totalElements").value(2))
                     .andExpect(jsonPath("$.page.totalPages").value(1))
+                    .andExpect(header().string(SNAPSHOT_HEADER, SNAPSHOT_TOKEN))
                     .andReturn();
 
             TransactionResponseDTO[] content = readPageContent(result);
@@ -650,7 +658,7 @@ public class TransactionControllerTests {
         @DisplayName("Should return 400 when digit is invalid")
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
             when(transactionQueryService.findByAccountNumber(
-                    eq("99999"), eq("3"), any(), any(), any(), any(Pageable.class)
+                    eq("99999"), eq("3"), any(), any(), any(), any(Pageable.class), isNull()
             )).thenThrow(
                     new InvalidAccountDigitException(
                             ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
@@ -660,7 +668,8 @@ public class TransactionControllerTests {
             performGet("3", 400, ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH);
 
             verify(transactionQueryService).findByAccountNumber(
-                    eq("99999"), eq("3"), isNull(), isNull(), isNull(), any(Pageable.class)
+                    eq("99999"), eq("3"), isNull(), isNull(), isNull(),
+                    any(Pageable.class), isNull()
             );
             verifyNoMoreInteractions(transactionQueryService);
         }
@@ -669,7 +678,7 @@ public class TransactionControllerTests {
         @DisplayName("Should return 404 when account does not exist")
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
             when(transactionQueryService.findByAccountNumber(
-                    eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
+                    eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class), isNull()
             )).thenThrow(
                     new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
             );
@@ -683,7 +692,8 @@ public class TransactionControllerTests {
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
             when(transactionQueryService.findByAccountNumber(
-                    eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
+                    eq("99999"), eq("5"), any(), any(), any(),
+                    any(Pageable.class), isNull()
             )).thenThrow(new RuntimeException());
 
             performGet("5", 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
@@ -774,10 +784,40 @@ public class TransactionControllerTests {
             verifyNoInteractions(transactionQueryService);
         }
 
+        @Test
+        @DisplayName("Should forward snapshot token to the service")
+        void shouldForwardSnapshotTokenToService() throws Exception {
+            Page<TransactionResponseDTO> page =
+                    new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0);
+
+            when(transactionQueryService.findByAccountNumber(
+                    eq("99999"), eq("5"), any(), any(), any(),
+                    any(Pageable.class), eq(SNAPSHOT_TOKEN)
+            )).thenReturn(new TransactionPageResult(page, SNAPSHOT_TOKEN));
+
+            mockMvc.perform(get(URL, "99999")
+                            .param("digit", "5")
+                            .header(SNAPSHOT_HEADER, SNAPSHOT_TOKEN))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string(SNAPSHOT_HEADER, SNAPSHOT_TOKEN));
+
+            verify(transactionQueryService).findByAccountNumber(
+                    eq("99999"), eq("5"), isNull(), isNull(), isNull(),
+                    any(Pageable.class), eq(SNAPSHOT_TOKEN)
+            );
+            verifyNoMoreInteractions(transactionQueryService);
+        }
+
         private void stubService(Page<TransactionResponseDTO> page) {
             when(transactionQueryService.findByAccountNumber(
-                    eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
-            )).thenReturn(page);
+                    eq("99999"),
+                    eq("5"),
+                    any(),
+                    any(),
+                    any(),
+                    any(Pageable.class),
+                    isNull()
+            )).thenReturn(new TransactionPageResult(page, SNAPSHOT_TOKEN));
         }
 
         private Pageable verifyServiceCall(
@@ -794,7 +834,8 @@ public class TransactionControllerTests {
                     eq(type),
                     eq(startDate),
                     eq(endDate),
-                    pageableCaptor.capture()
+                    pageableCaptor.capture(),
+                    isNull()
             );
             verifyNoMoreInteractions(transactionQueryService);
 

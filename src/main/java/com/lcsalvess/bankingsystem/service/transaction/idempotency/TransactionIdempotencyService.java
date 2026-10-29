@@ -9,7 +9,7 @@ import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRecord;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRepository;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionQueryService;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

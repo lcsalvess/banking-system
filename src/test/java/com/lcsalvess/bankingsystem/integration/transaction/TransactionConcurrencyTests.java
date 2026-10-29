@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.integration.transaction;
 
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
@@ -28,6 +29,8 @@ import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.service.transaction.balancereconciliation.BalanceReconciliationJob;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionPageResult;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
 import jakarta.persistence.EntityManager;
@@ -37,6 +40,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -59,6 +65,7 @@ import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -88,6 +95,9 @@ class TransactionConcurrencyTests {
 
     @Autowired
     private TransactionService transactionService;
+
+    @Autowired
+    private TransactionQueryService transactionQueryService;
 
     @Autowired
     private DailyYieldService dailyYieldService;
@@ -893,6 +903,163 @@ class TransactionConcurrencyTests {
                     today,
                     recoveredAccount.getLastYieldProcessedDate()
             );
+        }
+    }
+
+    @Nested
+    @DisplayName("Stable transaction pagination")
+    class StableTransactionPagination {
+
+        @Test
+        @DisplayName("Should keep the original snapshot when transactions are inserted between page requests")
+        void shouldKeepSnapshotStableWhenTransactionsAreInsertedBetweenPageRequests() {
+            CheckingAccount account = createCheckingAccount("0.00");
+
+            transactionService.deposit(operation(account, "10.00"));
+            transactionService.deposit(operation(account, "20.00"));
+
+            List<Transaction> initialTransactions = transactionRepository.findAll(
+                    TransactionSpecifications.byAccountAndFilters(
+                            account.getId(),
+                            null,
+                            null,
+                            null
+                    ),
+                    Sort.by(Sort.Direction.DESC, "id")
+            );
+
+            assertEquals(2, initialTransactions.size());
+
+            UUID boundaryTransactionCode =
+                    initialTransactions.getFirst().getTransactionCode();
+
+            UUID olderTransactionCode =
+                    initialTransactions.get(1).getTransactionCode();
+
+            Pageable firstPageable = PageRequest.of(
+                    0,
+                    1,
+                    Sort.by(Sort.Direction.DESC, "id")
+            );
+
+            Pageable secondPageable = PageRequest.of(
+                    1,
+                    1,
+                    firstPageable.getSort()
+            );
+
+            TransactionPageResult firstResult =
+                    transactionQueryService.findByAccountNumber(
+                            account.getAccountNumber(),
+                            account.getDigit(),
+                            null,
+                            null,
+                            null,
+                            firstPageable,
+                            null
+                    );
+
+            assertEquals(
+                    boundaryTransactionCode,
+                    firstResult.page().getContent().getFirst().transactionCode()
+            );
+
+            assertEquals(2, firstResult.page().getTotalElements());
+
+            transactionService.deposit(operation(account, "30.00"));
+
+            Transaction newestTransaction =
+                    transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+                            account.getId()
+                    ).orElseThrow();
+
+            assertNotEquals(
+                    boundaryTransactionCode,
+                    newestTransaction.getTransactionCode()
+            );
+
+            TransactionPageResult secondResult =
+                    transactionQueryService.findByAccountNumber(
+                            account.getAccountNumber(),
+                            account.getDigit(),
+                            null,
+                            null,
+                            null,
+                            secondPageable,
+                            firstResult.snapshotToken()
+                    );
+
+            assertEquals(
+                    firstResult.snapshotToken(),
+                    secondResult.snapshotToken()
+            );
+
+            assertEquals(
+                    List.of(olderTransactionCode),
+                    secondResult.page().getContent()
+                            .stream()
+                            .map(TransactionResponseDTO::transactionCode)
+                            .toList()
+            );
+
+            assertEquals(2, secondResult.page().getTotalElements());
+        }
+
+        @Test
+        @DisplayName("Should keep an empty snapshot when a transaction is inserted after the first request")
+        void shouldKeepEmptySnapshotWhenTransactionIsInsertedAfterFirstRequest() {
+            CheckingAccount account = createCheckingAccount("0.00");
+
+            Pageable firstPageable = PageRequest.of(
+                    0,
+                    1,
+                    Sort.by(Sort.Direction.DESC, "id")
+            );
+
+            Pageable secondPageable = PageRequest.of(
+                    1,
+                    1,
+                    firstPageable.getSort()
+            );
+
+            TransactionPageResult firstResult =
+                    transactionQueryService.findByAccountNumber(
+                            account.getAccountNumber(),
+                            account.getDigit(),
+                            null,
+                            null,
+                            null,
+                            firstPageable,
+                            null
+                    );
+
+            assertEquals(
+                    "v1:empty:" + account.getAccountNumber() + ":" + account.getDigit(),
+                    firstResult.snapshotToken()
+            );
+            assertTrue(firstResult.page().isEmpty());
+            assertEquals(0, firstResult.page().getTotalElements());
+
+            transactionService.deposit(operation(account, "10.00"));
+
+            TransactionPageResult secondResult =
+                    transactionQueryService.findByAccountNumber(
+                            account.getAccountNumber(),
+                            account.getDigit(),
+                            null,
+                            null,
+                            null,
+                            secondPageable,
+                            firstResult.snapshotToken()
+                    );
+
+            assertEquals(
+                    firstResult.snapshotToken(),
+                    secondResult.snapshotToken()
+            );
+
+            assertTrue(secondResult.page().isEmpty());
+            assertEquals(0, secondResult.page().getTotalElements());
         }
     }
 

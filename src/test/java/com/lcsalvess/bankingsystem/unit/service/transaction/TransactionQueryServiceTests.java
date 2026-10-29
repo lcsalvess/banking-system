@@ -9,11 +9,13 @@ import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import com.lcsalvess.bankingsystem.exception.transaction.InvalidTransactionSnapshotException;
 import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionQueryService;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionPageResult;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -48,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -132,6 +135,8 @@ class TransactionQueryServiceTests {
                     new BigDecimal("5.00")
             );
 
+            stubLatestTransaction(account, withdrawal, 2L);
+
             Specification<Transaction> specification = specification();
 
             Page<Transaction> page = new PageImpl<>(
@@ -148,14 +153,14 @@ class TransactionQueryServiceTests {
             try (MockedStatic<TransactionSpecifications> specifications =
                          mockStatic(TransactionSpecifications.class)) {
 
-                specifications.when(() ->
-                        TransactionSpecifications.byAccountAndFilters(
-                                ACCOUNT_ID,
-                                null,
-                                null,
-                                null
-                        )
-                ).thenReturn(specification);
+                stubSpecification(
+                        specifications,
+                        specification,
+                        null,
+                        null,
+                        null,
+                        2L
+                );
 
                 Page<TransactionResponseDTO> result =
                         transactionQueryService.findByAccountNumber(
@@ -175,17 +180,20 @@ class TransactionQueryServiceTests {
                 assertEquals(2, result.getTotalElements());
                 assertEquals(PAGEABLE, result.getPageable());
 
-                specifications.verify(() ->
-                        TransactionSpecifications.byAccountAndFilters(
-                                ACCOUNT_ID,
-                                null,
-                                null,
-                                null
-                        )
+                verifySpecification(
+                        specifications,
+                        null,
+                        null,
+                        null,
+                        2L,
+                        1
                 );
             }
 
             verifyAccountLookup(account);
+            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            );
             verify(transactionRepository).findAll(specification, PAGEABLE);
             verifyNoMoreInteractionsOnMocks();
         }
@@ -203,6 +211,8 @@ class TransactionQueryServiceTests {
                     TEST_USER,
                     OPERATION_AMOUNT
             );
+
+            stubLatestTransaction(account, deposit, 1L);
 
             Page<Transaction> page = new PageImpl<>(
                     List.of(deposit),
@@ -228,14 +238,14 @@ class TransactionQueryServiceTests {
 
                 Specification<Transaction> specification = specification();
 
-                specifications.when(() ->
-                        TransactionSpecifications.byAccountAndFilters(
-                                ACCOUNT_ID,
-                                TransactionType.DEPOSIT,
-                                expectedStart,
-                                expectedEndExclusive
-                        )
-                ).thenReturn(specification);
+                stubSpecification(
+                        specifications,
+                        specification,
+                        TransactionType.DEPOSIT,
+                        expectedStart,
+                        expectedEndExclusive,
+                        1L
+                );
 
                 when(transactionRepository.findAll(specification, PAGEABLE))
                         .thenReturn(page);
@@ -255,13 +265,13 @@ class TransactionQueryServiceTests {
                         result.getContent()
                 );
 
-                specifications.verify(() ->
-                        TransactionSpecifications.byAccountAndFilters(
-                                ACCOUNT_ID,
-                                TransactionType.DEPOSIT,
-                                expectedStart,
-                                expectedEndExclusive
-                        )
+                verifySpecification(
+                        specifications,
+                        TransactionType.DEPOSIT,
+                        expectedStart,
+                        expectedEndExclusive,
+                        1L,
+                        1
                 );
 
                 verify(transactionRepository).findAll(
@@ -271,6 +281,9 @@ class TransactionQueryServiceTests {
             }
 
             verifyAccountLookup(account);
+            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            );
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -283,20 +296,24 @@ class TransactionQueryServiceTests {
 
             stubAccountLookup(account);
 
+            when(transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            )).thenReturn(Optional.empty());
+
             when(transactionRepository.findAll(specification, PAGEABLE))
                     .thenReturn(new PageImpl<>(List.of(), PAGEABLE, 0));
 
             try (MockedStatic<TransactionSpecifications> specifications =
                          mockStatic(TransactionSpecifications.class)) {
 
-                specifications.when(() ->
-                        TransactionSpecifications.byAccountAndFilters(
-                                ACCOUNT_ID,
-                                null,
-                                null,
-                                null
-                        )
-                ).thenReturn(specification);
+                stubSpecification(
+                        specifications,
+                        specification,
+                        null,
+                        null,
+                        null,
+                        0L
+                );
 
                 Page<TransactionResponseDTO> result =
                         transactionQueryService.findByAccountNumber(
@@ -310,9 +327,21 @@ class TransactionQueryServiceTests {
 
                 assertTrue(result.isEmpty());
                 assertEquals(0, result.getTotalElements());
+
+                verifySpecification(
+                        specifications,
+                        null,
+                        null,
+                        null,
+                        0L,
+                        1
+                );
             }
 
             verifyAccountLookup(account);
+            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            );
             verify(transactionRepository).findAll(specification, PAGEABLE);
             verifyNoMoreInteractionsOnMocks();
         }
@@ -355,6 +384,14 @@ class TransactionQueryServiceTests {
         void shouldAppendIdTieBreakerWhenSortHasNoId() {
             CheckingAccount account = account();
 
+            Transaction latestTransaction = transactionWithId(
+                    TransactionType.DEPOSIT,
+                    account,
+                    1L
+            );
+
+            stubLatestTransaction(account, latestTransaction, 1L);
+
             Specification<Transaction> specification = specification();
 
             Pageable requested = PageRequest.of(
@@ -375,14 +412,14 @@ class TransactionQueryServiceTests {
             try (MockedStatic<TransactionSpecifications> specifications =
                          mockStatic(TransactionSpecifications.class)) {
 
-                specifications.when(() ->
-                        TransactionSpecifications.byAccountAndFilters(
-                                ACCOUNT_ID,
-                                null,
-                                null,
-                                null
-                        )
-                ).thenReturn(specification);
+                stubSpecification(
+                        specifications,
+                        specification,
+                        null,
+                        null,
+                        null,
+                        1L
+                );
 
                 transactionQueryService.findByAccountNumber(
                         ACCOUNT_NUMBER,
@@ -399,6 +436,10 @@ class TransactionQueryServiceTests {
 
             verifyAccountLookup(account);
 
+            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            );
+
             verify(transactionRepository).findAll(
                     eq(specification),
                     captor.capture()
@@ -413,6 +454,326 @@ class TransactionQueryServiceTests {
                     ),
                     captor.getValue().getSort()
             );
+        }
+
+        @Test
+        @DisplayName("Should reuse the original snapshot when a new transaction is created between page requests")
+        void shouldReuseOriginalSnapshotWhenNewTransactionIsCreatedBetweenPageRequests() {
+            CheckingAccount account = account();
+
+            Transaction olderTransaction = transactionWithId(
+                    TransactionType.DEPOSIT,
+                    account,
+                    1L
+            );
+
+            Transaction boundaryTransaction = transactionWithId(
+                    TransactionType.WITHDRAWAL,
+                    account,
+                    2L
+            );
+
+            Pageable firstPageable = PageRequest.of(
+                    0,
+                    1,
+                    PAGEABLE.getSort()
+            );
+
+            Pageable nextPageable = PageRequest.of(
+                    1,
+                    1,
+                    PAGEABLE.getSort()
+            );
+
+            Page<Transaction> firstPage = new PageImpl<>(
+                    List.of(boundaryTransaction),
+                    firstPageable,
+                    2
+            );
+
+            Page<Transaction> secondPage = new PageImpl<>(
+                    List.of(olderTransaction),
+                    nextPageable,
+                    2
+            );
+
+            Specification<Transaction> specification = specification();
+
+            stubAccountLookup(account);
+
+            when(transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            )).thenReturn(Optional.of(boundaryTransaction));
+
+            when(transactionRepository.findByTransactionCodeAndAccount_Id(
+                    boundaryTransaction.getTransactionCode(),
+                    ACCOUNT_ID
+            )).thenReturn(Optional.of(boundaryTransaction));
+
+            when(transactionRepository.findAll(specification, firstPageable))
+                    .thenReturn(firstPage);
+
+            when(transactionRepository.findAll(specification, nextPageable))
+                    .thenReturn(secondPage);
+
+            try (MockedStatic<TransactionSpecifications> specifications =
+                         mockStatic(TransactionSpecifications.class)) {
+
+                stubSpecification(
+                        specifications,
+                        specification,
+                        null,
+                        null,
+                        null,
+                        2L
+                );
+
+                TransactionPageResult firstResult =
+                        findSnapshotPage(account, firstPageable, null);
+
+                assertEquals(
+                        "v1:" + boundaryTransaction.getTransactionCode(),
+                        firstResult.snapshotToken()
+                );
+
+                assertEquals(
+                        List.of(response(boundaryTransaction)),
+                        firstResult.page().getContent()
+                );
+
+                TransactionPageResult secondResult =
+                        findSnapshotPage(
+                                account,
+                                nextPageable,
+                                firstResult.snapshotToken()
+                        );
+
+                assertEquals(
+                        firstResult.snapshotToken(),
+                        secondResult.snapshotToken()
+                );
+
+                assertEquals(
+                        List.of(response(olderTransaction)),
+                        secondResult.page().getContent()
+                );
+
+                assertEquals(2, secondResult.page().getTotalElements());
+
+                verifySpecification(
+                        specifications,
+                        null,
+                        null,
+                        null,
+                        2L,
+                        2
+                );
+            }
+
+            verify(accountService, times(2)).findEntityByAccountNumber(
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT
+            );
+
+            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            );
+
+            verify(transactionRepository).findByTransactionCodeAndAccount_Id(
+                    boundaryTransaction.getTransactionCode(),
+                    ACCOUNT_ID
+            );
+
+            verify(transactionRepository).findAll(specification, firstPageable);
+            verify(transactionRepository).findAll(specification, nextPageable);
+
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should reject malformed snapshot tokens")
+        void shouldRejectMalformedSnapshotTokens() {
+            CheckingAccount account = account();
+
+            stubAccountLookup(account);
+
+            for (String invalidSnapshotToken : List.of(
+                    "invalid-token",
+                    "v1:not-a-valid-uuid"
+            )) {
+                assertThrowsWithMessage(
+                        InvalidTransactionSnapshotException.class,
+                        ApiErrorMessages.INVALID_TRANSACTION_SNAPSHOT,
+                        () -> findSnapshotPage(
+                                account,
+                                PAGEABLE,
+                                invalidSnapshotToken
+                        )
+                );
+            }
+
+            verify(accountService, times(2)).findEntityByAccountNumber(
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT
+            );
+
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should reject a snapshot token belonging to another account")
+        void shouldRejectSnapshotTokenBelongingToAnotherAccount() {
+            CheckingAccount account = account();
+
+            UUID transactionCode = UUID.fromString(
+                    "123e4567-e89b-12d3-a456-426614174000"
+            );
+
+            String snapshotToken = "v1:" + transactionCode;
+
+            stubAccountLookup(account);
+
+            when(transactionRepository.findByTransactionCodeAndAccount_Id(
+                    transactionCode,
+                    ACCOUNT_ID
+            )).thenReturn(Optional.empty());
+
+            assertThrowsWithMessage(
+                    InvalidTransactionSnapshotException.class,
+                    ApiErrorMessages.INVALID_TRANSACTION_SNAPSHOT,
+                    () -> findSnapshotPage(
+                            account,
+                            PAGEABLE,
+                            snapshotToken
+                    )
+            );
+
+            verifyAccountLookup(account);
+
+            verify(transactionRepository).findByTransactionCodeAndAccount_Id(
+                    transactionCode,
+                    ACCOUNT_ID
+            );
+
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should reuse the empty snapshot token across page requests")
+        void shouldReuseEmptySnapshotTokenAcrossPageRequests() {
+            CheckingAccount account = account();
+
+            Pageable nextPageable = PageRequest.of(
+                    1,
+                    PAGEABLE.getPageSize(),
+                    PAGEABLE.getSort()
+            );
+
+            Specification<Transaction> specification = specification();
+
+            stubAccountLookup(account);
+
+            when(transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            )).thenReturn(Optional.empty());
+
+            when(transactionRepository.findAll(specification, PAGEABLE))
+                    .thenReturn(new PageImpl<>(List.of(), PAGEABLE, 0));
+
+            when(transactionRepository.findAll(specification, nextPageable))
+                    .thenReturn(new PageImpl<>(List.of(), nextPageable, 0));
+
+            try (MockedStatic<TransactionSpecifications> specifications =
+                         mockStatic(TransactionSpecifications.class)) {
+
+                stubSpecification(
+                        specifications,
+                        specification,
+                        null,
+                        null,
+                        null,
+                        0L
+                );
+
+                TransactionPageResult firstResult =
+                        findSnapshotPage(account, PAGEABLE, null);
+
+                assertEquals(
+                        "v1:empty:" + account.getAccountNumber() + ":" + account.getDigit(),
+                        firstResult.snapshotToken()
+                );
+                assertTrue(firstResult.page().isEmpty());
+
+                TransactionPageResult secondResult =
+                        findSnapshotPage(
+                                account,
+                                nextPageable,
+                                firstResult.snapshotToken()
+                        );
+
+                assertEquals(
+                        firstResult.snapshotToken(),
+                        secondResult.snapshotToken()
+                );
+
+                assertTrue(secondResult.page().isEmpty());
+                assertEquals(0, secondResult.page().getTotalElements());
+
+                verifySpecification(
+                        specifications,
+                        null,
+                        null,
+                        null,
+                        0L,
+                        2
+                );
+            }
+
+            verify(accountService, times(2)).findEntityByAccountNumber(
+                    ACCOUNT_NUMBER,
+                    ACCOUNT_DIGIT
+            );
+
+            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+                    ACCOUNT_ID
+            );
+
+            verify(transactionRepository).findAll(specification, PAGEABLE);
+            verify(transactionRepository).findAll(specification, nextPageable);
+
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should reject an empty snapshot token belonging to another account")
+        void shouldRejectEmptySnapshotTokenBelongingToAnotherAccount() {
+            CheckingAccount account = account();
+
+            CheckingAccount otherAccount = new CheckingAccount(
+                    null,
+                    "00002",
+                    "1"
+            );
+
+            String snapshotToken = "v1:empty:"
+                    + otherAccount.getAccountNumber()
+                    + ":"
+                    + otherAccount.getDigit();
+
+            stubAccountLookup(account);
+
+            assertThrowsWithMessage(
+                    InvalidTransactionSnapshotException.class,
+                    ApiErrorMessages.INVALID_TRANSACTION_SNAPSHOT,
+                    () -> findSnapshotPage(
+                            account,
+                            PAGEABLE,
+                            snapshotToken
+                    )
+            );
+
+            verifyAccountLookup(account);
+            verifyNoMoreInteractionsOnMocks();
         }
 
         private static Specification<Transaction> specification() {
@@ -483,6 +844,92 @@ class TransactionQueryServiceTests {
                 account.getAccountNumber(),
                 account.getDigit()
         )).thenReturn(account);
+    }
+
+    private void stubLatestTransaction(
+            Account account,
+            Transaction transaction,
+            Long id
+    ) {
+        ReflectionTestUtils.setField(transaction, "id", id);
+
+        when(transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+                account.getId()
+        )).thenReturn(Optional.of(transaction));
+    }
+
+    private void stubSpecification(
+            MockedStatic<TransactionSpecifications> specifications,
+            Specification<Transaction> specification,
+            TransactionType type,
+            Instant startDate,
+            Instant endExclusive,
+            Long maxTransactionId
+    ) {
+        specifications.when(() ->
+                TransactionSpecifications.byAccountAndFilters(
+                        ACCOUNT_ID,
+                        type,
+                        startDate,
+                        endExclusive,
+                        maxTransactionId
+                )
+        ).thenReturn(specification);
+    }
+
+    private void verifySpecification(
+            MockedStatic<TransactionSpecifications> specifications,
+            TransactionType type,
+            Instant startDate,
+            Instant endExclusive,
+            Long maxTransactionId,
+            int expectedInvocations
+    ) {
+        specifications.verify(() ->
+                        TransactionSpecifications.byAccountAndFilters(
+                                ACCOUNT_ID,
+                                type,
+                                startDate,
+                                endExclusive,
+                                maxTransactionId
+                        ),
+                times(expectedInvocations)
+        );
+    }
+
+    private Transaction transactionWithId(
+            TransactionType type,
+            Account account,
+            long id
+    ) {
+        Transaction transaction = Transaction.create(
+                type,
+                OPERATION_AMOUNT,
+                CREATED_AT,
+                account,
+                TEST_USER,
+                OPERATION_AMOUNT
+        );
+
+        ReflectionTestUtils.setField(transaction, "id", id);
+
+        return transaction;
+    }
+
+    private TransactionPageResult findSnapshotPage(
+            Account account,
+            Pageable pageable,
+            String snapshotToken
+    ) {
+        return transactionQueryService.findByAccountNumber(
+                account.getAccountNumber(),
+                account.getDigit(),
+                null,
+                null,
+                null,
+                pageable,
+                snapshotToken
+        );
     }
 
     private void verifyAccountLookup(Account account) {

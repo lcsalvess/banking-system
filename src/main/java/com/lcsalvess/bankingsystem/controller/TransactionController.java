@@ -4,7 +4,7 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.service.transaction.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
 import com.lcsalvess.bankingsystem.util.pagination.SortWhitelist;
 import com.lcsalvess.bankingsystem.util.pagination.SortableBy;
@@ -25,7 +25,15 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.Set;
@@ -45,11 +53,11 @@ public class TransactionController {
     private static final Set<String> SORTABLE_PROPERTIES =
             Set.of(SORTABLE.split(","));
 
-    private final TransactionService transactionService;
+    private final TransactionQueryService transactionQueryService;
     private final TransactionIdempotencyService transactionIdempotencyService;
 
-    public TransactionController(TransactionService transactionService, TransactionIdempotencyService transactionIdempotencyService) {
-        this.transactionService = transactionService;
+    public TransactionController(TransactionQueryService transactionQueryService, TransactionIdempotencyService transactionIdempotencyService) {
+        this.transactionQueryService = transactionQueryService;
         this.transactionIdempotencyService = transactionIdempotencyService;
     }
 
@@ -124,7 +132,7 @@ public class TransactionController {
     ) {
         SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
 
-        return transactionService.findByAccountNumber(
+        return transactionQueryService.findByAccountNumber(
                 accountNumber,
                 digit,
                 type,
@@ -157,7 +165,7 @@ public class TransactionController {
     public TransactionResponseDTO findByTransactionCode(
             @PathVariable UUID transactionCode
     ) {
-        return transactionService.findByTransactionCode(transactionCode);
+        return transactionQueryService.findByTransactionCode(transactionCode);
     }
 
     @Operation(

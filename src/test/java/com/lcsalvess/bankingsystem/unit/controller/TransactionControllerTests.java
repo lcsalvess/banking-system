@@ -13,7 +13,7 @@ import com.lcsalvess.bankingsystem.exception.account.InvalidAccountDigitExceptio
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.exception.transaction.TransactionNotFoundException;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.service.transaction.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
@@ -86,7 +86,7 @@ public class TransactionControllerTests {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private TransactionService transactionService;
+    private TransactionQueryService transactionQueryService;
 
     @MockitoBean
     private TransactionIdempotencyService transactionIdempotencyService;
@@ -119,7 +119,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -133,7 +133,7 @@ public class TransactionControllerTests {
         ) throws Exception {
             performValidationError(URL, request, field, message);
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
 
         @Test
@@ -141,7 +141,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
             performMissingBody(URL);
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
 
         @Test
@@ -160,7 +160,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -179,7 +179,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -198,7 +198,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -213,7 +213,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
     }
 
@@ -245,7 +245,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -259,7 +259,7 @@ public class TransactionControllerTests {
         ) throws Exception {
             performValidationError(URL, request, field, message);
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
 
         @Test
@@ -267,7 +267,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
             performMissingBody(URL);
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
 
         @Test
@@ -286,7 +286,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -305,7 +305,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -324,7 +324,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -343,7 +343,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -358,7 +358,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
     }
 
@@ -390,7 +390,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -404,7 +404,7 @@ public class TransactionControllerTests {
         ) throws Exception {
             performValidationError(URL, request, field, message);
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
 
         @Test
@@ -412,7 +412,7 @@ public class TransactionControllerTests {
         void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
             performMissingBody(URL);
 
-            verifyNoInteractions(transactionIdempotencyService, transactionService);
+            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
         }
 
         @Test
@@ -431,7 +431,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -450,7 +450,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -474,7 +474,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -493,7 +493,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -512,7 +512,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -527,7 +527,7 @@ public class TransactionControllerTests {
 
             verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
             verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
     }
 
@@ -649,7 +649,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 400 when digit is invalid")
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            when(transactionService.findByAccountNumber(
+            when(transactionQueryService.findByAccountNumber(
                     eq("99999"), eq("3"), any(), any(), any(), any(Pageable.class)
             )).thenThrow(
                     new InvalidAccountDigitException(
@@ -659,16 +659,16 @@ public class TransactionControllerTests {
 
             performGet("3", 400, ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH);
 
-            verify(transactionService).findByAccountNumber(
+            verify(transactionQueryService).findByAccountNumber(
                     eq("99999"), eq("3"), isNull(), isNull(), isNull(), any(Pageable.class)
             );
-            verifyNoMoreInteractions(transactionService);
+            verifyNoMoreInteractions(transactionQueryService);
         }
 
         @Test
         @DisplayName("Should return 404 when account does not exist")
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
-            when(transactionService.findByAccountNumber(
+            when(transactionQueryService.findByAccountNumber(
                     eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
             )).thenThrow(
                     new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND)
@@ -682,7 +682,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(transactionService.findByAccountNumber(
+            when(transactionQueryService.findByAccountNumber(
                     eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
             )).thenThrow(new RuntimeException());
 
@@ -700,7 +700,7 @@ public class TransactionControllerTests {
                     .andExpect(jsonPath("$.status").value(400))
                     .andExpect(jsonPath("$.message").value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -721,7 +721,7 @@ public class TransactionControllerTests {
                                     .value(ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH)
                     );
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -742,7 +742,7 @@ public class TransactionControllerTests {
                                     .value(ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH)
                     );
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @Test
@@ -754,7 +754,7 @@ public class TransactionControllerTests {
 
             performErrorResponse(result, 400, ApiErrorMessages.INVALID_REQUEST_PARAMETER);
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -771,11 +771,11 @@ public class TransactionControllerTests {
 
             performErrorResponse(result, 400, ApiErrorMessages.INVALID_REQUEST_PARAMETER);
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         private void stubService(Page<TransactionResponseDTO> page) {
-            when(transactionService.findByAccountNumber(
+            when(transactionQueryService.findByAccountNumber(
                     eq("99999"), eq("5"), any(), any(), any(), any(Pageable.class)
             )).thenReturn(page);
         }
@@ -788,7 +788,7 @@ public class TransactionControllerTests {
             ArgumentCaptor<Pageable> pageableCaptor =
                     ArgumentCaptor.forClass(Pageable.class);
 
-            verify(transactionService).findByAccountNumber(
+            verify(transactionQueryService).findByAccountNumber(
                     eq("99999"),
                     eq("5"),
                     eq(type),
@@ -796,7 +796,7 @@ public class TransactionControllerTests {
                     eq(endDate),
                     pageableCaptor.capture()
             );
-            verifyNoMoreInteractions(transactionService);
+            verifyNoMoreInteractions(transactionQueryService);
 
             return pageableCaptor.getValue();
         }
@@ -848,7 +848,7 @@ public class TransactionControllerTests {
                     new BigDecimal("100.00")
             );
 
-            when(transactionService.findByTransactionCode(transactionCode))
+            when(transactionQueryService.findByTransactionCode(transactionCode))
                     .thenReturn(expected);
 
             MvcResult result =
@@ -866,8 +866,8 @@ public class TransactionControllerTests {
 
             assertTransactionEquals(expected, readTransaction(result));
 
-            verify(transactionService).findByTransactionCode(transactionCode);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionQueryService).findByTransactionCode(transactionCode);
+            verifyNoMoreInteractions(transactionQueryService);
         }
 
         @Test
@@ -875,7 +875,7 @@ public class TransactionControllerTests {
         void shouldReturnNotFoundWhenTransactionDoesNotExist() throws Exception {
             UUID transactionCode = UUID.randomUUID();
 
-            when(transactionService.findByTransactionCode(transactionCode))
+            when(transactionQueryService.findByTransactionCode(transactionCode))
                     .thenThrow(
                             new TransactionNotFoundException(
                                     ApiErrorMessages.TRANSACTION_NOT_FOUND
@@ -888,8 +888,8 @@ public class TransactionControllerTests {
                     ApiErrorMessages.TRANSACTION_NOT_FOUND
             );
 
-            verify(transactionService).findByTransactionCode(transactionCode);
-            verifyNoMoreInteractions(transactionService);
+            verify(transactionQueryService).findByTransactionCode(transactionCode);
+            verifyNoMoreInteractions(transactionQueryService);
         }
 
         @Test
@@ -901,7 +901,7 @@ public class TransactionControllerTests {
                     ApiErrorMessages.INVALID_REQUEST_PARAMETER
             );
 
-            verifyNoInteractions(transactionService);
+            verifyNoInteractions(transactionQueryService);
         }
 
         private ResultActions performGetByTransactionCode(

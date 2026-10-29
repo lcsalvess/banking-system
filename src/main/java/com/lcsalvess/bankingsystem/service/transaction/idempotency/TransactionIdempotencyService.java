@@ -9,6 +9,7 @@ import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRecord;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRepository;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.service.transaction.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,17 +23,20 @@ public class TransactionIdempotencyService {
     private final TransactionIdempotencyRepository idempotencyRepository;
     private final TransactionRepository transactionRepository;
     private final TransactionService transactionService;
+    private final TransactionQueryService transactionQueryService;
     private final CurrentUserService currentUserService;
 
     public TransactionIdempotencyService(
             TransactionIdempotencyRepository idempotencyRepository,
             TransactionRepository transactionRepository,
             TransactionService transactionService,
+            TransactionQueryService transactionQueryService,
             CurrentUserService currentUserService
     ) {
         this.idempotencyRepository = idempotencyRepository;
         this.transactionRepository = transactionRepository;
         this.transactionService = transactionService;
+        this.transactionQueryService = transactionQueryService;
         this.currentUserService = currentUserService;
     }
 
@@ -154,7 +158,7 @@ public class TransactionIdempotencyService {
             throw new IdempotencyKeyConflictException();
         }
 
-        return transactionService.findByTransactionCode(
+        return transactionQueryService.findByTransactionCode(
                 existing.transactionCode()
         );
     }

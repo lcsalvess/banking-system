@@ -137,6 +137,9 @@ public final class ApiErrorMessages {
     public static final String IDEMPOTENCY_KEY_CONFLICT =
             "A chave de idempotência já foi utilizada com uma operação ou dados diferentes.";
 
+    public static final String INVALID_TRANSACTION_SNAPSHOT =
+            "Token de snapshot de transações inválido.";
+
     // Data integrity
     public static final String CLIENT_EMAIL_ALREADY_EXISTS =
             "Já existe um cliente cadastrado com este e-mail.";

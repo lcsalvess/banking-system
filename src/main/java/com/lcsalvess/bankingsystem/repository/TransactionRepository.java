@@ -22,6 +22,15 @@ public interface TransactionRepository extends
 
     Optional<Transaction> findByTransactionCode(UUID transactionCode);
 
+    Optional<Transaction> findFirstByAccount_IdOrderByIdDesc(
+            Long accountId
+    );
+
+    Optional<Transaction> findByTransactionCodeAndAccount_Id(
+            UUID transactionCode,
+            Long accountId
+    );
+
     boolean existsByAccountIdAndTypeAndYieldDate(
             Long accountId,
             TransactionType type,

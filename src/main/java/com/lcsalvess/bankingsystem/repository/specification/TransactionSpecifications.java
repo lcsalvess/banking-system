@@ -17,15 +17,45 @@ public final class TransactionSpecifications {
             Instant startDate,
             Instant endExclusive
     ) {
+        return byAccountAndFilters(
+                accountId,
+                type,
+                startDate,
+                endExclusive,
+                null
+        );
+    }
+
+    public static Specification<Transaction> byAccountAndFilters(
+            Long accountId,
+            TransactionType type,
+            Instant startDate,
+            Instant endExclusive,
+            Long maxTransactionId
+    ) {
         return (root, query, cb) -> cb.and(
                 cb.equal(root.get("account").get("id"), accountId),
-                type == null ? cb.conjunction() : cb.equal(root.get("type"), type),
-                startDate == null ? cb.conjunction()
+
+                maxTransactionId == null
+                        ? cb.conjunction()
+                        : cb.lessThanOrEqualTo(
+                        root.get("id"),
+                        maxTransactionId
+                ),
+
+                type == null
+                        ? cb.conjunction()
+                        : cb.equal(root.get("type"), type),
+
+                startDate == null
+                        ? cb.conjunction()
                         : cb.greaterThanOrEqualTo(
                         root.get("createdAt"),
                         startDate
                 ),
-                endExclusive == null ? cb.conjunction()
+
+                endExclusive == null
+                        ? cb.conjunction()
                         : cb.lessThan(
                         root.get("createdAt"),
                         endExclusive

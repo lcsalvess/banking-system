@@ -4,14 +4,17 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.service.transaction.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionPageResult;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.util.pagination.SortWhitelist;
 import com.lcsalvess.bankingsystem.util.pagination.SortableBy;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountDigit;
 import com.lcsalvess.bankingsystem.validation.accountnumber.ValidAccountNumber;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +26,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,6 +52,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/transactions")
 public class TransactionController {
 
+    private static final String SNAPSHOT_HEADER = "X-Transaction-Snapshot";
     private static final String SORTABLE = "createdAt,id,type,amount";
 
     private static final Set<String> SORTABLE_PROPERTIES =
@@ -72,7 +77,12 @@ public class TransactionController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Transactions retrieved successfully"
+                    description = "Transactions retrieved successfully",
+                    headers = @Header(
+                            name = SNAPSHOT_HEADER,
+                            description = "Snapshot token to reuse when navigating transaction pages.",
+                            schema = @Schema(type = "string")
+                    )
             ),
             @ApiResponse(
                     responseCode = "400",
@@ -85,7 +95,7 @@ public class TransactionController {
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
     @GetMapping("/accounts/{accountNumber}")
-    public Page<TransactionResponseDTO> findByAccountNumber(
+    public ResponseEntity<Page<TransactionResponseDTO>> findByAccountNumber(
             @Parameter(
                     description = "Account number",
                     example = "12345",
@@ -128,18 +138,30 @@ public class TransactionController {
                     sort = {"createdAt", "id"},
                     direction = Sort.Direction.DESC
             )
-            Pageable pageable
+            Pageable pageable,
+            @Parameter(
+                    description = "Snapshot token returned by the previous page request. "
+                            + "Reuse it to keep subsequent pages consistent."
+            )
+            @RequestHeader(name = SNAPSHOT_HEADER, required = false)
+            String snapshotToken
     ) {
         SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
 
-        return transactionQueryService.findByAccountNumber(
-                accountNumber,
-                digit,
-                type,
-                startDate,
-                endDate,
-                pageable
-        );
+        TransactionPageResult result =
+                transactionQueryService.findByAccountNumber(
+                        accountNumber,
+                        digit,
+                        type,
+                        startDate,
+                        endDate,
+                        pageable,
+                        snapshotToken
+                );
+
+        return ResponseEntity.ok()
+                .header(SNAPSHOT_HEADER, result.snapshotToken())
+                .body(result.page());
     }
 
     @Operation(

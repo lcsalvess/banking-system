@@ -3,6 +3,7 @@ package com.lcsalvess.bankingsystem.entity.transaction;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.util.time.InstantPrecision;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,7 +23,6 @@ import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -124,7 +124,7 @@ public class Transaction {
         requireOrdinaryOperationType(type);
 
         BigDecimal validatedAmount = requireValidAmount(amount);
-        Instant validatedCreatedAt = truncateToMicros(createdAt);
+        Instant validatedCreatedAt = validateCreatedAt(createdAt);
         Account validatedAccount = requireAccount(account);
         BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
         User validatedActor = requireHumanActor(performedBy);
@@ -163,7 +163,7 @@ public class Transaction {
         );
 
         BigDecimal validatedAmount = requireValidAmount(amount);
-        Instant validatedCreatedAt = truncateToMicros(createdAt);
+        Instant validatedCreatedAt = validateCreatedAt(createdAt);
         Account validatedAccount = requireAccount(account);
         BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
         User validatedActor = requireHumanActor(performedBy);
@@ -195,7 +195,7 @@ public class Transaction {
         validateSystemYieldDate(yieldDate);
 
         BigDecimal validatedAmount = requireValidAmount(amount);
-        Instant validatedCreatedAt = truncateToMicros(createdAt);
+        Instant validatedCreatedAt = validateCreatedAt(createdAt);
         SavingsAccount validatedAccount = requireSavingsAccount(account);
         BigDecimal validatedBalance = requireValidBalanceAfter(balanceAfter);
 
@@ -285,16 +285,11 @@ public class Transaction {
         return performedBy;
     }
 
-    /**
-     * O PostgreSQL armazena timestamps com precisão de microssegundos.
-     * A truncagem garante que o valor em memória seja compatível
-     * com a precisão persistida.
-     */
-    private static Instant truncateToMicros(Instant value) {
-        return Objects.requireNonNull(
-                value,
+    private static Instant validateCreatedAt(Instant createdAt) {
+        return InstantPrecision.truncateToMicros(
+                createdAt,
                 "The transaction creation timestamp is required."
-        ).truncatedTo(ChronoUnit.MICROS);
+        );
     }
 
     private static Account requireAccount(Account account) {

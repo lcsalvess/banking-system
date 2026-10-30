@@ -14,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,6 +39,12 @@ class TransactionMigrationCompatibilityTests {
 
     private static final String UNEXPECTED_ACTOR_MESSAGE =
             "Unexpected user attribution found in historical YIELD transactions.";
+
+    private static final String INCOMPLETE_TRANSFER_MESSAGE =
+            "Historical transfer codes must identify exactly one consistent transfer pair.";
+
+    private static final String INVALID_YIELD_ACCOUNT_MESSAGE =
+            "Historical YIELD transactions must belong to a savings account.";
 
     @Test
     @DisplayName("Should preserve historical data when upgrading from V24 to V25")
@@ -76,6 +83,156 @@ class TransactionMigrationCompatibilityTests {
     }
 
     @Test
+    @DisplayName("Should abort the upgrade when a historical transfer pair is incomplete")
+    void shouldAbortUpgradeWhenTransferPairIsIncomplete()
+            throws SQLException {
+
+        assumeDatabaseAdminConfiguration();
+
+        String databaseName = createTemporaryDatabase();
+
+        try {
+            String databaseUrl = databaseUrl(databaseName);
+
+            migrateTo(databaseUrl, "24");
+
+            LegacyFixtures fixtures;
+            UUID incompleteTransferCode = UUID.randomUUID();
+
+            try (Connection connection = connect(databaseUrl)) {
+                fixtures = insertLegacyFixtures(
+                        connection,
+                        true
+                );
+
+                // A transfer code with only one transaction direction
+                // must make the V25 migration fail.
+                insertHistoricalTransaction(
+                        connection,
+                        "TRANSFER_SENT",
+                        new BigDecimal("50.00"),
+                        fixtures.checkingAccountId(),
+                        new BigDecimal("350.00"),
+                        incompleteTransferCode,
+                        null,
+                        fixtures.humanUserId()
+                );
+            }
+
+            FlywayException exception = assertThrows(
+                    FlywayException.class,
+                    () -> migrateTo(databaseUrl, "25")
+            );
+
+            assertMigrationFailure(
+                    exception,
+                    INCOMPLETE_TRANSFER_MESSAGE
+            );
+
+            try (Connection connection = connect(databaseUrl)) {
+                assertUnchangedAfterFailedUpgrade(
+                        connection,
+                        fixtures
+                );
+
+                assertEquals(
+                        1L,
+                        queryLong(
+                                connection,
+                                """
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transfer_code = ?
+                                """,
+                                incompleteTransferCode
+                        ),
+                        "The historical incomplete transfer must remain untouched."
+                );
+            }
+
+        } finally {
+            dropTemporaryDatabase(databaseName);
+        }
+    }
+
+    @Test
+    @DisplayName("Should abort the upgrade when a historical yield belongs to a checking account")
+    void shouldAbortUpgradeWhenYieldBelongsToCheckingAccount()
+            throws SQLException {
+
+        assumeDatabaseAdminConfiguration();
+
+        String databaseName = createTemporaryDatabase();
+
+        try {
+            String databaseUrl = databaseUrl(databaseName);
+
+            migrateTo(databaseUrl, "24");
+
+            LegacyFixtures fixtures;
+
+            try (Connection connection = connect(databaseUrl)) {
+                fixtures = insertLegacyFixtures(
+                        connection,
+                        true
+                );
+
+                // This record has the expected legacy system_migration
+                // actor, but its account is not a savings account.
+                insertHistoricalTransaction(
+                        connection,
+                        "YIELD",
+                        new BigDecimal("5.00"),
+                        fixtures.checkingAccountId(),
+                        new BigDecimal("355.00"),
+                        null,
+                        LocalDate.now().minusDays(2),
+                        fixtures.systemMigrationUserId()
+                );
+            }
+
+            FlywayException exception = assertThrows(
+                    FlywayException.class,
+                    () -> migrateTo(databaseUrl, "25")
+            );
+
+            assertMigrationFailure(
+                    exception,
+                    INVALID_YIELD_ACCOUNT_MESSAGE
+            );
+
+            try (Connection connection = connect(databaseUrl)) {
+                assertUnchangedAfterFailedUpgrade(
+                        connection,
+                        fixtures
+                );
+
+                // The invalid checking-account yield must also remain
+                // unchanged because the migration is transactional.
+                assertEquals(
+                        1L,
+                        queryLong(
+                                connection,
+                                """
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transaction_type = 'YIELD'
+                                  AND account_id = ?
+                                  AND performed_by_system = FALSE
+                                  AND performed_by_user_id = ?
+                                """,
+                                fixtures.checkingAccountId(),
+                                fixtures.systemMigrationUserId()
+                        )
+                );
+            }
+
+        } finally {
+            dropTemporaryDatabase(databaseName);
+        }
+    }
+
+    @Test
     @DisplayName("Should abort the upgrade when a historical yield has an unexpected human actor")
     void shouldAbortUpgradeWhenYieldHasUnexpectedHumanActor()
             throws SQLException {
@@ -103,15 +260,16 @@ class TransactionMigrationCompatibilityTests {
                     () -> migrateTo(databaseUrl, "25")
             );
 
-            assertTrue(
-                    exceptionMessages(exception)
-                            .contains(UNEXPECTED_ACTOR_MESSAGE),
-                    () -> "The migration failed for an unexpected reason: "
-                            + exceptionMessages(exception)
+            assertMigrationFailure(
+                    exception,
+                    UNEXPECTED_ACTOR_MESSAGE
             );
 
             try (Connection connection = connect(databaseUrl)) {
-                assertUnchangedAfterFailedUpgrade(connection, fixtures);
+                assertUnchangedAfterFailedUpgrade(
+                        connection,
+                        fixtures
+                );
             }
 
         } finally {
@@ -224,10 +382,12 @@ class TransactionMigrationCompatibilityTests {
 
     /**
      * Creates a V24 database state containing:
+     *
      * - a human-attributed deposit;
-     * - both legs of a transfer without transfer_code;
-     * - a historical yield attributed to a user;
-     * <p>
+     * - a legacy transfer pair without transfer_code;
+     * - a complete transfer pair with transfer_code;
+     * - a historical yield attributed to a user.
+     *
      * When yieldAttributedToMigrationUser is false, the historical yield
      * is attributed to a real user, which must make V25 abort.
      */
@@ -274,10 +434,11 @@ class TransactionMigrationCompatibilityTests {
                 checkingAccountId,
                 new BigDecimal("500.00"),
                 null,
+                null,
                 humanUserId
         );
 
-        // Historical transfer pair.
+        // Historical transfer pair without a transfer code.
         // V3 did not backfill transfer_code for these records.
         insertHistoricalTransaction(
                 connection,
@@ -285,6 +446,7 @@ class TransactionMigrationCompatibilityTests {
                 new BigDecimal("100.00"),
                 checkingAccountId,
                 new BigDecimal("400.00"),
+                null,
                 null,
                 humanUserId
         );
@@ -295,6 +457,33 @@ class TransactionMigrationCompatibilityTests {
                 new BigDecimal("100.00"),
                 savingsAccountId,
                 new BigDecimal("100.00"),
+                null,
+                null,
+                humanUserId
+        );
+
+        // A complete historical pair with a transfer code.
+        // V25 must preserve this valid pair.
+        UUID codedTransferCode = UUID.randomUUID();
+
+        insertHistoricalTransaction(
+                connection,
+                "TRANSFER_SENT",
+                new BigDecimal("25.00"),
+                checkingAccountId,
+                new BigDecimal("375.00"),
+                codedTransferCode,
+                null,
+                humanUserId
+        );
+
+        insertHistoricalTransaction(
+                connection,
+                "TRANSFER_RECEIVED",
+                new BigDecimal("25.00"),
+                savingsAccountId,
+                new BigDecimal("125.00"),
+                codedTransferCode,
                 null,
                 humanUserId
         );
@@ -310,15 +499,18 @@ class TransactionMigrationCompatibilityTests {
                 new BigDecimal("1.00"),
                 savingsAccountId,
                 new BigDecimal("101.00"),
-                java.time.LocalDate.now().minusDays(1),
+                null,
+                LocalDate.now().minusDays(1),
                 yieldActorId
         );
 
         return new LegacyFixtures(
                 humanUserId,
+                systemMigrationUserId,
                 checkingAccountId,
                 savingsAccountId,
-                yieldActorId
+                yieldActorId,
+                codedTransferCode
         );
     }
 
@@ -472,7 +664,8 @@ class TransactionMigrationCompatibilityTests {
             BigDecimal amount,
             Long accountId,
             BigDecimal balanceAfter,
-            java.time.LocalDate yieldDate,
+            UUID transferCode,
+            LocalDate yieldDate,
             Long actorId
     ) throws SQLException {
 
@@ -495,7 +688,7 @@ class TransactionMigrationCompatibilityTests {
                     ?,
                     ?,
                     ?,
-                    NULL,
+                    ?,
                     ?,
                     ?,
                     ?,
@@ -510,15 +703,22 @@ class TransactionMigrationCompatibilityTests {
             statement.setString(2, type);
             statement.setLong(3, accountId);
             statement.setObject(4, UUID.randomUUID());
-            statement.setBigDecimal(5, balanceAfter);
 
-            if (yieldDate == null) {
-                statement.setNull(6, Types.DATE);
+            if (transferCode == null) {
+                statement.setNull(5, Types.OTHER);
             } else {
-                statement.setObject(6, yieldDate);
+                statement.setObject(5, transferCode);
             }
 
-            statement.setLong(7, actorId);
+            statement.setBigDecimal(6, balanceAfter);
+
+            if (yieldDate == null) {
+                statement.setNull(7, Types.DATE);
+            } else {
+                statement.setObject(7, yieldDate);
+            }
+
+            statement.setLong(8, actorId);
 
             statement.executeUpdate();
         }
@@ -533,6 +733,7 @@ class TransactionMigrationCompatibilityTests {
             LegacyFixtures fixtures
     ) throws SQLException {
 
+        // Two historical transfer transactions must still have no code.
         assertEquals(
                 2L,
                 queryLong(
@@ -549,6 +750,21 @@ class TransactionMigrationCompatibilityTests {
                 )
         );
 
+        // The complete coded transfer pair must exist.
+        assertEquals(
+                2L,
+                queryLong(
+                        connection,
+                        """
+                        SELECT COUNT(*)
+                        FROM public.transactions
+                        WHERE transfer_code = ?
+                        """,
+                        fixtures.codedTransferCode()
+                )
+        );
+
+        // The legacy yield must still have its original attribution.
         assertEquals(
                 1L,
                 queryLong(
@@ -574,7 +790,7 @@ class TransactionMigrationCompatibilityTests {
             LegacyFixtures fixtures
     ) throws SQLException {
 
-        // Both historical transfer legs must remain intact.
+        // Both historical transfer legs without a code must remain intact.
         assertEquals(
                 2L,
                 queryLong(
@@ -588,6 +804,20 @@ class TransactionMigrationCompatibilityTests {
                         )
                           AND transfer_code IS NULL
                         """
+                )
+        );
+
+        // The historical coded transfer pair must remain intact.
+        assertEquals(
+                2L,
+                queryLong(
+                        connection,
+                        """
+                        SELECT COUNT(*)
+                        FROM public.transactions
+                        WHERE transfer_code = ?
+                        """,
+                        fixtures.codedTransferCode()
                 )
         );
 
@@ -635,7 +865,7 @@ class TransactionMigrationCompatibilityTests {
                 )
         );
 
-        // The new actor constraint must be validated.
+        // The strict actor constraint must be validated.
         assertEquals(
                 Boolean.TRUE,
                 queryBoolean(
@@ -644,6 +874,39 @@ class TransactionMigrationCompatibilityTests {
                         SELECT convalidated
                         FROM pg_constraint
                         WHERE conname = 'ck_transactions_actor'
+                        """
+                )
+        );
+
+        // The unique index must exist.
+        assertEquals(
+                1L,
+                queryLong(
+                        connection,
+                        """
+                        SELECT COUNT(*)
+                        FROM pg_indexes
+                        WHERE schemaname = 'public'
+                          AND indexname = 'uk_transactions_transfer_code_type'
+                        """
+                )
+        );
+
+        // The new integrity triggers must be installed.
+        assertEquals(
+                4L,
+                queryLong(
+                        connection,
+                        """
+                        SELECT COUNT(*)
+                        FROM pg_trigger
+                        WHERE NOT tgisinternal
+                          AND tgname IN (
+                              'ct_transactions_transfer_pair',
+                              'tr_transactions_yield_savings_account',
+                              'tr_savings_accounts_protect_yield_transactions',
+                              'tr_accounts_protect_yield_transactions'
+                          )
                         """
                 )
         );
@@ -672,7 +935,7 @@ class TransactionMigrationCompatibilityTests {
             LegacyFixtures fixtures
     ) throws SQLException {
 
-        // The invalid human attribution must remain untouched.
+        // The historical yield must retain its original attribution.
         assertEquals(
                 1L,
                 queryLong(
@@ -688,6 +951,37 @@ class TransactionMigrationCompatibilityTests {
                 )
         );
 
+        // The historical transfer records without a code must remain intact.
+        assertEquals(
+                2L,
+                queryLong(
+                        connection,
+                        """
+                        SELECT COUNT(*)
+                        FROM public.transactions
+                        WHERE transaction_type IN (
+                            'TRANSFER_SENT',
+                            'TRANSFER_RECEIVED'
+                        )
+                          AND transfer_code IS NULL
+                        """
+                )
+        );
+
+        // The complete coded transfer pair must remain intact.
+        assertEquals(
+                2L,
+                queryLong(
+                        connection,
+                        """
+                        SELECT COUNT(*)
+                        FROM public.transactions
+                        WHERE transfer_code = ?
+                        """,
+                        fixtures.codedTransferCode()
+                )
+        );
+
         // The transactional migration must not leave partial constraints.
         assertEquals(
                 0L,
@@ -696,19 +990,43 @@ class TransactionMigrationCompatibilityTests {
                         """
                         SELECT COUNT(*)
                         FROM pg_constraint
-                        WHERE conname = 'ck_transactions_amount_max'
+                        WHERE conname IN (
+                            'ck_transactions_amount_max',
+                            'ck_transactions_transfer_code'
+                        )
                         """
                 )
         );
 
+        // The unique index must not remain after a failed migration.
         assertEquals(
                 0L,
                 queryLong(
                         connection,
                         """
                         SELECT COUNT(*)
-                        FROM pg_constraint
-                        WHERE conname = 'ck_transactions_transfer_code'
+                        FROM pg_indexes
+                        WHERE schemaname = 'public'
+                          AND indexname = 'uk_transactions_transfer_code_type'
+                        """
+                )
+        );
+
+        // The new triggers must not remain after a failed migration.
+        assertEquals(
+                0L,
+                queryLong(
+                        connection,
+                        """
+                        SELECT COUNT(*)
+                        FROM pg_trigger
+                        WHERE NOT tgisinternal
+                          AND tgname IN (
+                              'ct_transactions_transfer_pair',
+                              'tr_transactions_yield_savings_account',
+                              'tr_savings_accounts_protect_yield_transactions',
+                              'tr_accounts_protect_yield_transactions'
+                          )
                         """
                 )
         );
@@ -725,6 +1043,24 @@ class TransactionMigrationCompatibilityTests {
                           AND success = TRUE
                         """
                 )
+        );
+    }
+
+    private static void assertMigrationFailure(
+            FlywayException exception,
+            String expectedMessage
+    ) {
+        String messages = exceptionMessages(exception);
+
+        assertTrue(
+                messages.contains(expectedMessage),
+                () -> "The migration failed for an unexpected reason. "
+                        + "Expected message: "
+                        + expectedMessage
+                        + System.lineSeparator()
+                        + "Actual messages:"
+                        + System.lineSeparator()
+                        + messages
         );
     }
 
@@ -841,9 +1177,11 @@ class TransactionMigrationCompatibilityTests {
 
     private record LegacyFixtures(
             Long humanUserId,
+            Long systemMigrationUserId,
             Long checkingAccountId,
             Long savingsAccountId,
-            Long yieldActorId
+            Long yieldActorId,
+            UUID codedTransferCode
     ) {
     }
 }

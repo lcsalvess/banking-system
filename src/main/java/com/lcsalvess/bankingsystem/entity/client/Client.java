@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.util.normalization.EmailNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.NameNormalizer;
 import jakarta.persistence.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(name = "clients",
@@ -11,6 +12,7 @@ import jakarta.persistence.*;
                 @UniqueConstraint(name = "uk_clients_cpf", columnNames = "cpf"),
                 @UniqueConstraint(name = "uk_clients_address", columnNames = "address_id")
         })
+@DynamicUpdate
 public class Client {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,61 +1,189 @@
 # Database
 
-- PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate does not change the schema; it only validates it against the entities (`spring.jpa.hibernate.ddl-auto=validate`).
-- `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq` sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters. `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`. `V4__add_transaction_history_index.sql` creates the index `idx_transactions_account_created_id` on `transactions (account_id, created_at DESC, id DESC)`, which supports the transaction history query.
-- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing transactions to that user, and then makes the column `NOT NULL` with the foreign key `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data. `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`). `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive. `V9__add_account_balance_upper_bound.sql` adds the `ck_accounts_balance_max` check constraint (`balance <= 9999999999999.99`).
-- `V10__add_user_token_version.sql` adds the `token_version` column to `users` (`INTEGER NOT NULL DEFAULT 0`), the credential version carried by every JWT. `V11__keep_system_migration_user_inactive.sql` adds the `ck_users_system_migration_inactive` check constraint, so the `system_migration` user can never be active. `V12__daily_yield_processing.sql` adds the `yield_date` column to `transactions` (filled from `created_at` for the existing yields), replaces the `uk_transactions_daily_yield` index so it is based on `(account_id, yield_date)` instead of the creation time, and adds the `ck_transactions_yield_date` check constraint (a `YIELD` must have a `yield_date`, and other types must not). `V13__system_transaction_attribution.sql` makes `performed_by_user_id` nullable again, adds the `performed_by_system` column (`BOOLEAN NOT NULL DEFAULT FALSE`), and adds the `ck_transactions_actor` check constraint (a system transaction must be a `YIELD` with no user, and any other transaction must reference a user). `V14__track_daily_yield_processing.sql` adds the `last_yield_processed_date` column to `savings_accounts`, the cursor of the daily yield processing. Existing accounts start from the later of their last yield date and the day before the migration (in `America/Sao_Paulo`), so no retroactive yield is granted for the historical period.
-- `V15__reserve_system_username.sql` adds the `ck_users_username_not_system` check constraint, so no user can have the reserved username `system`. The migration fails if such a user already exists. `V16__add_transaction_balance_after.sql` adds `balance_after` to `transactions`, backfills the running balance for existing transactions in ID order, enforces a non-null value and the `ck_transactions_balance_after_range` constraint, and creates `idx_transactions_account_id_desc` to support latest-transaction lookups. `V17__create_transaction_idempotency_requests.sql` creates `transaction_idempotency_requests` to persist idempotency keys per user, the request fingerprint, operation type, and resulting transaction reference; it adds foreign keys, uniqueness constraints, and checks for supported operation types and SHA-256 request hashes. `V18__add_created_at_index_to_transaction_idempotency_requests.sql` adds `idx_transaction_idempotency_created_at` to support efficient cleanup of expired idempotency records. `V19__create_audit_events.sql` creates the persistent `audit_events` table for audit records, including actor/action/target metadata, a timestamp, and the correlation ID, with database-side protection against `UPDATE`, `DELETE`, and `TRUNCATE`. `V20__configure_application_privileges.sql` configures least-privilege grants for the `banking_app` runtime role and default privileges for objects created by `banking_migrator`.
-- `V21__allow_runtime_updates_to_checking_accounts.sql` grants `UPDATE` on `checking_accounts` to the `banking_app` runtime role, allowing Hibernate's pessimistic locking with joined inheritance to operate while preserving the role's restricted privileges on other database objects.
+- PostgreSQL, with the schema versioned and applied by Flyway. Migrations live in `src/main/resources/db/migration` and
+  run automatically at startup. Hibernate does not change the schema; it only validates it against the entities
+  (`spring.jpa.hibernate.ddl-auto=validate`).
+- `V1__create_schema.sql` creates the initial schema: tables, constraints, indexes, and the `account_number_seq`
+  sequence. `V2__increase_account_number_length.sql` widens `accounts.account_number` to 20 characters.
+  `V3__add_transfer_code_to_transactions.sql` adds the nullable `transfer_code` column to `transactions`.
+  `V4__add_transaction_history_index.sql` creates the index `idx_transactions_account_created_id` on
+  `transactions (account_id, created_at DESC, id DESC)`, which supports the transaction history query.
+- `V5__normalize_email_uniqueness.sql` lowercases the existing e-mails of `users` and `clients` and replaces the
+  case-sensitive unique constraints with unique indexes on `LOWER(email)` (names kept: `uk_users_email` and
+  `uk_clients_email`). `V6__add_transaction_performed_by_user.sql` creates the inactive technical user
+  `system_migration`, adds the `performed_by_user_id` column to `transactions` as nullable, attributes the existing
+  transactions to that user, and then makes the column `NOT NULL` with the foreign key
+  `fk_transactions_performed_by_user`. It also aborts if a `system_migration` user already exists with unexpected data.
+  `V7__normalize_username_uniqueness.sql` lowercases and trims the existing usernames and replaces the case-sensitive
+  unique constraint with a unique index on `LOWER(username)` (name kept: `uk_users_username`).
+  `V8__harden_system_migration_user.sql` replaces the placeholder password of `system_migration` with a BCrypt hash and
+  its e-mail with the reserved address `system-migration@invalid.example`, keeping the user inactive.
+  `V9__add_account_balance_upper_bound.sql` adds the `ck_accounts_balance_max` check constraint
+  (`balance <= 9999999999999.99`).
+- `V10__add_user_token_version.sql` adds the `token_version` column to `users` (`INTEGER NOT NULL DEFAULT 0`), the
+  credential version carried by every JWT. `V11__keep_system_migration_user_inactive.sql` adds the
+  `ck_users_system_migration_inactive` check constraint, so the `system_migration` user can never be active.
+  `V12__daily_yield_processing.sql` adds the `yield_date` column to `transactions` (filled from `created_at` for the
+  existing yields), replaces the `uk_transactions_daily_yield` index so it is based on `(account_id, yield_date)`
+  instead of the creation time, and adds the `ck_transactions_yield_date` check constraint (a `YIELD` must have a
+  `yield_date`, and other types must not). `V13__system_transaction_attribution.sql` makes `performed_by_user_id`
+  nullable again, adds the `performed_by_system` column (`BOOLEAN NOT NULL DEFAULT FALSE`), and adds the
+  `ck_transactions_actor` check constraint (a system transaction must be a `YIELD` with no user, and any other
+  transaction must reference a user). `V14__track_daily_yield_processing.sql` adds the `last_yield_processed_date`
+  column to `savings_accounts`, the cursor of the daily yield processing. Existing accounts start from the later of
+  their last yield date and the day before the migration (in `America/Sao_Paulo`), so no retroactive yield is granted
+  for the historical period.
+- `V15__reserve_system_username.sql` adds the `ck_users_username_not_system` check constraint, so no user can have the
+  reserved username `system`. The migration fails if such a user already exists.
+  `V16__add_transaction_balance_after.sql` adds `balance_after` to `transactions`, backfills the running balance for
+  existing transactions in ID order, enforces a non-null value and the `ck_transactions_balance_after_range` constraint,
+  and creates `idx_transactions_account_id_desc` to support latest-transaction lookups.
+  `V17__create_transaction_idempotency_requests.sql` creates `transaction_idempotency_requests` to persist idempotency
+  keys per user, the request fingerprint, operation type, and resulting transaction reference; it adds foreign keys,
+  uniqueness constraints, and checks for supported operation types and SHA-256 request hashes.
+  `V18__add_created_at_index_to_transaction_idempotency_requests.sql` adds `idx_transaction_idempotency_created_at` to
+  support efficient cleanup of expired idempotency records. `V19__create_audit_events.sql` creates the persistent
+  `audit_events` table for audit records, including actor/action/target metadata, a timestamp, and the correlation ID,
+  with database-side protection against `UPDATE`, `DELETE`, and `TRUNCATE`.
+- `V20__configure_application_privileges.sql` establishes the initial table and sequence grants for the `banking_app`
+  runtime role and default privileges for objects created by `banking_migrator`. The effective runtime privilege policy
+  is maintained by the `afterMigrate__apply_runtime_privileges.sql` callback.
+- `V21__allow_runtime_updates_to_checking_accounts.sql` historically grants `UPDATE` on `checking_accounts` to support
+  Hibernate's pessimistic locking with joined inheritance. The current callback supersedes this grant and revokes it
+  because account locking now targets only the base `accounts` table.
 - `V22__allow_auditor_user_role.sql` replaces `ck_users_role` so that `users.role` also accepts `AUDITOR`.
-- `V23__add_audit_events_query_indexes.sql` adds the indexes that support the audit query API (see below). It uses a plain `CREATE INDEX`, which blocks writes to `audit_events` while each index is built; on a large existing table, create the indexes `CONCURRENTLY` before deploying.
-- `V24__use_timezone_aware_timestamps.sql` converts `users.created_at`, `users.updated_at`, `transactions.created_at`, `audit_events.created_at`, and `transaction_idempotency_requests.created_at` to `TIMESTAMP(6) WITH TIME ZONE`. It explicitly interprets legacy timestamps in `America/Sao_Paulo`, except for `users.created_at` of the `system_migration` technical user, which is interpreted as UTC. This exception assumes the PostgreSQL session used by V6 was configured for UTC; the current database timezone does not establish the historical session timezone. The migration also restores `CURRENT_TIMESTAMP` defaults for new `audit_events` and `transaction_idempotency_requests` records.
-- Schema changes must be added as new versioned migrations (`V25__description.sql`, and so on). Migrations that were already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database privileges; do not edit them. Changes to the runtime role's privilege policy go in `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
+- `V23__add_audit_events_query_indexes.sql` adds the indexes that support the audit query API (see below). It uses a
+  plain `CREATE INDEX`, which blocks writes to `audit_events` while each index is built; on a large existing table,
+  create the indexes `CONCURRENTLY` before deploying.
+- `V24__use_timezone_aware_timestamps.sql` converts `users.created_at`, `users.updated_at`, `transactions.created_at`,
+  `audit_events.created_at`, and `transaction_idempotency_requests.created_at` to `TIMESTAMP(6) WITH TIME ZONE`. It
+  explicitly interprets legacy timestamps in `America/Sao_Paulo`, except for `users.created_at` of the
+  `system_migration` technical user, which is interpreted as UTC. This exception assumes the PostgreSQL session used by
+  V6 was configured for UTC; the current database timezone does not establish the historical session timezone. The
+  migration also restores `CURRENT_TIMESTAMP` defaults for new `audit_events` and `transaction_idempotency_requests`
+  records.
+- Schema changes must be added as new versioned migrations (`V25__description.sql`, and so on). Migrations that were
+  already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database
+  privileges; do not edit them. Changes to the runtime role's privilege policy go in
+  `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
 
 ## Database roles and privileges
 
 The local and production profiles use separate PostgreSQL login roles:
 
-- `banking_app` is the runtime role used by the datasource. It must not own schema objects and must not be able to create objects in `public`.
-- `banking_migrator` is the Flyway role. It applies migrations and owns the objects it creates, including `flyway_schema_history`.
-- The test profile uses a separate test database and a dedicated test role (for example, `banking_test`) for both the datasource and Flyway. Do not use the restricted `banking_app` role to run integration tests that need to clean up fixtures.
+- `banking_app` is the runtime role used by the datasource. It must not own schema objects and must not be able to
+  create objects in `public`.
+- `banking_migrator` is the Flyway role. It applies migrations and owns the objects it creates, including
+  `flyway_schema_history`.
+- The test profile uses a separate test database and a dedicated test role (for example, `banking_test`) for both the
+  datasource and Flyway. Do not use the restricted `banking_app` role to run integration tests that need to clean up
+  fixtures.
 
-`scripts/db/bootstrap-roles.sql` provisions the login roles and schema-level access; passwords are set separately and are never stored in the script. The table and sequence grants below are applied by the Flyway callback `src/main/resources/db/callback/afterMigrate__apply_runtime_privileges.sql`, which runs after every successful migrate. It is the single source of truth for the runtime role's privileges: because it is re-applied on each startup, a grant cannot be silently lost, and any manual change to the role's privileges is reverted on the next startup.
+`scripts/db/bootstrap-roles.sql` provisions the login roles and schema-level access; passwords are set separately and
+are never stored in the script. The table and sequence grants below are applied by the Flyway callback
+`src/main/resources/db/callback/afterMigrate__apply_runtime_privileges.sql`, which runs after every successful migrate.
+It is the single source of truth for the runtime role's privileges: because it is re-applied on each startup, a grant
+cannot be silently lost, and any manual change to the role's privileges is reverted on the next startup.
 
-For upgrades of an **existing database at V19**, if its objects were created by an earlier database user, run `scripts/db/transfer-existing-ownership.sql` as a PostgreSQL administrator against the application database after the bootstrap script and before V20 is applied. It transfers ownership of existing tables, sequences, and the audit trigger function to `banking_migrator`. The script deliberately rejects the test database and an upgrade where V20 is already recorded as successful. Fresh databases do not need this script because Flyway creates their objects as `banking_migrator`. See the [Development Guide](DEVELOPMENT.md#configuration) for the exact procedure.
+For upgrades of an **existing database at V19**, if its objects were created by an earlier database user, run
+`scripts/db/transfer-existing-ownership.sql` as a PostgreSQL administrator against the application database after the
+bootstrap script and before V20 is applied. It transfers ownership of existing tables, sequences, and the audit trigger
+function to `banking_migrator`. The script deliberately rejects the test database and an upgrade where V20 is already
+recorded as successful. Fresh databases do not need this script because Flyway creates their objects as
+`banking_migrator`. See the [Development Guide](DEVELOPMENT.md#configuration) for the exact procedure.
 
-| Table                              | `SELECT` | `INSERT` |   `UPDATE` | `DELETE` |
-|------------------------------------|---------:|---------:|-----------:|---------:|
-| `accounts`                         |      Yes |      Yes |        Yes |       No |
-| `addresses`                        |      Yes |      Yes |        Yes |       No |
-| `audit_events`                     |      Yes |      Yes |         No |       No |
-| `checking_accounts`                |      Yes |      Yes |  `id` only |       No |
-| `clients`                          |      Yes |      Yes |        Yes |       No |
-| `flyway_schema_history`            |       No |       No |         No |       No |
-| `savings_accounts`                 |      Yes |      Yes |        Yes |       No |
-| `transaction_idempotency_requests` |      Yes |      Yes |        Yes |      Yes |
-| `transactions`                     |      Yes |      Yes |         No |       No |
-| `users`                            |      Yes |      Yes |        Yes |       No |
+| Table                              | SELECT | INSERT | UPDATE                                                                                       | DELETE |
+|------------------------------------|:------:|:------:|----------------------------------------------------------------------------------------------|:------:|
+| `accounts`                         |  Yes   |  Yes   | `balance`, `status`                                                                          |   No   |
+| `addresses`                        |  Yes   |  Yes   | `city`, `complement`, `neighborhood`, `postal_code`, `state`, `street_name`, `street_number` |   No   |
+| `audit_events`                     |  Yes   |  Yes   | No                                                                                           |   No   |
+| `checking_accounts`                |  Yes   |  Yes   | No                                                                                           |   No   |
+| `clients`                          |  Yes   |  Yes   | `name`, `email`, `phone_number`                                                              |   No   |
+| `flyway_schema_history`            |   No   |   No   | No                                                                                           |   No   |
+| `savings_accounts`                 |  Yes   |  Yes   | `last_yield_date`, `last_yield_processed_date`                                               |   No   |
+| `transaction_idempotency_requests` |  Yes   |  Yes   | Yes                                                                                          |  Yes   |
+| `transactions`                     |  Yes   |  Yes   | No                                                                                           |   No   |
+| `users`                            |  Yes   |  Yes   | `password`, `active`, `token_version`, `updated_at`                                          |   No   |
 
-`checking_accounts` has only the `id` column. `banking_app` receives `UPDATE` on that column alone because PostgreSQL requires `UPDATE` on at least one column of every table touched by `SELECT ... FOR UPDATE`, and Hibernate's pessimistic lock over joined inheritance locks it. `banking_app` receives `USAGE` and `SELECT`, but not `UPDATE`, on the existing sequences used by identity columns and account-number generation. Its schema privileges allow `USAGE` but not `CREATE`. The append-only audit policy is enforced both by the role's lack of `UPDATE`/`DELETE` grants and by database triggers that reject changes and truncation.
+`checking_accounts` has only the `id` column, and `banking_app` does not
+receive any `UPDATE` privilege on it. Previously, V21 granted `UPDATE`
+on this table because Hibernate's pessimistic lock over joined inheritance
+also locked the subclass table. Account locking now uses an explicit
+native query in `AccountRepository.lockIdByAccountNumber`, which executes
+`SELECT id FROM public.accounts WHERE account_number = :accountNumber
+FOR UPDATE`. After acquiring the lock on the base row, `AccountService`
+loads the polymorphic entity through `findById`. This preserves
+transaction-level serialization without requiring `UPDATE` on
+`checking_accounts`.
 
-Default privileges for future tables created by `banking_migrator` in `public` grant `banking_app` only `SELECT` and `INSERT`; future sequences grant `USAGE` and `SELECT`. A new table whose application workflow requires `UPDATE` or `DELETE` must receive those grants explicitly in `afterMigrate__apply_runtime_privileges.sql` (and be added to its `REVOKE` list so the policy stays deterministic).
+PostgreSQL requires `SELECT` and `UPDATE` privileges on at least one
+column of the table being locked by `SELECT ... FOR UPDATE`. The
+`balance` and `status` column grants on `accounts` satisfy this
+requirement. Account operations retain their existing transaction
+boundaries, and transfers continue to acquire account locks in
+deterministic account-number order.
 
-The callback fails the startup, instead of skipping, when Flyway is not connected as `banking_migrator`, so a misconfigured `local` or `prod` environment cannot run with missing or excess privileges. The `test` profile does not load the `db/callback` location (`spring.flyway.locations`) and runs Flyway as the fixture owner. `V20` and `V21` are kept unchanged because Flyway validates the checksums of applied migrations. They remain conditional on `banking_migrator`, and the callback supersedes them: it first revokes everything and then re-grants the policy above. The two-role behavior is verified in CI by `LeastPrivilegeSmokeTests`, which migrates an empty database as `banking_migrator` and checks what `banking_app` can and cannot do.
+Default privileges for future tables created by `banking_migrator` in `public` grant `banking_app` only `SELECT` and
+`INSERT`; future sequences grant `USAGE` and `SELECT`. A new table whose application workflow requires `UPDATE` or
+`DELETE` must receive those grants explicitly in `afterMigrate__apply_runtime_privileges.sql` (and be added to its
+`REVOKE` list so the policy stays deterministic).
 
-- Tables use snake_case names, generally plural: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`, `savings_accounts`, `transactions`, `transaction_idempotency_requests`, and `audit_events`.
-- Constraints and indexes follow descriptive naming conventions: `uk_<table>_<column>` for conventional unique constraints or indexes, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints. Composite and partial unique indexes use names that describe the enforced business rule, such as `uk_accounts_client_type_active` and `uk_transactions_daily_yield`.
-- `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`, `checking_accounts`, and `savings_accounts` tables.
-- Application timestamps migrated by V24 use `TIMESTAMP(6) WITH TIME ZONE` in PostgreSQL and `Instant` in Java, with microsecond precision. Business dates such as `yield_date` remain date-only values and must not be treated as timestamps.
-- Check constraints in the database enforce a non-negative account balance, a positive transaction amount, and the allowed values of state, role, account type, account status, and transaction type.
-- Two partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type per client) and `uk_transactions_daily_yield` (one yield per account per reference date).
-- `audit_events` has indexes for the audit query filters. Each one ends with the same sort keys as the default listing (`created_at DESC, id DESC`), so the first page is read straight from the index: `idx_audit_events_created_at`, `idx_audit_events_event_type_created_at`, and `idx_audit_events_outcome_created_at`. `idx_audit_events_actor_username_prefix` indexes `lower(actor_username)` with `text_pattern_ops` and serves the case-insensitive prefix search of `actorUsername`; substring search is not supported because it would need the `pg_trgm` extension, and creating an extension requires privileges that `banking_migrator` does not have. `idx_audit_events_entity` and `idx_audit_events_actor` (from V19) serve lookups by affected entity and by actor ID.
-- The database constraint and index names mapped to business errors are centralized in the `DatabaseConstraint` enum within the Java application code. Each name must match a constraint or index defined by a Flyway migration.
+The callback fails the startup, instead of skipping, when Flyway is not connected as `banking_migrator`, so a
+misconfigured `local` or `prod` environment cannot run with missing or excess privileges. The `test` profile does not
+load the `db/callback` location (`spring.flyway.locations`) and runs Flyway as the fixture owner. `V20` and `V21` are
+kept unchanged because Flyway validates the checksums of applied migrations. They remain conditional on
+`banking_migrator`, and the callback supersedes them: it first revokes everything and then re-grants the policy above.
+The two-role behavior is verified in CI by `LeastPrivilegeSmokeTests`, which migrates an empty database as
+`banking_migrator` and checks what `banking_app` can and cannot do.
+
+- Tables use snake_case names, generally plural: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`,
+  `savings_accounts`, `transactions`, `transaction_idempotency_requests`, and `audit_events`.
+- Constraints and indexes follow descriptive naming conventions: `uk_<table>_<column>` for conventional unique
+  constraints or indexes, `fk_<table>_<reference>` for foreign keys, and `ck_<table>_<rule>` for check constraints.
+  Composite and partial unique indexes use names that describe the enforced business rule, such as
+  `uk_accounts_client_type_active` and `uk_transactions_daily_yield`.
+- `Account` uses joined inheritance (`CheckingAccount` and `SavingsAccount` extend it), mapped to the `accounts`,
+  `checking_accounts`, and `savings_accounts` tables.
+- Entities subject to column-level runtime UPDATE privileges use Hibernate's `@DynamicUpdate`. This makes generated
+  UPDATE statements include only modified columns, aligning Hibernate's dirty-checking behavior with the PostgreSQL
+  column-level grants. When adding a new mutable entity attribute or update operation, its required column privilege
+  must also be reviewed in the runtime privilege callback.
+- Application timestamps migrated by V24 use `TIMESTAMP(6) WITH TIME ZONE` in PostgreSQL and `Instant` in Java, with
+  microsecond precision. Business dates such as `yield_date` remain date-only values and must not be treated as
+  timestamps.
+- Check constraints in the database enforce a non-negative account balance, a positive transaction amount, and the
+  allowed values of state, role, account type, account status, and transaction type.
+- Two partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type
+  per client) and `uk_transactions_daily_yield` (one yield per account per reference date).
+- `audit_events` has indexes for the audit query filters. Each one ends with the same sort keys as the default listing
+  (`created_at DESC, id DESC`), so the first page is read straight from the index: `idx_audit_events_created_at`,
+  `idx_audit_events_event_type_created_at`, and `idx_audit_events_outcome_created_at`.
+  `idx_audit_events_actor_username_prefix` indexes `lower(actor_username)` with `text_pattern_ops` and serves the
+  case-insensitive prefix search of `actorUsername`; substring search is not supported because it would need the
+  `pg_trgm` extension, and creating an extension requires privileges that `banking_migrator` does not have.
+  `idx_audit_events_entity` and `idx_audit_events_actor` (from V19) serve lookups by affected entity and by actor ID.
+- The database constraint and index names mapped to business errors are centralized in the `DatabaseConstraint` enum
+  within the Java application code. Each name must match a constraint or index defined by a Flyway migration.
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).
-- `Transaction` also has a `transfer_code` column (UUID, nullable, not updatable). It is filled only for `TRANSFER_SENT` and `TRANSFER_RECEIVED` and holds the same value in both rows of a transfer.
-- Concurrency is handled with pessimistic locking: `AccountRepository.findByAccountNumberForUpdate` uses `LockModeType.PESSIMISTIC_WRITE`. The locking methods of `AccountService` require an existing transaction (`Propagation.MANDATORY`), so a lock can never be taken and released outside the operation that needs it.
-- User operations use the same mechanism: `UserRepository.findByIdForUpdate` locks the row on deactivation, reactivation, and password change. Deactivating an `ADMIN` also locks every active admin before the last-admin check, so concurrent deactivations always leave at least one active administrator.
-- `Transaction` has a `transaction_code` column (UUID, not null, not updatable) with the `uk_transactions_code` unique constraint, used as its public identifier.
-- Open Session in View is disabled (`spring.jpa.open-in-view=false`). Account queries that need the client use `JOIN FETCH` to avoid lazy loading outside a transaction.
-- Read operations in the services run with `@Transactional(readOnly = true)`, while operations that change data use regular transactions.
-- For clients, the transaction boundary is in `ClientPersistenceService`: `ClientService` resolves the address first and only then calls it, so the transaction covers just the persistence work.
-- Most entities have no public setters: `Client` and `Address` change through domain methods such as `Client.update(...)` and `Address.updateFrom(...)`. `User` changes only through its constructor, which normalizes the username and e-mail, and through `deactivate()`, `reactivate()`, and `changePassword(...)`. `deactivate()` (when the user is active) and `changePassword(...)` increment `tokenVersion`.
+- `Transaction` also has a `transfer_code` column (UUID, nullable, not updatable). It is filled only for `TRANSFER_SENT`
+  and `TRANSFER_RECEIVED` and holds the same value in both rows of a transfer.
+- Concurrency is handled with pessimistic locking. `AccountRepository.lockIdByAccountNumber` executes a native
+  `SELECT ... FOR UPDATE` against the base `accounts` table, and `AccountService` loads the corresponding polymorphic
+  entity after acquiring the lock. Account locking methods require an existing transaction (`Propagation.MANDATORY`), so
+  a lock cannot be acquired and released outside the operation that needs it. Transfers acquire locks in deterministic
+  account-number order to avoid deadlocks.
+- User operations use the same mechanism: `UserRepository.findByIdForUpdate` locks the row on deactivation,
+  reactivation, and password change. Deactivating an `ADMIN` also locks every active admin before the last-admin check,
+  so concurrent deactivations always leave at least one active administrator.
+- `Transaction` has a `transaction_code` column (UUID, not null, not updatable) with the `uk_transactions_code` unique
+  constraint, used as its public identifier.
+- Open Session in View is disabled (`spring.jpa.open-in-view=false`). Account queries that need the client use
+  `JOIN FETCH` to avoid lazy loading outside a transaction.
+- Read operations in the services run with `@Transactional(readOnly = true)`, while operations that change data use
+  regular transactions.
+- For clients, the transaction boundary is in `ClientPersistenceService`: `ClientService` resolves the address first and
+  only then calls it, so the transaction covers just the persistence work.
+- Most entities have no public setters: `Client` and `Address` change through domain methods such as
+  `Client.update(...)` and `Address.updateFrom(...)`. `User` changes only through its constructor, which normalizes the
+  username and e-mail, and through `deactivate()`, `reactivate()`, and `changePassword(...)`. `deactivate()` (when the
+  user is active) and `changePassword(...)` increment `tokenVersion`.

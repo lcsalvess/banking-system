@@ -130,7 +130,7 @@ class TransactionConcurrencyTests {
 
     @BeforeEach
     void setUp() {
-        transactionRepository.deleteAll();
+        transactionRepository.deleteAllInBatch();
         accountRepository.deleteAll();
         clientRepository.deleteAll();
         addressRepository.deleteAll();

@@ -19,7 +19,6 @@ ALTER TABLE public.transactions
 -- transfer_code.
 --
 -- Non-transfer transactions must never contain transfer metadata.
--- Fail rather than silently preserve unexpected historical data.
 DO
 $$
     BEGIN
@@ -63,8 +62,8 @@ ALTER TABLE public.transactions
             ) NOT VALID;
 
 
--- Fail with an explicit message if historical transfer codes
--- are duplicated for the same transaction direction.
+-- Fail if historical transfer codes are duplicated
+-- for the same transaction direction.
 DO
 $$
     BEGIN
@@ -133,7 +132,7 @@ $$;
 
 
 -- ============================================================
--- Transfer pair integrity
+-- Transfer pair integrity functions
 -- ============================================================
 
 -- Validate the complete transfer pair.
@@ -183,6 +182,12 @@ BEGIN
     FROM public.transactions
     WHERE transfer_code = p_transfer_code;
 
+    -- Deleting the complete pair is valid.
+    -- A remaining unmatched transaction is not.
+    IF transfer_count = 0 THEN
+        RETURN;
+    END IF;
+
     IF transfer_count <> 2
         OR sent_count <> 1
         OR received_count <> 1
@@ -206,9 +211,6 @@ $$;
 -- INSERT: validates the new transfer code.
 -- UPDATE: validates the old code and, if changed, the new code.
 -- DELETE: validates the old transfer code.
---
--- This prevents an already valid transfer pair from becoming
--- inconsistent after it has been created.
 CREATE OR REPLACE FUNCTION public.enforce_transaction_transfer_pair()
     RETURNS TRIGGER
     LANGUAGE plpgsql
@@ -242,16 +244,12 @@ END;
 $$;
 
 
--- The complete pair is validated at transaction commit.
+-- IMPORTANT:
+-- The constraint trigger is intentionally created at the end
+-- of this migration, after historical transaction updates.
 --
--- This is necessary because the application inserts the sent
--- and received transactions within the same @Transactional method.
-CREATE CONSTRAINT TRIGGER ct_transactions_transfer_pair
-    AFTER INSERT OR UPDATE OR DELETE
-    ON public.transactions
-    DEFERRABLE INITIALLY DEFERRED
-    FOR EACH ROW
-EXECUTE FUNCTION public.enforce_transaction_transfer_pair();
+-- This avoids pending deferred trigger events when ALTER TABLE
+-- is executed during the migration.
 
 
 -- ============================================================
@@ -463,3 +461,22 @@ CREATE TRIGGER tr_accounts_protect_yield_transactions
     ON public.accounts
     FOR EACH ROW
 EXECUTE FUNCTION public.prevent_account_type_change_with_yield();
+
+
+-- ============================================================
+-- Transfer pair constraint trigger
+-- ============================================================
+
+-- Validate the complete transfer pair at transaction commit.
+--
+-- The application inserts both transfer legs within the same
+-- @Transactional method.
+--
+-- This trigger is created last so no subsequent migration
+-- statement modifies transactions while deferred events are pending.
+CREATE CONSTRAINT TRIGGER ct_transactions_transfer_pair
+    AFTER INSERT OR UPDATE OR DELETE
+    ON public.transactions
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+EXECUTE FUNCTION public.enforce_transaction_transfer_pair();

@@ -107,7 +107,7 @@ class TransactionIdempotencyIntegrationTests {
     void setUp() {
         clearIdempotencyRequests();
 
-        transactionRepository.deleteAll();
+        transactionRepository.deleteAllInBatch();
         accountRepository.deleteAll();
         clientRepository.deleteAll();
         addressRepository.deleteAll();
@@ -123,9 +123,6 @@ class TransactionIdempotencyIntegrationTests {
                         Role.EMPLOYEE
                 )
         );
-
-        when(currentUserService.getCurrentUser()).thenReturn(testUser);
-        when(currentUserService.getUsername()).thenReturn(testUser.getUsername());
     }
 
     @AfterEach

@@ -497,6 +497,33 @@ class TransactionConstraintIntegrationTests {
         );
     }
 
+    @Test
+    @DisplayName("Should allow deleting both sides of a transfer pair")
+    void shouldAllowDeletingCompleteTransferPair() {
+        UUID transferCode = UUID.randomUUID();
+
+        insertTransferPair(
+                transferCode,
+                new BigDecimal("100.00"),
+                checkingAccountId,
+                destinationAccountId,
+                userId,
+                userId
+        );
+
+        validateDeferredTransferPair();
+
+        assertDoesNotThrow(() ->
+                jdbcTemplate.update(
+                        """
+                        DELETE FROM public.transactions
+                        WHERE transfer_code = ?
+                        """,
+                        transferCode
+                )
+        );
+    }
+
     // ============================================================
     // Yield account integrity
     // ============================================================

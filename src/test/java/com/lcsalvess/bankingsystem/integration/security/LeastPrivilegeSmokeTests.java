@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -14,6 +15,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -61,15 +63,10 @@ class LeastPrivilegeSmokeTests {
     }
 
     @Test
-    @DisplayName("Runtime role can lock joined account tables with FOR UPDATE")
-    void shouldLockJoinedAccountTables() {
+    @DisplayName("Runtime role can lock the base account table with FOR UPDATE")
+    void shouldLockAccountBaseTable() {
         assertDoesNotThrow(() -> executeAsApp(
-                "SELECT a.id FROM checking_accounts c "
-                        + "JOIN accounts a ON a.id = c.id FOR UPDATE"
-        ));
-        assertDoesNotThrow(() -> executeAsApp(
-                "SELECT a.id FROM savings_accounts s "
-                        + "JOIN accounts a ON a.id = s.id FOR UPDATE"
+                "SELECT id FROM public.accounts FOR UPDATE"
         ));
     }
 
@@ -77,16 +74,57 @@ class LeastPrivilegeSmokeTests {
     @DisplayName("Runtime role can do the work it needs")
     void shouldAllowRuntimeOperations() {
         List<String> allowed = List.of(
-                "SELECT 1 FROM users LIMIT 1",
-                "UPDATE users SET id = id WHERE false",
-                "UPDATE accounts SET id = id WHERE false",
-                "UPDATE savings_accounts SET id = id WHERE false",
-                "SELECT 1 FROM transactions LIMIT 1",
-                "SELECT 1 FROM audit_events LIMIT 1",
-                "UPDATE transaction_idempotency_requests "
+                // SELECT privileges
+                "SELECT 1 FROM public.accounts LIMIT 1",
+                "SELECT 1 FROM public.addresses LIMIT 1",
+                "SELECT 1 FROM public.audit_events LIMIT 1",
+                "SELECT 1 FROM public.checking_accounts LIMIT 1",
+                "SELECT 1 FROM public.clients LIMIT 1",
+                "SELECT 1 FROM public.savings_accounts LIMIT 1",
+                "SELECT 1 FROM public.transactions LIMIT 1",
+                "SELECT 1 FROM public.users LIMIT 1",
+
+                // Accounts: permitted UPDATE columns
+                "UPDATE public.accounts "
+                        + "SET balance = balance, status = status WHERE false",
+
+                // Clients: permitted UPDATE columns
+                "UPDATE public.clients "
+                        + "SET name = name, email = email, phone_number = phone_number "
+                        + "WHERE false",
+
+                // Addresses: permitted UPDATE columns
+                "UPDATE public.addresses SET "
+                        + "city = city, "
+                        + "complement = complement, "
+                        + "neighborhood = neighborhood, "
+                        + "postal_code = postal_code, "
+                        + "state = state, "
+                        + "street_name = street_name, "
+                        + "street_number = street_number "
+                        + "WHERE false",
+
+                // Savings accounts: permitted UPDATE columns
+                "UPDATE public.savings_accounts "
+                        + "SET last_yield_date = last_yield_date, "
+                        + "last_yield_processed_date = last_yield_processed_date "
+                        + "WHERE false",
+
+                // Users: permitted UPDATE columns
+                "UPDATE public.users "
+                        + "SET password = password, "
+                        + "active = active, "
+                        + "token_version = token_version, "
+                        + "updated_at = updated_at "
+                        + "WHERE false",
+
+                // Idempotency records
+                "UPDATE public.transaction_idempotency_requests "
                         + "SET created_at = created_at WHERE false",
-                "DELETE FROM transaction_idempotency_requests WHERE false",
-                "SELECT nextval('account_number_seq')"
+                "DELETE FROM public.transaction_idempotency_requests WHERE false",
+
+                // Sequence access
+                "SELECT nextval('public.account_number_seq')"
         );
 
         for (String sql : allowed) {
@@ -98,19 +136,56 @@ class LeastPrivilegeSmokeTests {
     }
 
     @Test
+    @DisplayName("Runtime role has INSERT privileges on required tables")
+    void shouldHaveRequiredInsertPrivileges() throws SQLException {
+        List<String> insertableTables = List.of(
+                "public.accounts",
+                "public.addresses",
+                "public.audit_events",
+                "public.checking_accounts",
+                "public.clients",
+                "public.savings_accounts",
+                "public.transactions",
+                "public.users",
+                "public.transaction_idempotency_requests"
+        );
+
+        for (String table : insertableTables) {
+            assertTrue(
+                    appHasTablePrivilege(table, "INSERT"),
+                    () -> "Expected INSERT privilege on: " + table
+            );
+        }
+    }
+
+    @Test
     @DisplayName("Runtime role is denied everything beyond its policy")
     void shouldDenyOperationsOutsidePolicy() {
         List<String> denied = List.of(
-                "DELETE FROM transactions WHERE false",
-                "UPDATE transactions SET amount = amount WHERE false",
-                "DELETE FROM audit_events WHERE false",
-                "UPDATE audit_events SET outcome = outcome WHERE false",
-                "DELETE FROM accounts WHERE false",
-                "DELETE FROM users WHERE false",
-                "DELETE FROM clients WHERE false",
-                "DELETE FROM checking_accounts WHERE false",
-                "SELECT 1 FROM flyway_schema_history LIMIT 1",
-                "CREATE TABLE privilege_smoke_probe (id integer)"
+                // Financial and audit history are append-only
+                "DELETE FROM public.transactions WHERE false",
+                "UPDATE public.transactions SET amount = amount WHERE false",
+                "DELETE FROM public.audit_events WHERE false",
+                "UPDATE public.audit_events SET outcome = outcome WHERE false",
+
+                // Physical deletion is forbidden
+                "DELETE FROM public.accounts WHERE false",
+                "DELETE FROM public.users WHERE false",
+                "DELETE FROM public.clients WHERE false",
+                "DELETE FROM public.checking_accounts WHERE false",
+
+                // Forbidden UPDATE columns
+                "UPDATE public.accounts SET id = id WHERE false",
+                "UPDATE public.accounts SET client_id = client_id WHERE false",
+                "UPDATE public.clients SET cpf = cpf WHERE false",
+                "UPDATE public.addresses SET id = id WHERE false",
+                "UPDATE public.savings_accounts SET id = id WHERE false",
+                "UPDATE public.users SET role = role WHERE false",
+                "UPDATE public.checking_accounts SET id = id WHERE false",
+
+                // Migration metadata and schema modification
+                "SELECT 1 FROM public.flyway_schema_history LIMIT 1",
+                "CREATE TABLE public.privilege_smoke_probe (id integer)"
         );
 
         for (String sql : denied) {
@@ -132,7 +207,8 @@ class LeastPrivilegeSmokeTests {
     @DisplayName("Privileges are reapplied after being tampered with")
     void shouldReapplyPrivilegesOnNextMigrate() throws SQLException {
         try (Connection connection = DriverManager.getConnection(
-                url, migratorUser, migratorPassword);
+                url, migratorUser, migratorPassword
+        );
              Statement statement = connection.createStatement()) {
             statement.execute(
                     "GRANT DELETE ON TABLE public.transactions TO "
@@ -148,15 +224,39 @@ class LeastPrivilegeSmokeTests {
 
         SQLException exception = assertThrows(
                 SQLException.class,
-                () -> executeAsApp("DELETE FROM transactions WHERE false")
+                () -> executeAsApp("DELETE FROM public.transactions WHERE false")
         );
 
         assertEquals(PERMISSION_DENIED, exception.getSQLState());
     }
 
+    private static boolean appHasTablePrivilege(
+            String table,
+            String privilege
+    ) throws SQLException {
+        String sql = """
+                SELECT has_table_privilege(current_user, ?, ?)
+                """;
+
+        try (Connection connection = DriverManager.getConnection(
+                url, appUser, appPassword
+        );
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, table);
+            statement.setString(2, privilege);
+
+            try (var resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next());
+                return resultSet.getBoolean(1);
+            }
+        }
+    }
+
     private static void executeAsApp(String sql) throws SQLException {
         try (Connection connection = DriverManager.getConnection(
-                url, appUser, appPassword);
+                url, appUser, appPassword
+        );
              Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }

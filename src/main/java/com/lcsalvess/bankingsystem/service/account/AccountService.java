@@ -75,11 +75,11 @@ public class AccountService {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public Account findEntityByAccountNumberForUpdate(String accountNumber, String accountDigit) {
-        validateDigit(accountNumber, accountDigit);
-
-        return accountRepository.findByAccountNumberForUpdate(accountNumber)
-                .orElseThrow(() -> new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
+    public Account findEntityByAccountNumberForUpdate(
+            String accountNumber,
+            String accountDigit
+    ) {
+        return lockAccount(accountNumber, accountDigit);
     }
 
     @Transactional
@@ -165,8 +165,16 @@ public class AccountService {
     ) {
         validateDigit(accountNumber, accountDigit);
 
-        return accountRepository.findByAccountNumberForUpdate(accountNumber)
-                .orElseThrow(() -> new AccountNotFoundException(ApiErrorMessages.ACCOUNT_NOT_FOUND));
+        Long accountId = accountRepository
+                .lockIdByAccountNumber(accountNumber)
+                .orElseThrow(() -> new AccountNotFoundException(
+                        ApiErrorMessages.ACCOUNT_NOT_FOUND
+                ));
+
+        return accountRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(
+                        ApiErrorMessages.ACCOUNT_NOT_FOUND
+                ));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

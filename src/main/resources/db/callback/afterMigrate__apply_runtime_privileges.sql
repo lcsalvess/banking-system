@@ -18,7 +18,7 @@ $$
         IF current_user <> 'banking_migrator' THEN
             RAISE EXCEPTION
                 'Runtime privileges must be applied by banking_migrator, but Flyway is running as %. Check DB_MIGRATOR_USERNAME and DB_MIGRATOR_PASSWORD.',
-                        current_user;
+                current_user;
         END IF;
 
         -- Start from a clean slate so the result is deterministic on existing databases.
@@ -35,8 +35,9 @@ $$
             public.users
             FROM banking_app;
 
-        -- Core business data: read, create, and update; never physically deleted.
-        GRANT SELECT, INSERT, UPDATE ON TABLE
+        -- Core business data: read and create.
+        -- Updates are restricted to the specific columns required by the application.
+        GRANT SELECT, INSERT ON TABLE
             public.accounts,
             public.addresses,
             public.clients,
@@ -44,18 +45,38 @@ $$
             public.users
             TO banking_app;
 
-        -- Financial history is append-only for the runtime role.
-        GRANT SELECT, INSERT ON TABLE public.transactions TO banking_app;
+        -- Accounts: balance and status are the only mutable business attributes.
+        GRANT UPDATE (balance, status)
+            ON TABLE public.accounts TO banking_app;
 
-        -- Audit history can only be read and appended.
-        GRANT SELECT, INSERT ON TABLE public.audit_events TO banking_app;
+        -- Clients: only contact and identification-display data can be updated.
+        GRANT UPDATE (name, email, phone_number)
+            ON TABLE public.clients TO banking_app;
 
-        -- Joined-inheritance child table of accounts. Hibernate's pessimistic lock
-        -- (SELECT ... FOR UPDATE over the joined tables) requires UPDATE on at least
-        -- one column of every table it locks. checking_accounts only has the id
-        -- column, so the grant is limited to it instead of the whole table.
+        -- Addresses: only address information can be updated.
+        GRANT UPDATE (
+                      city,
+                      complement,
+                      neighborhood,
+                      postal_code,
+                      state,
+                      street_name,
+                      street_number
+            )
+            ON TABLE public.addresses TO banking_app;
+
+        -- Savings accounts: only yield processing dates can be updated.
+        GRANT UPDATE (last_yield_date, last_yield_processed_date)
+            ON TABLE public.savings_accounts TO banking_app;
+
+        -- Users: only authentication status and password-related fields can be updated.
+        GRANT UPDATE (password, active, token_version, updated_at)
+            ON TABLE public.users TO banking_app;
+
+        -- Joined-inheritance child table.
+        -- The application only needs to read and create checking accounts.
+        -- Pessimistic locking is now performed exclusively on the accounts table.
         GRANT SELECT, INSERT ON TABLE public.checking_accounts TO banking_app;
-        GRANT UPDATE (id) ON TABLE public.checking_accounts TO banking_app;
 
         -- Idempotency records are updated and deleted by the scheduled cleanup.
         GRANT SELECT, INSERT, UPDATE, DELETE

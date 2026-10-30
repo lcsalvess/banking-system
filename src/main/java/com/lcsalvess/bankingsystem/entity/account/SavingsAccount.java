@@ -3,6 +3,7 @@ package com.lcsalvess.bankingsystem.entity.account;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
         name = "id",
         foreignKey = @ForeignKey(name = "fk_savings_accounts_account")
 )
+@DynamicUpdate
 public class SavingsAccount extends Account {
 
     /**

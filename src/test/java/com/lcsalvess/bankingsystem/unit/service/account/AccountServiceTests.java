@@ -3,16 +3,20 @@ package com.lcsalvess.bankingsystem.unit.service.account;
 import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
 import com.lcsalvess.bankingsystem.entity.account.Account;
-import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
-import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
+import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
+import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
-import com.lcsalvess.bankingsystem.exception.account.*;
+import com.lcsalvess.bankingsystem.exception.account.AccountAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.account.AccountHasBalanceException;
+import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
+import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
+import com.lcsalvess.bankingsystem.exception.account.InvalidAccountDigitException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
@@ -38,7 +42,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,8 +60,19 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class AccountServiceTests {
@@ -665,8 +684,13 @@ public class AccountServiceTests {
     private void stubAccountLookupForUpdate(Account account) {
         when(accountNumberGenerator.isValid(account.getAccountNumber(), account.getDigit()))
                 .thenReturn(true);
-        when(accountRepository.findByAccountNumberForUpdate(account.getAccountNumber()))
-                .thenReturn(Optional.of(account));
+        when(accountRepository.lockIdByAccountNumber(
+                account.getAccountNumber()
+        )).thenReturn(Optional.of(account.getId()));
+
+        when(accountRepository.findById(
+                account.getId()
+        )).thenReturn(Optional.of(account));
     }
 
     private void verifyAccountLookup(Account account) {
@@ -680,7 +704,9 @@ public class AccountServiceTests {
         verify(accountNumberGenerator)
                 .isValid(account.getAccountNumber(), account.getDigit());
         verify(accountRepository)
-                .findByAccountNumberForUpdate(account.getAccountNumber());
+                .lockIdByAccountNumber(account.getAccountNumber());
+        verify(accountRepository)
+                .findById(account.getId());
     }
 
     private void stubAccountNotFound() {
@@ -693,7 +719,7 @@ public class AccountServiceTests {
     private void stubAccountNotFoundForUpdate() {
         when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT))
                 .thenReturn(true);
-        when(accountRepository.findByAccountNumberForUpdate(NON_EXISTENT_NUMBER))
+        when(accountRepository.lockIdByAccountNumber(NON_EXISTENT_NUMBER))
                 .thenReturn(Optional.empty());
     }
 
@@ -708,9 +734,11 @@ public class AccountServiceTests {
                 NON_EXISTENT_DIGIT
         );
 
-        verify(accountRepository).findByAccountNumberForUpdate(
+        verify(accountRepository).lockIdByAccountNumber(
                 NON_EXISTENT_NUMBER
         );
+
+        verify(accountRepository, never()).findById(anyLong());
     }
 
     private void verifyNoMoreInteractionsOnMocks() {

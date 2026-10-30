@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.entity.account;
 
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import jakarta.persistence.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -13,6 +14,7 @@ import java.util.Objects;
                 @UniqueConstraint(name = "uk_accounts_account_number", columnNames = "account_number")
         }
 )
+@DynamicUpdate
 @Inheritance(strategy = InheritanceType.JOINED)
 public abstract class Account {
 

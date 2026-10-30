@@ -2,9 +2,11 @@ package com.lcsalvess.bankingsystem.entity.address;
 
 import com.lcsalvess.bankingsystem.util.normalization.OptionalTextNormalizer;
 import jakarta.persistence.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(name = "addresses")
+@DynamicUpdate
 public class Address {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -48,6 +48,9 @@ jobs:
       DB_USERNAME: banking_test
       DB_PASSWORD: banking_test_password
       JWT_SECRET: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      MIGRATION_TEST_DB_ADMIN_URL: jdbc:postgresql://localhost:5432/postgres
+      MIGRATION_TEST_DB_ADMIN_USERNAME: banking_test
+      MIGRATION_TEST_DB_ADMIN_PASSWORD: banking_test_password
 
     steps:
       - name: Checkout repository

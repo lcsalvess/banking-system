@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.entity.audit;
 
+import com.lcsalvess.bankingsystem.util.time.InstantPrecision;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,8 +12,6 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -78,6 +77,11 @@ public class AuditEvent {
             UUID correlationId,
             Instant createdAt
     ) {
+        Instant normalizedCreatedAt = InstantPrecision.truncateToMicros(
+                createdAt,
+                "The audit event creation timestamp is required."
+        );
+
         this.eventType = eventType;
         this.outcome = outcome;
         this.actorType = actorType;
@@ -86,10 +90,7 @@ public class AuditEvent {
         this.entityType = entityType;
         this.entityId = entityId;
         this.correlationId = correlationId;
-        this.createdAt = Objects.requireNonNull(
-                createdAt,
-                "The audit event creation timestamp is required."
-        ).truncatedTo(ChronoUnit.MICROS);
+        this.createdAt = normalizedCreatedAt;
     }
 
     public Long getId() {

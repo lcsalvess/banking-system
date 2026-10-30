@@ -12,6 +12,7 @@ import com.lcsalvess.bankingsystem.dto.response.client.ClientSummaryResponseDTO;
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.client.ClientEmailAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
@@ -29,7 +30,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -43,9 +48,16 @@ import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ClientController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -257,7 +269,7 @@ public class ClientControllerTests {
 
     @Nested
     @DisplayName("POST /api/v1/clients")
-    class Save {
+    class Create {
 
         @Test
         @DisplayName("Should create client successfully")
@@ -323,6 +335,20 @@ public class ClientControllerTests {
                     .thenThrow(new ClientCpfAlreadyExistsException(ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS));
 
             performErrorResponse(postClient(request), 409, ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS);
+
+            verify(clientService).create(request);
+            verifyNoMoreInteractions(clientService);
+        }
+
+        @Test
+        @DisplayName("Should return 409 when email already exists")
+        void shouldReturnConflictWhenEmailAlreadyExists() throws Exception {
+            ClientRequestDTO request = validClientRequest();
+
+            when(clientService.create(request))
+                    .thenThrow(new ClientEmailAlreadyExistsException(ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS));
+
+            performErrorResponse(postClient(request), 409, ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS);
 
             verify(clientService).create(request);
             verifyNoMoreInteractions(clientService);

@@ -8,9 +8,10 @@ import com.lcsalvess.bankingsystem.dto.response.address.AddressResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.client.ClientResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.client.ClientSummaryResponseDTO;
 import com.lcsalvess.bankingsystem.entity.address.Address;
-import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.entity.address.State;
+import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.exception.client.ClientCpfAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.client.ClientEmailAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
@@ -39,7 +40,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,8 +53,18 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class ClientServiceTests {
@@ -343,6 +358,46 @@ public class ClientServiceTests {
             );
 
             verify(clientRepository).existsByCpf(CPF);
+            verifyNoMoreInteractionsOnMocks();
+        }
+
+        @Test
+        @DisplayName("Should translate the integrity violation when the email already exists")
+        void shouldTranslateViolationWhenEmailAlreadyExists() {
+            ClientRequestDTO request = clientRequest();
+            Address address = address();
+
+            ConstraintViolationException cause =
+                    new ConstraintViolationException(
+                            "Unique constraint violation",
+                            null,
+                            "uk_clients_email"
+                    );
+
+            DataIntegrityViolationException exception =
+                    new DataIntegrityViolationException(
+                            "Could not persist client",
+                            cause
+                    );
+
+            when(clientRepository.existsByCpf(CPF)).thenReturn(false);
+            when(addressService.createFromPostalCode(request.address())).thenReturn(address);
+            when(currentUserService.getUsername()).thenReturn(USERNAME);
+            when(clientPersistenceService.create(any(Client.class), eq(USERNAME)))
+                    .thenThrow(exception);
+
+            ClientEmailAlreadyExistsException thrown = assertThrows(
+                    ClientEmailAlreadyExistsException.class,
+                    () -> clientService.create(request)
+            );
+
+            assertEquals(ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS, thrown.getMessage());
+            assertSame(exception, thrown.getCause());
+
+            verify(clientRepository).existsByCpf(CPF);
+            verify(addressService).createFromPostalCode(request.address());
+            verify(currentUserService).getUsername();
+            verify(clientPersistenceService).create(any(Client.class), eq(USERNAME));
             verifyNoMoreInteractionsOnMocks();
         }
 

@@ -78,6 +78,12 @@ $$
         -- Pessimistic locking is now performed exclusively on the accounts table.
         GRANT SELECT, INSERT ON TABLE public.checking_accounts TO banking_app;
 
+        -- Financial history is append-only for the runtime role.
+        GRANT SELECT, INSERT ON TABLE public.transactions TO banking_app;
+
+        -- Audit history can only be read and appended.
+        GRANT SELECT, INSERT ON TABLE public.audit_events TO banking_app;
+
         -- Idempotency records are updated and deleted by the scheduled cleanup.
         GRANT SELECT, INSERT, UPDATE, DELETE
             ON TABLE public.transaction_idempotency_requests TO banking_app;

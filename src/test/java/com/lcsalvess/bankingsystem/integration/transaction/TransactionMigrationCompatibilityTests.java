@@ -140,10 +140,10 @@ class TransactionMigrationCompatibilityTests {
                         queryLong(
                                 connection,
                                 """
-                                SELECT COUNT(*)
-                                FROM public.transactions
-                                WHERE transfer_code = ?
-                                """,
+                                        SELECT COUNT(*)
+                                        FROM public.transactions
+                                        WHERE transfer_code = ?
+                                        """,
                                 incompleteTransferCode
                         ),
                         "The historical incomplete transfer must remain untouched."
@@ -214,13 +214,13 @@ class TransactionMigrationCompatibilityTests {
                         queryLong(
                                 connection,
                                 """
-                                SELECT COUNT(*)
-                                FROM public.transactions
-                                WHERE transaction_type = 'YIELD'
-                                  AND account_id = ?
-                                  AND performed_by_system = FALSE
-                                  AND performed_by_user_id = ?
-                                """,
+                                        SELECT COUNT(*)
+                                        FROM public.transactions
+                                        WHERE transaction_type = 'YIELD'
+                                          AND account_id = ?
+                                          AND performed_by_system = FALSE
+                                          AND performed_by_user_id = ?
+                                        """,
                                 fixtures.checkingAccountId(),
                                 fixtures.systemMigrationUserId()
                         )
@@ -382,12 +382,12 @@ class TransactionMigrationCompatibilityTests {
 
     /**
      * Creates a V24 database state containing:
-     *
+     * <p>
      * - a human-attributed deposit;
      * - a legacy transfer pair without transfer_code;
      * - a complete transfer pair with transfer_code;
      * - a historical yield attributed to a user.
-     *
+     * <p>
      * When yieldAttributedToMigrationUser is false, the historical yield
      * is attributed to a real user, which must make V25 abort.
      */
@@ -401,10 +401,10 @@ class TransactionMigrationCompatibilityTests {
         long systemMigrationUserId = queryLong(
                 connection,
                 """
-                SELECT id
-                FROM public.users
-                WHERE username = ?
-                """,
+                        SELECT id
+                        FROM public.users
+                        WHERE username = ?
+                        """,
                 SYSTEM_MIGRATION_USERNAME
         );
 
@@ -520,26 +520,26 @@ class TransactionMigrationCompatibilityTests {
         return insertReturningId(
                 connection,
                 """
-                INSERT INTO public.users (
-                    username,
-                    email,
-                    password,
-                    role,
-                    active,
-                    created_at,
-                    updated_at
-                )
-                VALUES (
-                    'upgrade_actor',
-                    ?,
-                    'not-a-real-hash',
-                    'EMPLOYEE',
-                    TRUE,
-                    CURRENT_TIMESTAMP,
-                    CURRENT_TIMESTAMP
-                )
-                RETURNING id
-                """,
+                        INSERT INTO public.users (
+                            username,
+                            email,
+                            password,
+                            role,
+                            active,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (
+                            'upgrade_actor',
+                            ?,
+                            'not-a-real-hash',
+                            'EMPLOYEE',
+                            TRUE,
+                            CURRENT_TIMESTAMP,
+                            CURRENT_TIMESTAMP
+                        )
+                        RETURNING id
+                        """,
                 "upgrade-actor-" + UUID.randomUUID() + "@example.invalid"
         );
     }
@@ -550,47 +550,47 @@ class TransactionMigrationCompatibilityTests {
         Long addressId = insertReturningId(
                 connection,
                 """
-                INSERT INTO public.addresses (
-                    city,
-                    complement,
-                    neighborhood,
-                    postal_code,
-                    state,
-                    street_name,
-                    street_number
-                )
-                VALUES (
-                    'Mogi das Cruzes',
-                    NULL,
-                    'Centro',
-                    '08700000',
-                    'SP',
-                    'Rua de Teste',
-                    '100'
-                )
-                RETURNING id
-                """
+                        INSERT INTO public.addresses (
+                            city,
+                            complement,
+                            neighborhood,
+                            postal_code,
+                            state,
+                            street_name,
+                            street_number
+                        )
+                        VALUES (
+                            'Mogi das Cruzes',
+                            NULL,
+                            'Centro',
+                            '08700000',
+                            'SP',
+                            'Rua de Teste',
+                            '100'
+                        )
+                        RETURNING id
+                        """
         );
 
         return insertReturningId(
                 connection,
                 """
-                INSERT INTO public.clients (
-                    cpf,
-                    email,
-                    name,
-                    phone_number,
-                    address_id
-                )
-                VALUES (
-                    '12345678901',
-                    'upgrade-client@example.invalid',
-                    'Upgrade Test Client',
-                    '11999990000',
-                    ?
-                )
-                RETURNING id
-                """,
+                        INSERT INTO public.clients (
+                            cpf,
+                            email,
+                            name,
+                            phone_number,
+                            address_id
+                        )
+                        VALUES (
+                            '12345678901',
+                            'upgrade-client@example.invalid',
+                            'Upgrade Test Client',
+                            '11999990000',
+                            ?
+                        )
+                        RETURNING id
+                        """,
                 addressId
         );
     }
@@ -606,17 +606,17 @@ class TransactionMigrationCompatibilityTests {
         Long accountId = insertReturningId(
                 connection,
                 """
-                INSERT INTO public.accounts (
-                    account_number,
-                    balance,
-                    status,
-                    account_type,
-                    client_id,
-                    account_digit
-                )
-                VALUES (?, ?, 'ACTIVE', ?, ?, '0')
-                RETURNING id
-                """,
+                        INSERT INTO public.accounts (
+                            account_number,
+                            balance,
+                            status,
+                            account_type,
+                            client_id,
+                            account_digit
+                        )
+                        VALUES (?, ?, 'ACTIVE', ?, ?, '0')
+                        RETURNING id
+                        """,
                 accountNumber,
                 balance,
                 accountType,
@@ -627,26 +627,26 @@ class TransactionMigrationCompatibilityTests {
             executeUpdate(
                     connection,
                     """
-                    INSERT INTO public.checking_accounts (id)
-                    VALUES (?)
-                    """,
+                            INSERT INTO public.checking_accounts (id)
+                            VALUES (?)
+                            """,
                     accountId
             );
         } else if ("SAVINGS".equals(accountType)) {
             executeUpdate(
                     connection,
                     """
-                    INSERT INTO public.savings_accounts (
-                        id,
-                        last_yield_date,
-                        last_yield_processed_date
-                    )
-                    VALUES (
-                        ?,
-                        CURRENT_DATE - 2,
-                        CURRENT_DATE - 2
-                    )
-                    """,
+                            INSERT INTO public.savings_accounts (
+                                id,
+                                last_yield_date,
+                                last_yield_processed_date
+                            )
+                            VALUES (
+                                ?,
+                                CURRENT_DATE - 2,
+                                CURRENT_DATE - 2
+                            )
+                            """,
                     accountId
             );
         } else {
@@ -739,14 +739,14 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transaction_type IN (
-                            'TRANSFER_SENT',
-                            'TRANSFER_RECEIVED'
-                        )
-                          AND transfer_code IS NULL
-                        """
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transaction_type IN (
+                                    'TRANSFER_SENT',
+                                    'TRANSFER_RECEIVED'
+                                )
+                                  AND transfer_code IS NULL
+                                """
                 )
         );
 
@@ -756,10 +756,10 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transfer_code = ?
-                        """,
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transfer_code = ?
+                                """,
                         fixtures.codedTransferCode()
                 )
         );
@@ -770,12 +770,12 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transaction_type = 'YIELD'
-                          AND performed_by_system = FALSE
-                          AND performed_by_user_id = ?
-                        """,
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transaction_type = 'YIELD'
+                                  AND performed_by_system = FALSE
+                                  AND performed_by_user_id = ?
+                                """,
                         fixtures.yieldActorId()
                 )
         );
@@ -796,14 +796,14 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transaction_type IN (
-                            'TRANSFER_SENT',
-                            'TRANSFER_RECEIVED'
-                        )
-                          AND transfer_code IS NULL
-                        """
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transaction_type IN (
+                                    'TRANSFER_SENT',
+                                    'TRANSFER_RECEIVED'
+                                )
+                                  AND transfer_code IS NULL
+                                """
                 )
         );
 
@@ -813,10 +813,10 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transfer_code = ?
-                        """,
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transfer_code = ?
+                                """,
                         fixtures.codedTransferCode()
                 )
         );
@@ -827,12 +827,12 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transaction_type = 'YIELD'
-                          AND performed_by_system = TRUE
-                          AND performed_by_user_id IS NULL
-                        """
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transaction_type = 'YIELD'
+                                  AND performed_by_system = TRUE
+                                  AND performed_by_user_id IS NULL
+                                """
                 )
         );
 
@@ -842,12 +842,12 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transaction_type = 'DEPOSIT'
-                          AND performed_by_system = FALSE
-                          AND performed_by_user_id = ?
-                        """,
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transaction_type = 'DEPOSIT'
+                                  AND performed_by_system = FALSE
+                                  AND performed_by_user_id = ?
+                                """,
                         fixtures.humanUserId()
                 )
         );
@@ -858,10 +858,10 @@ class TransactionMigrationCompatibilityTests {
                 queryBoolean(
                         connection,
                         """
-                        SELECT convalidated
-                        FROM pg_constraint
-                        WHERE conname = 'ck_transactions_transfer_code'
-                        """
+                                SELECT convalidated
+                                FROM pg_constraint
+                                WHERE conname = 'ck_transactions_transfer_code'
+                                """
                 )
         );
 
@@ -871,10 +871,10 @@ class TransactionMigrationCompatibilityTests {
                 queryBoolean(
                         connection,
                         """
-                        SELECT convalidated
-                        FROM pg_constraint
-                        WHERE conname = 'ck_transactions_actor'
-                        """
+                                SELECT convalidated
+                                FROM pg_constraint
+                                WHERE conname = 'ck_transactions_actor'
+                                """
                 )
         );
 
@@ -884,11 +884,11 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM pg_indexes
-                        WHERE schemaname = 'public'
-                          AND indexname = 'uk_transactions_transfer_code_type'
-                        """
+                                SELECT COUNT(*)
+                                FROM pg_indexes
+                                WHERE schemaname = 'public'
+                                  AND indexname = 'uk_transactions_transfer_code_type'
+                                """
                 )
         );
 
@@ -898,16 +898,16 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM pg_trigger
-                        WHERE NOT tgisinternal
-                          AND tgname IN (
-                              'ct_transactions_transfer_pair',
-                              'tr_transactions_yield_savings_account',
-                              'tr_savings_accounts_protect_yield_transactions',
-                              'tr_accounts_protect_yield_transactions'
-                          )
-                        """
+                                SELECT COUNT(*)
+                                FROM pg_trigger
+                                WHERE NOT tgisinternal
+                                  AND tgname IN (
+                                      'ct_transactions_transfer_pair',
+                                      'tr_transactions_yield_savings_account',
+                                      'tr_savings_accounts_protect_yield_transactions',
+                                      'tr_accounts_protect_yield_transactions'
+                                  )
+                                """
                 )
         );
 
@@ -917,11 +917,11 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.flyway_schema_history
-                        WHERE version = '25'
-                          AND success = TRUE
-                        """
+                                SELECT COUNT(*)
+                                FROM public.flyway_schema_history
+                                WHERE version = '25'
+                                  AND success = TRUE
+                                """
                 )
         );
     }
@@ -935,18 +935,22 @@ class TransactionMigrationCompatibilityTests {
             LegacyFixtures fixtures
     ) throws SQLException {
 
-        // The historical yield must retain its original attribution.
+
+        // The historical yield on the savings account must retain
+        // its original attribution.
         assertEquals(
                 1L,
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transaction_type = 'YIELD'
-                          AND performed_by_system = FALSE
-                          AND performed_by_user_id = ?
-                        """,
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transaction_type = 'YIELD'
+                                  AND account_id = ?
+                                  AND performed_by_system = FALSE
+                                  AND performed_by_user_id = ?
+                                """,
+                        fixtures.savingsAccountId(),
                         fixtures.yieldActorId()
                 )
         );
@@ -957,14 +961,14 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transaction_type IN (
-                            'TRANSFER_SENT',
-                            'TRANSFER_RECEIVED'
-                        )
-                          AND transfer_code IS NULL
-                        """
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transaction_type IN (
+                                    'TRANSFER_SENT',
+                                    'TRANSFER_RECEIVED'
+                                )
+                                  AND transfer_code IS NULL
+                                """
                 )
         );
 
@@ -974,10 +978,10 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.transactions
-                        WHERE transfer_code = ?
-                        """,
+                                SELECT COUNT(*)
+                                FROM public.transactions
+                                WHERE transfer_code = ?
+                                """,
                         fixtures.codedTransferCode()
                 )
         );
@@ -988,13 +992,13 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM pg_constraint
-                        WHERE conname IN (
-                            'ck_transactions_amount_max',
-                            'ck_transactions_transfer_code'
-                        )
-                        """
+                                SELECT COUNT(*)
+                                FROM pg_constraint
+                                WHERE conname IN (
+                                    'ck_transactions_amount_max',
+                                    'ck_transactions_transfer_code'
+                                )
+                                """
                 )
         );
 
@@ -1004,11 +1008,11 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM pg_indexes
-                        WHERE schemaname = 'public'
-                          AND indexname = 'uk_transactions_transfer_code_type'
-                        """
+                                SELECT COUNT(*)
+                                FROM pg_indexes
+                                WHERE schemaname = 'public'
+                                  AND indexname = 'uk_transactions_transfer_code_type'
+                                """
                 )
         );
 
@@ -1018,16 +1022,16 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM pg_trigger
-                        WHERE NOT tgisinternal
-                          AND tgname IN (
-                              'ct_transactions_transfer_pair',
-                              'tr_transactions_yield_savings_account',
-                              'tr_savings_accounts_protect_yield_transactions',
-                              'tr_accounts_protect_yield_transactions'
-                          )
-                        """
+                                SELECT COUNT(*)
+                                FROM pg_trigger
+                                WHERE NOT tgisinternal
+                                  AND tgname IN (
+                                      'ct_transactions_transfer_pair',
+                                      'tr_transactions_yield_savings_account',
+                                      'tr_savings_accounts_protect_yield_transactions',
+                                      'tr_accounts_protect_yield_transactions'
+                                  )
+                                """
                 )
         );
 
@@ -1037,11 +1041,11 @@ class TransactionMigrationCompatibilityTests {
                 queryLong(
                         connection,
                         """
-                        SELECT COUNT(*)
-                        FROM public.flyway_schema_history
-                        WHERE version = '25'
-                          AND success = TRUE
-                        """
+                                SELECT COUNT(*)
+                                FROM public.flyway_schema_history
+                                WHERE version = '25'
+                                  AND success = TRUE
+                                """
                 )
         );
     }

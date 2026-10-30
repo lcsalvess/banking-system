@@ -480,6 +480,7 @@ class TransactionConcurrencyTests {
     @DisplayName("Historical balance reconstruction")
     class HistoricalBalanceReconstruction {
 
+
         @Test
         @DisplayName("Should reconstruct the balance at the start of a day")
         void shouldCalculateBalanceAtStartOfDay() {
@@ -490,6 +491,14 @@ class TransactionConcurrencyTests {
 
             UUID outgoingTransferCode = UUID.randomUUID();
             UUID incomingTransferCode = UUID.randomUUID();
+
+            // Counterpart of the outgoing transfer from the savings account.
+            CheckingAccount outgoingCounterparty =
+                    createCheckingAccount("0.00");
+
+            // Counterpart of the incoming transfer to the savings account.
+            CheckingAccount incomingCounterparty =
+                    createCheckingAccount("30.00");
 
             transactionRepository.saveAllAndFlush(List.of(
                     Transaction.create(
@@ -508,6 +517,8 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("90.00")
                     ),
+
+                    // Transfer sent by the savings account.
                     Transaction.createTransfer(
                             TransactionType.TRANSFER_SENT,
                             new BigDecimal("20.00"),
@@ -517,6 +528,29 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("70.00")
                     ),
+
+                    // Matching transfer received by another account.
+                    Transaction.createTransfer(
+                            TransactionType.TRANSFER_RECEIVED,
+                            new BigDecimal("20.00"),
+                            atSaoPaulo(LocalDate.of(2026, 1, 12), 10, 0),
+                            outgoingCounterparty,
+                            outgoingTransferCode,
+                            actor,
+                            new BigDecimal("20.00")
+                    ),
+
+                    // Opening deposit for the account sending the next transfer.
+                    Transaction.create(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("30.00"),
+                            atSaoPaulo(LocalDate.of(2026, 1, 10), 9, 0),
+                            incomingCounterparty,
+                            actor,
+                            new BigDecimal("30.00")
+                    ),
+
+                    // Transfer received by the savings account.
                     Transaction.createTransfer(
                             TransactionType.TRANSFER_RECEIVED,
                             new BigDecimal("30.00"),
@@ -526,6 +560,18 @@ class TransactionConcurrencyTests {
                             actor,
                             new BigDecimal("100.00")
                     ),
+
+                    // Matching transfer sent by another account.
+                    Transaction.createTransfer(
+                            TransactionType.TRANSFER_SENT,
+                            new BigDecimal("30.00"),
+                            atSaoPaulo(LocalDate.of(2026, 1, 13), 10, 0),
+                            incomingCounterparty,
+                            incomingTransferCode,
+                            actor,
+                            BigDecimal.ZERO
+                    ),
+
                     Transaction.createSystemYield(
                             new BigDecimal("2.50"),
                             atSaoPaulo(LocalDate.of(2026, 1, 16), 0, 5),

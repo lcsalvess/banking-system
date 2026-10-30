@@ -103,6 +103,7 @@ class TransactionIdempotencyIntegrationTests {
     private int clientSequence;
     private User testUser;
 
+
     @BeforeEach
     void setUp() {
         clearIdempotencyRequests();
@@ -123,6 +124,9 @@ class TransactionIdempotencyIntegrationTests {
                         Role.EMPLOYEE
                 )
         );
+
+        when(currentUserService.getCurrentUser()).thenReturn(testUser);
+        when(currentUserService.getUsername()).thenReturn(testUser.getUsername());
     }
 
     @AfterEach

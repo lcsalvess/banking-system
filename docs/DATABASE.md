@@ -62,7 +62,21 @@
   V6 was configured for UTC; the current database timezone does not establish the historical session timezone. The
   migration also restores `CURRENT_TIMESTAMP` defaults for new `audit_events` and `transaction_idempotency_requests`
   records.
-- Schema changes must be added as new versioned migrations (`V25__description.sql`, and so on). Migrations that were
+- `V25__enforce_transaction_row_integrity.sql` strengthens transaction
+  integrity at the database level. It adds `ck_transactions_amount_max`
+  to enforce the maximum transaction amount and
+  `ck_transactions_transfer_code` to require a transfer code for
+  `TRANSFER_SENT` and `TRANSFER_RECEIVED` transactions while rejecting
+  transfer codes on other transaction types. Both check constraints
+  are added as `NOT VALID`, preserving existing rows while enforcing
+  the rules for new or updated records. It also creates the partial
+  unique index `uk_transactions_transfer_code_type` to prevent duplicate
+  transfer directions for the same transfer code. Finally, it reattributes
+  legacy yields performed by `system_migration` as system-generated
+  transactions and strengthens `ck_transactions_actor`: yields must be
+  attributed to the system, while all other transaction types must
+  reference a user.
+- Schema changes must be added as new versioned migrations (`V26__description.sql`, and so on). Migrations that were
   already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database
   privileges; do not edit them. Changes to the runtime role's privilege policy go in
   `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
@@ -151,10 +165,12 @@ The two-role behavior is verified in CI by `LeastPrivilegeSmokeTests`, which mig
 - Application timestamps migrated by V24 use `TIMESTAMP(6) WITH TIME ZONE` in PostgreSQL and `Instant` in Java, with
   microsecond precision. Business dates such as `yield_date` remain date-only values and must not be treated as
   timestamps.
-- Check constraints in the database enforce a non-negative account balance, a positive transaction amount, and the
-  allowed values of state, role, account type, account status, and transaction type.
-- Two partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type
-  per client) and `uk_transactions_daily_yield` (one yield per account per reference date).
+- Check constraints in the database enforce a non-negative account balance, a positive transaction amount within the
+  maximum allowed value (`9999999999999.99`), and the allowed values of state, role, account type, account status, and
+  transaction type.
+- Three partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type
+  per client), `uk_transactions_daily_yield` (one yield per account per reference date), and
+  `uk_transactions_transfer_code_type` (at most one transaction per transfer direction for each transfer code).
 - `audit_events` has indexes for the audit query filters. Each one ends with the same sort keys as the default listing
   (`created_at DESC, id DESC`), so the first page is read straight from the index: `idx_audit_events_created_at`,
   `idx_audit_events_event_type_created_at`, and `idx_audit_events_outcome_created_at`.
@@ -166,7 +182,14 @@ The two-role behavior is verified in CI by `LeastPrivilegeSmokeTests`, which mig
   within the Java application code. Each name must match a constraint or index defined by a Flyway migration.
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).
 - `Transaction` also has a `transfer_code` column (UUID, nullable, not updatable). It is filled only for `TRANSFER_SENT`
-  and `TRANSFER_RECEIVED` and holds the same value in both rows of a transfer.
+  and `TRANSFER_RECEIVED`, and both rows of a transfer share the same value. The `ck_transactions_transfer_code` check
+  constraint requires a non-null value for transfer transactions and rejects it for other transaction types.
+  The `uk_transactions_transfer_code_type` partial unique index prevents duplicate transactions of the same direction
+  for a given transfer code. These database guarantees do not require both transfer directions to exist.
+- The `ck_transactions_actor` check constraint enforces transaction actor attribution. `YIELD` transactions must have
+  `performed_by_system = TRUE` and `performed_by_user_id = NULL`. All other transaction types must have
+  `performed_by_system = FALSE` and a non-null `performed_by_user_id`. During V25, legacy yield transactions attributed
+  to `system_migration` were reclassified as system-generated transactions.
 - Concurrency is handled with pessimistic locking. `AccountRepository.lockIdByAccountNumber` executes a native
   `SELECT ... FOR UPDATE` against the base `accounts` table, and `AccountService` loads the corresponding polymorphic
   entity after acquiring the lock. Account locking methods require an existing transaction (`Propagation.MANDATORY`), so

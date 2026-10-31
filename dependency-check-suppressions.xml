@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd
+                                  https://dependency-check.github.io/DependencyCheck/dependency-suppression.1.4.xsd">
+
+    <suppress until="2027-01-31Z">
+        <notes><![CDATA[
+            False positive for Spring Security 7.1.2.
+
+            CVE-2026-47842 affects Spring Security 7.1.0 only.
+            The vulnerability was fixed in version 7.1.1.
+            Spring Security 7.1.2 includes the fix.
+
+            Re-evaluate when updating the resolved dependency version.
+        ]]></notes>
+        <packageUrl>pkg:maven/org.springframework.security/spring-security-crypto@7.1.2</packageUrl>
+        <cve>CVE-2026-47842</cve>
+    </suppress>
+
+    <suppress until="2027-01-31Z">
+        <notes><![CDATA[
+            False positive for Spring Security 7.1.2.
+
+            CVE-2026-47838 affects previous Spring Security 5.x and 6.x
+            releases. Spring Security 7.1.x is not listed as affected
+            by the official vendor advisory.
+
+            Re-evaluate when updating the resolved dependency version.
+        ]]></notes>
+        <packageUrl>pkg:maven/org.springframework.security/spring-security-web@7.1.2</packageUrl>
+        <cve>CVE-2026-47838</cve>
+    </suppress>
+
+</suppressions>

@@ -14,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -29,6 +30,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * <p>Os testes comuns rodam com um usuário dono de tudo, então um grant
  * faltando (como o UPDATE em checking_accounts) passaria despercebido no CI.
+ *
+ * <p>Também confirma que os triggers append-only do ledger (V27) existem e
+ * estão habilitados, porque privilégios não protegem o dono do schema.
  *
  * <p>Não usa o contexto do Spring. É ignorado quando as variáveis abaixo não
  * estão definidas; o job {@code least-privilege} do CI as define.
@@ -233,6 +237,39 @@ class LeastPrivilegeSmokeTests {
         );
 
         assertEquals(PERMISSION_DENIED, exception.getSQLState());
+    }
+
+    @Test
+    @DisplayName("Ledger append-only triggers exist and are enabled")
+    void shouldKeepLedgerTriggersEnabled() throws SQLException {
+        String sql = """
+                SELECT tgname
+                FROM pg_trigger
+                WHERE tgrelid = 'public.transactions'::regclass
+                  AND NOT tgisinternal
+                  AND tgenabled = 'O'
+                """;
+
+        List<String> enabled = new ArrayList<>();
+
+        try (Connection connection = DriverManager.getConnection(
+                url, migratorUser, migratorPassword
+        );
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+
+            while (resultSet.next()) {
+                enabled.add(resultSet.getString(1));
+            }
+        }
+
+        assertTrue(
+                enabled.containsAll(List.of(
+                        "trg_transactions_no_update_delete",
+                        "trg_transactions_no_truncate"
+                )),
+                () -> "Missing or disabled ledger triggers. Enabled: " + enabled
+        );
     }
 
     private static boolean appHasTablePrivilege(

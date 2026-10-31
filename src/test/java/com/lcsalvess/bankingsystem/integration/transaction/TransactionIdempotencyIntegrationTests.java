@@ -16,7 +16,6 @@ import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceExce
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
 import com.lcsalvess.bankingsystem.repository.AddressRepository;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
-import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
@@ -24,6 +23,7 @@ import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
+import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -74,7 +74,7 @@ class TransactionIdempotencyIntegrationTests {
     private TransactionService transactionService;
 
     @Autowired
-    private TransactionRepository transactionRepository;
+    private LedgerTestCleaner ledgerTestCleaner;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -107,7 +107,7 @@ class TransactionIdempotencyIntegrationTests {
     void setUp() {
         clearIdempotencyRequests();
 
-        transactionRepository.deleteAll();
+        ledgerTestCleaner.deleteAllTransactions();
         accountRepository.deleteAll();
         clientRepository.deleteAll();
         addressRepository.deleteAll();

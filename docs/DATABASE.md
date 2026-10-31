@@ -123,12 +123,14 @@ are never stored in the script. The table and sequence grants below are applied 
 It is the single source of truth for the runtime role's privileges: because it is re-applied on each startup, a grant
 cannot be silently lost, and any manual change to the role's privileges is reverted on the next startup.
 
-For upgrades of an **existing database at V19**, if its objects were created by an earlier database user, run
+For upgrades of an **existing database at V19 or later**, if its objects were created by an earlier database user, run
 `scripts/db/transfer-existing-ownership.sql` as a PostgreSQL administrator against the application database after the
-bootstrap script and before V20 is applied. It transfers ownership of existing tables, sequences, and the audit trigger
-function to `banking_migrator`. The script deliberately rejects the test database and an upgrade where V20 is already
-recorded as successful. Fresh databases do not need this script because Flyway creates their objects as
-`banking_migrator`. See the [Development Guide](DEVELOPMENT.md#configuration) for the exact procedure.
+bootstrap script and before starting the new application version. It transfers ownership of existing tables, sequences,
+and applicable trigger functions to `banking_migrator`, including the ledger trigger function when V27 has already been
+applied. The script supports databases both before and after V20/V21, including recovery scenarios where those
+migrations were recorded as successful but the objects are still owned by a previous database user. Fresh databases
+do not need this script because Flyway creates their objects as `banking_migrator`. See the
+[Development Guide](DEVELOPMENT.md#configuration) for the exact procedure.
 
 | Table                              | SELECT | INSERT | UPDATE                                                                                       | DELETE |
 |------------------------------------|:------:|:------:|----------------------------------------------------------------------------------------------|:------:|

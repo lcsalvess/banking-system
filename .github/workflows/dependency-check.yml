@@ -47,6 +47,9 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+          server-id: sonatype-guide
+          server-username-env-var: GITHUB_ACTOR
+          server-password-env-var: SONATYPE_GUIDE_PAT
 
       - name: Get UTC date for cache key
         id: cache-date
@@ -68,6 +71,7 @@ jobs:
           org.owasp:dependency-check-maven:13.0.0:check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          SONATYPE_GUIDE_PAT: ${{ secrets.SONATYPE_GUIDE_PAT }}
 
       - name: Save updated Dependency-Check database
         if: success() && steps.odc-cache-restore.outputs.cache-hit != 'true'

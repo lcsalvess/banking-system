@@ -359,6 +359,10 @@
                     <dataDirectory>${user.home}/.dependency-check-data</dataDirectory>
 
                     <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+                    <ossIndexAnalyzerUrl>
+                        https://api.guide.sonatype.com
+                    </ossIndexAnalyzerUrl>
+                    <ossIndexServerId>sonatype-guide</ossIndexServerId>
 
                     <formats>
                         <format>HTML</format>

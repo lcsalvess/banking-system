@@ -88,10 +88,14 @@
   unchanged. The update is conditional: if `system_migration` is absent, as can happen in a test database after
   integration-test fixture cleanup, the migration affects zero rows and completes successfully.
 
-- Flyway connections explicitly initialize their session timezone to `America/Sao_Paulo` through
-  `spring.flyway.init-sqls`, configured in `application.properties`. This makes SQL migration timestamp handling
-  independent of the PostgreSQL server and JVM default timezone settings. The setting is inherited by the `test`
-  profile unless explicitly overridden. Migrations that use `CURRENT_TIMESTAMP` with timezone-naive columns must
+- Flyway connections explicitly initialize their session timezone to
+  `America/Sao_Paulo` through the SQL callback
+  `afterConnect.sql`, located in `db/migration`. The callback is
+  automatically discovered by Flyway configurations that include this
+  location, including Spring Boot-managed connections and programmatically
+  configured instances. This makes SQL migration timestamp handling
+  independent of the PostgreSQL server and JVM default timezone settings.
+  Migrations that use `CURRENT_TIMESTAMP` with timezone-naive columns must
   follow this explicit session-timezone convention.
 
 - Schema changes must be added as new versioned migrations (`V27__description.sql`, and so on). Migrations that were

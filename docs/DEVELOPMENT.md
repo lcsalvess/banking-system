@@ -78,23 +78,22 @@ The application and Flyway use separate database credentials in the `local` and 
 - `DB_USERNAME` and `DB_PASSWORD` identify the runtime database user (`banking_app`). This user performs application operations and should receive only the table and sequence privileges required by the application. It should not own database objects or have privileges to change the database schema.
 - `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD` identify the Flyway migration user (`banking_migrator`). This user applies schema migrations and owns the database objects managed by Flyway.
 
-Before starting the application in `local` or `prod`, provision the roles and schema access with `scripts/db/bootstrap-roles.sql`, set both role passwords securely, and configure all four database environment variables. After each migration run, Flyway executes the callback `db/callback/afterMigrate__apply_runtime_privileges.sql` as `banking_migrator` to configure the runtime role's table, sequence, and default privileges. If Flyway connects as any other user, the callback fails the startup with an explicit error: verify `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD`. The `test` profile does not load this callback.
+Before starting the application in `local` or `prod`, provision the roles and schema access with `scripts/db/bootstrap-roles.sql`, set both role passwords securely, and configure all four database environment variables. After each migration run, Flyway executes the callback `db/callback/afterMigrate__apply_runtime_privileges.sql` as `banking_migrator` to configure the runtime role's table, sequence, and default privileges. If Flyway connects as any other user, the callback fails the startup with an explicit error: verify `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD`. The `test` profile does not load this privilege callback.
 
 #### Flyway session timezone
 
-Flyway connections managed by Spring Boot explicitly initialize their session timezone to `America/Sao_Paulo` through the following property in `application.properties`:
+Flyway connections explicitly initialize their session timezone to `America/Sao_Paulo` through the SQL callback `afterConnect.sql`, located in `src/main/resources/db/migration`:
 
-```properties
-spring.flyway.init-sqls=SET TIME ZONE 'America/Sao_Paulo'
+```sql
+-- Initialize every Flyway connection with the business timezone.
+SET TIME ZONE 'America/Sao_Paulo';
 ```
 
-This initialization ensures that SQL migrations use a consistent session timezone, independently of the PostgreSQL server and JVM default timezone configurations.
+Because `callbackLocations` is not explicitly configured, Flyway automatically discovers callbacks in its configured migration locations. All Flyway configurations in this project include `classpath:db/migration`, allowing both Spring Boot-managed and programmatically configured instances to discover this callback.
 
-The property is inherited by the `local`, `prod`, and `test` profiles unless explicitly overridden. The test profile changes the Flyway database credentials and locations, but retains the timezone initialization configured in the main application properties.
+This ensures consistent SQL migration timestamp handling independently of the PostgreSQL server and JVM default timezone settings.
 
 Migrations that use `CURRENT_TIMESTAMP` with `TIMESTAMP WITHOUT TIME ZONE` columns, or that interpret legacy timezone-naive timestamps, must follow this explicit session-timezone convention.
-
-This Spring Boot property applies to Flyway instances configured through Spring Boot. Any Flyway instance created programmatically using `Flyway.configure()` must configure the same initialization SQL explicitly through `.initSql("SET TIME ZONE 'America/Sao_Paulo'")`. This is necessary to keep independently configured migration executions consistent with the application's timezone convention.
 
 Do not rely on the PostgreSQL server timezone or the JVM default timezone as an implicit substitute for this configuration.
 
@@ -178,7 +177,7 @@ For request examples, see the [API reference](API.md).
 
 The test suite runs against PostgreSQL using the `test` profile and the `banking_system_test` database. Flyway applies the same migrations used by the application, and Hibernate validates the resulting schema.
 
-The Spring Boot-managed Flyway instance in the `test` profile inherits the explicit `America/Sao_Paulo` session timezone initialization from `application.properties`.
+The Spring Boot-managed Flyway instance in the `test` profile includes `classpath:db/migration`, allowing Flyway to discover `afterConnect.sql`. Consequently, test migrations use the same explicit `America/Sao_Paulo` session timezone.
 
 For a fresh local setup, create a dedicated database role for tests and make it the owner of `banking_system_test`. Run the following commands as a PostgreSQL administrator, replacing the example password with a secure local value:
 
@@ -189,11 +188,11 @@ ALTER DATABASE banking_system_test OWNER TO banking_test;
 
 Set `DB_USERNAME=banking_test` and `DB_PASSWORD` to the configured password when running tests. The `test` profile uses these credentials for both the application datasource and Flyway. The role must be able to apply migrations and clean up integration-test fixtures. Do not use the runtime `banking_app` credentials, whose production-style grants intentionally prohibit physical deletion from business tables and transaction history.
 
-The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The privilege callback is not loaded in the `test` profile, keeping test fixture permissions separate from local and production privileges.
+The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The `afterMigrate__apply_runtime_privileges.sql` privilege callback is not loaded in the `test` profile, keeping test fixture permissions separate from local and production privileges. The `afterConnect.sql` callback remains available through `classpath:db/migration`.
 
 The runtime role's least-privilege grants are verified by `LeastPrivilegeSmokeTests`, which runs only when the `PRIVILEGE_TEST_*` environment variables are set. The `least-privilege` job in GitHub Actions configures them.
 
-`LeastPrivilegeSmokeTests` does not start the Spring application context. It creates Flyway instances programmatically to migrate the privilege-test database and verify the runtime role's permissions. These programmatic Flyway configurations must initialize their sessions with `America/Sao_Paulo`, using `.initSql("SET TIME ZONE 'America/Sao_Paulo'")`, to follow the same convention as the Spring Boot-managed migrations.
+`LeastPrivilegeSmokeTests` does not start the Spring application context. It creates Flyway instances programmatically to migrate the privilege-test database and verify the runtime role's permissions. These configurations include `classpath:db/migration` and do not define separate `callbackLocations`. Therefore, Flyway automatically discovers `afterConnect.sql` and initializes the migration connections with `America/Sao_Paulo`, following the same convention as the Spring Boot-managed migrations.
 
 For local execution, create an empty `banking_privilege_test` database. Run `scripts/db/bootstrap-roles.sql` as a PostgreSQL administrator against that database, then set the passwords for `banking_migrator` and `banking_app` to match the corresponding `PRIVILEGE_TEST_*` environment variables. The smoke test applies the database migrations itself.
 

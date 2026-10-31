@@ -360,6 +360,18 @@
 
                     <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
 
+                    <ossIndexAnalyzerUrl>
+                        https://api.guide.sonatype.com
+                    </ossIndexAnalyzerUrl>
+                    <ossIndexServerId>sonatype-guide</ossIndexServerId>
+
+                    <!-- Suppress verified false positives -->
+                    <suppressionFiles>
+                        <suppressionFile>
+                            ${project.basedir}/dependency-check-suppressions.xml
+                        </suppressionFile>
+                    </suppressionFiles>
+
                     <formats>
                         <format>HTML</format>
                         <format>JSON</format>

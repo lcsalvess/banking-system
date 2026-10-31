@@ -121,6 +121,12 @@
 
                 Swagger UI 5.34.1 updates DOMPurify to 3.4.17,
                 which includes fixes for both vulnerabilities.
+
+                Temporary pin: managed versions win over Springdoc's, so this
+                also blocks newer Springdoc defaults. Remove this entry (and
+                the swagger-ui.version property) as soon as the Swagger UI
+                version resolved by Springdoc is 5.34.1 or later. Check with:
+                ./mvnw dependency:tree -Dincludes=org.webjars:swagger-ui
             -->
             <dependency>
                 <groupId>org.webjars</groupId>
@@ -349,7 +355,10 @@
                 vulnerabilities.
                 Fails the build for vulnerabilities with a CVSS score
                 of 7.0 or higher (High and Critical severity).
-                Scanner errors also fail the build.
+                Scanner errors also fail the build, except remote errors
+                from OSS Index (ossIndexWarnOnlyOnRemoteErrors), which only
+                warn so that a Sonatype outage does not break the scheduled
+                scan. Findings reported by OSS Index still fail the build.
             -->
             <plugin>
                 <groupId>org.owasp</groupId>
@@ -364,6 +373,7 @@
                         https://api.guide.sonatype.com
                     </ossIndexAnalyzerUrl>
                     <ossIndexServerId>sonatype-guide</ossIndexServerId>
+                    <ossIndexWarnOnlyOnRemoteErrors>true</ossIndexWarnOnlyOnRemoteErrors>
 
                     <!-- Suppress verified false positives -->
                     <suppressionFiles>

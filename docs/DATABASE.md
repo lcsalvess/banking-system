@@ -97,8 +97,10 @@
   independent of the PostgreSQL server and JVM default timezone settings.
   Migrations that use `CURRENT_TIMESTAMP` with timezone-naive columns must
   follow this explicit session-timezone convention.
-
-- Schema changes must be added as new versioned migrations (`V27__description.sql`, and so on). Migrations that were
+- `V27__make_transactions_append_only.sql` makes `transactions` append-only for every database role, including the
+  table owner, with `BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers, the same approach V19 uses for
+  `audit_events`. See "Append-only ledger" below.
+- Schema changes must be added as new versioned migrations (`V28__description.sql`, and so on). Migrations that were
   already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database
   privileges; do not edit them. Changes to the runtime role's privilege policy go in
   `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
@@ -159,10 +161,12 @@ requirement. Account operations retain their existing transaction
 boundaries, and transfers continue to acquire account locks in
 deterministic account-number order.
 
-Default privileges for future tables created by `banking_migrator` in `public` grant `banking_app` only `SELECT` and
-`INSERT`; future sequences grant `USAGE` and `SELECT`. A new table whose application workflow requires `UPDATE` or
-`DELETE` must receive those grants explicitly in `afterMigrate__apply_runtime_privileges.sql` (and be added to its
-`REVOKE` list so the policy stays deterministic).
+Objects created later by `banking_migrator` in `public` receive no default privileges for `banking_app`: the callback
+revokes the default table and sequence privileges instead of granting them, which also clears the default grants left
+by earlier versions of the callback. A new table is therefore closed to the runtime role until it is granted
+explicitly in `afterMigrate__apply_runtime_privileges.sql`, together with its entry in the `REVOKE` list so the policy
+stays deterministic. Sequences backing `GENERATED ... AS IDENTITY` columns need no separate grant, because `INSERT` on
+the table is enough; `serial` sequences and standalone sequences (such as `account_number_seq`) do.
 
 The callback fails the startup, instead of skipping, when Flyway is not connected as `banking_migrator`, so a
 misconfigured `local` or `prod` environment cannot run with missing or excess privileges. The `test` profile does not
@@ -212,6 +216,14 @@ The two-role behavior is verified in CI by `LeastPrivilegeSmokeTests`, which mig
   `performed_by_system = TRUE` and `performed_by_user_id = NULL`. All other transaction types must have
   `performed_by_system = FALSE` and a non-null `performed_by_user_id`. During V25, legacy yield transactions attributed
   to `system_migration` were reclassified as system-generated transactions.
+- Append-only ledger. `trg_transactions_no_update_delete` and `trg_transactions_no_truncate` reject `UPDATE`, `DELETE`,
+  and `TRUNCATE` on `transactions` for every role, so an accidental statement by the table owner or an administrator
+  cannot rewrite financial history. A superuser can still bypass triggers deliberately. A migration that must correct
+  ledger rows has to say so explicitly and restore the protection before it ends:
+  `ALTER TABLE transactions DISABLE TRIGGER trg_transactions_no_update_delete;`, the corrective statements, then
+  `ALTER TABLE transactions ENABLE TRIGGER trg_transactions_no_update_delete;`. Flyway runs each migration in a
+  transaction, so a failure rolls the `DISABLE` back too. Tests that need to remove ledger rows use
+  `LedgerTestCleaner`, which does the same inside one transaction.
 - Concurrency is handled with pessimistic locking. `AccountRepository.lockIdByAccountNumber` executes a native
   `SELECT ... FOR UPDATE` against the base `accounts` table, and `AccountService` loads the corresponding polymorphic
   entity after acquiring the lock. Account locking methods require an existing transaction (`Propagation.MANDATORY`), so

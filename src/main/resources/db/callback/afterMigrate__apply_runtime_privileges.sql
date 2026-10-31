@@ -111,14 +111,13 @@ $$
             public.users_id_seq
             TO banking_app;
 
-        -- Defaults for future objects created by banking_migrator in public.
+        -- Future objects get no default privileges for banking_app, so a new
+        -- table or sequence is closed to the runtime role until it is granted
+        -- explicitly above. These REVOKEs also clear any default ACL left by
+        -- earlier versions of this callback, which granted SELECT and INSERT.
         ALTER DEFAULT PRIVILEGES FOR ROLE banking_migrator IN SCHEMA public
             REVOKE ALL PRIVILEGES ON TABLES FROM banking_app;
         ALTER DEFAULT PRIVILEGES FOR ROLE banking_migrator IN SCHEMA public
-            GRANT SELECT, INSERT ON TABLES TO banking_app;
-        ALTER DEFAULT PRIVILEGES FOR ROLE banking_migrator IN SCHEMA public
             REVOKE ALL PRIVILEGES ON SEQUENCES FROM banking_app;
-        ALTER DEFAULT PRIVILEGES FOR ROLE banking_migrator IN SCHEMA public
-            GRANT USAGE, SELECT ON SEQUENCES TO banking_app;
     END
 $$;

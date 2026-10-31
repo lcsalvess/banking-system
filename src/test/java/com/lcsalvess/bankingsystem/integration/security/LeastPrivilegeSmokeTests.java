@@ -58,6 +58,7 @@ class LeastPrivilegeSmokeTests {
         Flyway.configure()
                 .dataSource(url, migratorUser, migratorPassword)
                 .locations("classpath:db/migration", "classpath:db/callback")
+                .initSql("SET TIME ZONE 'America/Sao_Paulo'")
                 .load()
                 .migrate();
     }
@@ -219,6 +220,7 @@ class LeastPrivilegeSmokeTests {
         Flyway.configure()
                 .dataSource(url, migratorUser, migratorPassword)
                 .locations("classpath:db/migration", "classpath:db/callback")
+                .initSql("SET TIME ZONE 'America/Sao_Paulo'")
                 .load()
                 .migrate();
 

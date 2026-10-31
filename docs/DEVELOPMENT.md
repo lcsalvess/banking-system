@@ -46,11 +46,11 @@ Alternatively, connect to the existing application database as an administrator 
 
 Set the `SPRING_PROFILES_ACTIVE` environment variable to select the active profile.
 
-| Profile | Database                                                                  | Swagger UI / OpenAPI | Admin bootstrap required |
-|---------|---------------------------------------------------------------------------|----------------------|--------------------------|
-| `local` | `DB_URL` is required                                                      | Enabled              | No                       |
-| `prod`  | `DB_URL` is required                                                      | Disabled             | Yes                      |
-| `test`  | `jdbc:postgresql://localhost:5432/banking_system_test`                    | Disabled             | No                       |
+| Profile | Database                                               | Swagger UI / OpenAPI | Admin bootstrap required |
+|---------|--------------------------------------------------------|----------------------|--------------------------|
+| `local` | `DB_URL` is required                                   | Enabled              | No                       |
+| `prod`  | `DB_URL` is required                                   | Disabled             | Yes                      |
+| `test`  | `jdbc:postgresql://localhost:5432/banking_system_test` | Disabled             | No                       |
 
 Without an active profile, `DB_URL` is required, API documentation is disabled, and the initial administrator is required at startup, as in the `prod` profile. The `app.admin.bootstrap.required` property defaults to `true`; only `local` and `test` disable this requirement.
 
@@ -58,20 +58,20 @@ Use the `local` profile for development.
 
 ### 3. Configure environment variables
 
-| Variable                 | Required                          | Description                                                                               |
-|--------------------------|-----------------------------------|-------------------------------------------------------------------------------------------|
-| `SPRING_PROFILES_ACTIVE` | No                                | Active profile (`local`, `prod`, or `test`)                                               |
-| `DB_URL`                 | Yes, except in `test`             | JDBC URL of the PostgreSQL database                                                       |
-| `DB_USERNAME`            | Yes                               | PostgreSQL username for the application datasource                                        |
-| `DB_PASSWORD`            | Yes                               | Password for the application datasource user                                              |
-| `DB_MIGRATOR_USERNAME`   | Yes, except in `test`             | PostgreSQL username used by Flyway to apply database migrations                           |
-| `DB_MIGRATOR_PASSWORD`   | Yes, except in `test`             | Password for the Flyway migration user                                                    |
-| `JWT_SECRET`             | Yes                               | Base64-encoded secret used to sign JWTs, with at least 256 bits of key material           |
-| `ADMIN_USERNAME`         | No                                | Username of the initial administrator                                                     |
-| `ADMIN_EMAIL`            | No                                | Email address of the initial administrator                                                |
-| `ADMIN_PASSWORD`         | No                                | Password of the initial administrator                                                     |
-| `PROXY_IP_HEADER`        | No                                | Header with the original client IP behind a reverse proxy (for example `X-Forwarded-For`) |
-| `TRUSTED_PROXIES`        | No                                | Regular expression with the IPs of the trusted proxies; without it the header is ignored  |
+| Variable                 | Required              | Description                                                                               |
+|--------------------------|-----------------------|-------------------------------------------------------------------------------------------|
+| `SPRING_PROFILES_ACTIVE` | No                    | Active profile (`local`, `prod`, or `test`)                                               |
+| `DB_URL`                 | Yes, except in `test` | JDBC URL of the PostgreSQL database                                                       |
+| `DB_USERNAME`            | Yes                   | PostgreSQL username for the application datasource                                        |
+| `DB_PASSWORD`            | Yes                   | Password for the application datasource user                                              |
+| `DB_MIGRATOR_USERNAME`   | Yes, except in `test` | PostgreSQL username used by Flyway to apply database migrations                           |
+| `DB_MIGRATOR_PASSWORD`   | Yes, except in `test` | Password for the Flyway migration user                                                    |
+| `JWT_SECRET`             | Yes                   | Base64-encoded secret used to sign JWTs, with at least 256 bits of key material           |
+| `ADMIN_USERNAME`         | No                    | Username of the initial administrator                                                     |
+| `ADMIN_EMAIL`            | No                    | Email address of the initial administrator                                                |
+| `ADMIN_PASSWORD`         | No                    | Password of the initial administrator                                                     |
+| `PROXY_IP_HEADER`        | No                    | Header with the original client IP behind a reverse proxy (for example `X-Forwarded-For`) |
+| `TRUSTED_PROXIES`        | No                    | Regular expression with the IPs of the trusted proxies; without it the header is ignored  |
 
 The application and Flyway use separate database credentials in the `local` and `prod` profiles.
 
@@ -79,6 +79,24 @@ The application and Flyway use separate database credentials in the `local` and 
 - `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD` identify the Flyway migration user (`banking_migrator`). This user applies schema migrations and owns the database objects managed by Flyway.
 
 Before starting the application in `local` or `prod`, provision the roles and schema access with `scripts/db/bootstrap-roles.sql`, set both role passwords securely, and configure all four database environment variables. After each migration run, Flyway executes the callback `db/callback/afterMigrate__apply_runtime_privileges.sql` as `banking_migrator` to configure the runtime role's table, sequence, and default privileges. If Flyway connects as any other user, the callback fails the startup with an explicit error: verify `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD`. The `test` profile does not load this callback.
+
+#### Flyway session timezone
+
+Flyway connections managed by Spring Boot explicitly initialize their session timezone to `America/Sao_Paulo` through the following property in `application.properties`:
+
+```properties
+spring.flyway.init-sqls=SET TIME ZONE 'America/Sao_Paulo'
+```
+
+This initialization ensures that SQL migrations use a consistent session timezone, independently of the PostgreSQL server and JVM default timezone configurations.
+
+The property is inherited by the `local`, `prod`, and `test` profiles unless explicitly overridden. The test profile changes the Flyway database credentials and locations, but retains the timezone initialization configured in the main application properties.
+
+Migrations that use `CURRENT_TIMESTAMP` with `TIMESTAMP WITHOUT TIME ZONE` columns, or that interpret legacy timezone-naive timestamps, must follow this explicit session-timezone convention.
+
+This Spring Boot property applies to Flyway instances configured through Spring Boot. Any Flyway instance created programmatically using `Flyway.configure()` must configure the same initialization SQL explicitly through `.initSql("SET TIME ZONE 'America/Sao_Paulo'")`. This is necessary to keep independently configured migration executions consistent with the application's timezone convention.
+
+Do not rely on the PostgreSQL server timezone or the JVM default timezone as an implicit substitute for this configuration.
 
 Database passwords must be provided through environment variables or the run configuration and must not be committed to source control.
 
@@ -106,13 +124,7 @@ The transaction idempotency cleanup runs daily at 03:30 by default, using the Sp
 
 The retention period is configured by `banking.idempotency.retention-days` and defaults to 7 days. Expired records are also cleaned up asynchronously after application startup, so cleanup missed while the application was offline does not have to wait until the next scheduled run.
 
-Balance reconciliation runs daily at 03:00 by default, using the Spring
-cron expression configured by `banking.reconciliation.cron`. Its time
-zone is `America/Sao_Paulo`. The job checks account balances against
-the latest transaction snapshots and detects breaks in the historical
-balance chain. It is diagnostic only and does not modify balances or
-transaction history. It also runs asynchronously after application
-startup, except in the `test` profile.
+Balance reconciliation runs daily at 03:00 by default, using the Spring cron expression configured by `banking.reconciliation.cron`. Its time zone is `America/Sao_Paulo`. The job checks account balances against the latest transaction snapshots and detects breaks in the historical balance chain. It is diagnostic only and does not modify balances or transaction history. It also runs asynchronously after application startup, except in the `test` profile.
 
 The base URLs for the address lookup providers are defined in `application.properties`:
 
@@ -164,44 +176,26 @@ For request examples, see the [API reference](API.md).
 
 ## Testing
 
-The test suite runs against PostgreSQL using the `test` profile and the
-`banking_system_test` database. Flyway applies the same migrations used
-by the application, and Hibernate validates the resulting schema.
+The test suite runs against PostgreSQL using the `test` profile and the `banking_system_test` database. Flyway applies the same migrations used by the application, and Hibernate validates the resulting schema.
 
-For a fresh local setup, create a dedicated database role for tests and
-make it the owner of `banking_system_test`. Run the following commands
-as a PostgreSQL administrator, replacing the example password with a
-secure local value:
+The Spring Boot-managed Flyway instance in the `test` profile inherits the explicit `America/Sao_Paulo` session timezone initialization from `application.properties`.
+
+For a fresh local setup, create a dedicated database role for tests and make it the owner of `banking_system_test`. Run the following commands as a PostgreSQL administrator, replacing the example password with a secure local value:
 
 ```sql
 CREATE ROLE banking_test LOGIN PASSWORD 'replace-with-a-local-secret';
 ALTER DATABASE banking_system_test OWNER TO banking_test;
 ```
 
-Set `DB_USERNAME=banking_test` and `DB_PASSWORD` to the configured
-password when running tests. The `test` profile uses these credentials
-for both the application datasource and Flyway. The role must be able
-to apply migrations and clean up integration-test fixtures. Do not use
-the runtime `banking_app` credentials, whose production-style grants
-intentionally prohibit physical deletion from business tables and
-transaction history.
+Set `DB_USERNAME=banking_test` and `DB_PASSWORD` to the configured password when running tests. The `test` profile uses these credentials for both the application datasource and Flyway. The role must be able to apply migrations and clean up integration-test fixtures. Do not use the runtime `banking_app` credentials, whose production-style grants intentionally prohibit physical deletion from business tables and transaction history.
 
-The GitHub Actions workflow uses a dedicated `banking_test` user and a
-separate `banking_system_test` database. The privilege callback is not
-loaded in the `test` profile, keeping test fixture permissions separate
-from local and production privileges.
+The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The privilege callback is not loaded in the `test` profile, keeping test fixture permissions separate from local and production privileges.
 
-The runtime role's least-privilege grants are verified by
-`LeastPrivilegeSmokeTests`, which runs only when the
-`PRIVILEGE_TEST_*` environment variables are set. The
-`least-privilege` job in GitHub Actions configures them.
+The runtime role's least-privilege grants are verified by `LeastPrivilegeSmokeTests`, which runs only when the `PRIVILEGE_TEST_*` environment variables are set. The `least-privilege` job in GitHub Actions configures them.
 
-For local execution, create an empty `banking_privilege_test` database.
-Run `scripts/db/bootstrap-roles.sql` as a PostgreSQL administrator
-against that database, then set the passwords for `banking_migrator`
-and `banking_app` to match the corresponding `PRIVILEGE_TEST_*`
-environment variables. The smoke test applies the database migrations
-itself.
+`LeastPrivilegeSmokeTests` does not start the Spring application context. It creates Flyway instances programmatically to migrate the privilege-test database and verify the runtime role's permissions. These programmatic Flyway configurations must initialize their sessions with `America/Sao_Paulo`, using `.initSql("SET TIME ZONE 'America/Sao_Paulo'")`, to follow the same convention as the Spring Boot-managed migrations.
+
+For local execution, create an empty `banking_privilege_test` database. Run `scripts/db/bootstrap-roles.sql` as a PostgreSQL administrator against that database, then set the passwords for `banking_migrator` and `banking_app` to match the corresponding `PRIVILEGE_TEST_*` environment variables. The smoke test applies the database migrations itself.
 
 Run the following command from the repository root:
 

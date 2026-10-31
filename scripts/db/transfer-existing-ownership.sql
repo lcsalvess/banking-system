@@ -80,4 +80,16 @@ ALTER SEQUENCE public.users_id_seq OWNER TO banking_migrator;
 -- The audit triggers call this function; keep its ownership aligned with Flyway.
     ALTER FUNCTION public.audit_events_reject_change() OWNER TO banking_migrator;
 
+-- V27 introduces the ledger trigger function. Older databases may not
+-- have applied V27 yet, so transfer ownership only when the function exists.
+DO
+$$
+    BEGIN
+        IF to_regprocedure('public.transactions_reject_change()') IS NOT NULL THEN
+            EXECUTE
+                'ALTER FUNCTION public.transactions_reject_change() OWNER TO banking_migrator';
+        END IF;
+    END
+$$;
+
 COMMIT;

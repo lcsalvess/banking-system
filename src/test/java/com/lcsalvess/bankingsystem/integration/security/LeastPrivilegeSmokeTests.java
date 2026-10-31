@@ -1,6 +1,9 @@
 package com.lcsalvess.bankingsystem.integration.security;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.callback.Callback;
+import org.flywaydb.core.api.callback.Context;
+import org.flywaydb.core.api.callback.Event;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -8,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -58,6 +62,7 @@ class LeastPrivilegeSmokeTests {
         Flyway.configure()
                 .dataSource(url, migratorUser, migratorPassword)
                 .locations("classpath:db/migration", "classpath:db/callback")
+                .callbacks(timezoneVerificationCallback())
                 .load()
                 .migrate();
     }
@@ -260,5 +265,47 @@ class LeastPrivilegeSmokeTests {
              Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }
+    }
+
+    private static Callback timezoneVerificationCallback() {
+        return new Callback() {
+            @Override
+            public boolean supports(Event event, Context context) {
+                return event == Event.BEFORE_EACH_MIGRATE;
+            }
+
+            @Override
+            public boolean canHandleInTransaction(Event event, Context context) {
+                return true;
+            }
+
+            @Override
+            public void handle(Event event, Context context) {
+                try (Statement statement = context.getConnection().createStatement();
+                     ResultSet resultSet = statement.executeQuery(
+                             "SELECT current_setting('TimeZone')"
+                     )) {
+
+                    assertTrue(resultSet.next());
+
+                    assertEquals(
+                            "America/Sao_Paulo",
+                            resultSet.getString(1),
+                            "Flyway migration connection must use America/Sao_Paulo"
+                    );
+
+                } catch (SQLException exception) {
+                    throw new AssertionError(
+                            "Could not verify Flyway session timezone",
+                            exception
+                    );
+                }
+            }
+
+            @Override
+            public String getCallbackName() {
+                return "TimezoneVerification";
+            }
+        };
     }
 }

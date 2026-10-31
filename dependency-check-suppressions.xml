@@ -32,4 +32,55 @@
         <cve>CVE-2026-47838</cve>
     </suppress>
 
+    <!-- Temporary risk acceptance for DOMPurify bundled with Swagger UI 5.34.0. -->
+    <suppress until="2026-12-01Z">
+        <notes><![CDATA[
+            Temporary risk acceptance — not a false positive.
+
+            Springdoc OpenAPI 3.2.0 resolves Swagger UI WebJar 5.34.0,
+            which bundles DOMPurify 3.4.16.
+
+            DOMPurify 3.4.16 is affected by CVE-2026-116803.
+            The fixed version is 3.4.17.
+
+            Forcing Swagger UI 5.34.1 caused Swagger UI resources
+            to return HTTP 404 in this application. The override
+            was therefore removed to restore compatibility.
+
+            Swagger UI and OpenAPI endpoints are enabled only under
+            the local profile and are not exposed under the prod profile.
+
+            This suppression is temporary and must be reviewed
+            before 2026-12-01. Do not renew without reassessing
+            the dependency upgrade options.
+        ]]></notes>
+        <packageUrl>pkg:javascript/DOMPurify@3.4.16</packageUrl>
+        <cve>CVE-2026-116803</cve>
+    </suppress>
+
+    <suppress until="2026-12-01Z">
+        <notes><![CDATA[
+            Temporary risk acceptance — not a false positive.
+
+            Springdoc OpenAPI 3.2.0 resolves Swagger UI WebJar 5.34.0,
+            which bundles DOMPurify 3.4.16.
+
+            DOMPurify 3.4.16 is affected by CVE-2026-116804.
+            The fixed version is 3.4.17.
+
+            Forcing Swagger UI 5.34.1 caused Swagger UI resources
+            to return HTTP 404 in this application. The override
+            was therefore removed to restore compatibility.
+
+            Swagger UI and OpenAPI endpoints are enabled only under
+            the local profile and are not exposed under the prod profile.
+
+            This suppression is temporary and must be reviewed
+            before 2026-12-01. Do not renew without reassessing
+            the dependency upgrade options.
+        ]]></notes>
+        <packageUrl>pkg:javascript/DOMPurify@3.4.16</packageUrl>
+        <cve>CVE-2026-116804</cve>
+    </suppress>
+
 </suppressions>

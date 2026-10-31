@@ -190,23 +190,25 @@ Set `DB_USERNAME=banking_test` and `DB_PASSWORD` to the configured password when
 
 The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The `afterMigrate__apply_runtime_privileges.sql` privilege callback is not loaded in the `test` profile, keeping test fixture permissions separate from local and production privileges. The `afterConnect.sql` callback remains available through `classpath:db/migration`.
 
-The runtime role's least-privilege grants are verified by `LeastPrivilegeSmokeTests`, which runs only when the `PRIVILEGE_TEST_*` environment variables are set. The `least-privilege` job in GitHub Actions configures them.
+The runtime role's least-privilege grants are verified by `LeastPrivilegeSmokeTests`, and the application flows are exercised under that role by `RuntimePrivilegesEndToEndTests`. Both run only when the `PRIVILEGE_TEST_*` environment variables are set. The `least-privilege` job in GitHub Actions configures them.
 
-`LeastPrivilegeSmokeTests` does not start the Spring application context. It creates Flyway instances programmatically to migrate the privilege-test database and verify the runtime role's permissions. These configurations include `classpath:db/migration` and do not define separate `callbackLocations`. Therefore, Flyway automatically discovers `afterConnect.sql` and initializes the migration connections with `America/Sao_Paulo`, following the same convention as the Spring Boot-managed migrations.
+`LeastPrivilegeSmokeTests` does not start the Spring application context. It creates Flyway instances programmatically to migrate the privilege-test database and verify the runtime role's permissions. These configurations include `classpath:db/migration` and do not define separate `callbackLocations`. Therefore, Flyway automatically discovers `afterConnect.sql` and initializes the migration connections with `America/Sao_Paulo`, following the same convention as the Spring Boot-managed migrations. `RuntimePrivilegesEndToEndTests` starts the full application with the datasource connected as `banking_app` and Flyway as `banking_migrator`.
 
-For local execution, create an empty `banking_privilege_test` database. Run `scripts/db/bootstrap-roles.sql` as a PostgreSQL administrator against that database, then set the passwords for `banking_migrator` and `banking_app` to match the corresponding `PRIVILEGE_TEST_*` environment variables. The smoke test applies the database migrations itself.
+For local execution, create an empty `banking_privilege_test` database. Run `scripts/db/bootstrap-roles.sql` as a PostgreSQL administrator against that database, then set the passwords for `banking_migrator` and `banking_app` to match the corresponding `PRIVILEGE_TEST_*` environment variables. The tests apply the database migrations themselves. `banking_app` has no `DELETE` privilege, so the end-to-end test leaves its fixtures in the database (with identifiers unique per run); use a throwaway database.
 
-Run the following command from the repository root:
+Run the following commands from the repository root, in this order. The smoke test verifies the migrations from an empty database, so it must run before the end-to-end test, which leaves the database migrated:
 
 #### Linux / macOS / Git Bash
 
 ```bash
-PRIVILEGE_TEST_DB_URL=jdbc:postgresql://localhost:5432/banking_privilege_test \
-PRIVILEGE_TEST_MIGRATOR_USER=banking_migrator \
-PRIVILEGE_TEST_MIGRATOR_PASSWORD=... \
-PRIVILEGE_TEST_APP_USER=banking_app \
-PRIVILEGE_TEST_APP_PASSWORD=... \
+export PRIVILEGE_TEST_DB_URL=jdbc:postgresql://localhost:5432/banking_privilege_test
+export PRIVILEGE_TEST_MIGRATOR_USER=banking_migrator
+export PRIVILEGE_TEST_MIGRATOR_PASSWORD=...
+export PRIVILEGE_TEST_APP_USER=banking_app
+export PRIVILEGE_TEST_APP_PASSWORD=...
+
 ./mvnw test -Dtest=LeastPrivilegeSmokeTests
+./mvnw test -Dtest=RuntimePrivilegesEndToEndTests
 ```
 
 ### Running the tests

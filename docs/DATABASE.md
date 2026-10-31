@@ -173,8 +173,12 @@ misconfigured `local` or `prod` environment cannot run with missing or excess pr
 load the `db/callback` location (`spring.flyway.locations`) and runs Flyway as the fixture owner. `V20` and `V21` are
 kept unchanged because Flyway validates the checksums of applied migrations. They remain conditional on
 `banking_migrator`, and the callback supersedes them: it first revokes everything and then re-grants the policy above.
-The two-role behavior is verified in CI by `LeastPrivilegeSmokeTests`, which migrates an empty database as
-`banking_migrator` and checks what `banking_app` can and cannot do.
+The two-role behavior is verified in CI by two classes. `LeastPrivilegeSmokeTests` migrates an empty database as
+`banking_migrator` and checks what `banking_app` can and cannot do, including that new objects are closed by default
+and that the ledger triggers are enabled. `RuntimePrivilegesEndToEndTests` starts the application with the datasource
+connected as `banking_app` and runs the real flows (deposit, withdrawal, transfer, account cancellation, daily yield,
+password change, user deactivation, client and address updates), so a flow that dirties a column outside the policy
+fails with `permission denied` in CI instead of in production.
 
 - Tables use snake_case names, generally plural: `users`, `clients`, `addresses`, `accounts`, `checking_accounts`,
   `savings_accounts`, `transactions`, `transaction_idempotency_requests`, and `audit_events`.

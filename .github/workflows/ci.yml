@@ -137,3 +137,11 @@ jobs:
           ./mvnw --batch-mode --no-transfer-progress test
           -Dtest=LeastPrivilegeSmokeTests
           -Dsurefire.failIfNoSpecifiedTests=false
+
+      # Separate step, after the smoke test: that test verifies the migrations
+      # from an empty database, and the end-to-end test leaves it migrated.
+      - name: Run runtime privileges end-to-end tests
+        run: >-
+          ./mvnw --batch-mode --no-transfer-progress test
+          -Dtest=RuntimePrivilegesEndToEndTests
+          -Dsurefire.failIfNoSpecifiedTests=false

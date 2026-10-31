@@ -39,6 +39,11 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * estão definidas; o job {@code least-privilege} do CI as define.
  * Requer um banco vazio com as roles criadas por
  * {@code scripts/db/bootstrap-roles.sql}.
+ *
+ * <p>Deve rodar antes de {@code RuntimePrivilegesEndToEndTests}, no mesmo
+ * banco: ela verifica a migração a partir do zero (inclusive o timezone da
+ * sessão do Flyway), o que deixa de valer em um banco já migrado. O job do CI
+ * executa as duas classes em passos separados, nessa ordem.
  */
 class LeastPrivilegeSmokeTests {
 

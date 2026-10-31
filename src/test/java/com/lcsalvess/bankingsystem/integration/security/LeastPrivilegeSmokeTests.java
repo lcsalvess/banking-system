@@ -19,6 +19,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -183,13 +184,29 @@ class LeastPrivilegeSmokeTests {
                 "DELETE FROM public.clients WHERE false",
                 "DELETE FROM public.checking_accounts WHERE false",
 
+                // TRUNCATE is a separate privilege from DELETE
+                "TRUNCATE TABLE public.transactions",
+                "TRUNCATE TABLE public.audit_events",
+                "TRUNCATE TABLE public.accounts CASCADE",
+
+                // Physical deletion of the remaining business tables
+                "DELETE FROM public.addresses WHERE false",
+                "DELETE FROM public.savings_accounts WHERE false",
+
                 // Forbidden UPDATE columns
                 "UPDATE public.accounts SET id = id WHERE false",
                 "UPDATE public.accounts SET client_id = client_id WHERE false",
+                "UPDATE public.accounts SET account_number = account_number WHERE false",
+                "UPDATE public.accounts SET account_digit = account_digit WHERE false",
+                "UPDATE public.accounts SET account_type = account_type WHERE false",
                 "UPDATE public.clients SET cpf = cpf WHERE false",
+                "UPDATE public.clients SET address_id = address_id WHERE false",
                 "UPDATE public.addresses SET id = id WHERE false",
                 "UPDATE public.savings_accounts SET id = id WHERE false",
                 "UPDATE public.users SET role = role WHERE false",
+                "UPDATE public.users SET username = username WHERE false",
+                "UPDATE public.users SET email = email WHERE false",
+                "UPDATE public.users SET created_at = created_at WHERE false",
                 "UPDATE public.checking_accounts SET id = id WHERE false",
 
                 // Migration metadata and schema modification
@@ -240,6 +257,46 @@ class LeastPrivilegeSmokeTests {
     }
 
     @Test
+    @DisplayName("Objects created later are closed to the runtime role until granted")
+    void shouldNotGrantPrivilegesOnObjectsCreatedLater() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(
+                url, migratorUser, migratorPassword
+        );
+             Statement statement = connection.createStatement()) {
+
+            statement.execute("DROP TABLE IF EXISTS public.privilege_default_probe");
+            statement.execute("DROP SEQUENCE IF EXISTS public.privilege_default_probe_seq");
+            statement.execute("CREATE TABLE public.privilege_default_probe (id integer)");
+            statement.execute("CREATE SEQUENCE public.privilege_default_probe_seq");
+
+            try {
+                for (String privilege : List.of("SELECT", "INSERT", "UPDATE", "DELETE")) {
+                    assertFalse(
+                            appHasTablePrivilege(
+                                    "public.privilege_default_probe",
+                                    privilege
+                            ),
+                            () -> "A new table must not default to " + privilege
+                    );
+                }
+
+                for (String privilege : List.of("USAGE", "SELECT", "UPDATE")) {
+                    assertFalse(
+                            appHasSequencePrivilege(
+                                    "public.privilege_default_probe_seq",
+                                    privilege
+                            ),
+                            () -> "A new sequence must not default to " + privilege
+                    );
+                }
+            } finally {
+                statement.execute("DROP TABLE IF EXISTS public.privilege_default_probe");
+                statement.execute("DROP SEQUENCE IF EXISTS public.privilege_default_probe_seq");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("Ledger append-only triggers exist and are enabled")
     void shouldKeepLedgerTriggersEnabled() throws SQLException {
         String sql = """
@@ -270,6 +327,29 @@ class LeastPrivilegeSmokeTests {
                 )),
                 () -> "Missing or disabled ledger triggers. Enabled: " + enabled
         );
+    }
+
+    private static boolean appHasSequencePrivilege(
+            String sequence,
+            String privilege
+    ) throws SQLException {
+        String sql = """
+                SELECT has_sequence_privilege(current_user, ?, ?)
+                """;
+
+        try (Connection connection = DriverManager.getConnection(
+                url, appUser, appPassword
+        );
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, sequence);
+            statement.setString(2, privilege);
+
+            try (var resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next());
+                return resultSet.getBoolean(1);
+            }
+        }
     }
 
     private static boolean appHasTablePrivilege(

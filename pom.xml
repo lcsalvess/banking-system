@@ -121,6 +121,12 @@
 
                 Swagger UI 5.34.1 updates DOMPurify to 3.4.17,
                 which includes fixes for both vulnerabilities.
+
+                Temporary pin: managed versions win over Springdoc's, so this
+                also blocks newer Springdoc defaults. Remove this entry (and
+                the swagger-ui.version property) as soon as the Swagger UI
+                version resolved by Springdoc is 5.34.1 or later. Check with:
+                ./mvnw dependency:tree -Dincludes=org.webjars:swagger-ui
             -->
             <dependency>
                 <groupId>org.webjars</groupId>

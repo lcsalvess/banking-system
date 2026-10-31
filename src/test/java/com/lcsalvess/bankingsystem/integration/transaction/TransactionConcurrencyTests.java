@@ -33,6 +33,7 @@ import com.lcsalvess.bankingsystem.service.transaction.query.TransactionPageResu
 import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
+import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -85,6 +86,9 @@ class TransactionConcurrencyTests {
     private TransactionRepository transactionRepository;
 
     @Autowired
+    private LedgerTestCleaner ledgerTestCleaner;
+
+    @Autowired
     private AccountRepository accountRepository;
 
     @Autowired
@@ -130,7 +134,7 @@ class TransactionConcurrencyTests {
 
     @BeforeEach
     void setUp() {
-        transactionRepository.deleteAll();
+        ledgerTestCleaner.deleteAllTransactions();
         accountRepository.deleteAll();
         clientRepository.deleteAll();
         addressRepository.deleteAll();
@@ -702,7 +706,7 @@ class TransactionConcurrencyTests {
 
             // Corrupt the intermediate snapshot without changing the account balance
             // or the final transaction snapshot.
-            jdbcTemplate.update(
+            ledgerTestCleaner.updateTransactions(
                     """
                     UPDATE transactions
                     SET balance_after = 69.00
@@ -752,7 +756,7 @@ class TransactionConcurrencyTests {
                     account.getId()
             );
 
-            jdbcTemplate.update(
+            ledgerTestCleaner.updateTransactions(
                     "UPDATE transactions SET balance_after = 99.00 WHERE id = ?",
                     firstTransactionId
             );

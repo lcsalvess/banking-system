@@ -4,9 +4,9 @@ import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
+import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -49,7 +49,7 @@ class AuthControllerTests {
     private MockMvc mockMvc;
 
     @Autowired
-    private TransactionRepository transactionRepository;
+    private LedgerTestCleaner ledgerTestCleaner;
 
     @Autowired
     private RateLimitProtectionService rateLimitProtectionService;
@@ -59,7 +59,7 @@ class AuthControllerTests {
 
     @BeforeEach
     void setUp() {
-        transactionRepository.deleteAll();
+        ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
 
         // Limpa as tentativas de login dos usuários utilizados nos testes.

@@ -1,12 +1,12 @@
 package com.lcsalvess.bankingsystem.integration.security;
 
 import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.user.UserService;
+import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +22,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,7 +61,7 @@ class PasswordChangeIntegrationTests {
     private UserService userService;
 
     @Autowired
-    private TransactionRepository transactionRepository;
+    private LedgerTestCleaner ledgerTestCleaner;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -67,7 +71,7 @@ class PasswordChangeIntegrationTests {
 
     @BeforeEach
     void setUp() {
-        transactionRepository.deleteAll();
+        ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
 
         userRepository.save(new User(

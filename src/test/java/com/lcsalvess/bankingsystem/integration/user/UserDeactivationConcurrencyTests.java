@@ -1,22 +1,33 @@
 package com.lcsalvess.bankingsystem.integration.user;
 
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
-import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.user.UserService;
-import org.junit.jupiter.api.*;
+import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ActiveProfiles("test")
 @SpringBootTest
@@ -36,11 +47,11 @@ class UserDeactivationConcurrencyTests {
     private UserService userService;
 
     @Autowired
-    private TransactionRepository transactionRepository;
+    private LedgerTestCleaner ledgerTestCleaner;
 
     @BeforeEach
     void setUp() {
-        transactionRepository.deleteAllInBatch();
+        ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
     }
 

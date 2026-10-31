@@ -14,12 +14,14 @@ import com.lcsalvess.bankingsystem.repository.ClientRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
+import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -30,15 +32,23 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ActiveProfiles("test")
 @SpringBootTest
 @DisplayName("Transaction constraints integration")
 class TransactionConstraintIntegrationTests {
 
+    private static final String APPEND_ONLY_MESSAGE =
+            "transactions is append-only";
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private LedgerTestCleaner ledgerTestCleaner;
 
     @Autowired
     private UserRepository userRepository;
@@ -107,19 +117,13 @@ class TransactionConstraintIntegrationTests {
     @AfterEach
     void tearDown() {
         if (checkingAccount != null) {
-            jdbcTemplate.update(
-                    "DELETE FROM transactions WHERE account_id = ?",
-                    checkingAccount.getId()
-            );
+            ledgerTestCleaner.deleteTransactionsOfAccount(checkingAccount.getId());
 
             accountRepository.delete(checkingAccount);
         }
 
         if (savingsAccount != null) {
-            jdbcTemplate.update(
-                    "DELETE FROM transactions WHERE account_id = ?",
-                    savingsAccount.getId()
-            );
+            ledgerTestCleaner.deleteTransactionsOfAccount(savingsAccount.getId());
 
             accountRepository.delete(savingsAccount);
         }
@@ -314,6 +318,100 @@ class TransactionConstraintIntegrationTests {
                         false,
                         LocalDate.now().plusDays(1)
                 )
+        );
+    }
+
+    @Test
+    @DisplayName("Should reject UPDATE on transactions, even for the table owner")
+    void shouldRejectUpdate() {
+        insertTransaction(
+                TransactionType.DEPOSIT,
+                new BigDecimal("10.00"),
+                checkingAccount,
+                null,
+                user,
+                false,
+                null
+        );
+
+        DataAccessException exception = assertThrows(
+                DataAccessException.class,
+                () -> jdbcTemplate.update(
+                        "UPDATE transactions SET amount = amount WHERE account_id = ?",
+                        checkingAccount.getId()
+                )
+        );
+
+        assertAppendOnly(exception);
+        assertEquals(1, countTransactions(checkingAccount));
+    }
+
+    @Test
+    @DisplayName("Should reject DELETE on transactions, even for the table owner")
+    void shouldRejectDelete() {
+        insertTransaction(
+                TransactionType.DEPOSIT,
+                new BigDecimal("10.00"),
+                checkingAccount,
+                null,
+                user,
+                false,
+                null
+        );
+
+        DataAccessException exception = assertThrows(
+                DataAccessException.class,
+                () -> jdbcTemplate.update(
+                        "DELETE FROM transactions WHERE account_id = ?",
+                        checkingAccount.getId()
+                )
+        );
+
+        assertAppendOnly(exception);
+        assertEquals(1, countTransactions(checkingAccount));
+    }
+
+    @Test
+    @DisplayName("Should reject TRUNCATE on transactions, even for the table owner")
+    void shouldRejectTruncate() {
+        insertTransaction(
+                TransactionType.DEPOSIT,
+                new BigDecimal("10.00"),
+                checkingAccount,
+                null,
+                user,
+                false,
+                null
+        );
+
+        // transaction_idempotency_requests references transactions, so both
+        // tables must be named for PostgreSQL to reach the trigger.
+        DataAccessException exception = assertThrows(
+                DataAccessException.class,
+                () -> jdbcTemplate.execute(
+                        "TRUNCATE TABLE transactions, transaction_idempotency_requests"
+                )
+        );
+
+        assertAppendOnly(exception);
+        assertEquals(1, countTransactions(checkingAccount));
+    }
+
+    private int countTransactions(Account account) {
+        Integer total = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM transactions WHERE account_id = ?",
+                Integer.class,
+                account.getId()
+        );
+
+        return total == null ? 0 : total;
+    }
+
+    private void assertAppendOnly(DataAccessException exception) {
+        assertTrue(
+                exception.getMessage().contains(APPEND_ONLY_MESSAGE),
+                "The statement failed for another reason: "
+                        + exception.getMessage()
         );
     }
 

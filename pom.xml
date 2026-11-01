@@ -52,6 +52,7 @@
         <flyway.version>13.11.1</flyway.version>
         <bucket4j.version>8.21.0</bucket4j.version>
         <caffeine.version>3.3.1</caffeine.version>
+        <swagger-ui.version>5.34.1</swagger-ui.version>
         <!-- Allows Maven Surefire to replace argLine during late configuration. -->
         <argLine/>
     </properties>
@@ -77,14 +78,23 @@
             </dependency>
 
             <!--
-                Override Springdoc's transitive Swagger UI WebJar version.
-                Keep this version aligned with springdoc.swagger-ui.version
-                in application-local.properties so static resources resolve.
+                Temporarily pin the Swagger UI WebJar version to override Springdoc 3.2.0.
+
+                Springdoc 3.2.0 manages Swagger UI 5.34.0, which bundles DOMPurify 3.4.16
+                and is affected by CVE-2026-116803 and CVE-2026-116804.
+                Swagger UI 5.34.1 bundles DOMPurify 3.4.17, which fixes both vulnerabilities.
+
+                Keep this version aligned with springdoc.swagger-ui.version in
+                application-local.properties.
+
+                Remove this override once the Springdoc version in use manages Swagger UI
+                5.34.1 or later. Verify the resolved version with:
+                ./mvnw dependency:tree -Dincludes=org.webjars:swagger-ui
             -->
             <dependency>
                 <groupId>org.webjars</groupId>
                 <artifactId>swagger-ui</artifactId>
-                <version>5.34.1</version>
+                <version>${swagger-ui.version}</version>
             </dependency>
 
             <!--

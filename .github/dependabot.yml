@@ -1,12 +1,12 @@
 version: 2
 
 updates:
-  # Dependências Java e Spring gerenciadas pelo Maven
+  # Java and Spring dependencies managed by Maven
   - package-ecosystem: "maven"
     directory: "/"
     schedule:
-      interval: "daily"
-      time: "09:00"
+      interval: "cron"
+      cronjob: "0 9 * * *"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
     commit-message:
@@ -16,12 +16,12 @@ updates:
         patterns:
           - "org.springframework*"
 
-  # Versões das actions utilizadas pelo GitHub Actions
+  # GitHub Actions versions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
-      time: "09:30"
+      interval: "cron"
+      cronjob: "30 9 * * *"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 3
     commit-message:

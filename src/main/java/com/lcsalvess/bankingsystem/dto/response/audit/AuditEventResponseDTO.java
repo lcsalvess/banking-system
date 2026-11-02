@@ -21,7 +21,10 @@ public record AuditEventResponseDTO(
         AuditEntityType entityType,
         String entityId,
         UUID correlationId,
-        Instant createdAt
+        Instant createdAt,
+        String ipAddress,
+        String reason,
+        Integer httpStatus
 ) {
 
     public static AuditEventResponseDTO fromEntity(AuditEvent event) {
@@ -35,7 +38,12 @@ public record AuditEventResponseDTO(
                 event.getEntityType(),
                 event.getEntityId(),
                 event.getCorrelationId(),
-                event.getCreatedAt()
+                event.getCreatedAt(),
+                event.getIpAddress() != null
+                        ? event.getIpAddress().getHostAddress()
+                        : null,
+                event.getReason(),
+                event.getHttpStatus()
         );
     }
 }

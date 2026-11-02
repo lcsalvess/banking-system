@@ -8,6 +8,7 @@ import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitOperation;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
+import com.lcsalvess.bankingsystem.service.audit.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;
@@ -79,6 +80,9 @@ class AuthServiceTests {
     @Mock
     private RateLimitProtectionService rateLimitProtectionService;
 
+    @Mock
+    private AuditTrailRecorder auditTrailRecorder;
+
     private AuthService authService;
 
     @BeforeEach
@@ -90,7 +94,8 @@ class AuthServiceTests {
                 authManager,
                 jwtService,
                 passwordEncoder,
-                rateLimitProtectionService
+                rateLimitProtectionService,
+                auditTrailRecorder
         );
     }
 
@@ -133,12 +138,16 @@ class AuthServiceTests {
 
             verify(rateLimitProtectionService)
                     .recordSuccessfulLogin(TEST_ATTEMPT);
+
             verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
+
+            verify(auditTrailRecorder)
+                    .recordLoginSuccess(user, TEST_CLIENT_IP);
         }
 
         @Test
-        @DisplayName("Deve lançar exceção e manter a tentativa contabilizada quando as credenciais são inválidas")
+        @DisplayName("Deve lançar exceção e registrar falha quando as credenciais são inválidas")
         void shouldThrowWhenCredentialsAreInvalid() {
             LoginRequestDTO dto = createLoginRequestDTO();
 
@@ -166,8 +175,16 @@ class AuthServiceTests {
 
             verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
+
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
+
+            verify(auditTrailRecorder)
+                    .recordLoginFailure(
+                            TEST_USERNAME,
+                            TEST_CLIENT_IP,
+                            "INVALID_CREDENTIALS"
+                    );
 
             verifyNoInteractions(jwtService);
         }
@@ -215,8 +232,16 @@ class AuthServiceTests {
 
             verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
+
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
+
+            verify(auditTrailRecorder)
+                    .recordLoginFailure(
+                            TEST_USERNAME,
+                            TEST_CLIENT_IP,
+                            "ACCOUNT_NOT_ENABLED"
+                    );
 
             verifyNoInteractions(jwtService);
         }
@@ -248,12 +273,14 @@ class AuthServiceTests {
 
             verify(rateLimitProtectionService)
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
+
             verify(rateLimitProtectionService)
                     .cancelAttempt(TEST_ATTEMPT);
+
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
 
-            verifyNoInteractions(jwtService);
+            verifyNoInteractions(jwtService, auditTrailRecorder);
         }
 
         @Test
@@ -279,12 +306,14 @@ class AuthServiceTests {
 
             verify(rateLimitProtectionService)
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
+
             verify(rateLimitProtectionService)
                     .cancelAttempt(TEST_ATTEMPT);
+
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
 
-            verifyNoInteractions(jwtService);
+            verifyNoInteractions(jwtService, auditTrailRecorder);
         }
 
         @Test
@@ -319,7 +348,7 @@ class AuthServiceTests {
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
 
-            verifyNoInteractions(jwtService);
+            verifyNoInteractions(jwtService, auditTrailRecorder);
         }
     }
 
@@ -333,7 +362,7 @@ class AuthServiceTests {
                 mode = EnumSource.Mode.EXCLUDE,
                 names = "USER_ID"
         )
-        @DisplayName("Deve propagar a exceção sem verificar credenciais nem emitir token")
+        @DisplayName("Deve propagar a exceção e registrar o bloqueio sem verificar credenciais")
         void shouldRejectBeforeCheckingCredentials(
                 RateLimitScope scope
         ) {
@@ -362,8 +391,16 @@ class AuthServiceTests {
 
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
+
             verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
+
+            verify(auditTrailRecorder)
+                    .recordLoginBlocked(
+                            TEST_USERNAME,
+                            TEST_CLIENT_IP,
+                            scope
+                    );
         }
 
         @Test
@@ -386,6 +423,13 @@ class AuthServiceTests {
             );
 
             verify(passwordEncoder, never()).matches(any(), any());
+
+            verify(auditTrailRecorder)
+                    .recordLoginBlocked(
+                            TEST_USERNAME,
+                            TEST_CLIENT_IP,
+                            RateLimitScope.CLIENT_IP
+                    );
         }
     }
 
@@ -412,7 +456,7 @@ class AuthServiceTests {
         );
     }
 
-    @SuppressWarnings("unused") // Usado via @MethodSource.
+    @SuppressWarnings("unused") // Used by @MethodSource.
     static Stream<Arguments> accountStatusExceptions() {
         return Stream.of(
                 Arguments.of(

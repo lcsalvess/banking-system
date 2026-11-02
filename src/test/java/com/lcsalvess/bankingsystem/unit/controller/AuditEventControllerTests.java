@@ -106,7 +106,9 @@ class AuditEventControllerTests {
                     .andExpect(jsonPath("$.content[0].correlationId")
                             .value(correlationId.toString()))
                     .andExpect(jsonPath("$.page.totalElements").value(1))
-                    .andExpect(jsonPath("$.page.totalPages").value(1));
+                    .andExpect(jsonPath("$.page.totalPages").value(1))
+                    .andExpect(jsonPath("$.content[0].ipAddress")
+                            .value("192.0.2.10"));
 
             Pageable actualPageable = verifyFindAll(
                     null, null, null, null, null, null, null, null
@@ -186,7 +188,10 @@ class AuditEventControllerTests {
                     AuditEntityType.USER,
                     "42",
                     correlationId,
-                    createdAt
+                    createdAt,
+                    "192.0.2.10",
+                    null,
+                    null
             );
         }
     }

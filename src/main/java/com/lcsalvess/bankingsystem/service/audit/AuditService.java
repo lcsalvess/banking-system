@@ -51,7 +51,7 @@ public class AuditService {
         Optional<User> actor = currentUserService.findCurrentUser();
 
         auditEventRepository.save(
-                new AuditEvent(
+                AuditEvent.create(
                         eventType,
                         AuditOutcome.SUCCESS,
                         actor.isPresent()
@@ -84,7 +84,7 @@ public class AuditService {
                 : currentCorrelationId();
 
         auditEventRepository.save(
-                new AuditEvent(
+                AuditEvent.create(
                         record.eventType(),
                         record.outcome(),
                         record.actorType(),

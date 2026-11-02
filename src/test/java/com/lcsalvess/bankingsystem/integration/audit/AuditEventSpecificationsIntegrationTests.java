@@ -467,7 +467,7 @@ class AuditEventSpecificationsIntegrationTests {
             LocalDateTime createdAt,
             String reason
     ) {
-        return new AuditEvent(
+        return AuditEvent.create(
                 eventType,
                 outcome,
                 AuditActorType.USER,

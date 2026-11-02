@@ -58,7 +58,7 @@ public class AuditTrailRecorder {
     private final AuditService auditService;
     private final Counter writeFailures;
     private final Counter deduplicated;
-    private final Cache<String, Boolean> recentBlocks;
+    private final Cache<String, Object> recentBlocks;
 
     @Autowired
     public AuditTrailRecorder(
@@ -146,15 +146,7 @@ public class AuditTrailRecorder {
                 ? ipAddress.getHostAddress()
                 : clientIp;
 
-        if (recentBlocks.asMap().putIfAbsent(
-                blockKey(attemptedUsername, deduplicationIp, scope),
-                Boolean.TRUE
-        ) != null) {
-            deduplicated.increment();
-            return;
-        }
-
-        write(new DetachedAuditRecord(
+        DetachedAuditRecord record = new DetachedAuditRecord(
                 AuditEventType.LOGIN_BLOCKED,
                 AuditOutcome.DENIED,
                 AuditActorType.ANONYMOUS,
@@ -166,7 +158,27 @@ public class AuditTrailRecorder {
                 ipAddress,
                 429,
                 null
-        ));
+        );
+
+        String key = blockKey(
+                attemptedUsername,
+                deduplicationIp,
+                scope
+        );
+
+        Object reservationToken = new Object();
+
+        if (recentBlocks.asMap().putIfAbsent(
+                key,
+                reservationToken
+        ) != null) {
+            deduplicated.increment();
+            return;
+        }
+
+        if (!write(record)) {
+            recentBlocks.asMap().remove(key, reservationToken);
+        }
     }
 
     public void recordHttpRequestCompleted(
@@ -245,17 +257,21 @@ public class AuditTrailRecorder {
         return null;
     }
 
-    private void write(DetachedAuditRecord record) {
+    private boolean write(DetachedAuditRecord record) {
         try {
             auditService.recordDetached(record);
+            return true;
         } catch (RuntimeException exception) {
             writeFailures.increment();
+
             log.error(
                     "Could not record audit event: eventType={}, outcome={}",
                     record.eventType(),
                     record.outcome(),
                     exception
             );
+
+            return false;
         }
     }
 

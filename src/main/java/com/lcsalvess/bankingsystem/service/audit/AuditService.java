@@ -36,10 +36,11 @@ public class AuditService {
     }
 
     /**
-     * Registra uma operação bem-sucedida na MESMA transação da alteração
-     * auditada. Com MANDATORY, chamar fora de uma transação falha de forma
-     * explícita, e uma falha na gravação desfaz a operação inteira: nunca
-     * existe uma operação commitada sem o seu registro.
+     * Records a successful operation in the SAME transaction as the audited
+     * change. With MANDATORY, calling this method without an active transaction
+     * fails explicitly, and any failure to persist the audit event rolls back
+     * the entire operation: a committed operation can never exist without
+     * its corresponding audit record.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordSuccess(
@@ -62,6 +63,40 @@ public class AuditService {
                         entityId,
                         currentCorrelationId(),
                         clock.instant()
+                )
+        );
+    }
+
+    /**
+     * Records an event that must not depend on the operation's transaction:
+     * failures (which trigger rollback), access denials, and login events.
+     *
+     * <p>Runs in its own transaction (REQUIRES_NEW) and should therefore only
+     * be called when no transaction is active. Calling it from within an active
+     * transaction would require an additional database connection from the pool.
+     * Callers typically use {@link AuditTrailRecorder}, which never propagates
+     * audit write failures.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordDetached(DetachedAuditRecord record) {
+        UUID correlationId = record.correlationId() != null
+                ? record.correlationId()
+                : currentCorrelationId();
+
+        auditEventRepository.save(
+                new AuditEvent(
+                        record.eventType(),
+                        record.outcome(),
+                        record.actorType(),
+                        record.actorUserId(),
+                        record.actorUsername(),
+                        record.entityType(),
+                        record.entityId(),
+                        correlationId,
+                        clock.instant(),
+                        record.ipAddress(),
+                        record.reason(),
+                        record.httpStatus()
                 )
         );
     }

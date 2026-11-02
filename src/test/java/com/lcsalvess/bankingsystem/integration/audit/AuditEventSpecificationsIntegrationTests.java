@@ -162,7 +162,8 @@ class AuditEventSpecificationsIntegrationTests {
                             "filter-user",
                             AuditEntityType.ACCOUNT,
                             entityId,
-                            LocalDateTime.of(2025, 3, 10, 10, 2)
+                            LocalDateTime.of(2025, 3, 10, 10, 2),
+                            "INSUFFICIENT_FUNDS"
                     ),
                     event(
                             AuditEventType.TRANSFER,
@@ -444,6 +445,28 @@ class AuditEventSpecificationsIntegrationTests {
             String entityId,
             LocalDateTime createdAt
     ) {
+        return event(
+                eventType,
+                outcome,
+                actorUserId,
+                actorUsername,
+                entityType,
+                entityId,
+                createdAt,
+                null
+        );
+    }
+
+    private static AuditEvent event(
+            AuditEventType eventType,
+            AuditOutcome outcome,
+            Long actorUserId,
+            String actorUsername,
+            AuditEntityType entityType,
+            String entityId,
+            LocalDateTime createdAt,
+            String reason
+    ) {
         return new AuditEvent(
                 eventType,
                 outcome,
@@ -453,7 +476,10 @@ class AuditEventSpecificationsIntegrationTests {
                 entityType,
                 entityId,
                 UUID.randomUUID(),
-                createdAt.atZone(SAO_PAULO_ZONE).toInstant()
+                createdAt.atZone(SAO_PAULO_ZONE).toInstant(),
+                null,
+                reason,
+                null
         );
     }
 

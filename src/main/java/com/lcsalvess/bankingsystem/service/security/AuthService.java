@@ -4,6 +4,8 @@ import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
+import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
+import com.lcsalvess.bankingsystem.service.audit.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
 import org.slf4j.Logger;
@@ -28,18 +30,21 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final RateLimitProtectionService rateLimitProtectionService;
+    private final AuditTrailRecorder auditTrailRecorder;
     private final String dummyPasswordHash;
 
     public AuthService(
             AuthenticationManager authManager,
             JwtService jwtService,
             PasswordEncoder passwordEncoder,
-            RateLimitProtectionService rateLimitProtectionService
+            RateLimitProtectionService rateLimitProtectionService,
+            AuditTrailRecorder auditTrailRecorder
     ) {
         this.authManager = authManager;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.rateLimitProtectionService = rateLimitProtectionService;
+        this.auditTrailRecorder = auditTrailRecorder;
         this.dummyPasswordHash = passwordEncoder.encode(
                 UUID.randomUUID().toString()
         );
@@ -49,10 +54,7 @@ public class AuthService {
             LoginRequestDTO dto,
             String clientIp
     ) {
-        LoginAttempt attempt = rateLimitProtectionService.beginAttempt(
-                clientIp,
-                dto.username()
-        );
+        LoginAttempt attempt = beginAttemptAudited(dto, clientIp);
 
         User user;
 
@@ -61,18 +63,58 @@ public class AuthService {
             user = extractAndValidateUser(auth);
 
         } catch (BadCredentialsException exception) {
-            // Credenciais inválidas permanecem contabilizadas.
+            // Invalid credentials remain counted.
+            auditTrailRecorder.recordLoginFailure(
+                    dto.username(),
+                    clientIp,
+                    failureReason(exception)
+            );
             throw exception;
 
         } catch (RuntimeException exception) {
-            // Falhas inesperadas não devem contar como senha incorreta.
+            // Unexpected failures must not be counted as incorrect passwords.
             rateLimitProtectionService.cancelAttempt(attempt);
             throw exception;
         }
 
         rateLimitProtectionService.recordSuccessfulLogin(attempt);
 
-        return buildLoginResponse(user);
+        LoginResponseDTO response = buildLoginResponse(user);
+
+        auditTrailRecorder.recordLoginSuccess(user, clientIp);
+
+        return response;
+    }
+
+    private LoginAttempt beginAttemptAudited(
+            LoginRequestDTO dto,
+            String clientIp
+    ) {
+        try {
+            return rateLimitProtectionService.beginAttempt(
+                    clientIp,
+                    dto.username()
+            );
+        } catch (RateLimitExceededException exception) {
+            auditTrailRecorder.recordLoginBlocked(
+                    dto.username(),
+                    clientIp,
+                    exception.getScope()
+            );
+            throw exception;
+        }
+    }
+
+    /**
+     * The API response is identical in both cases (it does not reveal whether
+     * the account exists), but the audit trail, which is only accessible to
+     * AUDITOR users, distinguishes disabled or locked accounts from incorrect
+     * passwords.
+     */
+    private static String failureReason(BadCredentialsException exception) {
+        return exception.getCause() instanceof AccountStatusException
+                ? "ACCOUNT_NOT_ENABLED"
+                : "INVALID_CREDENTIALS";
     }
 
     private Authentication authenticateCredentials(LoginRequestDTO dto) {

@@ -36,10 +36,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     /**
-     * Única rota que o filtro ignora: deve coincidir com a rota liberada por
-     * {@code permitAll} na {@code SecurityConfig}. Assim, um token vencido
-     * reenviado ao login não bloqueia a nova autenticação, e as demais rotas
-     * sob {@code /api/v1/auth/} continuam passando pelo filtro.
+     * The only route excluded by this filter: it must match the route permitted
+     * by {@code permitAll} in {@code SecurityConfig}. This ensures that an
+     * expired token resent with a login request does not prevent new
+     * authentication, while all other routes under {@code /api/v1/auth/}
+     * continue to pass through the filter.
      */
     private static final PathPatternRequestMatcher LOGIN_REQUEST_MATCHER =
             PathPatternRequestMatcher.withDefaults()
@@ -80,8 +81,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String jwt = authHeader.substring(BEARER_PREFIX.length()).trim();
 
-        // "Bearer" sem token equivale a nenhuma credencial: a requisição segue
-        // sem autenticação e as rotas protegidas respondem 401 normalmente.
+        // "Bearer" without a token is equivalent to missing credentials:
+        // the request proceeds unauthenticated, and protected routes respond
+        // with 401 as usual.
         if (jwt.isEmpty()) {
             filterChain.doFilter(request, response);
             return;
@@ -102,7 +104,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // Token emitido antes da última troca de senha: não vale mais.
+            // A token issued before the most recent password change is no
+            // longer valid.
             if (!(userDetails instanceof User user)
                     || user.getTokenVersion() != claims.tokenVersion()) {
                 authenticationEntryPoint.commence(
@@ -123,6 +126,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext()
                     .setAuthentication(authentication);
 
+            // The audit filter runs outside the security filter chain, after
+            // the SecurityContext has already been cleared: the actor is
+            // therefore carried through the request.
+            request.setAttribute(
+                    AuditRequestAttributes.AUTHENTICATED_USER,
+                    userDetails
+            );
+
         } catch (JwtException | UsernameNotFoundException exception) {
             authenticationEntryPoint.commence(
                     request,
@@ -131,8 +142,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
             return;
         } catch (DataAccessException | TransactionException exception) {
-            // Falha de infraestrutura não é credencial inválida: responder 401
-            // faria o cliente descartar um token válido e reautenticar em vão.
+            // An infrastructure failure is not an invalid credential: returning
+            // 401 would cause the client to discard a valid token and
+            // unnecessarily reauthenticate.
             log.error("Could not load the user while authenticating the request.", exception);
             authenticationEntryPoint.commenceServiceUnavailable(response);
             return;

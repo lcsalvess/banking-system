@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 
+import java.net.InetAddress;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -63,6 +64,15 @@ public class AuditEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "ip_address", updatable = false)
+    private InetAddress ipAddress;
+
+    @Column(updatable = false, length = 60)
+    private String reason;
+
+    @Column(name = "http_status", updatable = false)
+    private Integer httpStatus;
+
     protected AuditEvent() {
     }
 
@@ -76,6 +86,36 @@ public class AuditEvent {
             String entityId,
             UUID correlationId,
             Instant createdAt
+    ) {
+        this(
+                eventType,
+                outcome,
+                actorType,
+                actorUserId,
+                actorUsername,
+                entityType,
+                entityId,
+                correlationId,
+                createdAt,
+                null,
+                null,
+                null
+        );
+    }
+
+    public AuditEvent(
+            AuditEventType eventType,
+            AuditOutcome outcome,
+            AuditActorType actorType,
+            Long actorUserId,
+            String actorUsername,
+            AuditEntityType entityType,
+            String entityId,
+            UUID correlationId,
+            Instant createdAt,
+            InetAddress ipAddress,
+            String reason,
+            Integer httpStatus
     ) {
         Instant normalizedCreatedAt = InstantPrecision.truncateToMicros(
                 createdAt,
@@ -91,6 +131,9 @@ public class AuditEvent {
         this.entityId = entityId;
         this.correlationId = correlationId;
         this.createdAt = normalizedCreatedAt;
+        this.ipAddress = ipAddress;
+        this.reason = reason;
+        this.httpStatus = httpStatus;
     }
 
     public Long getId() {
@@ -131,5 +174,17 @@ public class AuditEvent {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public InetAddress getIpAddress() {
+        return ipAddress;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public Integer getHttpStatus() {
+        return httpStatus;
     }
 }

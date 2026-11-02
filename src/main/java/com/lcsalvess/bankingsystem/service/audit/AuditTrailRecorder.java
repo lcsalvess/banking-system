@@ -9,12 +9,16 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
+import com.lcsalvess.bankingsystem.util.normalization.UsernameNormalizer;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -44,6 +48,19 @@ public class AuditTrailRecorder {
     static final Duration BLOCKED_DEDUPLICATION_WINDOW = Duration.ofMinutes(1);
     static final long BLOCKED_DEDUPLICATION_MAX_KEYS = 10_000;
 
+    static final Duration HTTP_FAILURE_DEDUPLICATION_WINDOW =
+            Duration.ofMinutes(1);
+    static final long HTTP_FAILURE_DEDUPLICATION_MAX_KEYS = 10_000;
+
+    /**
+     * After an infrastructure failure (database unavailable or timing out),
+     * writes are skipped for this period so that each request does not wait
+     * for its own connection timeout.
+     */
+    static final Duration INFRASTRUCTURE_BACKOFF = Duration.ofSeconds(5);
+
+    private static final String BACKOFF_KEY = "audit-store-unavailable";
+
     private static final Logger log =
             LoggerFactory.getLogger(AuditTrailRecorder.class);
 
@@ -59,6 +76,8 @@ public class AuditTrailRecorder {
     private final Counter writeFailures;
     private final Counter deduplicated;
     private final Cache<String, Object> recentBlocks;
+    private final Cache<String, Object> recentHttpFailures;
+    private final Cache<String, Boolean> infrastructureBackoff;
 
     @Autowired
     public AuditTrailRecorder(
@@ -90,6 +109,18 @@ public class AuditTrailRecorder {
                 .ticker(ticker)
                 .expireAfterWrite(BLOCKED_DEDUPLICATION_WINDOW)
                 .maximumSize(BLOCKED_DEDUPLICATION_MAX_KEYS)
+                .build();
+
+        this.recentHttpFailures = Caffeine.newBuilder()
+                .ticker(ticker)
+                .expireAfterWrite(HTTP_FAILURE_DEDUPLICATION_WINDOW)
+                .maximumSize(HTTP_FAILURE_DEDUPLICATION_MAX_KEYS)
+                .build();
+
+        this.infrastructureBackoff = Caffeine.newBuilder()
+                .ticker(ticker)
+                .expireAfterWrite(INFRASTRUCTURE_BACKOFF)
+                .maximumSize(1)
                 .build();
     }
 
@@ -161,7 +192,7 @@ public class AuditTrailRecorder {
         );
 
         String key = blockKey(
-                attemptedUsername,
+                UsernameNormalizer.normalize(attemptedUsername),
                 deduplicationIp,
                 scope
         );
@@ -190,11 +221,12 @@ public class AuditTrailRecorder {
             String failureReason,
             UUID correlationId
     ) {
-        AuditOutcome outcome = outcomeOf(httpStatus);
+        InetAddress ipAddress = parseClientIp(clientIp);
+        String reason = reasonForHttpStatus(httpStatus, failureReason);
 
-        write(new DetachedAuditRecord(
+        DetachedAuditRecord record = new DetachedAuditRecord(
                 AuditEventType.HTTP_REQUEST_COMPLETED,
-                outcome,
+                outcomeOf(httpStatus),
                 actor != null
                         ? AuditActorType.USER
                         : AuditActorType.ANONYMOUS,
@@ -202,11 +234,78 @@ public class AuditTrailRecorder {
                 actor != null ? actor.getUsername() : null,
                 AuditEntityType.ENDPOINT,
                 method + " " + path,
-                reasonForHttpStatus(httpStatus, failureReason),
-                parseClientIp(clientIp),
+                reason,
+                ipAddress,
                 httpStatus,
                 correlationId
-        ));
+        );
+
+        if (!isDeduplicableFailure(httpStatus)) {
+            write(record);
+            return;
+        }
+
+        String key = httpFailureKey(
+                actor,
+                ipAddress != null ? ipAddress.getHostAddress() : clientIp,
+                method,
+                path,
+                httpStatus,
+                reason
+        );
+
+        Object reservationToken = new Object();
+
+        if (recentHttpFailures.asMap().putIfAbsent(
+                key,
+                reservationToken
+        ) != null) {
+            deduplicated.increment();
+            return;
+        }
+
+        if (!write(record)) {
+            recentHttpFailures.asMap().remove(key, reservationToken);
+        }
+    }
+
+    /**
+     * Client errors can be produced at will, and the audit table is
+     * append-only. Only the first occurrence of the same failure (actor, IP,
+     * endpoint, status, reason) within the window is recorded.
+     *
+     * <p>401 is excluded: it is only recorded for the login endpoint, where
+     * failed attempts are already bounded by the rate limiter and each one
+     * has its own LOGIN_FAILURE event. Successes and server errors are
+     * never deduplicated.
+     */
+    private static boolean isDeduplicableFailure(int httpStatus) {
+        return httpStatus >= 400
+                && httpStatus < 500
+                && httpStatus != 401;
+    }
+
+    private static String httpFailureKey(
+            User actor,
+            String clientIp,
+            String method,
+            String path,
+            int httpStatus,
+            String reason
+    ) {
+        String subject = actor != null
+                ? "user:" + actor.getId()
+                : "anonymous";
+
+        return String.join(
+                "|",
+                subject,
+                String.valueOf(clientIp),
+                method,
+                path,
+                String.valueOf(httpStatus),
+                reason
+        );
     }
 
     private static String blockKey(
@@ -258,11 +357,28 @@ public class AuditTrailRecorder {
     }
 
     private boolean write(DetachedAuditRecord record) {
+        if (infrastructureBackoff.getIfPresent(BACKOFF_KEY) != null) {
+            writeFailures.increment();
+
+            log.debug(
+                    "Skipping audit event while the audit store is unavailable: "
+                            + "eventType={}, outcome={}",
+                    record.eventType(),
+                    record.outcome()
+            );
+
+            return false;
+        }
+
         try {
             auditService.recordDetached(record);
             return true;
         } catch (RuntimeException exception) {
             writeFailures.increment();
+
+            if (isInfrastructureFailure(exception)) {
+                infrastructureBackoff.put(BACKOFF_KEY, Boolean.TRUE);
+            }
 
             log.error(
                     "Could not record audit event: eventType={}, outcome={}",
@@ -273,6 +389,18 @@ public class AuditTrailRecorder {
 
             return false;
         }
+    }
+
+    /**
+     * Only infrastructure failures start the backoff. A failure caused by
+     * the record itself must never suspend auditing of other requests.
+     */
+    private static boolean isInfrastructureFailure(
+            RuntimeException exception
+    ) {
+        return exception instanceof DataAccessResourceFailureException
+                || exception instanceof CannotCreateTransactionException
+                || exception instanceof QueryTimeoutException;
     }
 
     private static AuditOutcome outcomeOf(int httpStatus) {

@@ -21,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -475,5 +476,102 @@ class AuditTrailRecorderTests {
 
         assertEquals(0.0, counter("audit.detached.write.failures"));
         verify(auditService, times(1)).recordDetached(any());
+    }
+
+    @Test
+    @DisplayName("Should ignore username case when deduplicating blocks")
+    void shouldDeduplicateBlocksIgnoringUsernameCase() {
+        recorder.recordLoginBlocked("Ghost", IP, RateLimitScope.USERNAME);
+        recorder.recordLoginBlocked("GHOST", IP, RateLimitScope.USERNAME);
+        recorder.recordLoginBlocked("ghost", IP, RateLimitScope.USERNAME);
+
+        verify(auditService, times(1)).recordDetached(any());
+        assertEquals(2.0, counter("audit.detached.deduplicated"));
+    }
+
+    @Test
+    @DisplayName("Should record a repeated client error only once per window")
+    void shouldDeduplicateRepeatedHttpClientErrors() {
+        for (int i = 0; i < 3; i++) {
+            recorder.recordHttpRequestCompleted(
+                    null, "POST", "/api/v1/auth/login", IP, 400, null, null
+            );
+        }
+
+        verify(auditService, times(1)).recordDetached(any());
+        assertEquals(2.0, counter("audit.detached.deduplicated"));
+
+        nanos.addAndGet(Duration.ofSeconds(61).toNanos());
+
+        recorder.recordHttpRequestCompleted(
+                null, "POST", "/api/v1/auth/login", IP, 400, null, null
+        );
+
+        verify(auditService, times(2)).recordDetached(any());
+    }
+
+    @Test
+    @DisplayName("Should keep client errors of different subjects apart")
+    void shouldNotDeduplicateDifferentHttpFailures() {
+        User actor = user();
+
+        recorder.recordHttpRequestCompleted(
+                actor, "GET", "/api/v1/users/{id}", IP, 403, null, null
+        );
+        recorder.recordHttpRequestCompleted(
+                actor, "GET", "/api/v1/users/{id}", "192.0.2.11", 403, null, null
+        );
+        recorder.recordHttpRequestCompleted(
+                actor, "GET", "/api/v1/users/{id}", IP, 404, null, null
+        );
+
+        verify(auditService, times(3)).recordDetached(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {200, 401, 500})
+    @DisplayName("Should never deduplicate successes, 401 or server errors")
+    void shouldNotDeduplicateOtherHttpOutcomes(int status) {
+        recorder.recordHttpRequestCompleted(
+                user(), "POST", "/api/v1/auth/login", IP, status, null, null
+        );
+        recorder.recordHttpRequestCompleted(
+                user(), "POST", "/api/v1/auth/login", IP, status, null, null
+        );
+
+        verify(auditService, times(2)).recordDetached(any());
+    }
+
+    @Test
+    @DisplayName("Should skip writes briefly after an infrastructure failure")
+    void shouldBackOffAfterInfrastructureFailure() {
+        doThrow(new CannotCreateTransactionException("database down"))
+                .doNothing()
+                .when(auditService).recordDetached(any());
+
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+
+        verify(auditService, times(1)).recordDetached(any());
+        assertEquals(2.0, counter("audit.detached.write.failures"));
+
+        nanos.addAndGet(Duration.ofSeconds(6).toNanos());
+
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+
+        verify(auditService, times(2)).recordDetached(any());
+    }
+
+    @Test
+    @DisplayName("Should not back off after a failure caused by the record")
+    void shouldNotBackOffAfterNonInfrastructureFailure() {
+        doThrow(new IllegalStateException("constraint"))
+                .doNothing()
+                .when(auditService).recordDetached(any());
+
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+
+        verify(auditService, times(2)).recordDetached(any());
     }
 }

@@ -49,13 +49,27 @@ public class AuditTrailFilter extends OncePerRequestFilter {
     private static final Pattern CAMEL_BOUNDARY =
             Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
 
-    private static final Pattern UUID_PATH_SEGMENT = Pattern.compile(
-            "(?i)(?<=/)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
-                    + "[0-9a-f]{4}-[0-9a-f]{12}(?=/|$)"
+    private static final Set<String> AUDITED_METHODS = Set.of(
+            "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE"
     );
 
-    private static final Pattern NUMERIC_PATH_SEGMENT =
-            Pattern.compile("(?<=/)\\d+(?=/|$)");
+    /*
+     * Routes known to the API. Used only when a request was rejected before
+     * MVC dispatch (no route pattern available), so that client-controlled
+     * path text never reaches the append-only audit table. Keep in sync with
+     * SecurityConfig; an unlisted literal degrades safely to {id}.
+     */
+    private static final Set<String> KNOWN_RESOURCES = Set.of(
+            "auth", "users", "clients", "accounts", "transactions",
+            "audit-events"
+    );
+
+    private static final Set<String> KNOWN_ACTIONS = Set.of(
+            "login", "password", "deposit", "withdraw", "transfer",
+            "code", "accounts", "deactivate", "reactivate"
+    );
+
+    private static final int MAX_UNMATCHED_SEGMENTS = 4;
 
     private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 
@@ -72,78 +86,124 @@ public class AuditTrailFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        filterChain.doFilter(request, response);
+        Throwable escaped = null;
 
-        String method = request.getMethod();
-        String path = endpointPath(request);
-
-        if (!isApiPath(path)) {
-            return;
+        try {
+            filterChain.doFilter(request, response);
+        } catch (ServletException | IOException | RuntimeException
+                 | Error exception) {
+            escaped = exception;
+            throw exception;
+        } finally {
+            recordOutcome(request, response, escaped);
         }
-
-        User actor = request.getAttribute(
-                AuditRequestAttributes.AUTHENTICATED_USER
-        ) instanceof User authenticatedUser
-                ? authenticatedUser
-                : null;
-
-        int status = response.getStatus();
-
-        boolean loginRequest = "POST".equals(method)
-                && LOGIN_PATH.equals(path);
-
-        /*
-         * LOGIN_BLOCKED is already deduplicated by AuditTrailRecorder.
-         * Recording every HTTP 429 here would bypass that protection.
-         */
-        if (loginRequest && status == 429) {
-            return;
-        }
-
-        boolean stateChangingRequest =
-                STATE_CHANGING_METHODS.contains(method);
-
-        boolean failedRequest = status >= 400;
-
-        /*
-         * Anonymous requests are only recorded for the login endpoint.
-         * This avoids allowing unauthenticated requests to flood the
-         * append-only audit table.
-         */
-        if (!loginRequest
-                && (actor == null
-                || (!stateChangingRequest && !failedRequest))) {
-            return;
-        }
-
-        Object failure = request.getAttribute(
-                AuditRequestAttributes.FAILURE_EXCEPTION
-        );
-
-        String failureReason = status >= 400
-                ? failureReasonOf(status, failure)
-                : null;
-
-        auditTrailRecorder.recordHttpRequestCompleted(
-                actor,
-                method,
-                path,
-                request.getRemoteAddr(),
-                status,
-                failureReason,
-                correlationIdOf(response)
-        );
     }
 
-    private static boolean isApiPath(String path) {
-        return path.equals(API_BASE_PATH)
-                || path.startsWith(API_BASE_PATH + "/");
+    /**
+     * Runs even when the chain throws. Never propagates: the audit write
+     * is best-effort and must not replace the original outcome.
+     */
+    private void recordOutcome(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Throwable escaped
+    ) {
+        try {
+            String method = methodOf(request);
+            String path = endpointPath(request);
+
+            if (isOutsideApi(path)) {
+                return;
+            }
+
+            User actor = request.getAttribute(
+                    AuditRequestAttributes.AUTHENTICATED_USER
+            ) instanceof User authenticatedUser
+                    ? authenticatedUser
+                    : null;
+
+            // An exception that escaped the chain has no response status yet:
+            // the container will answer 500.
+            int status = escaped != null && response.getStatus() < 400
+                    ? HttpServletResponse.SC_INTERNAL_SERVER_ERROR
+                    : response.getStatus();
+
+            boolean loginRequest = "POST".equals(method)
+                    && LOGIN_PATH.equals(path);
+
+            /*
+             * LOGIN_BLOCKED is already deduplicated by AuditTrailRecorder.
+             * Recording every HTTP 429 here would bypass that protection.
+             */
+            if (loginRequest && status == 429) {
+                return;
+            }
+
+            boolean stateChangingRequest =
+                    STATE_CHANGING_METHODS.contains(method);
+
+            boolean failedRequest = status >= 400;
+
+            /*
+             * Anonymous requests are only recorded for the login endpoint.
+             * Repeated client errors are additionally deduplicated by
+             * AuditTrailRecorder, so neither anonymous nor authenticated
+             * clients can control the growth of the append-only table.
+             */
+            if (!loginRequest
+                    && (actor == null
+                    || (!stateChangingRequest && !failedRequest))) {
+                return;
+            }
+
+            Object failure = request.getAttribute(
+                    AuditRequestAttributes.FAILURE_EXCEPTION
+            );
+
+            if (failure == null) {
+                failure = escaped;
+            }
+
+            String failureReason = status >= 400
+                    ? failureReasonOf(status, failure)
+                    : null;
+
+            auditTrailRecorder.recordHttpRequestCompleted(
+                    actor,
+                    method,
+                    path,
+                    request.getRemoteAddr(),
+                    status,
+                    failureReason,
+                    correlationIdOf(response)
+            );
+        } catch (RuntimeException exception) {
+            logger.warn("Could not record the HTTP outcome in the audit trail",
+                    exception);
+        }
+    }
+
+    /**
+     * Unknown methods are collapsed so the method cannot be used to
+     * create unbounded distinct audit subjects.
+     */
+    private static String methodOf(HttpServletRequest request) {
+        String method = request.getMethod();
+
+        return method != null && AUDITED_METHODS.contains(method)
+                ? method
+                : "OTHER";
+    }
+
+    private static boolean isOutsideApi(String path) {
+        return !path.equals(API_BASE_PATH)
+                && !path.startsWith(API_BASE_PATH + "/");
     }
 
     /**
      * Uses the MVC route pattern when available. For requests rejected
-     * before MVC dispatch, falls back to the request URI while masking
-     * numeric and UUID path segments.
+     * before MVC dispatch, falls back to the request URI reduced to known
+     * route segments (see {@link #sanitizeUnmatchedPath}).
      */
     private static String endpointPath(HttpServletRequest request) {
         Object matchingPattern = request.getAttribute(
@@ -163,11 +223,48 @@ public class AuditTrailFilter extends OncePerRequestFilter {
             path = path.substring(contextPath.length());
         }
 
-        path = UUID_PATH_SEGMENT.matcher(path)
-                .replaceAll("{id}");
+        return sanitizeUnmatchedPath(path);
+    }
 
-        return NUMERIC_PATH_SEGMENT.matcher(path)
-                .replaceAll("{id}");
+    /**
+     * Keeps only the API base path, a known resource, and known action
+     * literals. Every other segment becomes {id}; an unknown resource
+     * collapses the whole path to {unmatched}. The result has bounded
+     * cardinality and never contains client-chosen text or identifiers.
+     */
+    private static String sanitizeUnmatchedPath(String path) {
+        if (isOutsideApi(path)) {
+            return path;
+        }
+
+        StringBuilder sanitized = new StringBuilder(API_BASE_PATH);
+        int kept = 0;
+
+        for (String segment : path.substring(API_BASE_PATH.length()).split("/")) {
+            if (segment.isEmpty()) {
+                continue;
+            }
+
+            if (kept == MAX_UNMATCHED_SEGMENTS) {
+                break;
+            }
+
+            if (kept == 0) {
+                if (!KNOWN_RESOURCES.contains(segment)) {
+                    return API_BASE_PATH + "/{unmatched}";
+                }
+
+                sanitized.append('/').append(segment);
+            } else {
+                sanitized.append('/').append(
+                        KNOWN_ACTIONS.contains(segment) ? segment : "{id}"
+                );
+            }
+
+            kept++;
+        }
+
+        return sanitized.toString();
     }
 
     /**

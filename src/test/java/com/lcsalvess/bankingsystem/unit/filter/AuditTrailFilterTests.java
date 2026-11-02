@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
@@ -591,6 +592,88 @@ class AuditTrailFilterTests {
                 eq(IP),
                 eq(201),
                 isNull(),
+                isNull()
+        );
+
+        verifyNoMoreInteractions(recorder);
+    }
+
+    @Test
+    @DisplayName("Should not store client-chosen text from unmatched API paths")
+    void shouldMaskUnmatchedApiPaths() throws Exception {
+        run(request("GET", "/api/v1/" + "x".repeat(200), true), 403, null);
+
+        verify(recorder).recordHttpRequestCompleted(
+                eq(actor),
+                eq("GET"),
+                eq("/api/v1/{unmatched}"),
+                eq(IP),
+                eq(403),
+                eq("FORBIDDEN"),
+                isNull()
+        );
+
+        verifyNoMoreInteractions(recorder);
+    }
+
+    @Test
+    @DisplayName("Should mask unknown segments of known resources")
+    void shouldMaskUnknownSegmentsOfKnownResources() throws Exception {
+        run(request("PATCH", "/api/v1/users/john.doe/deactivate", true),
+                403, null);
+
+        verify(recorder).recordHttpRequestCompleted(
+                eq(actor),
+                eq("PATCH"),
+                eq("/api/v1/users/{id}/deactivate"),
+                eq(IP),
+                eq(403),
+                eq("FORBIDDEN"),
+                isNull()
+        );
+
+        verifyNoMoreInteractions(recorder);
+    }
+
+    @Test
+    @DisplayName("Should collapse unknown HTTP methods")
+    void shouldCollapseUnknownMethods() throws Exception {
+        run(request("FOO", true), 403, null);
+
+        verify(recorder).recordHttpRequestCompleted(
+                eq(actor),
+                eq("OTHER"),
+                eq(PATH),
+                eq(IP),
+                eq(403),
+                eq("FORBIDDEN"),
+                isNull()
+        );
+
+        verifyNoMoreInteractions(recorder);
+    }
+
+    @Test
+    @DisplayName("Should record the outcome when the chain throws")
+    void shouldRecordOutcomeWhenChainThrows() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        FilterChain chain = (req, res) -> {
+            throw new IllegalStateException("boom");
+        };
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> filter.doFilter(request("POST", true), response, chain)
+        );
+
+        verify(recorder).recordHttpRequestCompleted(
+                eq(actor),
+                eq("POST"),
+                eq(PATH),
+                eq(IP),
+                eq(500),
+                eq("INTERNAL_ERROR"),
                 isNull()
         );
 

@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.unit.service.audit;
+    package com.lcsalvess.bankingsystem.unit.service.audit;
 
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
@@ -60,7 +60,12 @@ class AuditTrailRecorderTests {
     }
 
     private static User user() {
-        User user = new User("lucas", "lucas@example.com", "hash", Role.EMPLOYEE);
+        User user = new User(
+                "lucas",
+                "lucas@example.com",
+                "hash",
+                Role.EMPLOYEE
+        );
         ReflectionTestUtils.setField(user, "id", 7L);
         return user;
     }
@@ -226,13 +231,19 @@ class AuditTrailRecorderTests {
     @DisplayName("Should record a repeated block of the same subject only once per window")
     void shouldDeduplicateBlocksWithinWindow() {
         recorder.recordLoginBlocked(
-                "ghost", IP, RateLimitScope.USERNAME_AND_IP
+                "ghost",
+                IP,
+                RateLimitScope.USERNAME_AND_IP
         );
         recorder.recordLoginBlocked(
-                "ghost", IP, RateLimitScope.USERNAME_AND_IP
+                "ghost",
+                IP,
+                RateLimitScope.USERNAME_AND_IP
         );
         recorder.recordLoginBlocked(
-                "ghost", IP, RateLimitScope.USERNAME_AND_IP
+                "ghost",
+                IP,
+                RateLimitScope.USERNAME_AND_IP
         );
 
         verify(auditService, times(1)).recordDetached(any());
@@ -243,13 +254,17 @@ class AuditTrailRecorderTests {
     @DisplayName("Should record the block again after the window expires")
     void shouldRecordAgainAfterWindow() {
         recorder.recordLoginBlocked(
-                "ghost", IP, RateLimitScope.USERNAME
+                "ghost",
+                IP,
+                RateLimitScope.USERNAME
         );
 
         nanos.addAndGet(Duration.ofSeconds(61).toNanos());
 
         recorder.recordLoginBlocked(
-                "ghost", IP, RateLimitScope.USERNAME
+                "ghost",
+                IP,
+                RateLimitScope.USERNAME
         );
 
         verify(auditService, times(2)).recordDetached(any());
@@ -271,10 +286,14 @@ class AuditTrailRecorderTests {
         recorder.recordLoginBlocked("a", IP, RateLimitScope.USERNAME);
         recorder.recordLoginBlocked("b", IP, RateLimitScope.USERNAME);
         recorder.recordLoginBlocked(
-                "a", "192.0.2.11", RateLimitScope.USERNAME_AND_IP
+                "a",
+                "192.0.2.11",
+                RateLimitScope.USERNAME_AND_IP
         );
         recorder.recordLoginBlocked(
-                "a", "192.0.2.12", RateLimitScope.USERNAME_AND_IP
+                "a",
+                "192.0.2.12",
+                RateLimitScope.USERNAME_AND_IP
         );
         recorder.recordLoginBlocked("a", IP, RateLimitScope.USER_ID);
 
@@ -282,37 +301,74 @@ class AuditTrailRecorderTests {
     }
 
     @Test
-    @DisplayName("Should record an access denied for the endpoint")
-    void shouldRecordAccessDenied() {
+    @DisplayName("Should record a successful HTTP response for an authenticated user")
+    void shouldRecordSuccessfulHttpResponse() {
         UUID correlationId = UUID.randomUUID();
 
-        recorder.recordAccessDenied(
+        recorder.recordHttpRequestCompleted(
                 user(),
-                "GET",
-                "/api/v1/audit-events",
+                "POST",
+                "/api/v1/clients",
                 IP,
+                201,
+                null,
                 correlationId
         );
 
         DetachedAuditRecord record = lastRecord(1);
 
-        assertEquals(AuditEventType.ACCESS_DENIED, record.eventType());
-        assertEquals(AuditOutcome.DENIED, record.outcome());
+        assertEquals(
+                AuditEventType.HTTP_REQUEST_COMPLETED,
+                record.eventType()
+        );
+        assertEquals(AuditOutcome.SUCCESS, record.outcome());
         assertEquals(AuditActorType.USER, record.actorType());
         assertEquals(7L, record.actorUserId());
+        assertEquals("lucas", record.actorUsername());
         assertEquals(AuditEntityType.ENDPOINT, record.entityType());
-        assertEquals("GET /api/v1/audit-events", record.entityId());
-        assertEquals("FORBIDDEN", record.reason());
-        assertEquals(403, record.httpStatus());
+        assertEquals("POST /api/v1/clients", record.entityId());
+        assertEquals(201, record.httpStatus());
+        assertNull(record.reason());
+        assertEquals(IP, record.ipAddress().getHostAddress());
         assertEquals(correlationId, record.correlationId());
     }
 
     @Test
-    @DisplayName("Should record a failed operation with reason and status")
-    void shouldRecordOperationFailed() {
+    @DisplayName("Should record an unauthorized HTTP response for an anonymous request")
+    void shouldRecordUnauthorizedHttpResponse() {
         UUID correlationId = UUID.randomUUID();
 
-        recorder.recordOperationFailed(
+        recorder.recordHttpRequestCompleted(
+                null,
+                "POST",
+                "/api/v1/auth/login",
+                IP,
+                401,
+                null,
+                correlationId
+        );
+
+        DetachedAuditRecord record = lastRecord(1);
+
+        assertEquals(
+                AuditEventType.HTTP_REQUEST_COMPLETED,
+                record.eventType()
+        );
+        assertEquals(AuditOutcome.DENIED, record.outcome());
+        assertEquals(AuditActorType.ANONYMOUS, record.actorType());
+        assertNull(record.actorUserId());
+        assertNull(record.actorUsername());
+        assertEquals("UNAUTHORIZED", record.reason());
+        assertEquals(401, record.httpStatus());
+        assertEquals(correlationId, record.correlationId());
+    }
+
+    @Test
+    @DisplayName("Should preserve the business failure reason in the HTTP audit event")
+    void shouldPreserveBusinessFailureReason() {
+        UUID correlationId = UUID.randomUUID();
+
+        recorder.recordHttpRequestCompleted(
                 user(),
                 "POST",
                 "/api/v1/transactions/withdraw",
@@ -324,11 +380,40 @@ class AuditTrailRecorderTests {
 
         DetachedAuditRecord record = lastRecord(1);
 
-        assertEquals(AuditEventType.OPERATION_FAILED, record.eventType());
+        assertEquals(
+                AuditEventType.HTTP_REQUEST_COMPLETED,
+                record.eventType()
+        );
         assertEquals(AuditOutcome.FAILURE, record.outcome());
-        assertEquals("POST /api/v1/transactions/withdraw", record.entityId());
         assertEquals("INSUFFICIENT_BALANCE", record.reason());
         assertEquals(409, record.httpStatus());
+        assertEquals(correlationId, record.correlationId());
+    }
+
+    @Test
+    @DisplayName("Should use a generic reason for an HTTP server error")
+    void shouldRecordHttpServerError() {
+        UUID correlationId = UUID.randomUUID();
+
+        recorder.recordHttpRequestCompleted(
+                user(),
+                "GET",
+                "/api/v1/clients",
+                IP,
+                503,
+                null,
+                correlationId
+        );
+
+        DetachedAuditRecord record = lastRecord(1);
+
+        assertEquals(
+                AuditEventType.HTTP_REQUEST_COMPLETED,
+                record.eventType()
+        );
+        assertEquals(AuditOutcome.FAILURE, record.outcome());
+        assertEquals("HTTP_SERVER_ERROR", record.reason());
+        assertEquals(503, record.httpStatus());
         assertEquals(correlationId, record.correlationId());
     }
 

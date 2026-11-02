@@ -1,7 +1,9 @@
 package com.lcsalvess.bankingsystem.integration.audit;
 
+import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,10 +34,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * End-to-end tests (HTTP, filters, services, and PostgreSQL) verifying that
- * login events, access denials, and operation failures are recorded in the
- * audit trail. Since the audit table is immutable, each test uses a unique
- * username and queries only its own records.
+ * End-to-end tests (HTTP, filters, services, and PostgreSQL) verifying
+ * authentication events and HTTP request outcomes.
+ *
+ * <p>Business authentication events and HTTP completion events are
+ * independent records linked by the same correlation ID.
+ *
+ * <p>Since the audit table is immutable, each test uses a unique username
+ * and queries only its own records.
  */
 @ActiveProfiles("test")
 @SpringBootTest
@@ -47,6 +53,8 @@ class AuditSecurityEventsIntegrationTests {
     // Documentation range (RFC 5737): rate-limit bucket reserved for this test.
     private static final String CLIENT_IP = "198.51.100.77";
 
+    private static final String LOGIN_PATH = "/api/v1/auth/login";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -55,6 +63,9 @@ class AuditSecurityEventsIntegrationTests {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private LoginRateLimitProperties loginRateLimitProperties;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -77,53 +88,117 @@ class AuditSecurityEventsIntegrationTests {
     }
 
     @Test
-    @DisplayName("Should record failed login as anonymous LOGIN_FAILURE with IP address")
+    @DisplayName("Should record failed login and its actual HTTP response")
     void shouldRecordFailedLogin() throws Exception {
-        login("wrong-password").andExpect(status().isUnauthorized());
+        ResultActions result = login("wrong-password")
+                .andExpect(status().isUnauthorized());
 
-        Map<String, Object> row = single("LOGIN_FAILURE");
+        UUID correlationId = correlationIdOf(result);
 
-        assertEquals("FAILURE", row.get("outcome"));
-        assertEquals("ANONYMOUS", row.get("actor_type"));
-        assertNull(row.get("actor_user_id"));
-        assertEquals("AUTHENTICATION", row.get("entity_type"));
-        assertEquals("INVALID_CREDENTIALS", row.get("reason"));
-        assertEquals(CLIENT_IP, row.get("ip_address_text"));
+        Map<String, Object> loginRow = single("LOGIN_FAILURE");
+
+        assertEquals("FAILURE", loginRow.get("outcome"));
+        assertEquals("ANONYMOUS", loginRow.get("actor_type"));
+        assertNull(loginRow.get("actor_user_id"));
+        assertEquals("AUTHENTICATION", loginRow.get("entity_type"));
+        assertEquals("INVALID_CREDENTIALS", loginRow.get("reason"));
+        assertEquals(CLIENT_IP, loginRow.get("ip_address_text"));
+
+        Map<String, Object> httpRow =
+                singleHttpRequest(correlationId);
+
+        assertEquals(
+                "HTTP_REQUEST_COMPLETED",
+                httpRow.get("event_type")
+        );
+        assertEquals("DENIED", httpRow.get("outcome"));
+        assertEquals("ANONYMOUS", httpRow.get("actor_type"));
+        assertEquals("ENDPOINT", httpRow.get("entity_type"));
+        assertEquals(
+                "POST " + LOGIN_PATH,
+                httpRow.get("entity_id")
+        );
+        assertEquals("UNAUTHORIZED", httpRow.get("reason"));
+        assertEquals(401, httpRow.get("http_status"));
+        assertEquals(CLIENT_IP, httpRow.get("ip_address_text"));
+        assertEquals(correlationId, httpRow.get("correlation_id"));
+
+        assertEquals(
+                loginRow.get("correlation_id"),
+                httpRow.get("correlation_id")
+        );
     }
 
     @Test
-    @DisplayName("Should record successful login as LOGIN_SUCCESS for the authenticated user")
+    @DisplayName("Should record successful login and its actual HTTP response")
     void shouldRecordSuccessfulLogin() throws Exception {
-        login(PASSWORD).andExpect(status().isOk());
+        ResultActions result = login(PASSWORD)
+                .andExpect(status().isOk());
 
-        Map<String, Object> row = single("LOGIN_SUCCESS");
+        UUID correlationId = correlationIdOf(result);
 
-        assertEquals("SUCCESS", row.get("outcome"));
-        assertEquals("USER", row.get("actor_type"));
-        assertEquals(userId, ((Number) row.get("actor_user_id")).longValue());
-        assertEquals(CLIENT_IP, row.get("ip_address_text"));
-        assertNull(row.get("reason"));
+        Map<String, Object> loginRow = single("LOGIN_SUCCESS");
+
+        assertEquals("SUCCESS", loginRow.get("outcome"));
+        assertEquals("USER", loginRow.get("actor_type"));
+        assertEquals(
+                userId,
+                ((Number) loginRow.get("actor_user_id")).longValue()
+        );
+        assertEquals(CLIENT_IP, loginRow.get("ip_address_text"));
+        assertNull(loginRow.get("reason"));
+
+        Map<String, Object> httpRow =
+                singleHttpRequest(correlationId);
+
+        assertEquals(
+                "HTTP_REQUEST_COMPLETED",
+                httpRow.get("event_type")
+        );
+        assertEquals("SUCCESS", httpRow.get("outcome"));
+        assertEquals("ANONYMOUS", httpRow.get("actor_type"));
+        assertEquals("ENDPOINT", httpRow.get("entity_type"));
+        assertEquals(
+                "POST " + LOGIN_PATH,
+                httpRow.get("entity_id")
+        );
+        assertEquals(200, httpRow.get("http_status"));
+        assertEquals(CLIENT_IP, httpRow.get("ip_address_text"));
+        assertNull(httpRow.get("reason"));
+        assertEquals(correlationId, httpRow.get("correlation_id"));
+
+        assertEquals(
+                loginRow.get("correlation_id"),
+                httpRow.get("correlation_id")
+        );
     }
 
     @Test
-    @DisplayName("Should record URL authorization denial as ACCESS_DENIED for the authenticated user")
+    @DisplayName("Should record URL authorization denial as an HTTP request outcome")
     void shouldRecordAccessDenied() throws Exception {
         String token = loginAndGetToken();
 
         mockMvc.perform(get("/api/v1/audit-events")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer " + token
+                        )
                         .with(request -> {
                             request.setRemoteAddr(CLIENT_IP);
                             return request;
                         }))
                 .andExpect(status().isForbidden());
 
-        Map<String, Object> row = single("ACCESS_DENIED");
+        Map<String, Object> row =
+                single("HTTP_REQUEST_COMPLETED");
 
         assertEquals("DENIED", row.get("outcome"));
         assertEquals("USER", row.get("actor_type"));
         assertEquals("ENDPOINT", row.get("entity_type"));
-        assertEquals("GET /api/v1/audit-events", row.get("entity_id"));
+        assertEquals(
+                "GET /api/v1/audit-events",
+                row.get("entity_id")
+        );
         assertEquals("FORBIDDEN", row.get("reason"));
         assertEquals(403, row.get("http_status"));
         assertEquals(CLIENT_IP, row.get("ip_address_text"));
@@ -131,12 +206,15 @@ class AuditSecurityEventsIntegrationTests {
     }
 
     @Test
-    @DisplayName("Should record business failure on a data-modifying operation as OPERATION_FAILED")
+    @DisplayName("Should record business failure as an HTTP request outcome")
     void shouldRecordFailedOperation() throws Exception {
         String token = loginAndGetToken();
 
         mockMvc.perform(patch("/api/v1/auth/password")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer " + token
+                        )
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -150,27 +228,38 @@ class AuditSecurityEventsIntegrationTests {
                         }))
                 .andExpect(status().isBadRequest());
 
-        Map<String, Object> row = single("OPERATION_FAILED");
+        Map<String, Object> row =
+                single("HTTP_REQUEST_COMPLETED");
 
         assertEquals("FAILURE", row.get("outcome"));
-        assertEquals("PATCH /api/v1/auth/password", row.get("entity_id"));
-        assertEquals("INVALID_CURRENT_PASSWORD", row.get("reason"));
+        assertEquals("USER", row.get("actor_type"));
+        assertEquals("ENDPOINT", row.get("entity_type"));
+        assertEquals(
+                "PATCH /api/v1/auth/password",
+                row.get("entity_id")
+        );
+        assertEquals(
+                "INVALID_CURRENT_PASSWORD",
+                row.get("reason")
+        );
         assertEquals(400, row.get("http_status"));
         assertEquals(CLIENT_IP, row.get("ip_address_text"));
+        assertNotNull(row.get("correlation_id"));
     }
 
     @Test
-    @DisplayName("Should not record audit events for rejected anonymous requests")
+    @DisplayName("Should not record HTTP outcomes for rejected anonymous requests outside login")
     void shouldNotRecordAnonymousRejections() throws Exception {
-        int before = countOperationalFailures();
+        int before = countHttpRequestEvents();
 
-        mockMvc.perform(get("/api/v1/clients").with(request -> {
-                    request.setRemoteAddr(CLIENT_IP);
-                    return request;
-                }))
+        mockMvc.perform(get("/api/v1/clients")
+                        .with(request -> {
+                            request.setRemoteAddr(CLIENT_IP);
+                            return request;
+                        }))
                 .andExpect(status().isUnauthorized());
 
-        assertEquals(before, countOperationalFailures());
+        assertEquals(before, countHttpRequestEvents());
     }
 
     @Test
@@ -212,7 +301,46 @@ class AuditSecurityEventsIntegrationTests {
         );
     }
 
-    private void insert(String outcome, String reason, String ipAddress) {
+    @Test
+    @DisplayName("Should deduplicate repeated rate-limited login audit events")
+    void shouldDeduplicateRepeatedLoginBlocks() throws Exception {
+        int maxFailedAttempts = loginRateLimitProperties.maxFailedAttempts();
+
+        for (int i = 0; i < maxFailedAttempts; i++) {
+            login("wrong-password")
+                    .andExpect(status().isUnauthorized());
+        }
+
+        ResultActions firstBlocked = login("wrong-password")
+                .andExpect(status().isTooManyRequests());
+
+        UUID firstCorrelationId = correlationIdOf(firstBlocked);
+
+        ResultActions repeatedBlocked = login("wrong-password")
+                .andExpect(status().isTooManyRequests());
+
+        UUID repeatedCorrelationId = correlationIdOf(repeatedBlocked);
+
+        Map<String, Object> row = single("LOGIN_BLOCKED");
+
+        assertEquals("DENIED", row.get("outcome"));
+        assertEquals("ANONYMOUS", row.get("actor_type"));
+        assertEquals("RATE_LIMIT_USERNAME_AND_IP", row.get("reason"));
+        assertEquals(429, row.get("http_status"));
+        assertEquals(CLIENT_IP, row.get("ip_address_text"));
+        assertEquals(firstCorrelationId, row.get("correlation_id"));
+
+        assertEquals(1, countByEventTypeAndUsername("LOGIN_BLOCKED"));
+
+        assertEquals(0, countHttpRequestEvents(firstCorrelationId));
+        assertEquals(0, countHttpRequestEvents(repeatedCorrelationId));
+    }
+
+    private void insert(
+            String outcome,
+            String reason,
+            String ipAddress
+    ) {
         jdbcTemplate.update(
                 """
                 INSERT INTO audit_events
@@ -235,6 +363,11 @@ class AuditSecurityEventsIntegrationTests {
         );
     }
 
+    /**
+     * Finds an event associated with the current test user.
+     * HTTP completion records for authenticated requests retain the actor
+     * username, while business authentication events retain their own entity ID.
+     */
     private Map<String, Object> single(String eventType) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 """
@@ -249,19 +382,78 @@ class AuditSecurityEventsIntegrationTests {
                 username
         );
 
-        // ACCESS_DENIED and OPERATION_FAILED use the endpoint as entity_id.
-        // The unique username identifies the actor associated with those events.
-        assertEquals(1, rows.size(), "Rows for " + eventType + ": " + rows);
+        assertEquals(
+                1,
+                rows.size(),
+                "Rows for " + eventType + ": " + rows
+        );
 
         return rows.getFirst();
     }
 
-    private int countOperationalFailures() {
+    /**
+     * Login requests are anonymous at the HTTP layer. Their HTTP completion
+     * event is therefore located using the correlation ID returned by the API.
+     */
+    private Map<String, Object> singleHttpRequest(UUID correlationId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                """
+                SELECT audit_events.*,
+                       host(ip_address) AS ip_address_text
+                FROM audit_events
+                WHERE event_type = 'HTTP_REQUEST_COMPLETED'
+                  AND correlation_id = ?
+                """,
+                correlationId
+        );
+
+        assertEquals(
+                1,
+                rows.size(),
+                "HTTP request events for correlation ID "
+                        + correlationId + ": " + rows
+        );
+
+        return rows.getFirst();
+    }
+
+    private int countByEventTypeAndUsername(String eventType) {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT count(*)
                 FROM audit_events
-                WHERE event_type IN ('ACCESS_DENIED', 'OPERATION_FAILED')
+                WHERE event_type = ?
+                  AND actor_username = ?
+                """,
+                Integer.class,
+                eventType,
+                username
+        );
+
+        return count == null ? 0 : count;
+    }
+
+    private int countHttpRequestEvents(UUID correlationId) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT count(*)
+                FROM audit_events
+                WHERE event_type = 'HTTP_REQUEST_COMPLETED'
+                  AND correlation_id = ?
+                """,
+                Integer.class,
+                correlationId
+        );
+
+        return count == null ? 0 : count;
+    }
+
+    private int countHttpRequestEvents() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT count(*)
+                FROM audit_events
+                WHERE event_type = 'HTTP_REQUEST_COMPLETED'
                 """,
                 Integer.class
         );
@@ -269,8 +461,18 @@ class AuditSecurityEventsIntegrationTests {
         return count == null ? 0 : count;
     }
 
+    private UUID correlationIdOf(ResultActions result) throws Exception {
+        String header = result.andReturn()
+                .getResponse()
+                .getHeader(CorrelationIdFilter.CORRELATION_ID_HEADER);
+
+        assertNotNull(header, "Correlation ID response header is missing");
+
+        return UUID.fromString(header);
+    }
+
     private ResultActions login(String password) throws Exception {
-        return mockMvc.perform(post("/api/v1/auth/login")
+        return mockMvc.perform(post(LOGIN_PATH)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {

@@ -1,4 +1,4 @@
-    package com.lcsalvess.bankingsystem.unit.service.audit;
+package com.lcsalvess.bankingsystem.unit.service.audit;
 
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
@@ -298,6 +298,40 @@ class AuditTrailRecorderTests {
         recorder.recordLoginBlocked("a", IP, RateLimitScope.USER_ID);
 
         verify(auditService, times(5)).recordDetached(any());
+    }
+
+    @Test
+    @DisplayName("Should retry a blocked event after a failed audit write")
+    void shouldRetryBlockedEventAfterWriteFailure() {
+        doThrow(new IllegalStateException("database down"))
+                .doNothing()
+                .when(auditService).recordDetached(any());
+
+        // First attempt fails and releases its deduplication reservation.
+        recorder.recordLoginBlocked(
+                "ghost",
+                IP,
+                RateLimitScope.USERNAME
+        );
+
+        // Second attempt retries and succeeds.
+        recorder.recordLoginBlocked(
+                "ghost",
+                IP,
+                RateLimitScope.USERNAME
+        );
+
+        // Third attempt is deduplicated after the successful write.
+        recorder.recordLoginBlocked(
+                "ghost",
+                IP,
+                RateLimitScope.USERNAME
+        );
+
+        verify(auditService, times(2)).recordDetached(any());
+
+        assertEquals(1.0, counter("audit.detached.write.failures"));
+        assertEquals(1.0, counter("audit.detached.deduplicated"));
     }
 
     @Test

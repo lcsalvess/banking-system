@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.config.openapi;
 
 import com.lcsalvess.bankingsystem.config.openapi.OpenApiConfig;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
@@ -265,6 +266,14 @@ class OpenApiConfigTests {
 
                 assertEquals("Invalid credentials.", response.getDescription());
                 assertEquals(ERROR_SCHEMA_REF, jsonOf(response).getSchema().get$ref());
+
+                Map<?, ?> example = exampleOf(jsonOf(response));
+
+                assertEquals(
+                        ApiErrorMessages.INVALID_CREDENTIALS,
+                        example.get("message")
+                );
+
                 assertNull(login.getResponses().get("403"));
             }
         }

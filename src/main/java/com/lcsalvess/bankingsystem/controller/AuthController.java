@@ -2,11 +2,14 @@ package com.lcsalvess.bankingsystem.controller;
 
 import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
+import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.PasswordChangeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -54,6 +57,25 @@ public class AuthController {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid request body or validation errors."
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Invalid username or password.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(
+                                    implementation = ApiErrorResponse.class
+                            ),
+                            examples = @ExampleObject(
+                                    value = """
+                                {
+                                  "status": 401,
+                                  "message": "Usuário ou senha inválidos.",
+                                  "timestamp": "2026-10-15T18:30:00Z"
+                                }
+                                """
+                            )
+                    )
             ),
             @ApiResponse(
                     responseCode = "429",

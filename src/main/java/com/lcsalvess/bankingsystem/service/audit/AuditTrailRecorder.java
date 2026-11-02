@@ -169,46 +169,28 @@ public class AuditTrailRecorder {
         ));
     }
 
-    public void recordAccessDenied(
-            User actor,
-            String method,
-            String path,
-            String clientIp,
-            UUID correlationId
-    ) {
-        write(new DetachedAuditRecord(
-                AuditEventType.ACCESS_DENIED,
-                AuditOutcome.DENIED,
-                AuditActorType.USER,
-                actor.getId(),
-                actor.getUsername(),
-                AuditEntityType.ENDPOINT,
-                method + " " + path,
-                "FORBIDDEN",
-                parseClientIp(clientIp),
-                403,
-                correlationId
-        ));
-    }
-
-    public void recordOperationFailed(
+    public void recordHttpRequestCompleted(
             User actor,
             String method,
             String path,
             String clientIp,
             int httpStatus,
-            String reason,
+            String failureReason,
             UUID correlationId
     ) {
+        AuditOutcome outcome = outcomeOf(httpStatus);
+
         write(new DetachedAuditRecord(
-                AuditEventType.OPERATION_FAILED,
-                AuditOutcome.FAILURE,
-                AuditActorType.USER,
-                actor.getId(),
-                actor.getUsername(),
+                AuditEventType.HTTP_REQUEST_COMPLETED,
+                outcome,
+                actor != null
+                        ? AuditActorType.USER
+                        : AuditActorType.ANONYMOUS,
+                actor != null ? actor.getId() : null,
+                actor != null ? actor.getUsername() : null,
                 AuditEntityType.ENDPOINT,
                 method + " " + path,
-                reason,
+                reasonForHttpStatus(httpStatus, failureReason),
                 parseClientIp(clientIp),
                 httpStatus,
                 correlationId
@@ -275,5 +257,49 @@ public class AuditTrailRecorder {
                     exception
             );
         }
+    }
+
+    private static AuditOutcome outcomeOf(int httpStatus) {
+        if (httpStatus >= 200 && httpStatus < 400) {
+            return AuditOutcome.SUCCESS;
+        }
+
+        if (httpStatus == 401
+                || httpStatus == 403
+                || httpStatus == 429) {
+            return AuditOutcome.DENIED;
+        }
+
+        return AuditOutcome.FAILURE;
+    }
+
+    private static String reasonForHttpStatus(
+            int httpStatus,
+            String failureReason
+    ) {
+        if (httpStatus >= 200 && httpStatus < 400) {
+            return null;
+        }
+
+        if (failureReason != null && !failureReason.isBlank()) {
+            return failureReason;
+        }
+
+        return switch (httpStatus) {
+            case 401 -> "UNAUTHORIZED";
+            case 403 -> "FORBIDDEN";
+            case 429 -> "RATE_LIMIT_EXCEEDED";
+            default -> {
+                if (httpStatus >= 500) {
+                    yield "HTTP_SERVER_ERROR";
+                }
+
+                if (httpStatus >= 400) {
+                    yield "HTTP_CLIENT_ERROR";
+                }
+
+                yield "HTTP_UNEXPECTED_STATUS";
+            }
+        };
     }
 }

@@ -16,6 +16,7 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerMapping;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -24,27 +25,37 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Records audit events for authenticated requests whose outcomes are not
- * captured by the business-operation audit records, including access denials,
- * failures of data-modifying operations, and server errors.
+ * Records the final HTTP outcome of relevant API requests.
  *
- * <p>Registered as a servlet filter outside the Spring Security filter chain,
- * it wraps downstream request processing. After the filter chain returns,
- * it inspects the HTTP response status and request attributes populated by
- * authentication and MVC exception handling to determine whether an audit
- * event should be recorded.
+ * <p>Business events remain recorded transactionally by AuditService.
+ * This filter complements them with the actual HTTP response returned
+ * by the API.
  *
- * <p>Requests without an authenticated application user are ignored by this
- * filter. Authentication events, including login successes, failures, and
- * rate-limit blocks, are recorded by the authentication flow.
+ * <p>Successful state-changing requests, authenticated request failures,
+ * and login requests are recorded. Successful read-only requests and
+ * anonymous rejections outside the login endpoint are ignored.
+ *
+ * <p>The audit write is best-effort and must never change the original
+ * HTTP response.
  */
 public class AuditTrailFilter extends OncePerRequestFilter {
 
-    private static final Set<String> READ_ONLY_METHODS =
-            Set.of("GET", "HEAD", "OPTIONS");
+    private static final String API_BASE_PATH = "/api/v1";
+    private static final String LOGIN_PATH = "/api/v1/auth/login";
+
+    private static final Set<String> STATE_CHANGING_METHODS =
+            Set.of("POST", "PUT", "PATCH", "DELETE");
 
     private static final Pattern CAMEL_BOUNDARY =
             Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
+
+    private static final Pattern UUID_PATH_SEGMENT = Pattern.compile(
+            "(?i)(?<=/)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+                    + "[0-9a-f]{4}-[0-9a-f]{12}(?=/|$)"
+    );
+
+    private static final Pattern NUMERIC_PATH_SEGMENT =
+            Pattern.compile("(?<=/)\\d+(?=/|$)");
 
     private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 
@@ -63,50 +74,156 @@ public class AuditTrailFilter extends OncePerRequestFilter {
 
         filterChain.doFilter(request, response);
 
-        if (!(request.getAttribute(AuditRequestAttributes.AUTHENTICATED_USER)
-                instanceof User actor)) {
+        String method = request.getMethod();
+        String path = endpointPath(request);
+
+        if (!isApiPath(path)) {
             return;
         }
 
-        int status = response.getStatus();
-        String method = request.getMethod();
-        String path = request.getRequestURI();
-        String clientIp = request.getRemoteAddr();
-        UUID correlationId = correlationIdOf(response);
-        Object failure =
-                request.getAttribute(AuditRequestAttributes.FAILURE_EXCEPTION);
+        User actor = request.getAttribute(
+                AuditRequestAttributes.AUTHENTICATED_USER
+        ) instanceof User authenticatedUser
+                ? authenticatedUser
+                : null;
 
-        if (status == HttpServletResponse.SC_FORBIDDEN) {
-            auditTrailRecorder.recordAccessDenied(
-                    actor, method, path, clientIp, correlationId
-            );
-        } else if (status >= 500) {
-            auditTrailRecorder.recordOperationFailed(
-                    actor, method, path, clientIp, status,
-                    reasonOf(failure), correlationId
-            );
-        } else if (status >= 400
-                && !READ_ONLY_METHODS.contains(method)
-                && failure instanceof BusinessException) {
-            auditTrailRecorder.recordOperationFailed(
-                    actor, method, path, clientIp, status,
-                    reasonOf(failure), correlationId
-            );
+        int status = response.getStatus();
+
+        boolean loginRequest = "POST".equals(method)
+                && LOGIN_PATH.equals(path);
+
+        /*
+         * LOGIN_BLOCKED is already deduplicated by AuditTrailRecorder.
+         * Recording every HTTP 429 here would bypass that protection.
+         */
+        if (loginRequest && status == 429) {
+            return;
         }
+
+        boolean stateChangingRequest =
+                STATE_CHANGING_METHODS.contains(method);
+
+        boolean failedRequest = status >= 400;
+
+        /*
+         * Anonymous requests are only recorded for the login endpoint.
+         * This avoids allowing unauthenticated requests to flood the
+         * append-only audit table.
+         */
+        if (!loginRequest
+                && (actor == null
+                || (!stateChangingRequest && !failedRequest))) {
+            return;
+        }
+
+        Object failure = request.getAttribute(
+                AuditRequestAttributes.FAILURE_EXCEPTION
+        );
+
+        String failureReason = status >= 400
+                ? failureReasonOf(status, failure)
+                : null;
+
+        auditTrailRecorder.recordHttpRequestCompleted(
+                actor,
+                method,
+                path,
+                request.getRemoteAddr(),
+                status,
+                failureReason,
+                correlationIdOf(response)
+        );
+    }
+
+    private static boolean isApiPath(String path) {
+        return path.equals(API_BASE_PATH)
+                || path.startsWith(API_BASE_PATH + "/");
     }
 
     /**
-     * Código estável do motivo. Para erros de negócio vem do nome da classe
-     * ({@code InsufficientBalanceException} vira
-     * {@code INSUFFICIENT_BALANCE}); para o resto, um código fixo, para nunca
-     * gravar nome de classe interna nem mensagem de exceção.
+     * Uses the MVC route pattern when available. For requests rejected
+     * before MVC dispatch, falls back to the request URI while masking
+     * numeric and UUID path segments.
+     */
+    private static String endpointPath(HttpServletRequest request) {
+        Object matchingPattern = request.getAttribute(
+                HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE
+        );
+
+        if (matchingPattern != null) {
+            return matchingPattern.toString();
+        }
+
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+
+        if (contextPath != null
+                && !contextPath.isEmpty()
+                && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+
+        path = UUID_PATH_SEGMENT.matcher(path)
+                .replaceAll("{id}");
+
+        return NUMERIC_PATH_SEGMENT.matcher(path)
+                .replaceAll("{id}");
+    }
+
+    /**
+     * Maps known HTTP outcomes to stable reason codes.
+     * Business exceptions retain their specific codes.
+     */
+    private static String failureReasonOf(
+            int httpStatus,
+            Object failure
+    ) {
+        if (httpStatus == HttpServletResponse.SC_UNAUTHORIZED) {
+            return "UNAUTHORIZED";
+        }
+
+        if (httpStatus == HttpServletResponse.SC_FORBIDDEN) {
+            return "FORBIDDEN";
+        }
+
+        if (httpStatus == 429) {
+            return "RATE_LIMIT_EXCEEDED";
+        }
+
+        if (failure instanceof BusinessException
+                || failure instanceof DataIntegrityViolationException
+                || failure instanceof PessimisticLockingFailureException
+                || failure instanceof QueryTimeoutException
+                || failure instanceof DataAccessResourceFailureException
+                || failure instanceof CannotCreateTransactionException
+                || failure instanceof AddressProviderUnavailableException) {
+            return reasonOf(failure);
+        }
+
+        /*
+         * Preserve a specific internal failure code for server errors.
+         * Unknown client errors use the generic code from AuditTrailRecorder.
+         */
+        if (httpStatus >= 500 && failure != null) {
+            return reasonOf(failure);
+        }
+
+        return null;
+    }
+
+    /**
+     * Converts known exception types into stable reason codes.
+     * Exception messages and internal class names are never persisted.
      */
     static String reasonOf(Object failure) {
         if (failure instanceof BusinessException) {
             String name = failure.getClass().getSimpleName();
 
             if (name.endsWith("Exception")) {
-                name = name.substring(0, name.length() - "Exception".length());
+                name = name.substring(
+                        0,
+                        name.length() - "Exception".length()
+                );
             }
 
             String code = CAMEL_BOUNDARY.matcher(name)
@@ -141,8 +258,8 @@ public class AuditTrailFilter extends OncePerRequestFilter {
     }
 
     /**
-     * O MDC já foi limpo pelo {@code CorrelationIdFilter} quando este filtro
-     * grava; o id continua disponível no cabeçalho da resposta.
+     * The CorrelationIdFilter clears the MDC before this filter records.
+     * The response header remains available and carries the request ID.
      */
     private static UUID correlationIdOf(HttpServletResponse response) {
         String header = response.getHeader(

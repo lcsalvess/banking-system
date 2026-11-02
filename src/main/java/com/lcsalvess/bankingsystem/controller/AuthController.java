@@ -56,6 +56,10 @@ public class AuthController {
                     description = "Invalid request body or validation errors."
             ),
             @ApiResponse(
+                    responseCode = "401",
+                    description = "Invalid username or password."
+            ),
+            @ApiResponse(
                     responseCode = "429",
                     description = "Too many login attempts. Retry after the indicated delay.",
                     headers = @Header(

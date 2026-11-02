@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.config.openapi;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import io.swagger.v3.oas.models.*;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
@@ -128,7 +129,11 @@ public class OpenApiConfig {
 
                         operation.getResponses().forEach((status, response) -> {
                             if (status.matches("[45]\\d\\d")) {
-                                response.setContent(errorContent(status));
+                                String message = isPublicLogin && "401".equals(status)
+                                        ? ApiErrorMessages.INVALID_CREDENTIALS
+                                        : errorMessage(status);
+
+                                response.setContent(errorContent(status, message));
                             }
                         });
 
@@ -413,19 +418,10 @@ public class OpenApiConfig {
     }
 
     private Content errorContent(String status) {
-        String message = switch (status) {
-            case "400" -> "Request validation failed.";
-            case "401" -> "Authentication is required or the JWT is invalid.";
-            case "403" -> "Insufficient permissions to access this resource.";
-            case "404" -> "The requested resource was not found.";
-            case "405" -> "The HTTP method is not supported.";
-            case "409" -> "The request conflicts with the current resource state.";
-            case "415" -> "The request content type is not supported.";
-            case "429" -> "Too many login attempts. Please wait before trying again.";
-            case "503" -> "Service temporarily unavailable.";
-            default -> "Unexpected internal server error.";
-        };
+        return errorContent(status, errorMessage(status));
+    }
 
+    private Content errorContent(String status, String message) {
         return new Content()
                 .addMediaType(
                         "application/json",
@@ -438,5 +434,20 @@ public class OpenApiConfig {
                                         "timestamp", "2026-10-15T18:30:00Z"
                                 ))
                 );
+    }
+
+    private String errorMessage(String status) {
+        return switch (status) {
+            case "400" -> "Request validation failed.";
+            case "401" -> "Authentication is required or the JWT is invalid.";
+            case "403" -> "Insufficient permissions to access this resource.";
+            case "404" -> "The requested resource was not found.";
+            case "405" -> "The HTTP method is not supported.";
+            case "409" -> "The request conflicts with the current resource state.";
+            case "415" -> "The request content type is not supported.";
+            case "429" -> "Too many login attempts. Please wait before trying again.";
+            case "503" -> "Service temporarily unavailable.";
+            default -> "Unexpected internal server error.";
+        };
     }
 }

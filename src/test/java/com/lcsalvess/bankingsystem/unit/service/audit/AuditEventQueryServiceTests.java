@@ -341,7 +341,7 @@ class AuditEventQueryServiceTests {
     }
 
     private static AuditEvent createEvent(Long id) {
-        AuditEvent event = new AuditEvent(
+        AuditEvent event = AuditEvent.create(
                 AuditEventType.USER_CREATED,
                 AuditOutcome.SUCCESS,
                 AuditActorType.USER,

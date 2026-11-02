@@ -13,11 +13,12 @@ import jakarta.validation.constraints.NotNull;
 
 import java.net.InetAddress;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Registro imutável de uma operação auditada. O banco rejeita UPDATE, DELETE e
- * TRUNCATE nesta tabela, e por isso nenhuma coluna é atualizável.
+ * Immutable record of an audited operation. The database rejects UPDATE,
+ * DELETE, and TRUNCATE operations on this table, so no column is updatable.
  */
 @Entity
 @Table(name = "audit_events")
@@ -73,10 +74,28 @@ public class AuditEvent {
     @Column(name = "http_status", updatable = false)
     private Integer httpStatus;
 
+    /**
+     * Constructor required by JPA. It is not public to prevent application
+     * code from creating instances without using the factory methods.
+     */
     protected AuditEvent() {
     }
 
-    public AuditEvent(
+    /**
+     * Creates an audit event without additional HTTP information.
+     *
+     * @param eventType the type of event being recorded
+     * @param outcome the outcome of the audited operation
+     * @param actorType the type of actor responsible for the operation
+     * @param actorUserId the ID of the user responsible for the operation, if applicable
+     * @param actorUsername the username of the actor, if applicable
+     * @param entityType the type of entity affected by the operation
+     * @param entityId the identifier of the affected entity
+     * @param correlationId the correlation ID associated with the request, if available
+     * @param createdAt the timestamp when the event occurred
+     * @return a new audit event
+     */
+    public static AuditEvent create(
             AuditEventType eventType,
             AuditOutcome outcome,
             AuditActorType actorType,
@@ -87,7 +106,7 @@ public class AuditEvent {
             UUID correlationId,
             Instant createdAt
     ) {
-        this(
+        return create(
                 eventType,
                 outcome,
                 actorType,
@@ -103,7 +122,24 @@ public class AuditEvent {
         );
     }
 
-    public AuditEvent(
+    /**
+     * Creates an audit event with additional HTTP information.
+     *
+     * @param eventType the type of event being recorded
+     * @param outcome the outcome of the audited operation
+     * @param actorType the type of actor responsible for the operation
+     * @param actorUserId the ID of the user responsible for the operation, if applicable
+     * @param actorUsername the username of the actor, if applicable
+     * @param entityType the type of entity affected by the operation
+     * @param entityId the identifier of the affected entity
+     * @param correlationId the correlation ID associated with the request, if available
+     * @param createdAt the timestamp when the event occurred
+     * @param ipAddress the IP address associated with the request, if available
+     * @param reason the reason associated with the event, if applicable
+     * @param httpStatus the HTTP response status, if applicable
+     * @return a new audit event
+     */
+    public static AuditEvent create(
             AuditEventType eventType,
             AuditOutcome outcome,
             AuditActorType actorType,
@@ -117,11 +153,67 @@ public class AuditEvent {
             String reason,
             Integer httpStatus
     ) {
-        Instant normalizedCreatedAt = InstantPrecision.truncateToMicros(
-                createdAt,
-                "The audit event creation timestamp is required."
+        AuditEventType validatedEventType = Objects.requireNonNull(
+                eventType,
+                "The audit event type is required."
         );
 
+        AuditOutcome validatedOutcome = Objects.requireNonNull(
+                outcome,
+                "The audit event outcome is required."
+        );
+
+        AuditActorType validatedActorType = Objects.requireNonNull(
+                actorType,
+                "The audit event actor type is required."
+        );
+
+        AuditEntityType validatedEntityType = Objects.requireNonNull(
+                entityType,
+                "The audit event entity type is required."
+        );
+
+        String validatedEntityId = Objects.requireNonNull(
+                entityId,
+                "The audit event entity ID is required."
+        );
+
+        Instant validatedCreatedAt = validateCreatedAt(createdAt);
+
+        return new AuditEvent(
+                validatedEventType,
+                validatedOutcome,
+                validatedActorType,
+                actorUserId,
+                actorUsername,
+                validatedEntityType,
+                validatedEntityId,
+                correlationId,
+                validatedCreatedAt,
+                ipAddress,
+                reason,
+                httpStatus
+        );
+    }
+
+    /**
+     * Internal constructor with no validation or operations that may throw
+     * exceptions during object initialization.
+     */
+    private AuditEvent(
+            AuditEventType eventType,
+            AuditOutcome outcome,
+            AuditActorType actorType,
+            Long actorUserId,
+            String actorUsername,
+            AuditEntityType entityType,
+            String entityId,
+            UUID correlationId,
+            Instant createdAt,
+            InetAddress ipAddress,
+            String reason,
+            Integer httpStatus
+    ) {
         this.eventType = eventType;
         this.outcome = outcome;
         this.actorType = actorType;
@@ -130,7 +222,7 @@ public class AuditEvent {
         this.entityType = entityType;
         this.entityId = entityId;
         this.correlationId = correlationId;
-        this.createdAt = normalizedCreatedAt;
+        this.createdAt = createdAt;
         this.ipAddress = ipAddress;
         this.reason = reason;
         this.httpStatus = httpStatus;
@@ -186,5 +278,12 @@ public class AuditEvent {
 
     public Integer getHttpStatus() {
         return httpStatus;
+    }
+
+    private static Instant validateCreatedAt(Instant createdAt) {
+        return InstantPrecision.truncateToMicros(
+                createdAt,
+                "The audit event creation timestamp is required."
+        );
     }
 }

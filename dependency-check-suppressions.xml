@@ -3,4 +3,39 @@
               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
               xsi:schemaLocation="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd
                                   https://dependency-check.github.io/DependencyCheck/dependency-suppression.1.4.xsd">
+
+    <suppress until="2027-01-31Z">
+        <notes><![CDATA[
+            False positive reported by Sonatype OSS Index for Spring Security 7.1.2.
+
+            The official Spring advisory identifies Spring Security 7.1.0
+            as affected. The vulnerability was fixed in version 7.1.1.
+            Spring Security 7.1.2 includes the fix.
+
+            Advisory: https://spring.io/security/cve-2026-47842
+
+            Re-evaluate when updating the resolved dependency version
+            or when Sonatype corrects its vulnerability metadata.
+        ]]></notes>
+        <packageUrl>pkg:maven/org.springframework.security/spring-security-crypto@7.1.2</packageUrl>
+        <cve>CVE-2026-47842</cve>
+    </suppress>
+
+    <suppress until="2027-01-31Z">
+        <notes><![CDATA[
+            False positive reported by Sonatype OSS Index for Spring Security 7.1.2.
+
+            The official Spring advisory lists affected versions in the
+            5.7, 5.8, 6.3, 6.4 and 6.5 release lines.
+            Spring Security 7.1.2 is not listed as affected.
+
+            Advisory: https://spring.io/security/cve-2026-47838
+
+            Re-evaluate when updating the resolved dependency version
+            or when Sonatype corrects its vulnerability metadata.
+        ]]></notes>
+        <packageUrl>pkg:maven/org.springframework.security/spring-security-web@7.1.2</packageUrl>
+        <cve>CVE-2026-47838</cve>
+    </suppress>
+
 </suppressions>

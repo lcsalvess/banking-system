@@ -8,6 +8,8 @@ updates:
       interval: "cron"
       cronjob: "0 9 * * *"
       timezone: "America/Sao_Paulo"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     commit-message:
       prefix: "build(deps)"
@@ -23,6 +25,8 @@ updates:
       interval: "cron"
       cronjob: "30 9 * * *"
       timezone: "America/Sao_Paulo"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     commit-message:
       prefix: "ci(deps)"

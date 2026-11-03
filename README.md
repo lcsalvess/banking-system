@@ -1,5 +1,10 @@
 # Banking System
 
+[![CI](https://github.com/lcsalvess/banking-system/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/lcsalvess/banking-system/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/lcsalvess/banking-system/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/lcsalvess/banking-system/actions/workflows/codeql.yml)
+[![OWASP Dependency-Check](https://github.com/lcsalvess/banking-system/actions/workflows/dependency-check.yml/badge.svg?branch=master)](https://github.com/lcsalvess/banking-system/actions/workflows/dependency-check.yml)
+[![Zizmor](https://github.com/lcsalvess/banking-system/actions/workflows/zizmor.yml/badge.svg?branch=master)](https://github.com/lcsalvess/banking-system/actions/workflows/zizmor.yml)
+
 ## About
 A banking system backend developed with Java and Spring Boot, designed as a RESTful API with PostgreSQL persistence, authentication and authorization, external service integration, observability, and automated testing.
 

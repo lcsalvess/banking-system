@@ -8,6 +8,7 @@ on:
       - .mvn/**
       - mvnw
       - mvnw.cmd
+      - dependency-check-suppressions.xml
       - .github/workflows/dependency-check.yml
 
   pull_request:
@@ -17,6 +18,7 @@ on:
       - .mvn/**
       - mvnw
       - mvnw.cmd
+      - dependency-check-suppressions.xml
       - .github/workflows/dependency-check.yml
 
   schedule:

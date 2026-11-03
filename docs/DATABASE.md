@@ -100,7 +100,13 @@
 - `V27__make_transactions_append_only.sql` makes `transactions` append-only for every database role, including the
   table owner, with `BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers, the same approach V19 uses for
   `audit_events`. See "Append-only ledger" below.
-- Schema changes must be added as new versioned migrations (`V28__description.sql`, and so on). Migrations that were
+- `V28__extend_audit_events_for_security_events.sql` adds the nullable columns `ip_address` (`INET`), `reason`
+  (`VARCHAR(60)`), and `http_status` to `audit_events`, so existing rows are unchanged. New check constraints require
+  `ip_address` to be a single host (`/32` or `/128`), `reason` to match `^[A-Z][A-Z0-9_]{0,59}$`, `http_status` to be
+  between 100 and 599, and every non-`SUCCESS` event to have a `reason`. It also creates the partial index
+  `idx_audit_events_ip_address_created_at`. The runtime privileges are granted per table, so the new columns are
+  covered by the existing `SELECT` and `INSERT` grants.
+- Schema changes must be added as new versioned migrations (`V29__description.sql`, and so on). Migrations that were
   already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database
   privileges; do not edit them. Changes to the runtime role's privilege policy go in
   `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
@@ -210,6 +216,8 @@ fails with `permission denied` in CI instead of in production.
   case-insensitive prefix search of `actorUsername`; substring search is not supported because it would need the
   `pg_trgm` extension, and creating an extension requires privileges that `banking_migrator` does not have.
   `idx_audit_events_entity` and `idx_audit_events_actor` (from V19) serve lookups by affected entity and by actor ID.
+  `idx_audit_events_ip_address_created_at` (from V28) is a partial index on `ip_address` and `created_at DESC`, for
+  investigations such as "what did this IP do"; the audit query API does not filter by IP address.
 - The database constraint and index names mapped to business errors are centralized in the `DatabaseConstraint` enum
   within the Java application code. Each name must match a constraint or index defined by a Flyway migration.
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).

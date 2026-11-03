@@ -36,6 +36,8 @@ An administrator can deactivate other users but cannot deactivate
 their own account. Such a request returns `403 Forbidden`.
 The last active administrator also cannot be deactivated.
 
+`POST /api/v1/auth/login` returns `401 Unauthorized` with a generic message for invalid credentials, a disabled account, or an unknown username, so the response does not reveal whether the account exists. Every login outcome is recorded in the audit trail (see [Audit Trail](BUSINESS_RULES.md#audit-trail)).
+
 `POST /api/v1/auth/login` is rate limited per client IP, per username and IP, and per username (see [Login Rate Limiting](SECURITY.md#login-rate-limiting)). When a limit is reached, it returns `429 Too Many Requests` with a `Retry-After` header holding the number of seconds to wait:
 
 ```http
@@ -78,6 +80,10 @@ The endpoint supports the following optional filters:
 - `actorUsername`: case-insensitive search by the beginning of the username.
 - `entityType`: exact type of the affected entity.
 - `entityId`: exact affected entity ID.
+
+Each event contains `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, and `createdAt`. Security and HTTP events also contain `ipAddress`, `reason`, and `httpStatus`. Fields without a value are omitted from the response.
+
+The event types currently generated are the business events (`USER_CREATED`, `USER_DEACTIVATED`, `USER_REACTIVATED`, `USER_PASSWORD_CHANGED`, `CLIENT_CREATED`, `CLIENT_UPDATED`, `ACCOUNT_CREATED`, `ACCOUNT_CANCELLED`, `DEPOSIT`, `WITHDRAWAL`, and `TRANSFER`) and the security events `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGIN_BLOCKED`, and `HTTP_REQUEST_COMPLETED`. A request normally produces a business or login event and an `HTTP_REQUEST_COMPLETED` event with the same `correlationId`.
 
 Blank optional text filters are ignored. Invalid filters, dates,
 pagination, or sorting parameters return `400 Bad Request`.

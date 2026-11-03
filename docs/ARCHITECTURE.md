@@ -13,7 +13,7 @@ src/main/java/com/lcsalvess/bankingsystem
 ├── entity/          # Domain entities and enums, grouped by domain, including audit events
 ├── event/           # Application events, post-commit log listeners, and the in-transaction audit listener
 ├── exception/          # Business exceptions, database constraints, error messages, and global handling
-├── filter/             # HTTP filters, including correlation ID propagation
+├── filter/             # HTTP filters, including correlation ID propagation and HTTP outcome auditing
 ├── integration/
 │   └── address/        # External address-provider clients and lookup orchestration
 │       ├── brasilapi/
@@ -27,11 +27,11 @@ src/main/java/com/lcsalvess/bankingsystem
 │   ├── idempotency/    # Transaction idempotency persistence
 │   ├── projection/     # Read-only query projections
 │   └── specification/  # Dynamic filters
-├── security/           # JWT authentication filter and JSON handlers for 401/403 responses
+├── security/           # JWT authentication filter, JSON handlers for 401/403 responses, and audit request attributes
 ├── serialization/      # Custom JSON serialization
 ├── util/               # Normalization, CPF masking, time-zone, and pagination utilities
 ├── service/            # Business rules and application logic
-│   ├── audit/          # Audit event recording and read-only audit queries
+│   ├── audit/          # In-transaction and detached audit recording, and read-only audit queries
 │   ├── account/        # Account operations, row locking, and account number generation
 │   ├── address/        # Address-resolution application logic
 │   ├── client/         # Client operations and persistence responsibilities
@@ -64,7 +64,7 @@ The diagram below illustrates the simplified request/response flow, from authent
 ```mermaid
 flowchart TB
     client["Client<br/>HTTP request"]
-    security["Filters and Spring Security<br/>Correlation ID, JWT authentication<br/>and authorization"]
+    security["Filters and Spring Security<br/>Audit trail filter, Correlation ID,<br/>JWT authentication and authorization"]
     controller["REST Controller<br/>Request binding and validation"]
     service["Service Layer<br/>Business rules and transaction management"]
 
@@ -83,6 +83,19 @@ flowchart TB
 
 On successful execution, the service returns the operation result to the
 controller, which maps it to a response DTO and produces the HTTP response.
+
+### Audit Recording
+
+Audit events follow two paths:
+
+- **In the operation's transaction.** `AuditService#recordSuccess` uses `Propagation.MANDATORY`, so the event commits or rolls back together with the business change. A failure to write it prevents the operation from committing.
+- **Outside the transaction.** `AuditTrailRecorder` writes login events and HTTP outcomes through `AuditService#recordDetached` (`REQUIRES_NEW`). It is best-effort, deduplicates repeated events, pauses writes after database availability failures, and must not be called inside an active transaction.
+
+`AuditTrailFilter` is registered as a servlet filter with `Ordered.HIGHEST_PRECEDENCE + 10`, outside the Spring Security chain, and records the outcome in a `finally` block, so it sees the final status of 401/403 responses produced by the security handlers and of requests whose chain throws. Three details connect it to the rest of the request:
+
+- The `SecurityContext` is already cleared when the filter records, so `JwtAuthenticationFilter` stores the authenticated user in a request attribute (`AuditRequestAttributes`).
+- `AuditExceptionCaptureResolver` is registered as the first `HandlerExceptionResolver`. It only stores the exception in a request attribute and returns `null`, so `GlobalExceptionHandler` still builds the response.
+- `CorrelationIdFilter` runs inside the security chain, so the audit filter reads the correlation ID from the response header rather than from the MDC.
 
 ### Error Handling
 

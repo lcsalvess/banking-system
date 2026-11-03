@@ -49,7 +49,7 @@ see [Architecture](docs/ARCHITECTURE.md).
 
 ## Features
 
-- **Authentication and authorization** with JWT and role-based access: `ADMIN` manages users and metrics, `EMPLOYEE` operates clients, accounts, and transactions
+- **Authentication and authorization** with JWT and role-based access: `ADMIN` manages users and metrics, `EMPLOYEE` operates clients, accounts, and transactions, `AUDITOR` reads the audit trail
 - **User management**: user creation with role assignment, paginated listing with filters, deactivation and reactivation, and secure password storage (BCrypt)
 - **Password change**: any authenticated user can change their own password, which revokes every token issued before the change
 - **Password policy**: new passwords must include uppercase and lowercase letters, a digit, and a special character, in addition to the character and UTF-8 byte limits
@@ -68,6 +68,8 @@ see [Architecture](docs/ARCHITECTURE.md).
 - **Public transaction identifier**: every transaction has a UUID (`transactionCode`) exposed in responses, while the internal database ID is never returned
 - **Transfer traceability**: the two transactions of a transfer share a `transferCode`, so both legs can be correlated
 - **Transaction actor attribution**: every transaction records who performed it: the authenticated user for API operations (`performed_by_user_id`, including both legs of a transfer), or the system for automatic yields (`performed_by_system`)
+- **Audit trail**: an append-only `audit_events` table, protected by database triggers, records business operations in the same transaction as the change, plus login events and the HTTP outcome of relevant requests, with client IP, reason, and HTTP status. `AUDITOR` users query it through `GET /api/v1/audit-events`
+- **Audit growth protection**: repeated client errors are deduplicated, request paths are reduced to known routes, and audit writes pause briefly during database outages, so clients cannot control the size of the table and an outage is not amplified
 - **Identity normalization**: usernames and e-mails are trimmed and lowercased, so `Admin` and `admin` are the same user and e-mail uniqueness is case-insensitive
 - **Concurrency control**: pessimistic row locking (`SELECT ... FOR UPDATE`) on every operation that changes a balance or an account status, with a fixed lock order in transfers to avoid deadlocks
 - **Automatic savings yield**: a scheduled job credits a compounded daily yield to savings accounts, catching up on missed days after downtime and recovering pending days at startup
@@ -98,8 +100,8 @@ behavior, see [Business Rules](docs/BUSINESS_RULES.md).
 ## Security
 
 The API uses stateless JWT authentication, role-based authorization,
-credential-version token revocation, password validation, and login
-rate limiting.
+credential-version token revocation, password validation, login
+rate limiting, and an audit trail of authentication and access events.
 
 For authentication flows, role permissions, token validation, and security
 controls, see [Security](docs/SECURITY.md).

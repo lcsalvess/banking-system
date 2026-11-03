@@ -64,19 +64,14 @@ jobs:
           key: ${{ runner.os }}-odc-13.0.0-${{ steps.cache-date.outputs.date }}
           restore-keys: |
             ${{ runner.os }}-odc-13.0.0-
+          fail-on-cache-miss: true
 
-      - name: Scan dependencies without credentials
+      - name: Scan dependencies using cached vulnerability data
         run: >-
           ./mvnw --batch-mode --no-transfer-progress
+          -DautoUpdate=false
           -DossIndexAnalyzerEnabled=false
           org.owasp:dependency-check-maven:13.0.0:check
-
-      - name: Save updated Dependency-Check database
-        if: success() && steps.odc-cache-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.dependency-check-data
-          key: ${{ steps.odc-cache-restore.outputs.cache-primary-key }}
 
       - name: Upload Dependency-Check reports
         if: always() && hashFiles('target/dependency-check-report.html', 'target/dependency-check-report.json') != ''

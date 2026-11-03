@@ -31,7 +31,7 @@ permissions:
 
 concurrency:
   group: dependency-check-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   dependency-check-pr:
@@ -67,6 +67,64 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-odc-13.0.0-
           fail-on-cache-miss: true
+
+      - name: Validate Dependency-Check cache freshness
+        env:
+          RESTORED_CACHE_KEY: ${{ steps.odc-cache-restore.outputs.cache-matched-key }}
+          MAX_CACHE_AGE_DAYS: '8'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected_prefix="${RUNNER_OS}-odc-13.0.0-"
+
+          if [[ -z "$RESTORED_CACHE_KEY" ]]; then
+            echo "::error::Dependency-Check cache restore did not provide a matched cache key."
+            exit 1
+          fi
+
+          case "$RESTORED_CACHE_KEY" in
+            "$expected_prefix"*) ;;
+            *)
+              echo "::error::Unexpected Dependency-Check cache key format: '$RESTORED_CACHE_KEY'."
+              exit 1
+              ;;
+          esac
+
+          cache_date="${RESTORED_CACHE_KEY#"$expected_prefix"}"
+
+          if [[ ! "$cache_date" =~ ^[0-9]{8}$ ]]; then
+            echo "::error::Dependency-Check cache key does not contain a valid YYYYMMDD date: '$RESTORED_CACHE_KEY'."
+            exit 1
+          fi
+
+          cache_date_iso="${cache_date:0:4}-${cache_date:4:2}-${cache_date:6:2}"
+
+          if ! cache_epoch="$(date -u -d "$cache_date_iso" +%s 2>/dev/null)"; then
+            echo "::error::Unable to parse the date from the restored Dependency-Check cache key: '$RESTORED_CACHE_KEY'."
+            exit 1
+          fi
+
+          if [[ "$(date -u -d "@$cache_epoch" +%Y%m%d)" != "$cache_date" ]]; then
+            echo "::error::The restored Dependency-Check cache key contains an invalid calendar date: '$RESTORED_CACHE_KEY'."
+            exit 1
+          fi
+
+          today_iso="$(date -u +'%Y-%m-%d')"
+          today_epoch="$(date -u -d "$today_iso" +%s)"
+          age_days=$(( (today_epoch - cache_epoch) / 86400 ))
+
+          if (( age_days < 0 )); then
+            echo "::error::The restored Dependency-Check cache is dated in the future: '$RESTORED_CACHE_KEY'."
+            exit 1
+          fi
+
+          if (( age_days > MAX_CACHE_AGE_DAYS )); then
+            echo "::error::The restored Dependency-Check cache is too old (${age_days} days). Maximum allowed age: ${MAX_CACHE_AGE_DAYS} days. Restored key: '$RESTORED_CACHE_KEY'."
+            exit 1
+          fi
+
+          echo "Dependency-Check cache is fresh: key='$RESTORED_CACHE_KEY', age=${age_days} days, maximum=${MAX_CACHE_AGE_DAYS} days."
 
       - name: Scan dependencies using cached vulnerability data
         run: >-

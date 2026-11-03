@@ -48,6 +48,7 @@ Operations are logged through Spring application events:
 - Listeners use `@TransactionalEventListener` in the `AFTER_COMMIT` phase, so an operation is logged as successful only after its database transaction commits.
 - The daily yield job logs the start and end of each run, including a summary of the results (`attempted`, `applied`, `alreadyProcessed`, `notEligible`, `noYield`, `balanceLimitReached`, `skippedAccounts`, and `failed`) and a status of `completed`, `completed with failures`, or `aborted`.
 - The rate limiter logs each rejection with its operation, scope, and subject (the client IP for login rejections by IP, or `user:<id>` for password changes), never the username (see [Login Rate Limiting](SECURITY.md#login-rate-limiting) and [Password Change Rate Limiting](SECURITY.md#password-change-rate-limiting)).
+- Audit trail writes for security and HTTP events are best-effort. A failed write is logged at `ERROR` with the event type and outcome, and counted in `audit.detached.write.failures`. While the 5-second pause after a database availability failure is active, skipped events are counted and logged at `DEBUG` only (see [Audit of Security Events](SECURITY.md#audit-of-security-events)).
 - The global exception handler logs business errors, authentication and authorization failures, data integrity violations, address provider failures, and unexpected errors.
 - The application log level is controlled by `logging.level.com.lcsalvess.bankingsystem` (`INFO` by default). SQL logging is disabled.
 
@@ -74,6 +75,8 @@ Operations are logged through Spring application events:
 
 - Custom Micrometer counter:
 
-| Counter                        | Description                                                                                                                                                             |
-|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `security.rate_limit.rejected` | Requests rejected by the security rate limiter, tagged by `operation` (`login` or `password_change`) and `scope` (`client_ip`, `username_ip`, `username`, or `user_id`) |
+| Counter                         | Description                                                                                                                                                                                   |
+|---------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `security.rate_limit.rejected`  | Requests rejected by the security rate limiter, tagged by `operation` (`login` or `password_change`) and `scope` (`client_ip`, `username_ip`, `username`, or `user_id`)                       |
+| `audit.detached.write.failures` | Security and HTTP audit events that could not be written, including events skipped during the 5-second pause after a database failure. A sustained rise means the audit store is unavailable. |
+| `audit.detached.deduplicated`   | Security and HTTP audit events skipped as repeats of the same event within the one-minute window. A sudden rise indicates repeated blocked or failing requests.                               |

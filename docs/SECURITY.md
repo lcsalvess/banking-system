@@ -51,6 +51,24 @@ The audit API is read-only, and the database enforces the append-only
 nature of audit records. All requests without an explicit authorization
 rule are denied by default.
 
+## Audit of Security Events
+
+Authentication and access outcomes are recorded in the append-only `audit_events` table, in addition to the business events described in [Audit Trail](BUSINESS_RULES.md#audit-trail).
+
+| Event                    | Recorded when                                      | Outcome                                                         | Reason                                                                                                  |
+|--------------------------|----------------------------------------------------|-----------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `LOGIN_SUCCESS`          | Credentials are valid                              | `SUCCESS`                                                       | -                                                                                                       |
+| `LOGIN_FAILURE`          | Credentials are invalid or the account is disabled | `FAILURE`                                                       | `INVALID_CREDENTIALS` or `ACCOUNT_NOT_ENABLED`                                                          |
+| `LOGIN_BLOCKED`          | A login rate limit rejects the request             | `DENIED`                                                        | `RATE_LIMIT_CLIENT_IP`, `RATE_LIMIT_USERNAME_AND_IP`, `RATE_LIMIT_USERNAME`, or `RATE_LIMIT_USER_ID`    |
+| `HTTP_REQUEST_COMPLETED` | A relevant request finishes (see the rules below)  | `SUCCESS` (2xx/3xx), `DENIED` (401/403/429), `FAILURE` (others) | `UNAUTHORIZED`, `FORBIDDEN`, `RATE_LIMIT_EXCEEDED`, a stable code for known failures, or a generic code |
+
+- **Which requests.** Successful state-changing requests of authenticated users, every failed request of an authenticated user, and login requests except 429. Successful reads, anonymous rejections outside the login endpoint (including invalid or expired tokens), and requests outside `/api/v1` are not recorded.
+- **Data minimization.** Records never contain request bodies, passwords, tokens, exception messages, or class names. The entity of an HTTP event is `<METHOD> <route pattern>`; path parameters are not stored. The username attempted in a failed login is stored, so a password typed in the username field could be retained in an append-only table.
+- **Growth control.** The table cannot be cleaned, so clients must not control its size. Repeated 4xx responses (except 401) with the same actor, IP, endpoint, status, and reason are recorded once per minute. Requests rejected before MVC dispatch keep only known resources and actions in the path (other segments become `{id}`, unknown resources `/api/v1/{unmatched}`), and unknown HTTP methods are stored as `OTHER`. Failed logins are bounded by the login rate limiter, and `LOGIN_BLOCKED` is recorded once per subject per minute. The resource and action lists in `AuditTrailFilter` must be kept in sync with `SecurityConfig`.
+- **Best-effort writes.** These events are written in their own transaction and never change the response. A failed write is logged and counted in `audit.detached.write.failures`. After a database availability or timeout failure, writes are skipped for 5 seconds, so a database outage does not add a connection timeout to every request. Failures caused by the record itself do not start this pause. Business events remain fail-closed and are written in the operation's transaction.
+- **Client IP.** The IP comes from `request.getRemoteAddr()`, like the login rate limiter. With `server.forward-headers-strategy=none`, events recorded behind a reverse proxy show the proxy address unless forwarded headers are configured.
+- **Access.** Only `AUDITOR` can read these events, through `GET /api/v1/audit-events`.
+
 ## Login Rate Limiting
 
 Each login request is evaluated by up to three independent controls, checked in this order. Processing stops at the first rejection. Any rejection returns `429 Too Many Requests` with a `Retry-After` header.

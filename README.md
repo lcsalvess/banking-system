@@ -58,7 +58,7 @@ see [Architecture](docs/ARCHITECTURE.md).
 - **User management**: user creation with role assignment, paginated listing with filters, deactivation and reactivation, role changes (an administrator cannot change their own role), and secure password storage (BCrypt)
 - **Password change**: any authenticated user can change their own password, which revokes every token issued before the change
 - **Password policy**: new passwords must include uppercase and lowercase letters, a digit, and a special character, in addition to the character and UTF-8 byte limits
-- **Token revocation**: every JWT carries a credential version (`tv` claim) checked against the database, so tokens stop working after a password change, account deactivation, or role change
+- **Token revocation**: every JWT carries a credential version (`tv` claim) checked against the database, so tokens stop working after a password change, user deactivation, or role change
 - **Login rate limiting**: limits login requests per IP and temporarily blocks a username per client IP, and globally at a higher threshold, after repeated failed attempts, returning `429 Too Many Requests` with a `Retry-After` header
 - **Client management**: registration, listing, lookup, and partial update (`PATCH`), including address data
 - **Sensitive data protection**: the CPF is masked in every client response

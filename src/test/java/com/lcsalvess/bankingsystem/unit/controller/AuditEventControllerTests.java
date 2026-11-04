@@ -7,7 +7,10 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
-import com.lcsalvess.bankingsystem.service.audit.AuditEventQueryService;
+import com.lcsalvess.bankingsystem.exception.audit.InvalidAuditEventQuerySnapshotException;
+import com.lcsalvess.bankingsystem.service.audit.contract.AuditEventPageResult;
+import com.lcsalvess.bankingsystem.service.audit.contract.AuditEventQueryFilter;
+import com.lcsalvess.bankingsystem.service.audit.query.AuditEventQueryService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -44,6 +47,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,6 +61,11 @@ class AuditEventControllerTests {
 
     private static final String URL = "/api/v1/audit-events";
 
+    private static final String SNAPSHOT_HEADER = "X-Audit-Snapshot";
+
+    private static final String SNAPSHOT_TOKEN =
+            "550e8400-e29b-41d4-a716-446655440000";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -64,11 +73,11 @@ class AuditEventControllerTests {
     private AuditEventQueryService auditEventQueryService;
 
     @Nested
-    @DisplayName("Consulta de eventos")
+    @DisplayName("Audit event queries")
     class FindAllTests {
 
         @Test
-        @DisplayName("Should return a page using the default pagination and sorting")
+        @DisplayName("Should return a page and its snapshot response header")
         void shouldReturnPaginatedAuditEvents() throws Exception {
             UUID correlationId = UUID.randomUUID();
 
@@ -88,6 +97,10 @@ class AuditEventControllerTests {
                     .andExpect(status().isOk())
                     .andExpect(content().contentTypeCompatibleWith(
                             MediaType.APPLICATION_JSON
+                    ))
+                    .andExpect(header().string(
+                            SNAPSHOT_HEADER,
+                            SNAPSHOT_TOKEN
                     ))
                     .andExpect(jsonPath("$.content.length()").value(1))
                     .andExpect(jsonPath("$.content[0].id").value(1))
@@ -111,7 +124,8 @@ class AuditEventControllerTests {
                             .value("192.0.2.10"));
 
             Pageable actualPageable = verifyFindAll(
-                    null, null, null, null, null, null, null, null
+                    emptyFilter(),
+                    null
             );
 
             assertEquals(0, actualPageable.getPageNumber());
@@ -122,8 +136,16 @@ class AuditEventControllerTests {
         @Test
         @DisplayName("Should forward filters, pagination and sorting to the service")
         void shouldForwardFiltersAndPagination() throws Exception {
-            LocalDate startDate = LocalDate.of(2026, 10, 1);
-            LocalDate endDate = LocalDate.of(2026, 10, 25);
+            AuditEventQueryFilter expectedFilter = new AuditEventQueryFilter(
+                    LocalDate.of(2026, 10, 1),
+                    LocalDate.of(2026, 10, 25),
+                    AuditEventType.TRANSFER,
+                    AuditOutcome.SUCCESS,
+                    42L,
+                    "lucas",
+                    AuditEntityType.ACCOUNT,
+                    "12345"
+            );
 
             Pageable requestedPageable = PageRequest.of(
                     2,
@@ -151,19 +173,17 @@ class AuditEventControllerTests {
                     "sort", "eventType,asc"
             )
                     .andExpect(status().isOk())
+                    .andExpect(header().string(
+                            SNAPSHOT_HEADER,
+                            SNAPSHOT_TOKEN
+                    ))
                     .andExpect(jsonPath("$.content.length()").value(1))
                     .andExpect(jsonPath("$.page.totalElements").value(21))
                     .andExpect(jsonPath("$.page.totalPages").value(3));
 
             Pageable actualPageable = verifyFindAll(
-                    startDate,
-                    endDate,
-                    AuditEventType.TRANSFER,
-                    AuditOutcome.SUCCESS,
-                    42L,
-                    "lucas",
-                    AuditEntityType.ACCOUNT,
-                    "12345"
+                    expectedFilter,
+                    null
             );
 
             assertEquals(2, actualPageable.getPageNumber());
@@ -172,6 +192,75 @@ class AuditEventControllerTests {
                     Sort.by(Sort.Order.asc("eventType")),
                     actualPageable.getSort()
             );
+        }
+
+        @Test
+        @DisplayName("Should forward the snapshot request header")
+        void shouldForwardSnapshotHeader() throws Exception {
+            Pageable expectedPageable = PageRequest.of(
+                    1,
+                    20,
+                    defaultSort()
+            );
+
+            stubFindAll(new PageImpl<>(
+                    List.of(),
+                    expectedPageable,
+                    25
+            ));
+
+            performGetWithSnapshot(SNAPSHOT_TOKEN, "page", "1")
+                    .andExpect(status().isOk())
+                    .andExpect(header().string(
+                            SNAPSHOT_HEADER,
+                            SNAPSHOT_TOKEN
+                    ))
+                    .andExpect(jsonPath("$.content.length()").value(0))
+                    .andExpect(jsonPath("$.page.totalElements").value(25));
+
+            Pageable actualPageable = verifyFindAll(
+                    emptyFilter(),
+                    SNAPSHOT_TOKEN
+            );
+
+            assertEquals(1, actualPageable.getPageNumber());
+            assertEquals(20, actualPageable.getPageSize());
+            assertEquals(defaultSort(), actualPageable.getSort());
+        }
+
+        @Test
+        @DisplayName("Should respond 400 when the service rejects the snapshot")
+        void shouldRespondBadRequestForInvalidSnapshot() throws Exception {
+            when(auditEventQueryService.findAll(
+                    any(AuditEventQueryFilter.class),
+                    any(Pageable.class),
+                    nullable(String.class)
+            )).thenThrow(new InvalidAuditEventQuerySnapshotException(
+                    "The audit query snapshot is invalid, expired, "
+                            + "or does not match the request."
+            ));
+
+            performGetWithSnapshot(SNAPSHOT_TOKEN)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith(
+                            MediaType.APPLICATION_JSON
+                    ))
+                    .andExpect(jsonPath("$.status").value(400));
+        }
+
+        @Test
+        @DisplayName("Should forward a blank snapshot header untouched")
+        void shouldForwardBlankSnapshotHeader() throws Exception {
+            stubFindAll(new PageImpl<>(
+                    List.of(),
+                    PageRequest.of(0, 20, defaultSort()),
+                    0
+            ));
+
+            performGetWithSnapshot(" ")
+                    .andExpect(status().isOk());
+
+            verifyFindAll(emptyFilter(), " ");
         }
 
         private AuditEventResponseDTO getEvent(UUID correlationId) {
@@ -197,7 +286,7 @@ class AuditEventControllerTests {
     }
 
     @Nested
-    @DisplayName("Validação dos parâmetros")
+    @DisplayName("Parameter validation")
     class ParameterValidationTests {
 
         @Test
@@ -232,6 +321,13 @@ class AuditEventControllerTests {
     }
 
     private ResultActions performGet(String... parameters) throws Exception {
+        return performGetWithSnapshot(null, parameters);
+    }
+
+    private ResultActions performGetWithSnapshot(
+            String snapshotToken,
+            String... parameters
+    ) throws Exception {
         if (parameters.length % 2 != 0) {
             throw new IllegalArgumentException(
                     "Parameters must be provided as name/value pairs."
@@ -240,6 +336,10 @@ class AuditEventControllerTests {
 
         MockHttpServletRequestBuilder request = get(URL);
 
+        if (snapshotToken != null) {
+            request.header(SNAPSHOT_HEADER, snapshotToken);
+        }
+
         for (int i = 0; i < parameters.length; i += 2) {
             request.param(parameters[i], parameters[i + 1]);
         }
@@ -247,8 +347,10 @@ class AuditEventControllerTests {
         return mockMvc.perform(request);
     }
 
-    private void expectBadRequest(String parameter, String value)
-            throws Exception {
+    private void expectBadRequest(
+            String parameter,
+            String value
+    ) throws Exception {
         performGet(parameter, value)
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(
@@ -259,43 +361,28 @@ class AuditEventControllerTests {
         verifyNoInteractions(auditEventQueryService);
     }
 
-    private void stubFindAll(Page<AuditEventResponseDTO> result) {
+    private void stubFindAll(Page<AuditEventResponseDTO> page) {
         when(auditEventQueryService.findAll(
-                nullable(LocalDate.class),
-                nullable(LocalDate.class),
-                nullable(AuditEventType.class),
-                nullable(AuditOutcome.class),
-                nullable(Long.class),
-                nullable(String.class),
-                nullable(AuditEntityType.class),
-                nullable(String.class),
-                any(Pageable.class)
-        )).thenReturn(result);
+                any(AuditEventQueryFilter.class),
+                any(Pageable.class),
+                nullable(String.class)
+        )).thenReturn(new AuditEventPageResult(
+                page,
+                SNAPSHOT_TOKEN
+        ));
     }
 
     private Pageable verifyFindAll(
-            LocalDate startDate,
-            LocalDate endDate,
-            AuditEventType eventType,
-            AuditOutcome outcome,
-            Long actorUserId,
-            String actorUsername,
-            AuditEntityType entityType,
-            String entityId
+            AuditEventQueryFilter expectedFilter,
+            String snapshotToken
     ) {
         ArgumentCaptor<Pageable> pageableCaptor =
                 ArgumentCaptor.forClass(Pageable.class);
 
         verify(auditEventQueryService).findAll(
-                eqOrNull(startDate),
-                eqOrNull(endDate),
-                eqOrNull(eventType),
-                eqOrNull(outcome),
-                eqOrNull(actorUserId),
-                eqOrNull(actorUsername),
-                eqOrNull(entityType),
-                eqOrNull(entityId),
-                pageableCaptor.capture()
+                eq(expectedFilter),
+                pageableCaptor.capture(),
+                eqOrNull(snapshotToken)
         );
 
         verifyNoMoreInteractions(auditEventQueryService);
@@ -305,6 +392,19 @@ class AuditEventControllerTests {
 
     private static <T> T eqOrNull(T value) {
         return value == null ? isNull() : eq(value);
+    }
+
+    private static AuditEventQueryFilter emptyFilter() {
+        return new AuditEventQueryFilter(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
     }
 
     private static Sort defaultSort() {

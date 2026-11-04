@@ -2,7 +2,7 @@ package com.lcsalvess.bankingsystem.config.audit;
 
 import com.lcsalvess.bankingsystem.filter.AuditTrailFilter;
 import com.lcsalvess.bankingsystem.security.AuditExceptionCaptureResolver;
-import com.lcsalvess.bankingsystem.service.audit.AuditTrailRecorder;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Configuration;

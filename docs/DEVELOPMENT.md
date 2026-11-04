@@ -125,6 +125,8 @@ The retention period is configured by `banking.idempotency.retention-days` and d
 
 Balance reconciliation runs daily at 03:00 by default, using the Spring cron expression configured by `banking.reconciliation.cron`. Its time zone is `America/Sao_Paulo`. The job checks account balances against the latest transaction snapshots and detects breaks in the historical balance chain. It is diagnostic only and does not modify balances or transaction history. It also runs asynchronously after application startup, except in the `test` profile.
 
+Expired audit query snapshots are deleted every 5 minutes by default, using the Spring cron expression configured by `banking.audit.snapshot.cleanup-cron`. Its time zone is `America/Sao_Paulo`. A snapshot expires 15 minutes after its creation, and queries ignore expired snapshots even before the cleanup removes them. The `test` profile disables the schedule (`-`).
+
 The base URLs for the address lookup providers are defined in `application.properties`:
 
 - `integration.address.viacep.base-url`

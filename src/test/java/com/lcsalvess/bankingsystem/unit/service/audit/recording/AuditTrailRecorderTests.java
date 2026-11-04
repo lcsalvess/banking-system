@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.unit.service.audit;
+package com.lcsalvess.bankingsystem.unit.service.audit.recording;
 
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
@@ -7,9 +7,9 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
-import com.lcsalvess.bankingsystem.service.audit.AuditService;
-import com.lcsalvess.bankingsystem.service.audit.AuditTrailRecorder;
-import com.lcsalvess.bankingsystem.service.audit.DetachedAuditRecord;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditService;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
+import com.lcsalvess.bankingsystem.service.audit.recording.DetachedAuditRecord;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

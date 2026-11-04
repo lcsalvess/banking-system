@@ -31,7 +31,7 @@ src/main/java/com/lcsalvess/bankingsystem
 ├── serialization/      # Custom JSON serialization
 ├── util/               # Normalization, CPF masking, time-zone, and pagination utilities
 ├── service/            # Business rules and application logic
-│   ├── audit/          # In-transaction and detached audit recording, and read-only audit queries
+│   ├── audit/          # Audit recording (`recording`), audit queries and their snapshots (`query`), and shared query types (`contract`, `policy`)
 │   ├── account/        # Account operations, row locking, and account number generation
 │   ├── address/        # Address-resolution application logic
 │   ├── client/         # Client operations and persistence responsibilities
@@ -96,6 +96,12 @@ Audit events follow two paths:
 - The `SecurityContext` is already cleared when the filter records, so `JwtAuthenticationFilter` stores the authenticated user in a request attribute (`AuditRequestAttributes`).
 - `AuditExceptionCaptureResolver` is registered as the first `HandlerExceptionResolver`. It only stores the exception in a request attribute and returns `null`, so `GlobalExceptionHandler` still builds the response.
 - `CorrelationIdFilter` runs inside the security chain, so the audit filter reads the correlation ID from the response header rather than from the MDC.
+
+### Audit Queries
+
+`AuditEventQueryService` is a deliberately non-transactional dispatcher: without an `X-Audit-Snapshot` header it calls `AuditEventQuerySnapshotService#createSnapshot`, and with one it calls `findPage`. Keeping the branch outside the snapshot service lets each method run through its Spring proxy, so its own transaction settings (`REQUIRES_NEW`, `REPEATABLE_READ`) apply; calling one from the other inside the same class would bypass them.
+
+Creating a snapshot reads only the matching event IDs (up to 10,001, to detect an oversized result), discards the oldest active snapshots of the auditor beyond the limit, and stores the metadata and one item per position. Later pages read the stored IDs by position and load the events, which are immutable. The snapshot is bound to the auditor and to hashes of the filters and the sort; the page number and size are free. `AuditEventQuerySnapshotCleanupJob` deletes expired snapshots (`banking.audit.snapshot.cleanup-cron`, every 5 minutes by default). The limits are in `AuditEventQueryPolicy`.
 
 ### Error Handling
 

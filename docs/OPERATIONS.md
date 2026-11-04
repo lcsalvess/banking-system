@@ -49,6 +49,7 @@ Operations are logged through Spring application events:
 - The daily yield job logs the start and end of each run, including a summary of the results (`attempted`, `applied`, `alreadyProcessed`, `notEligible`, `noYield`, `balanceLimitReached`, `skippedAccounts`, and `failed`) and a status of `completed`, `completed with failures`, or `aborted`.
 - The rate limiter logs each rejection with its operation, scope, and subject (the client IP for login rejections by IP, or `user:<id>` for password changes), never the username (see [Login Rate Limiting](SECURITY.md#login-rate-limiting) and [Password Change Rate Limiting](SECURITY.md#password-change-rate-limiting)).
 - Audit trail writes for security and HTTP events are best-effort. A failed write is logged at `ERROR` with the event type and outcome, and counted in `audit.detached.write.failures`. While the 5-second pause after a database availability failure is active, skipped events are counted and logged at `DEBUG` only (see [Audit of Security Events](SECURITY.md#audit-of-security-events)).
+- The audit query snapshot cleanup logs the number of deleted snapshots at `INFO` when it removes any, and at `DEBUG` otherwise.
 - The global exception handler logs business errors, authentication and authorization failures, data integrity violations, address provider failures, and unexpected errors.
 - The application log level is controlled by `logging.level.com.lcsalvess.bankingsystem` (`INFO` by default). SQL logging is disabled.
 

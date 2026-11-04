@@ -93,6 +93,27 @@ contains the event records in `content` and pagination metadata in
 `page`. Sorting uses `id` as a deterministic tie-breaker when it is
 not already included in the requested sort.
 
+#### Stable pagination with snapshots
+
+Audit events are appended continuously, so paging through a live query could
+repeat or skip events. To avoid it, a request without the `X-Audit-Snapshot`
+header materializes the matching event IDs and their order as a snapshot and
+returns its identifier in the `X-Audit-Snapshot` response header. Send that
+header, with the same filters and sort, to read other pages of the same result:
+
+- The page number and the page size can change between requests; the filters
+  and the sort cannot. A different filter or sort, an unknown, expired, or
+  malformed identifier, or a snapshot created by another auditor returns
+  `400 Bad Request` with the same message in every case.
+- A snapshot expires 15 minutes after its creation. Events recorded after the
+  snapshot was created are not part of it; send the request again without the
+  header to take a new snapshot.
+- A query that matches more than 10,000 events returns `400 Bad Request`.
+  Narrow the filters or the date range.
+- Each auditor keeps at most 5 active snapshots. Creating another one discards
+  the oldest, whose identifier then returns `400 Bad Request`.
+- A page beyond the last one is valid and returns an empty `content`.
+
 ## Address Lookup Integration
 
 Address lookup is not exposed as a standalone endpoint. It is performed internally by `POST /api/v1/clients` and by `PATCH /api/v1/clients/{id}` when address data is included. The client operations can return `404 Not Found` when the postal code is not found or `503 Service Unavailable` when the address providers cannot resolve it due to failures.

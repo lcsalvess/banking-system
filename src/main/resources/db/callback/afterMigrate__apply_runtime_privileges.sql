@@ -26,6 +26,8 @@ $$
             public.accounts,
             public.addresses,
             public.audit_events,
+            public.audit_event_query_snapshots,
+            public.audit_event_query_snapshot_items,
             public.checking_accounts,
             public.clients,
             public.flyway_schema_history,
@@ -83,6 +85,14 @@ $$
 
         -- Audit history can only be read and appended.
         GRANT SELECT, INSERT ON TABLE public.audit_events TO banking_app;
+
+        -- Audit query snapshots are auxiliary data used for paginated queries.
+        -- The runtime role can read, create, and remove expired snapshots.
+        -- The original audit_events table remains append-only.
+        GRANT SELECT, INSERT, DELETE ON TABLE
+            public.audit_event_query_snapshots,
+            public.audit_event_query_snapshot_items
+            TO banking_app;
 
         -- Idempotency records are updated and deleted by the scheduled cleanup.
         GRANT SELECT, INSERT, UPDATE, DELETE

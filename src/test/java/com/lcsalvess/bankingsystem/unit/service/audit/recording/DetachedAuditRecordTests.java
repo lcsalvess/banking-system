@@ -1,10 +1,10 @@
-package com.lcsalvess.bankingsystem.unit.service.audit;
+package com.lcsalvess.bankingsystem.unit.service.audit.recording;
 
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
-import com.lcsalvess.bankingsystem.service.audit.DetachedAuditRecord;
+import com.lcsalvess.bankingsystem.service.audit.recording.DetachedAuditRecord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

@@ -8,7 +8,7 @@ import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitOperation;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
-import com.lcsalvess.bankingsystem.service.audit.AuditTrailRecorder;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.service.security.AuthService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;

@@ -106,7 +106,17 @@
   between 100 and 599, and every non-`SUCCESS` event to have a `reason`. It also creates the partial index
   `idx_audit_events_ip_address_created_at`. The runtime privileges are granted per table, so the new columns are
   covered by the existing `SELECT` and `INSERT` grants.
-- Schema changes must be added as new versioned migrations (`V29__description.sql`, and so on). Migrations that were
+- `V29__create_audit_event_query_snapshots.sql` creates `audit_event_query_snapshots` and
+  `audit_event_query_snapshot_items`, which materialize the result of an audit query so its pages stay stable (see
+  [API](API.md#stable-pagination-with-snapshots)). A snapshot stores the owning user, SHA-256 hashes of the filters
+  and the sort, the number of events (at most 10,000), and its creation and expiration times. Its items hold the
+  position of each event, as a primary key on `(snapshot_id, position)`, and a reference to the immutable
+  `audit_events` row (`ON DELETE RESTRICT`). Items are removed with their snapshot (`ON DELETE CASCADE`). The index
+  on `expires_at` serves the scheduled cleanup. The audit events themselves are not changed.
+- `V30__simplify_audit_event_query_snapshots.sql` drops the snapshot `page_size` column (any page size can read a
+  snapshot) and the redundant unique constraint on `(snapshot_id, audit_event_id)`, and adds the index on
+  `(actor_user_id, created_at DESC)` that serves the limit of active snapshots per user.
+- Schema changes must be added as new versioned migrations (`V31__description.sql`, and so on). Migrations that were
   already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database
   privileges; do not edit them. Changes to the runtime role's privilege policy go in
   `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
@@ -142,6 +152,8 @@ do not need this script because Flyway creates their objects as `banking_migrato
 |------------------------------------|:------:|:------:|----------------------------------------------------------------------------------------------|:------:|
 | `accounts`                         |  Yes   |  Yes   | `balance`, `status`                                                                          |   No   |
 | `addresses`                        |  Yes   |  Yes   | `city`, `complement`, `neighborhood`, `postal_code`, `state`, `street_name`, `street_number` |   No   |
+| `audit_event_query_snapshot_items` |  Yes   |  Yes   | No                                                                                           |  Yes   |
+| `audit_event_query_snapshots`      |  Yes   |  Yes   | No                                                                                           |  Yes   |
 | `audit_events`                     |  Yes   |  Yes   | No                                                                                           |   No   |
 | `checking_accounts`                |  Yes   |  Yes   | No                                                                                           |   No   |
 | `clients`                          |  Yes   |  Yes   | `name`, `email`, `phone_number`                                                              |   No   |
@@ -218,6 +230,9 @@ fails with `permission denied` in CI instead of in production.
   `idx_audit_events_entity` and `idx_audit_events_actor` (from V19) serve lookups by affected entity and by actor ID.
   `idx_audit_events_ip_address_created_at` (from V28) is a partial index on `ip_address` and `created_at DESC`, for
   investigations such as "what did this IP do"; the audit query API does not filter by IP address.
+- The snapshot tables are auxiliary data and are not append-only: the runtime role can `SELECT`, `INSERT`, and
+  `DELETE` them, but not `UPDATE` them. Expired snapshots are deleted by a scheduled job (see
+  [Operations](OPERATIONS.md)).
 - The database constraint and index names mapped to business errors are centralized in the `DatabaseConstraint` enum
   within the Java application code. Each name must match a constraint or index defined by a Flyway migration.
 - Monetary values use `BigDecimal` (`precision = 19`, `scale = 2`).

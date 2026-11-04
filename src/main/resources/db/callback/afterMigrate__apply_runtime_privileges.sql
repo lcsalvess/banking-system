@@ -71,8 +71,8 @@ $$
         GRANT UPDATE (last_yield_date, last_yield_processed_date)
             ON TABLE public.savings_accounts TO banking_app;
 
-        -- Users: only authentication status and password-related fields can be updated.
-        GRANT UPDATE (password, active, token_version, updated_at)
+        -- Users: only authentication status, password-related fields and role can be updated.
+        GRANT UPDATE (password, active, token_version, updated_at, role)
             ON TABLE public.users TO banking_app;
 
         -- Joined-inheritance child table.

@@ -45,6 +45,12 @@ public final class ApiErrorMessages {
     public static final String SELF_DEACTIVATION_NOT_ALLOWED =
             "Um administrador não pode desativar a própria conta.";
 
+    public static final String SELF_ROLE_CHANGE_NOT_ALLOWED =
+            "Um administrador não pode alterar o próprio papel.";
+
+    public static final String SYSTEM_USER_ROLE_CANNOT_BE_CHANGED =
+            "Não é permitido alterar o papel do usuário técnico do sistema.";
+
     // Authentication and authorization
     public static final String INVALID_CREDENTIALS =
             "Usuário ou senha inválidos.";

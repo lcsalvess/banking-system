@@ -55,7 +55,7 @@ see [Architecture](docs/ARCHITECTURE.md).
 ## Features
 
 - **Authentication and authorization** with JWT and role-based access: `ADMIN` manages users and metrics, `EMPLOYEE` operates clients, accounts, and transactions, `AUDITOR` reads the audit trail
-- **User management**: user creation with role assignment, paginated listing with filters, deactivation and reactivation, and secure password storage (BCrypt)
+- **User management**: user creation with role assignment, paginated listing with filters, deactivation and reactivation, role changes (an administrator cannot change their own role), and secure password storage (BCrypt)
 - **Password change**: any authenticated user can change their own password, which revokes every token issued before the change
 - **Password policy**: new passwords must include uppercase and lowercase letters, a digit, and a special character, in addition to the character and UTF-8 byte limits
 - **Token revocation**: every JWT carries a credential version (`tv` claim) checked against the database, so tokens stop working after a password change or a deactivation
@@ -225,3 +225,4 @@ Tests run against PostgreSQL using the `test` profile. See the [Development Guid
 - [ ] Docker Compose for the application and database
 - [ ] Continuous deployment (CD)
 - [ ] Refresh tokens
+- 

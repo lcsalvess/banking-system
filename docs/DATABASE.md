@@ -168,7 +168,7 @@ do not need this script because Flyway creates their objects as `banking_migrato
 | `savings_accounts`                 |  Yes   |  Yes   | `last_yield_date`, `last_yield_processed_date`                                               |   No   |
 | `transaction_idempotency_requests` |  Yes   |  Yes   | Yes                                                                                          |  Yes   |
 | `transactions`                     |  Yes   |  Yes   | No                                                                                           |   No   |
-| `users`                            |  Yes   |  Yes   | `password`, `active`, `token_version`, `updated_at`                                          |   No   |
+| `users`                            |  Yes   |  Yes   | `password`, `active`, `token_version`, `updated_at`, `role`                                  |   No   |
 
 `checking_accounts` has only the `id` column, and `banking_app` does not
 receive any `UPDATE` privilege on it. Previously, V21 granted `UPDATE`

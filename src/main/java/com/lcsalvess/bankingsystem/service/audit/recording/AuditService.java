@@ -48,6 +48,22 @@ public class AuditService {
             AuditEntityType entityType,
             String entityId
     ) {
+        recordSuccess(eventType, entityType, entityId, null);
+    }
+
+    /**
+     * Same as {@link #recordSuccess(AuditEventType, AuditEntityType, String)},
+     * with a reason code that describes what changed (for example, the previous
+     * and new role). The reason must match {@code ck_audit_events_reason}:
+     * upper case letters, digits and underscores, up to 60 characters.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordSuccess(
+            AuditEventType eventType,
+            AuditEntityType entityType,
+            String entityId,
+            String reason
+    ) {
         Optional<User> actor = currentUserService.findCurrentUser();
 
         auditEventRepository.save(
@@ -62,7 +78,10 @@ public class AuditService {
                         entityType,
                         entityId,
                         currentCorrelationId(),
-                        clock.instant()
+                        clock.instant(),
+                        null,
+                        reason,
+                        null
                 )
         );
     }

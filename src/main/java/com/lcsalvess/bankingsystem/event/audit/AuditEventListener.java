@@ -11,15 +11,16 @@ import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
+import com.lcsalvess.bankingsystem.event.user.UserRoleChangedEvent;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditService;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Grava a auditoria em BEFORE_COMMIT, dentro da transação da operação. Os
- * listeners de log existentes continuam em AFTER_COMMIT: o log é só
- * informativo, a auditoria não pode ficar de fora de uma operação commitada.
+ * Records the audit event in BEFORE_COMMIT, within the operation's transaction.
+ * Existing logging listeners remain in AFTER_COMMIT: logging is informational,
+ * while audit records must not be omitted from a committed operation.
  */
 @Component
 public class AuditEventListener {
@@ -36,6 +37,18 @@ public class AuditEventListener {
                 toAuditType(event.type()),
                 AuditEntityType.USER,
                 String.valueOf(event.userId())
+        );
+    }
+
+    // The previous and new roles are stored in the reason (e.g., EMPLOYEE_TO_AUDITOR),
+    // allowing the audit trail to show what changed, not just that a change occurred.
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void handleUserRoleChange(UserRoleChangedEvent event) {
+        auditService.recordSuccess(
+                AuditEventType.USER_ROLE_CHANGED,
+                AuditEntityType.USER,
+                String.valueOf(event.userId()),
+                event.previousRole().name() + "_TO_" + event.newRole().name()
         );
     }
 

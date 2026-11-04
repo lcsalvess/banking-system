@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.controller;
 
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDTO;
 import com.lcsalvess.bankingsystem.entity.user.Role;
@@ -20,7 +21,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Set;
 
@@ -171,5 +180,45 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public UserResponseDTO deactivate(@PathVariable Long userId) {
         return userService.deactivate(userId);
+    }
+
+    @Operation(
+            summary = "Change a user's role",
+            description = "Changes the role of an existing user and revokes the tokens "
+                    + "issued to them, so they must authenticate again. Only users with "
+                    + "the ADMIN role are authorized to perform this operation. "
+                    + "An administrator cannot change their own role, and the role of "
+                    + "the technical system user cannot be changed."
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Role changed successfully, or the user already had the requested role."
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid user ID or request body."
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The authenticated user does not have permission, "
+                            + "or is trying to change their own role."
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found."
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "The role of the technical system user cannot be changed."
+            )
+    })
+    @PatchMapping("/{userId}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserResponseDTO changeRole(
+            @PathVariable Long userId,
+            @RequestBody @Valid UserRoleUpdateRequestDTO dto
+    ) {
+        return userService.changeRole(userId, dto.role());
     }
 }

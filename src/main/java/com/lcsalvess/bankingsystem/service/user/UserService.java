@@ -3,27 +3,37 @@ package com.lcsalvess.bankingsystem.service.user;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDTO;
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
+import com.lcsalvess.bankingsystem.event.user.UserRoleChangedEvent;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.exception.user.*;
+import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
+import com.lcsalvess.bankingsystem.exception.user.SelfDeactivationNotAllowedException;
+import com.lcsalvess.bankingsystem.exception.user.SelfRoleChangeNotAllowedException;
+import com.lcsalvess.bankingsystem.exception.user.SystemUserCannotBeReactivatedException;
+import com.lcsalvess.bankingsystem.exception.user.SystemUserRoleCannotBeChangedException;
+import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
+import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.UserSpecifications;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.util.normalization.EmailNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.OptionalTextNormalizer;
-import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
 import com.lcsalvess.bankingsystem.util.normalization.UsernameNormalizer;
+import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class UserService {
@@ -99,9 +109,7 @@ public class UserService {
     public UserResponseDTO reactivate(Long userId) {
         User user = findUserForUpdateOrThrow(userId);
 
-        if (SYSTEM_MIGRATION_USERNAME.equals(
-                UsernameNormalizer.normalize(user.getUsername())
-        )) {
+        if (isSystemUser(user)) {
             throw new SystemUserCannotBeReactivatedException(
                     ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
             );
@@ -128,10 +136,11 @@ public class UserService {
     @Transactional
     public UserResponseDTO deactivate(Long userId) {
         validateNotSelfDeactivation(userId);
-        // O lock vem ANTES de carregar o alvo. Assim, as entidades de admin
-        // entram no contexto de persistência já com o estado commitado mais
-        // recente, e uma desativação concorrente do mesmo usuário é vista como
-        // "já desativado" (idempotente) em vez de virar um 409 indevido.
+        // The lock is acquired BEFORE loading the target. This ensures that
+        // administrator entities enter the persistence context with the latest
+        // committed state, so a concurrent deactivation of the same user is treated
+        // as "already deactivated" (idempotent) rather than resulting in an
+        // incorrect 409 response.
         List<User> activeAdmins = lockActiveAdminsIfTargetIsAdmin(userId);
 
         User user = findUserForUpdateOrThrow(userId);
@@ -151,6 +160,46 @@ public class UserService {
                         user.getId(),
                         UserOperationType.DEACTIVATED
                 )
+        );
+
+        return toResponse(user);
+    }
+
+    @Transactional
+    public UserResponseDTO changeRole(Long userId, Role newRole) {
+        validateNotSelfRoleChange(userId);
+
+        // Active administrators are always locked (without a prior role check,
+        // which could become stale before acquiring the lock), using the same
+        // order as deactivation: administrators by ID, followed by the target,
+        // preventing deadlocks.
+        List<User> activeAdmins = userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN);
+
+        User user = findUserForUpdateOrThrow(userId);
+
+        if (isSystemUser(user)) {
+            throw new SystemUserRoleCannotBeChangedException(
+                    ApiErrorMessages.SYSTEM_USER_ROLE_CANNOT_BE_CHANGED
+            );
+        }
+
+        // The caller must remain an active administrator after acquiring the lock.
+        // Since the target can never be the caller, at least one active administrator
+        // always remains, even if two administrators attempt to demote each other concurrently.
+        validateCallerIsActiveAdmin(activeAdmins);
+
+        if (user.getRole() == newRole) {
+            return toResponse(user);
+        }
+
+        Role previousRole = user.getRole();
+
+        user.changeRole(newRole);
+
+        userRepository.flush();
+
+        eventPublisher.publishEvent(
+                new UserRoleChangedEvent(user.getId(), previousRole, newRole)
         );
 
         return toResponse(user);
@@ -180,8 +229,11 @@ public class UserService {
     }
 
     /**
-     * Só administradores precisam do lock. O papel de um usuário não muda após
-     * a criação, então a checagem prévia de papel é segura.
+     * Only administrators require the lock during deactivation. If the target's
+     * role changes between this check and locking their row, the subsequent
+     * validation fails closed (409), ensuring the system is never left without
+     * an administrator.
+     * Role changes do not use this check: they always lock all administrators.
      */
     private List<User> lockActiveAdminsIfTargetIsAdmin(Long userId) {
         if (!userRepository.existsByIdAndRole(userId, Role.ADMIN)) {
@@ -213,6 +265,34 @@ public class UserService {
                             ApiErrorMessages.SELF_DEACTIVATION_NOT_ALLOWED
                     );
                 });
+    }
+
+    private void validateNotSelfRoleChange(Long userId) {
+        currentUserService.findCurrentUser()
+                .filter(currentUser -> currentUser.getId() != null
+                        && currentUser.getId().equals(userId))
+                .ifPresent(currentUser -> {
+                    throw new SelfRoleChangeNotAllowedException(
+                            ApiErrorMessages.SELF_ROLE_CHANGE_NOT_ALLOWED
+                    );
+                });
+    }
+
+    private void validateCallerIsActiveAdmin(List<User> activeAdmins) {
+        Long callerId = currentUserService.getCurrentUser().getId();
+
+        boolean callerIsActiveAdmin = activeAdmins.stream()
+                .anyMatch(admin -> Objects.equals(admin.getId(), callerId));
+
+        if (!callerIsActiveAdmin) {
+            throw new AccessDeniedException(ApiErrorMessages.ACCESS_DENIED_RESOURCE);
+        }
+    }
+
+    private static boolean isSystemUser(User user) {
+        return SYSTEM_MIGRATION_USERNAME.equals(
+                UsernameNormalizer.normalize(user.getUsername())
+        );
     }
 
     private UserSummaryResponseDTO toSummaryResponse(User user) {

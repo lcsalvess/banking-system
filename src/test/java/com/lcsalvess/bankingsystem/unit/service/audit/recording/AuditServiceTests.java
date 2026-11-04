@@ -97,6 +97,42 @@ class AuditServiceTests {
         }
 
         @Test
+        @DisplayName("Should store the reason when one is provided")
+        void shouldStoreReasonWhenProvided() {
+            when(currentUserService.findCurrentUser())
+                    .thenReturn(Optional.of(user(7L, "lucas")));
+
+            auditService.recordSuccess(
+                    AuditEventType.USER_ROLE_CHANGED,
+                    AuditEntityType.USER,
+                    "42",
+                    "EMPLOYEE_TO_AUDITOR"
+            );
+
+            AuditEvent saved = savedEvent();
+
+            assertEquals(AuditOutcome.SUCCESS, saved.getOutcome());
+            assertEquals("EMPLOYEE_TO_AUDITOR", saved.getReason());
+            assertNull(saved.getIpAddress());
+            assertNull(saved.getHttpStatus());
+        }
+
+        @Test
+        @DisplayName("Should leave the reason empty when none is provided")
+        void shouldLeaveReasonEmptyWhenNoneIsProvided() {
+            when(currentUserService.findCurrentUser())
+                    .thenReturn(Optional.of(user(7L, "lucas")));
+
+            auditService.recordSuccess(
+                    AuditEventType.USER_CREATED,
+                    AuditEntityType.USER,
+                    "42"
+            );
+
+            assertNull(savedEvent().getReason());
+        }
+
+        @Test
         @DisplayName("Should record an anonymous actor when nobody is authenticated")
         void shouldRecordAnonymousActorWhenNobodyIsAuthenticated() {
             when(currentUserService.findCurrentUser())

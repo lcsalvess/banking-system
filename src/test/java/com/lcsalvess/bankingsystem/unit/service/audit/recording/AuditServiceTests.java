@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.unit.service.audit;
+package com.lcsalvess.bankingsystem.unit.service.audit.recording;
 
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
@@ -9,7 +9,7 @@ import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.repository.audit.AuditEventRepository;
-import com.lcsalvess.bankingsystem.service.audit.AuditService;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

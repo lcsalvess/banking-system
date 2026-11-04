@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.service.audit;
+package com.lcsalvess.bankingsystem.service.audit.recording;
 
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;

@@ -15,11 +15,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -27,13 +29,14 @@ import java.util.concurrent.ThreadLocalRandom;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Prova no PostgreSQL que a trilha é append-only e que a gravação acompanha a
- * transação da operação. Como a tabela é imutável, o teste de commit deixa uma
- * linha (com entity_id aleatório) no banco de teste; todos os outros cenários
- * terminam em rollback e não deixam nada.
+ * Proves against PostgreSQL that the audit trail is append-only and that
+ * audit records participate in the transaction of the audited operation.
+ *
+ * <p> The successful commit scenarios intentionally leave rows in the test
+ * database. All other scenarios are rolled back.
  */
 @ActiveProfiles("test")
 @SpringBootTest
@@ -45,17 +48,27 @@ class AuditEventIntegrationTests {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
+    private DataSource dataSource;
+
+    @Autowired
     private ApplicationEventPublisher eventPublisher;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
 
     private TransactionTemplate transactionTemplate;
+    private TransactionTemplate jdbcTransactionTemplate;
 
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
+
         transactionTemplate = new TransactionTemplate(transactionManager);
+
+        // Use JDBC transaction management for direct database restriction tests.
+        jdbcTransactionTemplate = new TransactionTemplate(
+                new DataSourceTransactionManager(dataSource)
+        );
     }
 
     @AfterEach
@@ -72,6 +85,7 @@ class AuditEventIntegrationTests {
                 DataAccessException.class,
                 () -> transactionTemplate.executeWithoutResult(status -> {
                     insertAuditRow(entityId);
+
                     jdbcTemplate.update(
                             "UPDATE audit_events SET outcome = 'FAILURE' WHERE entity_id = ?",
                             entityId
@@ -92,6 +106,7 @@ class AuditEventIntegrationTests {
                 DataAccessException.class,
                 () -> transactionTemplate.executeWithoutResult(status -> {
                     insertAuditRow(entityId);
+
                     jdbcTemplate.update(
                             "DELETE FROM audit_events WHERE entity_id = ?",
                             entityId
@@ -108,8 +123,14 @@ class AuditEventIntegrationTests {
     void shouldRejectTruncate() {
         DataAccessException exception = assertThrows(
                 DataAccessException.class,
-                () -> transactionTemplate.executeWithoutResult(status ->
-                        jdbcTemplate.execute("TRUNCATE TABLE audit_events")
+                () -> jdbcTransactionTemplate.executeWithoutResult(status ->
+                        jdbcTemplate.execute(
+                                """
+                                TRUNCATE TABLE
+                                    audit_events,
+                                    audit_event_query_snapshot_items
+                                """
+                        )
                 )
         );
 
@@ -159,7 +180,11 @@ class AuditEventIntegrationTests {
         );
 
         Map<String, Object> row = jdbcTemplate.queryForMap(
-                "SELECT event_type, outcome, entity_type FROM audit_events WHERE entity_id = ?",
+                """
+                SELECT event_type, outcome, entity_type
+                FROM audit_events
+                WHERE entity_id = ?
+                """,
                 String.valueOf(clientId)
         );
 
@@ -184,7 +209,11 @@ class AuditEventIntegrationTests {
         );
 
         Map<String, Object> row = jdbcTemplate.queryForMap(
-                "SELECT event_type, outcome, entity_type FROM audit_events WHERE entity_id = ?",
+                """
+                SELECT event_type, outcome, entity_type
+                FROM audit_events
+                WHERE entity_id = ?
+                """,
                 String.valueOf(accountId)
         );
 
@@ -209,6 +238,7 @@ class AuditEventIntegrationTests {
                                     "lucas"
                             )
                     );
+
                     eventPublisher.publishEvent(
                             new AccountOperationEvent(
                                     accountId,
@@ -216,6 +246,7 @@ class AuditEventIntegrationTests {
                                     "lucas"
                             )
                     );
+
                     throw new IllegalStateException("forced rollback");
                 })
         );
@@ -235,6 +266,7 @@ class AuditEventIntegrationTests {
                     eventPublisher.publishEvent(
                             new UserOperationEvent(userId, UserOperationType.CREATED)
                     );
+
                     throw new IllegalStateException("forced rollback");
                 })
         );
@@ -264,11 +296,20 @@ class AuditEventIntegrationTests {
     }
 
     private void assertAppendOnly(DataAccessException exception) {
-        assertTrue(
-                exception.getMessage().contains(APPEND_ONLY_MESSAGE),
-                "The statement failed for another reason: "
-                        + exception.getMessage()
-        );
+        Throwable cause = exception;
+
+        while (cause != null) {
+            String message = cause.getMessage();
+
+            if (message != null && message.contains(APPEND_ONLY_MESSAGE)) {
+                return;
+            }
+
+            cause = cause.getCause();
+        }
+
+        fail("The statement failed for another reason: "
+                + exception.getMessage());
     }
 
     private String uniqueEntityId() {

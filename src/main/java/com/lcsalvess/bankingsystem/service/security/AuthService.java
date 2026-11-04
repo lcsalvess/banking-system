@@ -5,7 +5,7 @@ import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
-import com.lcsalvess.bankingsystem.service.audit.AuditTrailRecorder;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
 import org.slf4j.Logger;

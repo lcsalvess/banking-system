@@ -7,7 +7,7 @@ import com.lcsalvess.bankingsystem.filter.AuditTrailFilter;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.security.AuditRequestAttributes;
-import com.lcsalvess.bankingsystem.service.audit.AuditTrailRecorder;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;

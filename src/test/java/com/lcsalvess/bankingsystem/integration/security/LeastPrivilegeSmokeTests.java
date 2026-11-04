@@ -93,6 +93,8 @@ class LeastPrivilegeSmokeTests {
                 "SELECT 1 FROM public.accounts LIMIT 1",
                 "SELECT 1 FROM public.addresses LIMIT 1",
                 "SELECT 1 FROM public.audit_events LIMIT 1",
+                "SELECT 1 FROM public.audit_event_query_snapshots LIMIT 1",
+                "SELECT 1 FROM public.audit_event_query_snapshot_items LIMIT 1",
                 "SELECT 1 FROM public.checking_accounts LIMIT 1",
                 "SELECT 1 FROM public.clients LIMIT 1",
                 "SELECT 1 FROM public.savings_accounts LIMIT 1",
@@ -133,6 +135,10 @@ class LeastPrivilegeSmokeTests {
                         + "updated_at = updated_at "
                         + "WHERE false",
 
+                // Audit query snapshots: permitted DELETE operations
+                "DELETE FROM public.audit_event_query_snapshots WHERE false",
+                "DELETE FROM public.audit_event_query_snapshot_items WHERE false",
+
                 // Idempotency records
                 "UPDATE public.transaction_idempotency_requests "
                         + "SET created_at = created_at WHERE false",
@@ -157,6 +163,8 @@ class LeastPrivilegeSmokeTests {
                 "public.accounts",
                 "public.addresses",
                 "public.audit_events",
+                "public.audit_event_query_snapshots",
+                "public.audit_event_query_snapshot_items",
                 "public.checking_accounts",
                 "public.clients",
                 "public.savings_accounts",
@@ -182,6 +190,14 @@ class LeastPrivilegeSmokeTests {
                 "UPDATE public.transactions SET amount = amount WHERE false",
                 "DELETE FROM public.audit_events WHERE false",
                 "UPDATE public.audit_events SET outcome = outcome WHERE false",
+
+                // Audit query snapshots: UPDATE and TRUNCATE are not permitted.
+                "UPDATE public.audit_event_query_snapshots "
+                        + "SET expires_at = expires_at WHERE false",
+                "UPDATE public.audit_event_query_snapshot_items "
+                        + "SET position = position WHERE false",
+                "TRUNCATE TABLE public.audit_event_query_snapshots, "
+                        + "public.audit_event_query_snapshot_items",
 
                 // Physical deletion is forbidden
                 "DELETE FROM public.accounts WHERE false",

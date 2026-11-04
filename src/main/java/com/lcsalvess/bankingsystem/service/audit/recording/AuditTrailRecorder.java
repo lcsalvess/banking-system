@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.service.audit;
+package com.lcsalvess.bankingsystem.service.audit.recording;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;

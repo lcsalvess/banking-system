@@ -13,6 +13,7 @@ when running with the `local` profile.
 | GET    | `/api/v1/users`                                        | Retrieve a paginated list of users                  | `ADMIN`       |
 | PATCH  | `/api/v1/users/{userId}/deactivate`                    | Deactivate a user account                           | `ADMIN`       |
 | PATCH  | `/api/v1/users/{userId}/reactivate`                    | Reactivate a user account                           | `ADMIN`       |
+| PATCH  | `/api/v1/users/{userId}/role`                          | Change the role of a user                           | `ADMIN`       |
 | POST   | `/api/v1/clients`                                      | Register a client                                   | `EMPLOYEE`    |
 | GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients                | `EMPLOYEE`    |
 | GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                                  | `EMPLOYEE`    |
@@ -35,6 +36,8 @@ The deposit, withdrawal, and transfer endpoints require an `Idempotency-Key` hea
 An administrator can deactivate other users but cannot deactivate
 their own account. Such a request returns `403 Forbidden`.
 The last active administrator also cannot be deactivated.
+
+`PATCH /api/v1/users/{userId}/role` receives `{"role": "ADMIN|EMPLOYEE|AUDITOR"}`. An administrator cannot change their own role (`403 Forbidden`), and the role of the technical `system_migration` user cannot be changed (`409 Conflict`). Requesting the role the user already has returns the user unchanged. A successful change revokes every token issued to that user, so they must authenticate again.
 
 `POST /api/v1/auth/login` returns `401 Unauthorized` with a generic message for invalid credentials, a disabled account, or an unknown username, so the response does not reveal whether the account exists. Every login outcome is recorded in the audit trail (see [Audit Trail](BUSINESS_RULES.md#audit-trail)).
 
@@ -83,7 +86,7 @@ The endpoint supports the following optional filters:
 
 Each event contains `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, and `createdAt`. Security and HTTP events also contain `ipAddress`, `reason`, and `httpStatus`. Fields without a value are omitted from the response.
 
-The event types currently generated are the business events (`USER_CREATED`, `USER_DEACTIVATED`, `USER_REACTIVATED`, `USER_PASSWORD_CHANGED`, `CLIENT_CREATED`, `CLIENT_UPDATED`, `ACCOUNT_CREATED`, `ACCOUNT_CANCELLED`, `DEPOSIT`, `WITHDRAWAL`, and `TRANSFER`) and the security events `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGIN_BLOCKED`, and `HTTP_REQUEST_COMPLETED`. A request normally produces a business or login event and an `HTTP_REQUEST_COMPLETED` event with the same `correlationId`.
+The event types currently generated are the business events (`USER_CREATED`, `USER_DEACTIVATED`, `USER_REACTIVATED`, `USER_PASSWORD_CHANGED`, `USER_ROLE_CHANGED`, `CLIENT_CREATED`, `CLIENT_UPDATED`, `ACCOUNT_CREATED`, `ACCOUNT_CANCELLED`, `DEPOSIT`, `WITHDRAWAL`, and `TRANSFER`) and the security events `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGIN_BLOCKED`, and `HTTP_REQUEST_COMPLETED`. A request normally produces a business or login event and an `HTTP_REQUEST_COMPLETED` event with the same `correlationId`.
 
 Blank optional text filters are ignored. Invalid filters, dates,
 pagination, or sorting parameters return `400 Bad Request`.
@@ -178,7 +181,13 @@ curl -X PATCH http://localhost:8080/api/v1/auth/password \
 curl -X PATCH 'http://localhost:8080/api/v1/users/<user-id>/deactivate' \
   -H "Authorization: Bearer <admin-token>"
 
-# 9. Search audit events (AUDITOR only)
+# 9. Change a user's role (ADMIN only, never your own)
+curl -X PATCH 'http://localhost:8080/api/v1/users/<user-id>/role' \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"role": "AUDITOR"}'
+
+# 10. Search audit events (AUDITOR only)
 curl 'http://localhost:8080/api/v1/audit-events?startDate=2026-10-01&endDate=2026-10-26&eventType=TRANSFER&outcome=SUCCESS&page=0&size=20&sort=createdAt,desc' \
 -H "Authorization: Bearer <auditor-token>"
 ```

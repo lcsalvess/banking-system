@@ -116,7 +116,14 @@
 - `V30__simplify_audit_event_query_snapshots.sql` drops the snapshot `page_size` column (any page size can read a
   snapshot) and the redundant unique constraint on `(snapshot_id, audit_event_id)`, and adds the index on
   `(actor_user_id, created_at DESC)` that serves the limit of active snapshots per user.
-- Schema changes must be added as new versioned migrations (`V31__description.sql`, and so on). Migrations that were
+- `V31__validate_transaction_row_integrity.sql` validates the
+  `ck_transactions_amount_max` and `ck_transactions_transfer_code`
+  constraints introduced as `NOT VALID` by V25. Before validation,
+  existing transaction records were checked and no violations
+  were found. Both constraints are now validated against all
+  existing rows, while continuing to enforce the same rules
+  on new and updated records.
+- Schema changes must be added as new versioned migrations (`V32__description.sql`, and so on). Migrations that were
   already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database
   privileges; do not edit them. Changes to the runtime role's privilege policy go in
   `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.

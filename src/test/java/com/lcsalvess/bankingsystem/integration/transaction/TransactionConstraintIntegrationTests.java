@@ -397,6 +397,27 @@ class TransactionConstraintIntegrationTests {
         assertEquals(1, countTransactions(checkingAccount));
     }
 
+    @Test
+    @DisplayName("Should validate transaction integrity constraints")
+    void shouldValidateTransactionIntegrityConstraints() {
+        Integer validatedConstraints = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM pg_constraint
+                WHERE conrelid = 'public.transactions'::regclass
+                  AND contype = 'c'
+                  AND conname IN (
+                      'ck_transactions_amount_max',
+                      'ck_transactions_transfer_code'
+                  )
+                  AND convalidated = TRUE
+                """,
+                Integer.class
+        );
+
+        assertEquals(2, validatedConstraints);
+    }
+
     private int countTransactions(Account account) {
         Integer total = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM transactions WHERE account_id = ?",

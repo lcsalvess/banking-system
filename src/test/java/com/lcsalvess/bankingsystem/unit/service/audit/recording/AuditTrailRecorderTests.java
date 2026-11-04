@@ -20,6 +20,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.CannotCreateTransactionException;
 
@@ -573,5 +575,183 @@ class AuditTrailRecorderTests {
         recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
 
         verify(auditService, times(2)).recordDetached(any());
+    }
+
+    @Test
+    @DisplayName("Should release the HTTP failure deduplication reservation after a write failure")
+    void shouldRetryHttpFailureAfterWriteFailure() {
+        doThrow(new IllegalStateException("audit write failed"))
+                .doNothing()
+                .when(auditService).recordDetached(any());
+
+        recorder.recordHttpRequestCompleted(
+                null,
+                "POST",
+                "/api/v1/clients",
+                IP,
+                400,
+                null,
+                null
+        );
+
+        recorder.recordHttpRequestCompleted(
+                null,
+                "POST",
+                "/api/v1/clients",
+                IP,
+                400,
+                null,
+                null
+        );
+
+        verify(auditService, times(2)).recordDetached(any());
+        assertEquals(1.0, counter("audit.detached.write.failures"));
+        assertEquals(0.0, counter("audit.detached.deduplicated"));
+    }
+
+    @Test
+    @DisplayName("Should discard an IPv6 literal that cannot be parsed")
+    void shouldDiscardMalformedIpv6Address() {
+        recorder.recordLoginFailure(
+                "ghost",
+                "::::",
+                "INVALID_CREDENTIALS"
+        );
+
+        DetachedAuditRecord record = lastRecord(1);
+
+        assertNull(record.ipAddress());
+        assertEquals("INVALID_CREDENTIALS", record.reason());
+    }
+
+    @Test
+    @DisplayName("Should use the original client IP value when an HTTP failure IP is invalid")
+    void shouldUseOriginalIpForHttpFailureDeduplicationWhenParsingFails() {
+        recorder.recordHttpRequestCompleted(
+                null,
+                "POST",
+                "/api/v1/clients",
+                "invalid-host",
+                400,
+                null,
+                null
+        );
+
+        recorder.recordHttpRequestCompleted(
+                null,
+                "POST",
+                "/api/v1/clients",
+                "invalid-host",
+                400,
+                null,
+                null
+        );
+
+        verify(auditService, times(1)).recordDetached(any());
+        assertEquals(1.0, counter("audit.detached.deduplicated"));
+
+        DetachedAuditRecord record = lastRecord(1);
+        assertNull(record.ipAddress());
+    }
+
+    @Test
+    @DisplayName("Should use the original client IP value when a blocked login IP is invalid")
+    void shouldUseOriginalIpForBlockedLoginWhenParsingFails() {
+        recorder.recordLoginBlocked(
+                "ghost",
+                "invalid-host",
+                RateLimitScope.USERNAME
+        );
+
+        DetachedAuditRecord record = lastRecord(1);
+
+        assertNull(record.ipAddress());
+        assertEquals("RATE_LIMIT_USERNAME", record.reason());
+    }
+
+    @Test
+    @DisplayName("Should start infrastructure backoff after a data access resource failure")
+    void shouldBackOffAfterDataAccessResourceFailure() {
+        doThrow(new DataAccessResourceFailureException("database unavailable"))
+                .doNothing()
+                .when(auditService).recordDetached(any());
+
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+
+        verify(auditService, times(1)).recordDetached(any());
+        assertEquals(2.0, counter("audit.detached.write.failures"));
+
+        nanos.addAndGet(Duration.ofSeconds(6).toNanos());
+
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+
+        verify(auditService, times(2)).recordDetached(any());
+    }
+
+    @Test
+    @DisplayName("Should start infrastructure backoff after a query timeout")
+    void shouldBackOffAfterQueryTimeout() {
+        doThrow(new QueryTimeoutException("query timed out"))
+                .doNothing()
+                .when(auditService).recordDetached(any());
+
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+
+        verify(auditService, times(1)).recordDetached(any());
+        assertEquals(2.0, counter("audit.detached.write.failures"));
+
+        nanos.addAndGet(Duration.ofSeconds(6).toNanos());
+
+        recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
+
+        verify(auditService, times(2)).recordDetached(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {403, 429})
+    @DisplayName("Should classify forbidden and rate-limited HTTP responses as denied")
+    void shouldClassifyDeniedHttpResponses(int status) {
+        recorder.recordHttpRequestCompleted(
+                null,
+                "GET",
+                "/api/v1/resource",
+                IP,
+                status,
+                null,
+                null
+        );
+
+        DetachedAuditRecord record = lastRecord(1);
+
+        assertEquals(AuditOutcome.DENIED, record.outcome());
+        assertEquals(status, record.httpStatus());
+
+        if (status == 429) {
+            assertEquals("RATE_LIMIT_EXCEEDED", record.reason());
+        } else {
+            assertEquals("FORBIDDEN", record.reason());
+        }
+    }
+
+    @Test
+    @DisplayName("Should use an unexpected status reason for a nonstandard HTTP status")
+    void shouldUseUnexpectedStatusReason() {
+        recorder.recordHttpRequestCompleted(
+                null,
+                "GET",
+                "/api/v1/resource",
+                IP,
+                199,
+                null,
+                null
+        );
+
+        DetachedAuditRecord record = lastRecord(1);
+
+        assertEquals(AuditOutcome.FAILURE, record.outcome());
+        assertEquals("HTTP_UNEXPECTED_STATUS", record.reason());
+        assertEquals(199, record.httpStatus());
     }
 }

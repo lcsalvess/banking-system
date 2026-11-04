@@ -461,6 +461,49 @@ class AuditEventQuerySnapshotServiceTests {
             );
         }
 
+        @Test
+        @DisplayName("Should reject a null pageable")
+        void shouldRejectNullPageable() {
+            assertThrows(
+                    InvalidAuditEventQuerySnapshotException.class,
+                    () -> service.createSnapshot(
+                            emptyFilter(),
+                            null
+                    )
+            );
+
+            verifyNoInteractions(
+                    currentUserService,
+                    auditEventQueryRepository,
+                    snapshotRepository,
+                    itemRepository
+            );
+        }
+
+        @Test
+        @DisplayName("Should reject a pageable with a non-positive page size")
+        void shouldRejectNonPositivePageSize() {
+            Pageable pageable = mock(Pageable.class);
+
+            when(pageable.isUnpaged()).thenReturn(false);
+            when(pageable.getPageSize()).thenReturn(0);
+
+            assertThrows(
+                    InvalidAuditEventQuerySnapshotException.class,
+                    () -> service.createSnapshot(
+                            emptyFilter(),
+                            pageable
+                    )
+            );
+
+            verifyNoInteractions(
+                    currentUserService,
+                    auditEventQueryRepository,
+                    snapshotRepository,
+                    itemRepository
+            );
+        }
+
         private void assertInvalidDateRange(
                 LocalDate startDate,
                 LocalDate endDate
@@ -771,6 +814,115 @@ class AuditEventQuerySnapshotServiceTests {
                     snapshotRepository,
                     itemRepository,
                     auditEventQueryRepository
+            );
+        }
+
+        @Test
+        @DisplayName("Should reject a missing snapshot token")
+        void shouldRejectNullSnapshotToken() {
+            assertThrows(
+                    InvalidAuditEventQuerySnapshotException.class,
+                    () -> service.findPage(
+                            emptyFilter(),
+                            PageRequest.of(0, PAGE_SIZE, DEFAULT_SORT),
+                            null
+                    )
+            );
+
+            verifyNoInteractions(
+                    currentUserService,
+                    snapshotRepository,
+                    itemRepository,
+                    auditEventQueryRepository
+            );
+        }
+
+        @Test
+        @DisplayName("Should reject a blank snapshot token")
+        void shouldRejectBlankSnapshotToken() {
+            assertThrows(
+                    InvalidAuditEventQuerySnapshotException.class,
+                    () -> service.findPage(
+                            emptyFilter(),
+                            PageRequest.of(0, PAGE_SIZE, DEFAULT_SORT),
+                            " "
+                    )
+            );
+
+            verifyNoInteractions(
+                    currentUserService,
+                    snapshotRepository,
+                    itemRepository,
+                    auditEventQueryRepository
+            );
+        }
+
+        @Test
+        @DisplayName("Should reject a UUID token that is not in canonical format")
+        void shouldRejectNonCanonicalSnapshotToken() {
+            String nonCanonicalToken =
+                    "5d6f0cb8-bc9a-4a4e-8d43-f9e5c7d2a10";
+
+            assertThrows(
+                    InvalidAuditEventQuerySnapshotException.class,
+                    () -> service.findPage(
+                            emptyFilter(),
+                            PageRequest.of(0, PAGE_SIZE, DEFAULT_SORT),
+                            nonCanonicalToken
+                    )
+            );
+
+            verifyNoInteractions(
+                    currentUserService,
+                    snapshotRepository,
+                    itemRepository,
+                    auditEventQueryRepository
+            );
+        }
+
+        @Test
+        @DisplayName("Should reject a snapshot when a materialized event no longer exists")
+        void shouldRejectMissingMaterializedEvent() {
+            stubCurrentUser();
+
+            stubActiveSnapshot(
+                    emptyFilterHash(),
+                    defaultSortHash()
+            );
+
+            when(itemRepository.findEventIds(
+                    SNAPSHOT_ID,
+                    0,
+                    PAGE_SIZE
+            )).thenReturn(List.of(101L));
+
+            when(auditEventQueryRepository.findByIdIn(
+                    List.of(101L)
+            )).thenReturn(List.of());
+
+            assertThrows(
+                    IllegalStateException.class,
+                    () -> service.findPage(
+                            emptyFilter(),
+                            PageRequest.of(0, PAGE_SIZE, DEFAULT_SORT),
+                            SNAPSHOT_ID.toString()
+                    )
+            );
+
+            verify(snapshotRepository).findActiveByIdAndActor(
+                    SNAPSHOT_ID,
+                    ACTOR_ID,
+                    NOW
+            );
+
+            verify(itemRepository).findEventIds(
+                    SNAPSHOT_ID,
+                    0,
+                    PAGE_SIZE
+            );
+
+            verify(auditEventQueryRepository).findByIdIn(
+                    List.of(101L)
             );
         }
     }

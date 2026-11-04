@@ -3,13 +3,16 @@ package com.lcsalvess.bankingsystem.unit.controller;
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.UserController;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDTO;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
 import com.lcsalvess.bankingsystem.exception.user.SelfDeactivationNotAllowedException;
+import com.lcsalvess.bankingsystem.exception.user.SelfRoleChangeNotAllowedException;
 import com.lcsalvess.bankingsystem.exception.user.SystemUserCannotBeReactivatedException;
+import com.lcsalvess.bankingsystem.exception.user.SystemUserRoleCannotBeChangedException;
 import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
 import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
@@ -46,9 +49,16 @@ import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -62,6 +72,7 @@ public class UserControllerTests {
     private static final String USERS_URL = "/api/v1/users";
     private static final String REACTIVATE_URL = "/api/v1/users/{userId}/reactivate";
     private static final String DEACTIVATE_URL = "/api/v1/users/{userId}/deactivate";
+    private static final String ROLE_URL = "/api/v1/users/{userId}/role";
 
     private static final String VALID_USERNAME = "john.doe";
     private static final String VALID_EMAIL = "john.doe@example.com";
@@ -724,6 +735,109 @@ public class UserControllerTests {
                 400,
                 ApiErrorMessages.INVALID_REQUEST_DATA
         );
+    }
+
+    @Nested
+    @DisplayName("PATCH /api/v1/users/{userId}/role")
+    class ChangeRole {
+
+        private MockHttpServletRequestBuilder request(Object userId, String body) {
+            return patch(ROLE_URL, userId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body);
+        }
+
+        private String roleBody(Role role) throws Exception {
+            return objectMapper.writeValueAsString(new UserRoleUpdateRequestDTO(role));
+        }
+
+        @Test
+        @DisplayName("Should change the user's role successfully")
+        void shouldChangeRoleSuccessfully() throws Exception {
+            UserResponseDTO expected = userResponse(true);
+
+            when(userService.changeRole(1L, Role.AUDITOR)).thenReturn(expected);
+
+            MvcResult result = mockMvc.perform(request(1L, roleBody(Role.AUDITOR)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                    .andReturn();
+
+            assertEquals(expected, readUser(result));
+
+            verify(userService).changeRole(1L, Role.AUDITOR);
+            verifyNoMoreInteractions(userService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when the role is missing")
+        void shouldReturnBadRequestWhenRoleIsMissing() throws Exception {
+            mockMvc.perform(request(1L, "{}"))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(userService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when the role is unknown")
+        void shouldReturnBadRequestWhenRoleIsUnknown() throws Exception {
+            mockMvc.perform(request(1L, "{\"role\":\"ROOT\"}"))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(userService);
+        }
+
+        @Test
+        @DisplayName("Should return 403 when an administrator changes their own role")
+        void shouldReturnForbiddenWhenAdministratorChangesTheirOwnRole() throws Exception {
+            when(userService.changeRole(1L, Role.EMPLOYEE))
+                    .thenThrow(new SelfRoleChangeNotAllowedException(
+                            ApiErrorMessages.SELF_ROLE_CHANGE_NOT_ALLOWED
+                    ));
+
+            performErrorResponse(
+                    mockMvc.perform(request(1L, roleBody(Role.EMPLOYEE))),
+                    403,
+                    ApiErrorMessages.SELF_ROLE_CHANGE_NOT_ALLOWED
+            );
+
+            verify(userService).changeRole(1L, Role.EMPLOYEE);
+            verifyNoMoreInteractions(userService);
+        }
+
+        @Test
+        @DisplayName("Should return 404 when user does not exist")
+        void shouldReturnNotFoundWhenUserDoesNotExist() throws Exception {
+            when(userService.changeRole(1L, Role.EMPLOYEE))
+                    .thenThrow(new UserNotFoundException(ApiErrorMessages.USER_NOT_FOUND));
+
+            performErrorResponse(
+                    mockMvc.perform(request(1L, roleBody(Role.EMPLOYEE))),
+                    404,
+                    ApiErrorMessages.USER_NOT_FOUND
+            );
+
+            verify(userService).changeRole(1L, Role.EMPLOYEE);
+            verifyNoMoreInteractions(userService);
+        }
+
+        @Test
+        @DisplayName("Should return 409 when the user is the technical system user")
+        void shouldReturnConflictWhenUserIsTheSystemUser() throws Exception {
+            when(userService.changeRole(1L, Role.ADMIN))
+                    .thenThrow(new SystemUserRoleCannotBeChangedException(
+                            ApiErrorMessages.SYSTEM_USER_ROLE_CANNOT_BE_CHANGED
+                    ));
+
+            performErrorResponse(
+                    mockMvc.perform(request(1L, roleBody(Role.ADMIN))),
+                    409,
+                    ApiErrorMessages.SYSTEM_USER_ROLE_CANNOT_BE_CHANGED
+            );
+
+            verify(userService).changeRole(1L, Role.ADMIN);
+            verifyNoMoreInteractions(userService);
+        }
     }
 
     private UserResponseDTO readUser(MvcResult result) throws Exception {

@@ -21,6 +21,7 @@ import java.io.Serial;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @EntityListeners(UserTimestampListener.class)
@@ -52,9 +53,9 @@ public class User implements UserDetails {
     private boolean active = true;
 
     /**
-     * Versão de segurança incluída nos JWTs.
-     * É incrementada quando a senha muda ou a conta é desativada,
-     * invalidando os tokens emitidos com a versão anterior.
+     * Security version included in JWTs.
+     * It is incremented when the password changes, the account is deactivated,
+     * or the user's role is updated, invalidating tokens issued with the previous version.
      */
     @Column(name = "token_version", nullable = false)
     private int tokenVersion;
@@ -66,8 +67,8 @@ public class User implements UserDetails {
     private Instant updatedAt;
 
     /**
-     * Define os timestamps de criação a partir do relógio da aplicação.
-     * Chamado pelo {@link UserTimestampListener} antes do INSERT.
+     * Sets the creation timestamp using the application clock.
+     * Called by {@link UserTimestampListener} before the INSERT.
      */
     void initializeTimestamps(Instant now) {
         this.createdAt = now;
@@ -75,8 +76,8 @@ public class User implements UserDetails {
     }
 
     /**
-     * Atualiza o timestamp de modificação a partir do relógio da aplicação.
-     * Chamado pelo {@link UserTimestampListener} antes do UPDATE.
+     * Updates the modification timestamp using the application clock.
+     * Called by {@link UserTimestampListener} before the UPDATE.
      */
     void refreshUpdatedAt(Instant now) {
         this.updatedAt = now;
@@ -102,6 +103,22 @@ public class User implements UserDetails {
         }
 
         this.active = false;
+        this.tokenVersion++;
+    }
+
+    /**
+     * Updates the user's role and invalidates previously issued tokens,
+     * requiring the user to authenticate again with the new role.
+     * Does nothing if the role remains unchanged.
+     */
+    public void changeRole(Role newRole) {
+        Objects.requireNonNull(newRole, "The new role is required.");
+
+        if (this.role == newRole) {
+            return;
+        }
+
+        this.role = newRole;
         this.tokenVersion++;
     }
 

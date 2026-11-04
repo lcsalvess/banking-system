@@ -132,7 +132,8 @@ class LeastPrivilegeSmokeTests {
                         + "SET password = password, "
                         + "active = active, "
                         + "token_version = token_version, "
-                        + "updated_at = updated_at "
+                        + "updated_at = updated_at, "
+                        + "role = role "
                         + "WHERE false",
 
                 // Audit query snapshots: permitted DELETE operations
@@ -224,7 +225,6 @@ class LeastPrivilegeSmokeTests {
                 "UPDATE public.clients SET address_id = address_id WHERE false",
                 "UPDATE public.addresses SET id = id WHERE false",
                 "UPDATE public.savings_accounts SET id = id WHERE false",
-                "UPDATE public.users SET role = role WHERE false",
                 "UPDATE public.users SET username = username WHERE false",
                 "UPDATE public.users SET email = email WHERE false",
                 "UPDATE public.users SET created_at = created_at WHERE false",

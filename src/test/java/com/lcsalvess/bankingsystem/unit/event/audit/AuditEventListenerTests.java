@@ -3,15 +3,17 @@ package com.lcsalvess.bankingsystem.unit.event.audit;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.event.audit.AuditEventListener;
+import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
+import com.lcsalvess.bankingsystem.event.audit.AuditEventListener;
 import com.lcsalvess.bankingsystem.event.client.ClientOperationEvent;
 import com.lcsalvess.bankingsystem.event.client.ClientOperationType;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
+import com.lcsalvess.bankingsystem.event.user.UserRoleChangedEvent;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -64,6 +66,22 @@ class AuditEventListenerTests {
                 expectedType,
                 AuditEntityType.USER,
                 "42"
+        );
+        verifyNoMoreInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("Should audit role changes with the previous and the new role as the reason")
+    void shouldAuditUserRoleChange() {
+        listener.handleUserRoleChange(
+                new UserRoleChangedEvent(42L, Role.EMPLOYEE, Role.AUDITOR)
+        );
+
+        verify(auditService).recordSuccess(
+                AuditEventType.USER_ROLE_CHANGED,
+                AuditEntityType.USER,
+                "42",
+                "EMPLOYEE_TO_AUDITOR"
         );
         verifyNoMoreInteractions(auditService);
     }

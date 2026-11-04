@@ -17,4 +17,12 @@ public class UserEventListener {
                 event.type(),
                 event.userId());
     }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleUserRoleChange(UserRoleChangedEvent event) {
+        log.info("User role changed: id={}, previousRole={}, newRole={}",
+                event.userId(),
+                event.previousRole(),
+                event.newRole());
+    }
 }

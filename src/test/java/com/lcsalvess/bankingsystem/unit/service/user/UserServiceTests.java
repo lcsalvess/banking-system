@@ -2,11 +2,19 @@ package com.lcsalvess.bankingsystem.unit.service.user;
 
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
-import com.lcsalvess.bankingsystem.exception.user.*;
+import com.lcsalvess.bankingsystem.event.user.UserRoleChangedEvent;
+import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
+import com.lcsalvess.bankingsystem.exception.user.SelfDeactivationNotAllowedException;
+import com.lcsalvess.bankingsystem.exception.user.SelfRoleChangeNotAllowedException;
+import com.lcsalvess.bankingsystem.exception.user.SystemUserCannotBeReactivatedException;
+import com.lcsalvess.bankingsystem.exception.user.SystemUserRoleCannotBeChangedException;
+import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
+import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.user.UserService;
@@ -18,6 +26,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -419,6 +428,172 @@ class UserServiceTests {
             verify(currentUserService).findCurrentUser();
             verifyNoInteractions(userRepository, eventPublisher);
         }
+    }
+
+    @Nested
+    @DisplayName("Ao alterar o papel de um usuário")
+    class ChangeRoleTests {
+
+        @Test
+        @DisplayName("Deve alterar o papel, invalidar os tokens e registrar o evento")
+        void shouldChangeRoleAndRevokeTokens() {
+            User caller = createUserWithId(Role.ADMIN, 1L);
+            User target = createUserWithId(Role.EMPLOYEE, 2L);
+
+            when(currentUserService.findCurrentUser()).thenReturn(Optional.of(caller));
+            when(currentUserService.getCurrentUser()).thenReturn(caller);
+            when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
+                    .thenReturn(List.of(caller));
+            when(userRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+
+            UserResponseDTO response = userService.changeRole(2L, Role.AUDITOR);
+
+            assertEquals(Role.AUDITOR, response.role());
+            assertEquals(Role.AUDITOR, target.getRole());
+            assertEquals(1, target.getTokenVersion());
+
+            verify(userRepository).flush();
+            verify(eventPublisher).publishEvent(
+                    new UserRoleChangedEvent(2L, Role.EMPLOYEE, Role.AUDITOR)
+            );
+        }
+
+        @Test
+        @DisplayName("Deve rebaixar outro administrador enquanto o solicitante continua administrador")
+        void shouldDemoteAnotherAdministrator() {
+            User caller = createUserWithId(Role.ADMIN, 1L);
+            User target = createUserWithId(Role.ADMIN, 2L);
+
+            when(currentUserService.findCurrentUser()).thenReturn(Optional.of(caller));
+            when(currentUserService.getCurrentUser()).thenReturn(caller);
+            when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
+                    .thenReturn(List.of(caller, target));
+            when(userRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+
+            UserResponseDTO response = userService.changeRole(2L, Role.EMPLOYEE);
+
+            assertEquals(Role.EMPLOYEE, response.role());
+            assertEquals(Role.ADMIN, caller.getRole());
+            assertEquals(1, target.getTokenVersion());
+
+            verify(eventPublisher).publishEvent(
+                    new UserRoleChangedEvent(2L, Role.ADMIN, Role.EMPLOYEE)
+            );
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar quando o administrador tenta alterar o próprio papel")
+        void shouldRejectSelfRoleChange() {
+            User caller = createUserWithId(Role.ADMIN, 1L);
+
+            when(currentUserService.findCurrentUser()).thenReturn(Optional.of(caller));
+
+            assertThrows(
+                    SelfRoleChangeNotAllowedException.class,
+                    () -> userService.changeRole(1L, Role.EMPLOYEE)
+            );
+
+            assertEquals(Role.ADMIN, caller.getRole());
+            assertEquals(0, caller.getTokenVersion());
+
+            verify(userRepository, never()).findActiveUsersByRoleForUpdate(any());
+            verify(userRepository, never()).findByIdForUpdate(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Deve ser idempotente quando o usuário já tem o papel solicitado")
+        void shouldDoNothingWhenRoleIsUnchanged() {
+            User caller = createUserWithId(Role.ADMIN, 1L);
+            User target = createUserWithId(Role.EMPLOYEE, 2L);
+
+            when(currentUserService.findCurrentUser()).thenReturn(Optional.of(caller));
+            when(currentUserService.getCurrentUser()).thenReturn(caller);
+            when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
+                    .thenReturn(List.of(caller));
+            when(userRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+
+            UserResponseDTO response = userService.changeRole(2L, Role.EMPLOYEE);
+
+            assertEquals(Role.EMPLOYEE, response.role());
+            assertEquals(0, target.getTokenVersion());
+
+            verify(userRepository, never()).flush();
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Deve lançar exceção quando o usuário não existe")
+        void shouldThrowWhenUserDoesNotExist() {
+            User caller = createUserWithId(Role.ADMIN, 1L);
+
+            when(currentUserService.findCurrentUser()).thenReturn(Optional.of(caller));
+            when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
+                    .thenReturn(List.of(caller));
+            when(userRepository.findByIdForUpdate(2L)).thenReturn(Optional.empty());
+
+            assertThrows(
+                    UserNotFoundException.class,
+                    () -> userService.changeRole(2L, Role.EMPLOYEE)
+            );
+
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Deve rejeitar a troca de papel do usuário técnico do sistema")
+        void shouldRejectSystemUserRoleChange() {
+            User caller = createUserWithId(Role.ADMIN, 1L);
+            User systemUser = new User(
+                    "system_migration",
+                    "system-migration@invalid.example",
+                    "encoded-password",
+                    Role.EMPLOYEE
+            );
+            ReflectionTestUtils.setField(systemUser, "id", 2L);
+
+            when(currentUserService.findCurrentUser()).thenReturn(Optional.of(caller));
+            when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
+                    .thenReturn(List.of(caller));
+            when(userRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(systemUser));
+
+            assertThrows(
+                    SystemUserRoleCannotBeChangedException.class,
+                    () -> userService.changeRole(2L, Role.ADMIN)
+            );
+
+            assertEquals(Role.EMPLOYEE, systemUser.getRole());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Deve negar quando o solicitante deixou de ser administrador ativo antes do lock")
+        void shouldDenyWhenCallerIsNoLongerAnActiveAdministrator() {
+            User caller = createUserWithId(Role.ADMIN, 1L);
+            User otherAdmin = createUserWithId(Role.ADMIN, 3L);
+            User target = createUserWithId(Role.ADMIN, 2L);
+
+            when(currentUserService.findCurrentUser()).thenReturn(Optional.of(caller));
+            when(currentUserService.getCurrentUser()).thenReturn(caller);
+            when(userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN))
+                    .thenReturn(List.of(otherAdmin, target));
+            when(userRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+
+            assertThrows(
+                    AccessDeniedException.class,
+                    () -> userService.changeRole(2L, Role.EMPLOYEE)
+            );
+
+            assertEquals(Role.ADMIN, target.getRole());
+            assertEquals(0, target.getTokenVersion());
+            verifyNoInteractions(eventPublisher);
+        }
+    }
+
+    private User createUserWithId(Role role, long id) {
+        User user = createUser(role, true);
+        ReflectionTestUtils.setField(user, "id", id);
+        return user;
     }
 
     private User createUser(Role role, boolean active) {

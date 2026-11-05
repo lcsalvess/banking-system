@@ -220,13 +220,12 @@
         </dependency>
 
         <!--
-            Exclude android-json from spring-boot-starter-test to address
-            vulnerability CVE-2026-110974. This library is unmaintained and
-            susceptible to DoS via StackOverflowError.
+            Exclude android-json from the JPA test starter's
+            transitive dependencies to address CVE-2026-110974.
         -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
             <scope>test</scope>
             <exclusions>
                 <exclusion>

@@ -22,7 +22,7 @@ on:
       - .github/workflows/dependency-check.yml
 
   schedule:
-    - cron: '17 6 * * 1'
+    - cron: '17 6 */3 * *'
 
   workflow_dispatch:
 

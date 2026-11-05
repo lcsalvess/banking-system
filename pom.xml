@@ -46,6 +46,8 @@
         <jackson-bom.version>3.1.8</jackson-bom.version>
         <tomcat.version>11.0.27</tomcat.version>
         <asm.version>9.11.1</asm.version>
+        <!-- Override json-smart version to address vulnerability CVE-2026-113602 -->
+        <json-smart.version>2.6.1</json-smart.version>
         <jjwt.version>0.13.0</jjwt.version>
         <springdoc-openapi.version>3.2.0</springdoc-openapi.version>
         <postgresql.version>42.7.14</postgresql.version>
@@ -217,10 +219,20 @@
             <version>${caffeine.version}</version>
         </dependency>
 
+        <!--
+            Exclude android-json from the JPA test starter's
+            transitive dependencies to address CVE-2026-110974.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa-test</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.vaadin.external.google</groupId>
+                    <artifactId>android-json</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -28,13 +28,43 @@
       "matchDepNames": [
         "postgres"
       ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchFileNames": [
+        ".github/workflows/ci.yml"
+      ],
+      "enabled": true
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepTypes": [
+        "service"
+      ],
+      "matchDepNames": [
+        "postgres"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
       "matchFileNames": [
         ".github/workflows/ci.yml"
       ],
       "matchUpdateTypes": [
-        "digest"
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "lockFileMaintenance",
+        "lockfileUpdate",
+        "rollback",
+        "bump",
+        "replacement"
       ],
-      "enabled": true
+      "enabled": false
     }
   ]
 }

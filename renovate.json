@@ -25,11 +25,11 @@
       "matchDepTypes": [
         "service"
       ],
-      "matchPackageNames": [
+      "matchDepNames": [
         "postgres"
       ],
-      "matchDatasources": [
-        "docker"
+      "matchFileNames": [
+        ".github/workflows/ci.yml"
       ],
       "matchUpdateTypes": [
         "digest"

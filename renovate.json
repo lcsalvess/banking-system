@@ -2,5 +2,39 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "timezone": "America/Sao_Paulo",
+  "schedule": [
+    "every weekend"
+  ],
+  "enabledManagers": [
+    "github-actions"
+  ],
+  "automerge": false,
+  "packageRules": [
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "enabled": false
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepTypes": [
+        "service"
+      ],
+      "matchPackageNames": [
+        "postgres"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "enabled": true
+    }
   ]
 }

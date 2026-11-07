@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
@@ -108,5 +109,16 @@ class AccountNumberGeneratorTests {
     @DisplayName("Should return false when check digit is incorrect")
     void shouldReturnFalseWhenCheckDigitIsIncorrect() {
         assertFalse(accountNumberGenerator.isValid("12345", "4"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}-{1}")
+    @CsvSource({
+            "12345678, 9",   // 8 digits: the wraparound runs right after the last digit
+            "1234567891, 9", // 10 digits: weights restart at 2 after the 8th digit
+            "12348, 0"       // remainder 1: raw check digit 10 is normalized to 0
+    })
+    @DisplayName("Should validate account numbers that exercise weight wraparound and check digit normalization")
+    void shouldValidateAccountNumbersThatExerciseWeightWraparound(String number, String digit) {
+        assertTrue(accountNumberGenerator.isValid(number, digit));
     }
 }

@@ -2,7 +2,11 @@ package com.lcsalvess.bankingsystem.config.openapi;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import io.swagger.v3.oas.models.*;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.ExternalDocumentation;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
@@ -19,6 +23,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Configuration
 public class OpenApiConfig {
@@ -369,13 +374,13 @@ public class OpenApiConfig {
             return;
         }
 
-        LinkedHashMap<String, Object> example = createExample(type);
+        Map<String, Object> example = createExample(type);
 
         json.setExample(example);
     }
 
-    private static @NonNull LinkedHashMap<String, Object> createExample(String type) {
-        LinkedHashMap<String, Object> example = new LinkedHashMap<>();
+    private static @NonNull Map<String, Object> createExample(String type) {
+        Map<String, Object> example = new LinkedHashMap<>();
         example.put(
                 "transactionCode",
                 "108cf2a1-bcee-460a-a5db-f9b231947411"

@@ -1,6 +1,5 @@
 package com.lcsalvess.bankingsystem.unit.exception.handler;
 
-
 import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.handler.GlobalExceptionHandler;
@@ -12,8 +11,16 @@ import com.lcsalvess.bankingsystem.exception.user.InvalidCurrentPasswordExceptio
 import com.lcsalvess.bankingsystem.exception.user.PasswordUnchangedException;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
-import jakarta.validation.*;
-import jakarta.validation.constraints.*;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Valid;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,9 +45,13 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -50,7 +61,10 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = GlobalExceptionHandlerTests.TestController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -721,7 +735,7 @@ class GlobalExceptionHandlerTests {
     // OBJETOS DE TESTE PARA VALIDAÇÃO
     // -------------------------------------------------------------------------
 
-    private record TestRequest(
+    record TestRequest(
             @NotBlank
             @Size(max = 5)
             @Pattern(regexp = "[a-z]+")

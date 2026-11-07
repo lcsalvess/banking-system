@@ -677,7 +677,7 @@ class SecurityConfigTests {
             String token = Jwts.builder()
                     .subject(USERNAME)
                     .issuer(ISSUER)
-                    .issuedAt(new Date())
+                    .issuedAt(Date.from(Instant.now()))
                     .expiration(Date.from(Instant.now().plusSeconds(3600)))
                     .claim("tv", "invalid")
                     .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
@@ -1008,7 +1008,7 @@ class SecurityConfigTests {
         return Jwts.builder()
                 .subject(USERNAME)
                 .issuer(ISSUER)
-                .issuedAt(new Date())
+                .issuedAt(Date.from(Instant.now()))
                 .expiration(Date.from(Instant.now().plusSeconds(3600)))
                 .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
                 .compact();

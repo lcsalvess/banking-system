@@ -754,4 +754,38 @@ class AuditTrailRecorderTests {
         assertEquals("HTTP_UNEXPECTED_STATUS", record.reason());
         assertEquals(199, record.httpStatus());
     }
+
+    @Test
+    @DisplayName("Should discard IPv6 candidates containing invalid characters")
+    void shouldDiscardIpv6CandidateContainingInvalidCharacters() {
+        recorder.recordLoginFailure(
+                "ghost",
+                "2001:db8::g",
+                "INVALID_CREDENTIALS"
+        );
+
+        DetachedAuditRecord record = lastRecord(1);
+
+        assertNull(record.ipAddress());
+        assertEquals("INVALID_CREDENTIALS", record.reason());
+    }
+
+    @Test
+    @DisplayName("Should use generic reason when the supplied failure reason is blank")
+    void shouldUseGenericReasonWhenFailureReasonIsBlank() {
+        recorder.recordHttpRequestCompleted(
+                user(),
+                "POST",
+                "/api/v1/clients",
+                IP,
+                400,
+                "   ",
+                null
+        );
+
+        DetachedAuditRecord record = lastRecord(1);
+
+        assertEquals(AuditOutcome.FAILURE, record.outcome());
+        assertEquals("HTTP_CLIENT_ERROR", record.reason());
+    }
 }

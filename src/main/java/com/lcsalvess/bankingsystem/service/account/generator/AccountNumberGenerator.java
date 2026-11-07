@@ -24,12 +24,10 @@ public class AccountNumberGenerator {
     }
 
     public boolean isValid(String number, String digit) {
-        return number != null
+        return containsOnlyAsciiDigits(number)
                 && number.length() >= 5
-                && containsOnlyAsciiDigits(number)
-                && digit != null
-                && digit.length() == 1
                 && containsOnlyAsciiDigits(digit)
+                && digit.length() == 1
                 && calculateCheckDigit(number).equals(digit);
     }
 

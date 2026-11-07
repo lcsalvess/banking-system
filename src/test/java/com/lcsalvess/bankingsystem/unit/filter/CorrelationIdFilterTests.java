@@ -15,11 +15,19 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.MDC;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class CorrelationIdFilterTests {
 
@@ -92,7 +100,7 @@ class CorrelationIdFilterTests {
         @Test
         void shouldNormalizeUppercaseCorrelationId() throws ServletException, IOException {
             String correlationId = "550E8400-E29B-41D4-A716-446655440000";
-            String expectedCorrelationId = correlationId.toLowerCase();
+            String expectedCorrelationId = correlationId.toLowerCase(Locale.ROOT);
 
             when(request.getHeader(CORRELATION_ID_HEADER)).thenReturn(correlationId);
 

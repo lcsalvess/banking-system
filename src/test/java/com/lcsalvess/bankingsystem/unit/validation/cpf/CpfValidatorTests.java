@@ -3,6 +3,8 @@ package com.lcsalvess.bankingsystem.unit.validation.cpf;
 import com.lcsalvess.bankingsystem.validation.cpf.CpfValidator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -81,5 +83,31 @@ class CpfValidatorTests {
     @DisplayName("Should return false when CPF contains fullwidth digits")
     void shouldReturnFalseWhenCpfContainsFullwidthDigits() {
         assertFalse(cpfValidator.isValid("５" + "2998224725"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @ValueSource(strings = {
+            "12345685000", // 1st digit: remainder 0 -> 0 | 2nd digit: remainder 1 -> 0
+            "12345698500", // 1st digit: remainder 1 -> 0 | 2nd digit: remainder 0 -> 0
+            "12345685190", // 1st digit: remainder 2 -> 9 (boundary) | 2nd digit: remainder 0 -> 0
+            "12345683309"  // 1st digit: remainder 0 -> 0 | 2nd digit: remainder 2 -> 9 (boundary)
+    })
+    @DisplayName("Should return true for valid CPFs whose check digit remainders are 0, 1 and 2")
+    void shouldReturnTrueWhenCheckDigitRemaindersAreOnTheBoundary(String cpf) {
+        assertTrue(cpfValidator.isValid(cpf));
+    }
+
+    @Test
+    @DisplayName("Should return false when first check digit should be zero but is not")
+    void shouldReturnFalseWhenFirstCheckDigitShouldBeZeroButIsNot() {
+        // base 123456797 has remainder 0, so the correct 1st digit is 0
+        assertFalse(cpfValidator.isValid("12345679710"));
+    }
+
+    @Test
+    @DisplayName("Should return false when second check digit should be zero but is not")
+    void shouldReturnFalseWhenSecondCheckDigitShouldBeZeroButIsNot() {
+        // 1st digit is correct (0); the 2nd remainder is 0, so the correct 2nd digit is 0
+        assertFalse(cpfValidator.isValid("12345679701"));
     }
 }

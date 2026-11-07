@@ -1,5 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.exception.handler;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.lcsalvess.bankingsystem.exception.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.handler.GlobalExceptionHandler;
@@ -28,10 +31,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.PSQLState;
+import org.postgresql.util.ServerErrorMessage;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.MethodParameter;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -47,18 +55,28 @@ import org.springframework.security.authentication.InternalAuthenticationService
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.sql.SQLException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -385,6 +403,106 @@ class GlobalExceptionHandlerTests {
                 ));
     }
 
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("unknownConstraintLogCases")
+    void shouldLogOnlySqlStateAndConstraintWhenConstraintIsUnknown(
+            String description,
+            Throwable cause,
+            String expectedLogMessage
+    ) throws Exception {
+
+        List<ILoggingEvent> events = captureHandlerLogs(() ->
+                performThrowing(
+                        new DataIntegrityViolationException(
+                                "Sensitive database detail",
+                                cause
+                        )
+                )
+                        .andExpect(status().isInternalServerError())
+                        .andExpect(jsonPath("$.message")
+                                .value(ApiErrorMessages.DATABASE_INTEGRITY_ERROR))
+                        .andExpect(content().string(
+                                not(containsString("Sensitive database detail"))
+                        ))
+        );
+
+        ILoggingEvent event = events.stream()
+                .filter(e -> e.getFormattedMessage()
+                        .startsWith("Data integrity violation"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "Expected a data integrity warning to be logged."
+                ));
+
+        assertEquals(expectedLogMessage, event.getFormattedMessage());
+
+        // The exception itself is never logged: its detail carries row values.
+        assertNull(event.getThrowableProxy());
+    }
+
+    static Stream<Arguments> unknownConstraintLogCases() {
+        return Stream.of(
+                Arguments.of(
+                        "Hibernate violation with SQLState and constraint",
+                        new org.hibernate.exception.ConstraintViolationException(
+                                "Unknown constraint",
+                                new SQLException("reason", "23505"),
+                                "uk_unknown_constraint"
+                        ),
+                        "Data integrity violation: sqlState=23505, "
+                                + "constraint=uk_unknown_constraint"
+                ),
+                Arguments.of(
+                        "Hibernate violation whose SQLException has no SQLState",
+                        new org.hibernate.exception.ConstraintViolationException(
+                                "Unknown constraint",
+                                new SQLException("reason"),
+                                "uk_unknown_constraint"
+                        ),
+                        "Data integrity violation: sqlState=unknown, "
+                                + "constraint=uk_unknown_constraint"
+                ),
+                Arguments.of(
+                        "Hibernate violation without name wrapping a PostgreSQL error",
+                        new org.hibernate.exception.ConstraintViolationException(
+                                "Unknown constraint",
+                                postgresViolation("uk_from_postgres"),
+                                null
+                        ),
+                        "Data integrity violation: sqlState=23505, "
+                                + "constraint=uk_from_postgres"
+                ),
+                Arguments.of(
+                        "PostgreSQL error with constraint",
+                        postgresViolation("uk_from_postgres"),
+                        "Data integrity violation: sqlState=23505, "
+                                + "constraint=uk_from_postgres"
+                ),
+                Arguments.of(
+                        "PostgreSQL error without constraint field",
+                        postgresViolation(null),
+                        "Data integrity violation: sqlState=23505, "
+                                + "constraint=unknown"
+                ),
+                Arguments.of(
+                        "PostgreSQL error without server error message",
+                        new PSQLException(
+                                "No server message",
+                                PSQLState.UNEXPECTED_ERROR
+                        ),
+                        "Data integrity violation: sqlState="
+                                + PSQLState.UNEXPECTED_ERROR.getState()
+                                + ", constraint=unknown"
+                ),
+                Arguments.of(
+                        "Plain SQLException without SQLState",
+                        new SQLException("no state"),
+                        "Data integrity violation: sqlState=unknown, "
+                                + "constraint=unknown"
+                )
+        );
+    }
+
     // -------------------------------------------------------------------------
     // VALIDAÇÃO DO CORPO DA REQUISIÇÃO
     // -------------------------------------------------------------------------
@@ -421,6 +539,94 @@ class GlobalExceptionHandlerTests {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message")
                         .value(ApiErrorMessages.INVALID_REQUEST_DATA));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("fieldErrorCases")
+    void shouldResolveFieldErrorsDeterministically(
+            String description,
+            List<FieldError> fieldErrors,
+            String expectedMessage
+    ) throws Exception {
+
+        BindingResult bindingResult = bindingResult();
+        fieldErrors.forEach(bindingResult::addError);
+
+        performInvalidArgument(bindingResult)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.VALIDATION_ERROR))
+                .andExpect(jsonPath("$.errors.name").value(expectedMessage));
+    }
+
+    static Stream<Arguments> fieldErrorCases() {
+        return Stream.of(
+                Arguments.of(
+                        "required error first: later errors are ignored",
+                        List.of(
+                                nameError("NotBlank", "must not be blank"),
+                                nameError("Pattern", "must match the pattern")
+                        ),
+                        "must not be blank"
+                ),
+                Arguments.of(
+                        "required error last: it replaces earlier errors",
+                        List.of(
+                                nameError("Pattern", "must match the pattern"),
+                                nameError("NotBlank", "must not be blank")
+                        ),
+                        "must not be blank"
+                ),
+                Arguments.of(
+                        "non-required errors are joined",
+                        List.of(
+                                nameError("Pattern", "must match the pattern"),
+                                nameError("Size", "size must be at most 5")
+                        ),
+                        "must match the pattern; size must be at most 5"
+                ),
+                Arguments.of(
+                        "missing default message uses the fallback",
+                        List.of(nameError("Pattern", null)),
+                        "Valor inválido"
+                )
+        );
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("globalErrorCases")
+    void shouldReportGlobalErrorsUnderTheObjectName(
+            String description,
+            String defaultMessage,
+            String expectedMessage
+    ) throws Exception {
+
+        BindingResult bindingResult = bindingResult();
+        bindingResult.reject("PasswordsMatch", defaultMessage);
+
+        performInvalidArgument(bindingResult)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.VALIDATION_ERROR))
+                .andExpect(jsonPath("$.errors.testRequest")
+                        .value(expectedMessage));
+    }
+
+    static Stream<Arguments> globalErrorCases() {
+        return Stream.of(
+                Arguments.of(
+                        "with default message",
+                        "Passwords do not match",
+                        "Passwords do not match"
+                ),
+                Arguments.of(
+                        "without default message",
+                        null,
+                        "Objeto inválido"
+                )
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -469,6 +675,28 @@ class GlobalExceptionHandlerTests {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message")
                         .value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRequiredHeaderIsMissing()
+            throws Exception {
+
+        mockMvc.perform(get("/__test/required-header"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
+    }
+
+    @Test
+    void shouldReturnInvalidParameterMessageForOtherBindingExceptions()
+            throws Exception {
+
+        performThrowing(new ServletRequestBindingException("Binding failed"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message")
+                        .value(ApiErrorMessages.INVALID_REQUEST_PARAMETER));
     }
 
     @Test
@@ -654,6 +882,85 @@ class GlobalExceptionHandlerTests {
         }
     }
 
+    private ResultActions performInvalidArgument(BindingResult bindingResult)
+            throws Exception {
+
+        MethodParameter parameter = new MethodParameter(
+                TestController.class.getDeclaredMethod(
+                        "validated",
+                        TestRequest.class
+                ),
+                0
+        );
+
+        return performThrowing(
+                new MethodArgumentNotValidException(parameter, bindingResult)
+        );
+    }
+
+    private static BindingResult bindingResult() {
+        return new BeanPropertyBindingResult(
+                new TestRequest(null, null),
+                "testRequest"
+        );
+    }
+
+    private static FieldError nameError(String code, String message) {
+        return new FieldError(
+                "testRequest",
+                "name",
+                null,
+                false,
+                new String[]{code},
+                null,
+                message
+        );
+    }
+
+    /**
+     * Creates a PostgreSQL exception with SQLState 23505 and an optional
+     * constraint name, using the driver's own error representation.
+     */
+    private static PSQLException postgresViolation(String constraintName) {
+        StringBuilder serverError = new StringBuilder()
+                .append('S').append("ERROR").append('\0')
+                .append('C').append("23505").append('\0')
+                .append('M').append("duplicate key value").append('\0');
+
+        if (constraintName != null) {
+            serverError.append('n').append(constraintName).append('\0');
+        }
+
+        // Terminates the PostgreSQL ErrorResponse fields.
+        serverError.append('\0');
+
+        return new PSQLException(new ServerErrorMessage(serverError.toString()));
+    }
+
+    private static List<ILoggingEvent> captureHandlerLogs(ThrowingAction action)
+            throws Exception {
+
+        Logger handlerLogger =
+                (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        handlerLogger.addAppender(appender);
+
+        try {
+            action.run();
+            return List.copyOf(appender.list);
+        } finally {
+            handlerLogger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @FunctionalInterface
+    private interface ThrowingAction {
+        void run() throws Exception;
+    }
+
     @SuppressWarnings("unchecked")
     private static <T extends Throwable> void sneakyThrow(
             Throwable throwable
@@ -723,6 +1030,13 @@ class GlobalExceptionHandlerTests {
                 @RequestParam("id") Integer id
         ) {
             return id.toString();
+        }
+
+        @GetMapping("/__test/required-header")
+        String requiredHeader(
+                @RequestHeader("Idempotency-Key") String key
+        ) {
+            return key;
         }
 
         @PostMapping("/__test/post-only")

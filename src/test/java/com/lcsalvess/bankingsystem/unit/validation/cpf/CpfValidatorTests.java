@@ -70,4 +70,16 @@ class CpfValidatorTests {
     void shouldReturnFalseWhenCpfContainsPunctuation() {
         assertFalse(cpfValidator.isValid("5299822472."));
     }
+
+    @Test
+    @DisplayName("Should return false when CPF contains Arabic-Indic digits")
+    void shouldReturnFalseWhenCpfContainsArabicIndicDigits() {
+        assertFalse(cpfValidator.isValid("٥" + "2998224725"));
+    }
+
+    @Test
+    @DisplayName("Should return false when CPF contains fullwidth digits")
+    void shouldReturnFalseWhenCpfContainsFullwidthDigits() {
+        assertFalse(cpfValidator.isValid("５" + "2998224725"));
+    }
 }

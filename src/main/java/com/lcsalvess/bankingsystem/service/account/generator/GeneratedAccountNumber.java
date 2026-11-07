@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.service.account;
+package com.lcsalvess.bankingsystem.service.account.generator;
 
 public record GeneratedAccountNumber(
         String number,

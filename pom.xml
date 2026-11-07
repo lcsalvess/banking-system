@@ -55,6 +55,7 @@
         <bucket4j.version>8.22.0</bucket4j.version>
         <caffeine.version>3.3.1</caffeine.version>
         <swagger-ui.version>5.34.1</swagger-ui.version>
+        <error-prone.version>2.52.0</error-prone.version>
         <!-- Allows Maven Surefire to replace argLine during late configuration. -->
         <argLine/>
     </properties>
@@ -279,6 +280,37 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+
+            <!--
+                Runs Google Error Prone during Java compilation to detect
+                common programming mistakes and potentially problematic
+                code patterns.
+                Fails compilation when error-level findings are reported.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.16.0</version>
+
+                <configuration>
+                    <showWarnings>true</showWarnings>
+
+                    <compilerArgs>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <arg>--should-stop=ifError=FLOW</arg>
+                        <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+                        <arg>-Xplugin:ErrorProne</arg>
+                    </compilerArgs>
+
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>${error-prone.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
 
             <plugin>

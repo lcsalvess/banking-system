@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.config.security.JwtProperties;
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.service.security.JwtClaims;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import io.jsonwebtoken.Claims;
@@ -37,7 +37,14 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JwtServiceTests {
 
@@ -157,7 +164,7 @@ class JwtServiceTests {
 
             assertNotNull(token);
             assertFalse(token.isBlank());
-            assertEquals(3, token.split("\\.").length);
+            assertEquals(3, token.split("\\.", -1).length);
         }
 
         @Test
@@ -282,7 +289,7 @@ class JwtServiceTests {
         @Test
         @DisplayName("Deve rejeitar token com payload adulterado")
         void shouldRejectTokenWithTamperedPayload() {
-            String[] parts = jwtService.generateToken(user).split("\\.");
+            String[] parts = jwtService.generateToken(user).split("\\.", -1);
             long exp = Instant.now().plusSeconds(3600).getEpochSecond();
             String forgedPayload = Base64.getUrlEncoder().withoutPadding().encodeToString(
                     ("{\"sub\":\"admin\",\"iss\":\"" + ISSUER + "\",\"exp\":" + exp + "}")

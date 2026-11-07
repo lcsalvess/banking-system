@@ -240,7 +240,7 @@ public class AuditTrailFilter extends OncePerRequestFilter {
         StringBuilder sanitized = new StringBuilder(API_BASE_PATH);
         int kept = 0;
 
-        for (String segment : path.substring(API_BASE_PATH.length()).split("/")) {
+        for (String segment : path.substring(API_BASE_PATH.length()).split("/", -1)) {
             if (segment.isEmpty()) {
                 continue;
             }

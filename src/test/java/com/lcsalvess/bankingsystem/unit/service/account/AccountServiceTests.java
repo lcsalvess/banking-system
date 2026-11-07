@@ -21,8 +21,8 @@ import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
-import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
+import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
@@ -317,6 +317,51 @@ public class AccountServiceTests {
             );
 
             verify(accountNumberGenerator).isValid(SAVINGS_NUMBER, INVALID_DIGIT);
+            verifyNoMoreInteractionsOnMocks();
+        }
+    }
+
+    @Nested
+    @DisplayName("findEntityByAccountNumberForUpdate(String, String)")
+    class FindEntityByAccountNumberForUpdate {
+
+        @Test
+        @DisplayName("Should throw when locked account ID cannot be resolved")
+        void shouldThrowWhenLockedAccountIdCannotBeResolved() {
+            Long lockedAccountId = 99L;
+
+            when(accountNumberGenerator.isValid(
+                    NON_EXISTENT_NUMBER,
+                    NON_EXISTENT_DIGIT
+            )).thenReturn(true);
+
+            when(accountRepository.lockIdByAccountNumber(
+                    NON_EXISTENT_NUMBER
+            )).thenReturn(Optional.of(lockedAccountId));
+
+            when(accountRepository.findById(lockedAccountId))
+                    .thenReturn(Optional.empty());
+
+            assertThrowsWithMessage(
+                    AccountNotFoundException.class,
+                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
+                    () -> accountService.findEntityByAccountNumberForUpdate(
+                            NON_EXISTENT_NUMBER,
+                            NON_EXISTENT_DIGIT
+                    )
+            );
+
+            verify(accountNumberGenerator).isValid(
+                    NON_EXISTENT_NUMBER,
+                    NON_EXISTENT_DIGIT
+            );
+
+            verify(accountRepository).lockIdByAccountNumber(
+                    NON_EXISTENT_NUMBER
+            );
+
+            verify(accountRepository).findById(lockedAccountId);
+
             verifyNoMoreInteractionsOnMocks();
         }
     }

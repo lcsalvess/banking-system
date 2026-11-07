@@ -3,6 +3,7 @@ package com.lcsalvess.bankingsystem.dto.response.exception;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -43,15 +44,26 @@ public record ApiErrorResponse(
                 : Collections.unmodifiableMap(new LinkedHashMap<>(errors));
     }
 
-    public ApiErrorResponse(int status, String message) {
-        this(status, message, Instant.now(), null);
+    /**
+     * Creates an error response stamped with the application clock.
+     */
+    public static ApiErrorResponse of(
+            Clock clock,
+            int status,
+            String message
+    ) {
+        return new ApiErrorResponse(status, message, clock.instant(), null);
     }
 
-    public ApiErrorResponse(
+    /**
+     * Creates a validation error response stamped with the application clock.
+     */
+    public static ApiErrorResponse of(
+            Clock clock,
             int status,
             String message,
             Map<String, String> errors
     ) {
-        this(status, message, Instant.now(), errors);
+        return new ApiErrorResponse(status, message, clock.instant(), errors);
     }
 }

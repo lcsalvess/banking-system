@@ -14,7 +14,11 @@ import org.postgresql.util.PSQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
-import org.springframework.dao.*;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -40,6 +44,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.sql.SQLException;
+import java.time.Clock;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -50,6 +55,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    private final Clock clock;
+
+    public GlobalExceptionHandler(Clock clock) {
+        this.clock = clock;
+    }
+
     //-------------- AUTENTICAÇÃO ---------
 
     @ExceptionHandler(BadCredentialsException.class)
@@ -57,7 +68,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ApiErrorResponse handleBadCredentials() {
         log.warn("Authentication failed: invalid credentials.");
 
-        return new ApiErrorResponse(
+        return ApiErrorResponse.of(
+                clock,
                 HttpStatus.UNAUTHORIZED.value(),
                 ApiErrorMessages.INVALID_CREDENTIALS
         );
@@ -77,7 +89,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
             return ResponseEntity
                     .status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(new ApiErrorResponse(
+                    .body(ApiErrorResponse.of(
+                            clock,
                             HttpStatus.SERVICE_UNAVAILABLE.value(),
                             ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE
                     ));
@@ -87,7 +100,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ApiErrorResponse(
+                .body(ApiErrorResponse.of(
+                        clock,
                         HttpStatus.INTERNAL_SERVER_ERROR.value(),
                         ApiErrorMessages.INTERNAL_SERVER_ERROR
                 ));
@@ -103,7 +117,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 exception.getClass().getSimpleName()
         );
 
-        return new ApiErrorResponse(
+        return ApiErrorResponse.of(
+                clock,
                 HttpStatus.UNAUTHORIZED.value(),
                 ApiErrorMessages.AUTHENTICATION_FAILED
         );
@@ -120,7 +135,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                         HttpHeaders.RETRY_AFTER,
                         Long.toString(exception.getRetryAfterSeconds())
                 )
-                .body(new ApiErrorResponse(
+                .body(ApiErrorResponse.of(
+                        clock,
                         HttpStatus.TOO_MANY_REQUESTS.value(),
                         exception.getMessage()
                 ));
@@ -133,7 +149,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ApiErrorResponse handleAuthorizationDenied() {
         log.warn("Access denied: user is not authorized to perform the operation.");
 
-        return new ApiErrorResponse(
+        return ApiErrorResponse.of(
+                clock,
                 HttpStatus.FORBIDDEN.value(),
                 ApiErrorMessages.ACCESS_DENIED_RESOURCE
         );
@@ -145,7 +162,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleBusinessException(
             BusinessException exception) {
 
-        ApiErrorResponse error = new ApiErrorResponse(
+        ApiErrorResponse error = ApiErrorResponse.of(
+                clock,
                 exception.getStatus().value(),
                 exception.getMessage()
         );
@@ -173,7 +191,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             if (entry.getKey().isViolatedBy(exception)) {
                 return ResponseEntity
                         .status(HttpStatus.CONFLICT)
-                        .body(new ApiErrorResponse(
+                        .body(ApiErrorResponse.of(
+                                clock,
                                 HttpStatus.CONFLICT.value(),
                                 entry.getValue()
                         ));
@@ -190,7 +209,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ApiErrorResponse(
+                .body(ApiErrorResponse.of(
+                        clock,
                         HttpStatus.INTERNAL_SERVER_ERROR.value(),
                         ApiErrorMessages.DATABASE_INTEGRITY_ERROR
                 ));
@@ -230,7 +250,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             }
         });
 
-        return new ApiErrorResponse(
+        return ApiErrorResponse.of(
+                clock,
                 HttpStatus.BAD_REQUEST.value(),
                 ApiErrorMessages.VALIDATION_ERROR,
                 errors
@@ -289,7 +310,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 )
         );
 
-        ApiErrorResponse body = new ApiErrorResponse(
+        ApiErrorResponse body = ApiErrorResponse.of(
+                clock,
                 status.value(),
                 ApiErrorMessages.VALIDATION_ERROR,
                 errors
@@ -384,7 +406,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             @NonNull HttpStatusCode status,
             @NonNull WebRequest request) {
 
-        ApiErrorResponse error = new ApiErrorResponse(
+        ApiErrorResponse error = ApiErrorResponse.of(
+                clock,
                 status.value(),
                 ApiErrorMessages.METHOD_NOT_ALLOWED
         );
@@ -419,7 +442,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         log.error("Address lookup provider unavailable.", ex);
 
-        return new ApiErrorResponse(
+        return ApiErrorResponse.of(
+                clock,
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
         );
@@ -436,7 +460,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         log.error("Database unavailable.", exception);
 
-        return new ApiErrorResponse(
+        return ApiErrorResponse.of(
+                clock,
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE
         );
@@ -449,7 +474,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         log.warn("Could not acquire database lock.", exception);
 
-        return new ApiErrorResponse(
+        return ApiErrorResponse.of(
+                clock,
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE
         );
@@ -464,7 +490,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         log.error("Unexpected error while processing request.", exception);
 
-        return new ApiErrorResponse(
+        return ApiErrorResponse.of(
+                clock,
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 ApiErrorMessages.INTERNAL_SERVER_ERROR
         );
@@ -479,7 +506,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             WebRequest request,
             String message) {
 
-        ApiErrorResponse error = new ApiErrorResponse(
+        ApiErrorResponse error = ApiErrorResponse.of(
+                clock,
                 status.value(),
                 message
         );

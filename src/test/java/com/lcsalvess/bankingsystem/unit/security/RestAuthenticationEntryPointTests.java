@@ -21,14 +21,26 @@ import org.springframework.security.core.AuthenticationException;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RestAuthenticationEntryPointTests {
 
     private static final int UNAUTHORIZED_STATUS =
             HttpServletResponse.SC_UNAUTHORIZED;
+
+    private static final Instant FIXED_INSTANT =
+            Instant.parse("2026-01-01T12:00:00Z");
+
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
     private JsonMapper jsonMapper;
     private RestAuthenticationEntryPoint authenticationEntryPoint;
@@ -38,7 +50,7 @@ class RestAuthenticationEntryPointTests {
     @BeforeEach
     void setUp() {
         jsonMapper = JsonMapper.builder().build();
-        authenticationEntryPoint = new RestAuthenticationEntryPoint(jsonMapper);
+        authenticationEntryPoint = new RestAuthenticationEntryPoint(jsonMapper, FIXED_CLOCK);
 
         request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/accounts");
@@ -225,7 +237,10 @@ class RestAuthenticationEntryPointTests {
                             "O serviço está temporariamente indisponível. Tente novamente.",
                             errorResponse.message()
                     ),
-                    () -> assertNotNull(errorResponse.timestamp())
+                    () -> assertEquals(
+                            FIXED_INSTANT,
+                            errorResponse.timestamp()
+                    )
             );
         }
     }
@@ -257,7 +272,8 @@ class RestAuthenticationEntryPointTests {
                         ApiErrorMessages.AUTHENTICATION_FAILED,
                         errorResponse.message()
                 ),
-                () -> assertNotNull(
+                () -> assertEquals(
+                        FIXED_INSTANT,
                         errorResponse.timestamp()
                 )
         );

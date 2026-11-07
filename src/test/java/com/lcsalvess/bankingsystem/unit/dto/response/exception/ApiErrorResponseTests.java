@@ -5,6 +5,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,6 +19,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @DisplayName("ApiErrorResponse")
 class ApiErrorResponseTests {
+
+    private static final Instant FIXED_INSTANT =
+            Instant.parse("2026-01-01T12:00:00Z");
+
+    private static final Clock CLOCK =
+            Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
     @Nested
     @DisplayName("Error ordering")
@@ -30,7 +39,8 @@ class ApiErrorResponseTests {
             errors.put("cpf", "Invalid CPF.");
             errors.put("password", "Password is too weak.");
 
-            ApiErrorResponse response = new ApiErrorResponse(
+            ApiErrorResponse response = ApiErrorResponse.of(
+                    CLOCK,
                     400,
                     "Request validation failed.",
                     errors
@@ -44,6 +54,31 @@ class ApiErrorResponseTests {
     }
 
     @Nested
+    @DisplayName("Timestamp")
+    class TimestampTests {
+
+        @Test
+        @DisplayName("Should stamp the response with the provided clock")
+        void shouldUseTheProvidedClock() {
+            ApiErrorResponse withoutErrors = ApiErrorResponse.of(
+                    CLOCK,
+                    404,
+                    "Not found."
+            );
+
+            ApiErrorResponse withErrors = ApiErrorResponse.of(
+                    CLOCK,
+                    400,
+                    "Request validation failed.",
+                    Map.of("email", "Invalid email address.")
+            );
+
+            assertEquals(FIXED_INSTANT, withoutErrors.timestamp());
+            assertEquals(FIXED_INSTANT, withErrors.timestamp());
+        }
+    }
+
+    @Nested
     @DisplayName("Defensive copying")
     class DefensiveCopyTests {
 
@@ -53,7 +88,8 @@ class ApiErrorResponseTests {
             Map<String, String> errors = new LinkedHashMap<>();
             errors.put("email", "Invalid email address.");
 
-            ApiErrorResponse response = new ApiErrorResponse(
+            ApiErrorResponse response = ApiErrorResponse.of(
+                    CLOCK,
                     400,
                     "Request validation failed.",
                     errors
@@ -72,7 +108,8 @@ class ApiErrorResponseTests {
         @Test
         @DisplayName("Should expose an immutable errors map")
         void shouldExposeImmutableErrors() {
-            ApiErrorResponse response = new ApiErrorResponse(
+            ApiErrorResponse response = ApiErrorResponse.of(
+                    CLOCK,
                     400,
                     "Request validation failed.",
                     Map.of("email", "Invalid email address.")
@@ -94,7 +131,8 @@ class ApiErrorResponseTests {
         @Test
         @DisplayName("Should keep errors null when not applicable")
         void shouldKeepNullErrors() {
-            ApiErrorResponse response = new ApiErrorResponse(
+            ApiErrorResponse response = ApiErrorResponse.of(
+                    CLOCK,
                     404,
                     "Not found."
             );

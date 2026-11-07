@@ -13,14 +13,17 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 
 @Component
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final JsonMapper jsonMapper;
+    private final Clock clock;
 
-    public RestAuthenticationEntryPoint(JsonMapper jsonMapper) {
+    public RestAuthenticationEntryPoint(JsonMapper jsonMapper, Clock clock) {
         this.jsonMapper = jsonMapper;
+        this.clock = clock;
     }
 
     @Override
@@ -30,7 +33,8 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             @NonNull AuthenticationException exception
     ) throws IOException {
 
-        ApiErrorResponse errorResponse = new ApiErrorResponse(
+        ApiErrorResponse errorResponse = ApiErrorResponse.of(
+                clock,
                 HttpServletResponse.SC_UNAUTHORIZED,
                 ApiErrorMessages.AUTHENTICATION_FAILED
         );
@@ -52,7 +56,8 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response
     ) throws IOException {
 
-        ApiErrorResponse errorResponse = new ApiErrorResponse(
+        ApiErrorResponse errorResponse = ApiErrorResponse.of(
+                clock,
                 HttpServletResponse.SC_SERVICE_UNAVAILABLE,
                 ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE
         );

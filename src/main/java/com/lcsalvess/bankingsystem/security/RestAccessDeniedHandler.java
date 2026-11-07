@@ -18,6 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 
 @Component
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
@@ -29,9 +30,11 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
             new AuthenticationTrustResolverImpl();
 
     private final JsonMapper jsonMapper;
+    private final Clock clock;
 
-    public RestAccessDeniedHandler(JsonMapper jsonMapper) {
+    public RestAccessDeniedHandler(JsonMapper jsonMapper, Clock clock) {
         this.jsonMapper = jsonMapper;
+        this.clock = clock;
     }
 
     @Override
@@ -57,7 +60,8 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
                 exception.getClass().getSimpleName()
         );
 
-        ApiErrorResponse errorResponse = new ApiErrorResponse(
+        ApiErrorResponse errorResponse = ApiErrorResponse.of(
+                clock,
                 HttpServletResponse.SC_FORBIDDEN,
                 ApiErrorMessages.ACCESS_DENIED_RESOURCE
         );

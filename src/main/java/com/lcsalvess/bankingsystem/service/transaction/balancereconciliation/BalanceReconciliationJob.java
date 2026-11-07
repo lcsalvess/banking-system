@@ -16,12 +16,12 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Verifica a consistência dos saldos das contas e da cadeia histórica
- * de snapshots das transações.
- * <p>
- * Detecta divergências entre o saldo atual e o último {@code balance_after},
- * bem como quebras na sequência histórica dos saldos. Apenas registra as
- * inconsistências encontradas: não corrige saldos automaticamente.
+ * Checks the consistency of account balances and the historical transaction balance chain.
+ *
+ * <p>Detects discrepancies between the current account balance and the latest
+ * {@code balance_after} value, as well as breaks in the historical balance sequence.
+ * This job reports detected inconsistencies only and never corrects account balances
+ * automatically.
  */
 @Component
 public class BalanceReconciliationJob {
@@ -45,7 +45,9 @@ public class BalanceReconciliationJob {
     }
 
     /**
-     * @return quantidade de contas com divergências de saldo ou histórico.
+     * Checks account balances against their transaction history.
+     *
+     * @return the number of accounts with balance or history discrepancies.
      */
     public int reconcile() {
         List<BalanceMismatch> mismatches =

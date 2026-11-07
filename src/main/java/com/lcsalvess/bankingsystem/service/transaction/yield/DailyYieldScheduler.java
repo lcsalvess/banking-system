@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.service.transaction.yield;
 
-import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
+import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
 import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
@@ -226,23 +226,23 @@ public class DailyYieldScheduler {
         private int skippedAccounts;
         private int failed;
 
-        public void incrementAttempted() {
+        private void incrementAttempted() {
             attempted++;
         }
 
-        public void incrementSkipped() {
+        private void incrementSkipped() {
             skippedAccounts++;
         }
 
-        public void incrementFailed() {
+        private void incrementFailed() {
             failed++;
         }
 
-        public int getFailed() {
+        private int getFailed() {
             return failed;
         }
 
-        public void registerResult(DailyYieldProcessingResult result) {
+        private void registerResult(DailyYieldProcessingResult result) {
             switch (result) {
                 case APPLIED -> applied++;
                 case ALREADY_PROCESSED -> alreadyProcessed++;

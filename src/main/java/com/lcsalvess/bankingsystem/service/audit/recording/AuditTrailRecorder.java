@@ -333,7 +333,7 @@ public class AuditTrailRecorder {
 
         try {
             if (IPV4_LITERAL.matcher(clientIp).matches()) {
-                String[] octets = clientIp.split("\\.");
+                String[] octets = clientIp.split("\\.", -1);
                 byte[] address = new byte[4];
 
                 for (int i = 0; i < octets.length; i++) {

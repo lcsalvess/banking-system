@@ -22,6 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -196,7 +197,7 @@ class UserSpecificationsIntegrationTests {
             String marker = uniqueMarker();
 
             persistUsers(Stream.of(Role.values())
-                    .map(r -> user(marker, roleUsername(r, marker), "u-" + r.ordinal(), r))
+                    .map(r -> user(marker, roleUsername(r, marker), "u-" + r.name(), r))
                     .toArray(User[]::new));
 
             Page<User> result = findUsers(null, role, null);
@@ -364,7 +365,7 @@ class UserSpecificationsIntegrationTests {
     }
 
     private static String roleUsername(Role role, String marker) {
-        return "r-" + role.name().substring(0, 3).toLowerCase() + "-" + marker;
+        return "r-" + role.name().substring(0, 3).toLowerCase(Locale.ROOT) + "-" + marker;
     }
 
     private static Set<String> ownedUsernames(Page<User> page, String marker) {

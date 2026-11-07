@@ -4,37 +4,41 @@ import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Define uma anotação de validação personalizada para CPF.
+ * Defines a custom validation annotation for Brazilian CPF numbers.
  */
 @Documented
-// Faz a anotação aparecer na documentação gerada pelo Javadoc.
+// Includes the annotation in the generated Javadoc documentation.
 @Constraint(validatedBy = CpfConstraintValidator.class)
-// Informa ao Bean Validation que esta é uma constraint personalizada.
-// Quando @ValidCpf for encontrada, CpfConstraintValidator será executado.
+// Registers this annotation as a custom Bean Validation constraint.
+// CpfConstraintValidator is invoked whenever {@code @ValidCpf} is encountered.
 @Target({ElementType.FIELD, ElementType.PARAMETER})
-// Define onde @ValidCpf pode ser utilizada.
-// FIELD = atributos/campos.
-// PARAMETER = parâmetros de métodos.
+// Defines where {@code @ValidCpf} can be applied.
+// FIELD = fields.
+// PARAMETER = method and constructor parameters.
 @Retention(RetentionPolicy.RUNTIME)
-// Mantém a anotação disponível durante a execução da aplicação.
-// Isso permite que o Bean Validation consiga encontrá-la em runtime.
+// Keeps the annotation available at runtime.
+// This allows Bean Validation to discover it during application execution.
 public @interface ValidCpf {
 
     /**
-     * Mensagem exibida quando a validação falhar.
+     * Message displayed when validation fails.
      */
     String message() default ValidationMessages.INVALID_CPF;
 
     /**
-     * Permite agrupar diferentes regras de validação.
+     * Allows multiple validation constraints to be grouped together.
      */
     Class<?>[] groups() default {};
 
     /**
-     * Permite associar metadados à validação.
+     * Allows metadata to be associated with the validation constraint.
      */
     Class<? extends Payload>[] payload() default {};
 }

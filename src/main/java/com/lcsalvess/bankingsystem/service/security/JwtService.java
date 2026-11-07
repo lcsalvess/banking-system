@@ -15,6 +15,7 @@ import io.jsonwebtoken.security.WeakKeyException;
 import javax.crypto.SecretKey;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Date;
 
 public class JwtService {
@@ -85,16 +86,14 @@ public class JwtService {
     }
 
     public String generateToken(User user) {
-        Date issuedAt = Date.from(clock.instant());
-        Date expiration = new Date(
-                issuedAt.getTime() + expirationInSeconds * 1000
-        );
+        Instant issuedAt = clock.instant();
+        Instant expiration = issuedAt.plusSeconds(expirationInSeconds);
 
         return Jwts.builder()
                 .subject(user.getUsername())
                 .issuer(issuer)
-                .issuedAt(issuedAt)
-                .expiration(expiration)
+                .issuedAt(Date.from(issuedAt))
+                .expiration(Date.from(expiration))
                 .claim(TOKEN_VERSION_CLAIM, user.getTokenVersion())
                 .signWith(signingKey)
                 .compact();

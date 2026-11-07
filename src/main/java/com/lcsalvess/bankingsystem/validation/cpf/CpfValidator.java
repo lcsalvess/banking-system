@@ -5,24 +5,29 @@ public class CpfValidator {
         if (cpf == null || cpf.length() != 11) {
             return false;
         }
-        for (char character : cpf.toCharArray()) {
-            if (!Character.isDigit(character)) {
+
+        for (int i = 0; i < cpf.length(); i++) {
+            char character = cpf.charAt(i);
+
+            if (character < '0' || character > '9') {
                 return false;
             }
         }
+
         if (cpf.chars().distinct().count() == 1) {
             return false;
         }
 
         int[] digits = new int[11];
         for (int i = 0; i < 11; i++) {
-            digits[i] = Character.getNumericValue(cpf.charAt(i));
+            digits[i] = cpf.charAt(i) - '0';
         }
 
         int sum = 0;
         for (int i = 0; i < 9; i++) {
             sum += digits[i] * (10 - i);
         }
+
         int remainder = sum % 11;
 
         int firstDigit;
@@ -31,6 +36,7 @@ public class CpfValidator {
         } else {
             firstDigit = 11 - remainder;
         }
+
         if (digits[9] != firstDigit) {
             return false;
         }
@@ -39,6 +45,7 @@ public class CpfValidator {
         for (int i = 0; i < 10; i++) {
             sum += digits[i] * (11 - i);
         }
+
         remainder = sum % 11;
 
         int secondDigit;
@@ -47,10 +54,7 @@ public class CpfValidator {
         } else {
             secondDigit = 11 - remainder;
         }
-        if (digits[10] != secondDigit) {
-            return false;
-        }
 
-        return true;
+        return digits[10] == secondDigit;
     }
 }

@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -285,7 +286,7 @@ class DatabaseConstraintTests {
                     integrityViolation(
                             DatabaseConstraint.USER_USERNAME_UNIQUE
                                     .getConstraintName()
-                                    .toUpperCase()
+                                    .toUpperCase(Locale.ROOT)
                     );
 
             assertFalse(

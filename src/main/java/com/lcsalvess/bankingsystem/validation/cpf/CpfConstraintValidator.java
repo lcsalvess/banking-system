@@ -4,24 +4,27 @@ import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
 /**
- * Implementa a lógica de validação utilizada pela anotação @ValidCpf.
+ * Implements the validation logic for the {@link ValidCpf} annotation.
  */
 public class CpfConstraintValidator
         implements ConstraintValidator<ValidCpf, String> {
 
     /*
-     * Utiliza a classe responsável pelo algoritmo de validação do CPF.
+     * Uses the class responsible for the CPF validation algorithm.
      */
     private final CpfValidator cpfValidator = new CpfValidator();
 
     /**
-     * Executa a validação quando o Bean Validation encontra a anotação @ValidCpf.
-     * Valida apenas os dígitos verificadores: nulo e formato ficam a cargo de
-     * @NotBlank e @Pattern, evitando duas violações no mesmo campo.
+     * Validates a CPF when Bean Validation processes the {@link ValidCpf} annotation.
      *
-     * @param cpf valor do CPF que será validado.
-     * @param context contexto fornecido pelo Bean Validation.
-     * @return true se o CPF for válido ou não tiver 11 dígitos numéricos; false se os dígitos verificadores forem inválidos.
+     * <p>This validator checks only the check digits. Null and format validation
+     * are delegated to {@code @NotBlank} and {@code @Pattern}, preventing duplicate
+     * constraint violations for the same field.
+     *
+     * @param cpf the CPF value to validate.
+     * @param context the context provided by Bean Validation.
+     * @return {@code true} if the value is null, does not contain exactly 11 ASCII
+     *         digits, or has valid check digits; {@code false} otherwise.
      */
     @Override
     public boolean isValid(String cpf, ConstraintValidatorContext context) {

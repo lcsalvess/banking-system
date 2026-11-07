@@ -51,6 +51,7 @@
         <jjwt.version>0.13.0</jjwt.version>
         <springdoc-openapi.version>3.2.0</springdoc-openapi.version>
         <postgresql.version>42.7.14</postgresql.version>
+        <checkerframework.version>3.55.1</checkerframework.version>
         <flyway.version>13.12.0</flyway.version>
         <bucket4j.version>8.22.0</bucket4j.version>
         <caffeine.version>3.3.1</caffeine.version>
@@ -204,6 +205,13 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>${postgresql.version}</version>
+        </dependency>
+
+        <!-- Checker Framework qualifier annotations required by PostgreSQL JDBC API -->
+        <dependency>
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+            <version>${checkerframework.version}</version>
         </dependency>
 
         <!-- Rate limiting with Bucket4j and Caffeine -->

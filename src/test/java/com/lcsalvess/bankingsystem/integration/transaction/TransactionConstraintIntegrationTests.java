@@ -12,8 +12,8 @@ import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
-import com.lcsalvess.bankingsystem.service.account.AccountNumberGenerator;
-import com.lcsalvess.bankingsystem.service.account.GeneratedAccountNumber;
+import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
+import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +28,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -66,6 +67,9 @@ class TransactionConstraintIntegrationTests {
     private Client client;
     private CheckingAccount checkingAccount;
     private SavingsAccount savingsAccount;
+
+    private static final ZoneId BUSINESS_ZONE =
+            ZoneId.of("America/Sao_Paulo");
 
     private String testId;
     private int clientSequence;
@@ -109,7 +113,7 @@ class TransactionConstraintIntegrationTests {
                         client,
                         savingsNumber.number(),
                         savingsNumber.digit(),
-                        LocalDate.now()
+                        LocalDate.now(BUSINESS_ZONE)
                 )
         );
     }
@@ -303,7 +307,7 @@ class TransactionConstraintIntegrationTests {
                         null,
                         null,
                         true,
-                        LocalDate.now()
+                        LocalDate.now(BUSINESS_ZONE)
                 )
         );
 
@@ -316,7 +320,7 @@ class TransactionConstraintIntegrationTests {
                         null,
                         user,
                         false,
-                        LocalDate.now().plusDays(1)
+                        LocalDate.now(BUSINESS_ZONE).plusDays(1)
                 )
         );
     }

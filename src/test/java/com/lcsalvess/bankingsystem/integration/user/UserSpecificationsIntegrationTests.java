@@ -196,7 +196,7 @@ class UserSpecificationsIntegrationTests {
             String marker = uniqueMarker();
 
             persistUsers(Stream.of(Role.values())
-                    .map(r -> user(marker, roleUsername(r, marker), "u-" + r.ordinal(), r))
+                    .map(r -> user(marker, roleUsername(r, marker), "u-" + r.name(), r))
                     .toArray(User[]::new));
 
             Page<User> result = findUsers(null, role, null);

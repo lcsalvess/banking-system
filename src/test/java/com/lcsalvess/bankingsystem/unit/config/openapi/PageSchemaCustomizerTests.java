@@ -8,6 +8,7 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.IntegerSchema;
+import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
@@ -100,6 +101,17 @@ class PageSchemaCustomizerTests {
         }
 
         @Test
+        @DisplayName("Should ignore the document when Components has no schemas")
+        void shouldIgnoreWhenComponentsHaveNoSchemas() {
+            OpenAPI openApi = emptyOpenApi();
+            openApi.setComponents(new Components());
+
+            assertDoesNotThrow(() -> apply(openApi));
+
+            assertNull(openApi.getComponents().getSchemas());
+        }
+
+        @Test
         @DisplayName("Should ignore the document when PageMetadata is not registered")
         void shouldIgnoreWhenPageMetadataIsNotRegistered() {
             OpenAPI openApi = emptyOpenApi();
@@ -123,6 +135,16 @@ class PageSchemaCustomizerTests {
     @Nested
     @DisplayName("Page examples")
     class PageExamplesTests {
+
+        @Test
+        @DisplayName("Should ignore page examples when Paths are not registered")
+        void shouldIgnoreWhenPathsAreNull() {
+            OpenAPI openApi = new OpenAPI();
+
+            assertDoesNotThrow(() -> apply(openApi));
+
+            assertNull(openApi.getPaths());
+        }
 
         @ParameterizedTest(name = "{0}")
         @ValueSource(strings = {USERS_PATH, AUDIT_EVENTS_PATH})
@@ -267,6 +289,29 @@ class PageSchemaCustomizerTests {
             assertTrue(responseOf(get, "200").getContent().isEmpty());
         }
 
+        @Test
+        @DisplayName("Should ignore a 200 JSON response without a schema")
+        void shouldIgnoreA200ResponseWithoutSchema() {
+            Operation get = operationWithResponse(
+                    "200",
+                    new ApiResponse()
+                            .description("OK.")
+                            .content(new Content()
+                                    .addMediaType("application/json", new MediaType()))
+            );
+
+            OpenAPI openApi = openApiWith(USERS_PATH, new PathItem().get(get));
+
+            assertDoesNotThrow(() -> apply(openApi));
+
+            assertNull(
+                    responseOf(get, "200")
+                            .getContent()
+                            .get("application/json")
+                            .getSchema()
+            );
+        }
+
         @ParameterizedTest(name = "{0}")
         @ValueSource(strings = {
                 "#/components/schemas/Missing",
@@ -284,6 +329,20 @@ class PageSchemaCustomizerTests {
 
             assertSame(original, responseSchemaOf(openApi, USERS_PATH));
             assertEquals(reference, original.get$ref());
+        }
+
+        @Test
+        @DisplayName("Should keep a response reference when Components has no schemas")
+        void shouldKeepReferenceWhenComponentsHaveNoSchemas() {
+            Schema<?> original = new Schema<>().$ref(PAGE_RESPONSE_REF);
+            OpenAPI openApi = getOpenApi(USERS_PATH, original);
+            openApi.setComponents(new Components());
+
+            apply(openApi);
+
+            assertSame(original, responseSchemaOf(openApi, USERS_PATH));
+            assertEquals(PAGE_RESPONSE_REF, original.get$ref());
+            assertNull(openApi.getComponents().getSchemas());
         }
 
         @Test

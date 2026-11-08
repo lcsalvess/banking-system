@@ -3,22 +3,27 @@ package com.lcsalvess.bankingsystem.service.account;
 import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
 import com.lcsalvess.bankingsystem.entity.account.Account;
-import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
-import com.lcsalvess.bankingsystem.entity.client.Client;
-import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
+import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
+import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
+import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
-import com.lcsalvess.bankingsystem.exception.account.*;
+import com.lcsalvess.bankingsystem.exception.account.AccountAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.account.AccountHasBalanceException;
+import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
+import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
+import com.lcsalvess.bankingsystem.exception.account.InvalidAccountDigitException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
+import com.lcsalvess.bankingsystem.repository.specification.AccountSpecifications;
 import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNumber;
-import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.util.pagination.PageableTieBreaker;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -57,6 +62,25 @@ public class AccountService {
     @Transactional(readOnly = true)
     public Page<AccountResponseDTO> findAll(Pageable pageable) {
         return accountRepository.findAllWithClient(
+                        PageableTieBreaker.withIdTieBreaker(pageable)
+                )
+                .map(AccountResponseDTO::fromEntity);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AccountResponseDTO> findByClientId(
+            Long clientId,
+            AccountType type,
+            AccountStatus status,
+            Pageable pageable
+    ) {
+        // Fails with 404 before querying when the client does not exist. The
+        // client also stays in the persistence context, so mapping the
+        // accounts below does not trigger one extra query per account.
+        clientService.findEntityById(clientId);
+
+        return accountRepository.findAll(
+                        AccountSpecifications.byClientAndFilters(clientId, type, status),
                         PageableTieBreaker.withIdTieBreaker(pageable)
                 )
                 .map(AccountResponseDTO::fromEntity);

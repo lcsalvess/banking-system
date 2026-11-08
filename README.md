@@ -66,7 +66,7 @@ see [Architecture](docs/ARCHITECTURE.md).
 - **Provider response validation**: addresses returned by external providers are validated before being used
 - **Versioned database schema** managed by Flyway migrations and validated by Hibernate at startup
 - **Database privilege separation**: separate PostgreSQL roles for application runtime (`banking_app`) and Flyway migrations (`banking_migrator`), with least-privilege table and sequence grants and restricted access to migration metadata
-- **Account management**: checking and savings accounts, with generated account numbers and check digits
+- **Account management**: checking and savings accounts, with generated account numbers and check digits, and listing of the accounts of a client filtered by type and status
 - **Transactions**: deposit, withdrawal, transfer between accounts, transaction history per account, and lookup by public identifier
 - **Transaction idempotency**: a required `Idempotency-Key` UUID prevents duplicate financial operations on retries and allows the original result to be recovered
 - **Idempotency cleanup**: removes expired idempotency records daily at 03:30 (`America/Sao_Paulo`) and after application startup, recovering cleanup missed while the application was offline (7-day retention by default)

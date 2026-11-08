@@ -117,7 +117,7 @@ public class PageSchemaCustomizer implements OpenApiCustomizer {
             return;
         }
 
-        if (json.getSchema() != null && json.getSchema().get$ref() != null) {
+        if (json.getSchema().get$ref() != null) {
             ObjectSchema isolatedSchema = copyObjectSchema(responseSchema);
             json.setSchema(isolatedSchema);
             responseSchema = isolatedSchema;
@@ -164,11 +164,9 @@ public class PageSchemaCustomizer implements OpenApiCustomizer {
             copy.setTitle(source.getTitle());
         }
 
-        if (source.getProperties() != null) {
-            copy.setProperties(
-                    new LinkedHashMap<>(source.getProperties())
-            );
-        }
+        copy.setProperties(
+                new LinkedHashMap<>(source.getProperties())
+        );
 
         if (source.getRequired() != null) {
             copy.setRequired(

@@ -123,7 +123,10 @@
   were found. Both constraints are now validated against all
   existing rows, while continuing to enforce the same rules
   on new and updated records.
-- Schema changes must be added as new versioned migrations (`V32__description.sql`, and so on). Migrations that were
+- `V32__add_accounts_client_id_index.sql` creates the index `idx_accounts_client_id` on `accounts (client_id)`, which
+  supports the listing of the accounts of a client. It uses a plain `CREATE INDEX`, which blocks writes to `accounts`
+  while the index is built; on a large existing table, create the index `CONCURRENTLY` before deploying.
+- Schema changes must be added as new versioned migrations (`V33__description.sql`, and so on). Migrations that were
   already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database
   privileges; do not edit them. Changes to the runtime role's privilege policy go in
   `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
@@ -228,6 +231,9 @@ fails with `permission denied` in CI instead of in production.
 - Three partial unique indexes enforce business rules: `uk_accounts_client_type_active` (one active account of each type
   per client), `uk_transactions_daily_yield` (one yield per account per reference date), and
   `uk_transactions_transfer_code_type` (at most one transaction per transfer direction for each transfer code).
+- `idx_accounts_client_id` indexes `accounts (client_id)` and serves the listing of the accounts of a client
+  (`GET /api/v1/clients/{clientId}/accounts`). Unlike `uk_accounts_client_type_active`, which indexes only active
+  accounts to enforce a business rule, it covers every status, including cancelled accounts.
 - `audit_events` has indexes for the audit query filters. Each one ends with the same sort keys as the default listing
   (`created_at DESC, id DESC`), so the first page is read straight from the index: `idx_audit_events_created_at`,
   `idx_audit_events_event_type_created_at`, and `idx_audit_events_outcome_created_at`.

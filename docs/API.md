@@ -18,6 +18,7 @@ when running with the `local` profile.
 | GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients                | `EMPLOYEE`    |
 | GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                                  | `EMPLOYEE`    |
 | PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client                           | `EMPLOYEE`    |
+| GET    | `/api/v1/clients/{clientId}/accounts`                  | List the accounts of a client (paginated)           | `EMPLOYEE`    |
 | POST   | `/api/v1/accounts`                                     | Create a checking or savings account                | `EMPLOYEE`    |
 | GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts               | `EMPLOYEE`    |
 | GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                                      | `EMPLOYEE`    |
@@ -64,10 +65,13 @@ If `id` is explicitly included, its requested direction and position are preserv
 | `GET /api/v1/users`                                 | `search`, `role`, `active`                                                                               | `id`, `username`, `email`, `role`, `active`                                                                                       | `id` ascending                               | 20           |
 | `GET /api/v1/clients`                               | `name`                                                                                                   | `id`, `name`                                                                                                                      | `id` ascending                               | 10           |
 | `GET /api/v1/accounts`                              | -                                                                                                        | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
+| `GET /api/v1/clients/{clientId}/accounts`           | `type`, `status`                                                                                         | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
 | `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate`                                                                           | `createdAt`, `id`, `type`, `amount`                                                                                               | `createdAt` descending, then `id` descending | 10           |
 | `GET /api/v1/audit-events`                          | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
 
 On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Dates are interpreted in the `America/Sao_Paulo` timezone: `startDate` includes transactions from the beginning of that local calendar day, and `endDate` includes the entire day, implemented using an exclusive upper bound at the beginning of the following day. Both dates must be between `2020-01-01` and the current date in the application timezone, and `startDate` cannot be after `endDate` (`400 Bad Request`).
+
+On the accounts of a client, `type` accepts `CHECKING` or `SAVINGS` and `status` accepts `ACTIVE` or `CANCELLED`. Cancelled accounts are included unless the `status` filter excludes them. A client that does not exist returns `404 Not Found`, and an invalid filter value or sort property returns `400 Bad Request`.
 
 ### Audit Event Queries
 
@@ -190,6 +194,10 @@ curl -X PATCH 'http://localhost:8080/api/v1/users/<user-id>/role' \
 # 10. Search audit events (AUDITOR only)
 curl 'http://localhost:8080/api/v1/audit-events?startDate=2026-10-01&endDate=2026-10-26&eventType=TRANSFER&outcome=SUCCESS&page=0&size=20&sort=createdAt,desc' \
 -H "Authorization: Bearer <auditor-token>"
+
+# 11. List the active savings accounts of a client
+curl 'http://localhost:8080/api/v1/clients/1/accounts?type=SAVINGS&status=ACTIVE' \
+  -H "Authorization: Bearer <employee-token>"
 ```
 
 Transactions are returned with their public identifier, and the internal database ID is not exposed:

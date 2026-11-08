@@ -18,6 +18,7 @@
 ## Accounts
 
 - A client can have at most one active checking account and one active savings account. A new account of the same type can be opened after the previous one is canceled.
+- The accounts of a client can be listed with optional filters by type and status. Cancelled accounts remain part of the client's history, so they are included unless the status filter excludes them. Listing the accounts of a client that does not exist returns `404 Not Found`.
 - Account numbers are generated from a database sequence, padded to at least 5 digits (for example `00001`), followed by a check digit (modulo 11). The `account_number` column holds up to 20 digits.
 - Every operation that receives an account number also requires the check digit.
 - The account number must contain between 5 and 20 digits and the check digit exactly 1 digit. Otherwise, the request is rejected with `400 Bad Request` before reaching the service.

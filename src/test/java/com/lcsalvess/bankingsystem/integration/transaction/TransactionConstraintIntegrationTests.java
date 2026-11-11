@@ -84,7 +84,9 @@ class TransactionConstraintIntegrationTests {
         clientSequence = 0;
 
         user = userRepository.saveAndFlush(
-                new User(
+                User.createHuman(
+                        "EMP-TXC-" + testId,
+                        "Transaction Constraint Test User",
                         "txc-" + testId,
                         "txc-" + testId + "@test.com",
                         "test-password",

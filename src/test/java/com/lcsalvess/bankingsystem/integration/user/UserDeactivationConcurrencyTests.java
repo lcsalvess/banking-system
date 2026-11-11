@@ -17,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -35,10 +36,10 @@ class UserDeactivationConcurrencyTests {
 
     private static final int TIMEOUT_SECONDS = 30;
 
-    // A janela da race é pequena: repetir faz o teste falhar de forma
-    // confiável se o lock for removido, em vez de passar por sorte.
     private static final String REPETITION_NAME =
             "{displayName} [{currentRepetition}/{totalRepetitions}]";
+
+    private static final String EMPLOYEE_ID_PREFIX = "EMP-TEST-";
 
     @Autowired
     private UserRepository userRepository;
@@ -101,6 +102,7 @@ class UserDeactivationConcurrencyTests {
                 throws Exception {
 
             List<User> admins = createAdmins(2);
+
             User target = admins.get(0);
             User other = admins.get(1);
 
@@ -109,8 +111,8 @@ class UserDeactivationConcurrencyTests {
                     deactivation(target)
             ));
 
-            // Ambas as chamadas são bem-sucedidas: a segunda vê o alvo já
-            // desativado e retorna sem lançar 409.
+            // Both calls should succeed: the second sees the target
+            // already deactivated and returns without throwing 409.
             assertEquals(2L, countSucceeded(results));
 
             assertFalse(isActive(target));
@@ -126,10 +128,15 @@ class UserDeactivationConcurrencyTests {
         @Test
         @DisplayName("Should deactivate an employee even when only one administrator exists")
         void shouldDeactivateEmployeeWhenOnlyOneAdminExists() {
-            createAdmins(1);
-            User employee = createUser("employee-concurrency", Role.EMPLOYEE);
 
-            userService.deactivate(employee.getId());
+            createAdmins(1);
+
+            User employee = createUser(
+                    "employee-concurrency",
+                    Role.EMPLOYEE
+            );
+
+            userService.deactivate(employee.getEmployeeId());
 
             assertFalse(isActive(employee));
             assertEquals(1L, countActiveAdmins());
@@ -143,7 +150,7 @@ class UserDeactivationConcurrencyTests {
     private Callable<Boolean> deactivation(User user) {
         return () -> {
             try {
-                userService.deactivate(user.getId());
+                userService.deactivate(user.getEmployeeId());
                 return true;
             } catch (LastAdminCannotBeDeactivatedException ex) {
                 return false;
@@ -193,6 +200,7 @@ class UserDeactivationConcurrencyTests {
             }
 
             return results;
+
         } finally {
             start.countDown();
             executor.shutdownNow();
@@ -212,12 +220,21 @@ class UserDeactivationConcurrencyTests {
     private List<User> createAdmins(int quantity) {
         return IntStream.rangeClosed(1, quantity)
                 .mapToObj(number ->
-                        createUser("admin-concurrency-" + number, Role.ADMIN))
+                        createUser(
+                                "admin-concurrency-" + number,
+                                Role.ADMIN
+                        )
+                )
                 .toList();
     }
 
     private User createUser(String username, Role role) {
-        User user = new User(
+        String employeeId = EMPLOYEE_ID_PREFIX
+                + username.toUpperCase(Locale.ROOT);
+
+        User user = User.createHuman(
+                employeeId,
+                "Concurrency Test User",
                 username,
                 username + "@test.com",
                 "test-password",

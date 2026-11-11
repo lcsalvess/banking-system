@@ -25,25 +25,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Prova, contra um PostgreSQL real, que o schema migrado como
- * {@code banking_migrator} (com o afterMigrate de privilégios) entrega ao
- * {@code banking_app} exatamente o que o runtime precisa e nada além.
+ * Verifies against a real PostgreSQL instance that the schema migrated as
+ * {@code banking_migrator}, including the runtime privilege callback,
+ * grants {@code banking_app} exactly what the application needs.
  *
- * <p>Os testes comuns rodam com um usuário dono de tudo, então um grant
- * faltando (como o UPDATE em checking_accounts) passaria despercebido no CI.
+ * <p>Regular tests run as the schema owner, so missing grants (such as UPDATE
+ * on checking_accounts) would otherwise go unnoticed.
  *
- * <p>Também confirma que os triggers append-only do ledger (V27) existem e
- * estão habilitados, porque privilégios não protegem o dono do schema.
+ * <p>Also verifies that the ledger append-only triggers (V27) exist and are
+ * enabled because privileges alone do not protect the schema owner.
  *
- * <p>Não usa o contexto do Spring. É ignorado quando as variáveis abaixo não
- * estão definidas; o job {@code least-privilege} do CI as define.
- * Requer um banco vazio com as roles criadas por
+ * <p>Does not use the Spring application context. Tests are skipped when the
+ * required environment variables are missing. The CI {@code least-privilege}
+ * job configures them. Requires an empty database with roles provisioned by
  * {@code scripts/db/bootstrap-roles.sql}.
  *
- * <p>Deve rodar antes de {@code RuntimePrivilegesEndToEndTests}, no mesmo
- * banco: ela verifica a migração a partir do zero (inclusive o timezone da
- * sessão do Flyway), o que deixa de valer em um banco já migrado. O job do CI
- * executa as duas classes em passos separados, nessa ordem.
+ * <p>Must run before {@code RuntimePrivilegesEndToEndTests} against the same
+ * database. This test verifies migrations from an empty database, including
+ * the Flyway session timezone. The CI job runs both classes in separate steps,
+ * in this order.
  */
 class LeastPrivilegeSmokeTests {
 
@@ -133,8 +133,12 @@ class LeastPrivilegeSmokeTests {
                         + "active = active, "
                         + "token_version = token_version, "
                         + "updated_at = updated_at, "
-                        + "role = role "
+                        + "role = role, "
+                        + "full_name = full_name "
                         + "WHERE false",
+
+                // Employee ID generation: function execution is permitted.
+                "SELECT public.next_employee_id()",
 
                 // Audit query snapshots: permitted DELETE operations
                 "DELETE FROM public.audit_event_query_snapshots WHERE false",
@@ -158,7 +162,7 @@ class LeastPrivilegeSmokeTests {
     }
 
     @Test
-    @DisplayName("Runtime role has INSERT privileges on required tables")
+    @DisplayName("Runtime role has INSERT privileges on required tables and user columns")
     void shouldHaveRequiredInsertPrivileges() throws SQLException {
         List<String> insertableTables = List.of(
                 "public.accounts",
@@ -170,7 +174,6 @@ class LeastPrivilegeSmokeTests {
                 "public.clients",
                 "public.savings_accounts",
                 "public.transactions",
-                "public.users",
                 "public.transaction_idempotency_requests"
         );
 
@@ -178,6 +181,58 @@ class LeastPrivilegeSmokeTests {
             assertTrue(
                     appHasTablePrivilege(table, "INSERT"),
                     () -> "Expected INSERT privilege on: " + table
+            );
+        }
+
+        // Users: INSERT is granted only at the column level.
+        List<String> insertableUserColumns = List.of(
+                "employee_id",
+                "full_name",
+                "username",
+                "email",
+                "password",
+                "role",
+                "active",
+                "token_version",
+                "created_at",
+                "updated_at"
+        );
+
+        for (String column : insertableUserColumns) {
+            assertTrue(
+                    appHasColumnPrivilege(
+                            "public.users",
+                            column,
+                            "INSERT"
+                    ),
+                    () -> "Expected INSERT privilege on public.users."
+                            + column
+            );
+        }
+
+        assertFalse(
+                appHasTablePrivilege("public.users", "INSERT"),
+                "The runtime role must not have table-level INSERT on users."
+        );
+
+        assertFalse(
+                appHasColumnPrivilege(
+                        "public.users",
+                        "user_type",
+                        "INSERT"
+                ),
+                "The runtime role must not be allowed to insert user_type."
+        );
+
+        // The employee sequence must not be directly accessible.
+        for (String privilege : List.of("USAGE", "SELECT", "UPDATE")) {
+            assertFalse(
+                    appHasSequencePrivilege(
+                            "public.employee_id_seq",
+                            privilege
+                    ),
+                    () -> "The runtime role must not have "
+                            + privilege + " on employee_id_seq."
             );
         }
     }
@@ -228,7 +283,42 @@ class LeastPrivilegeSmokeTests {
                 "UPDATE public.users SET username = username WHERE false",
                 "UPDATE public.users SET email = email WHERE false",
                 "UPDATE public.users SET created_at = created_at WHERE false",
+                "UPDATE public.users SET employee_id = employee_id WHERE false",
+                "UPDATE public.users SET user_type = user_type WHERE false",
                 "UPDATE public.checking_accounts SET id = id WHERE false",
+
+                // Explicit user_type insertion is forbidden.
+                """
+                INSERT INTO public.users (
+                    employee_id,
+                    full_name,
+                    username,
+                    email,
+                    password,
+                    user_type,
+                    role,
+                    active,
+                    token_version,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    'EMP-999999',
+                    'Joe Doe',
+                    'privilege-probe',
+                    'privilege-probe@example.com',
+                    'encoded-password',
+                    'HUMAN',
+                    'EMPLOYEE',
+                    TRUE,
+                    0,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                )
+                """,
+
+                // Direct employee sequence access is forbidden.
+                "SELECT nextval('public.employee_id_seq')",
 
                 // Migration metadata and schema modification
                 "SELECT 1 FROM public.flyway_schema_history LIMIT 1",
@@ -388,6 +478,31 @@ class LeastPrivilegeSmokeTests {
 
             statement.setString(1, table);
             statement.setString(2, privilege);
+
+            try (var resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next());
+                return resultSet.getBoolean(1);
+            }
+        }
+    }
+
+    private static boolean appHasColumnPrivilege(
+            String table,
+            String column,
+            String privilege
+    ) throws SQLException {
+        String sql = """
+                SELECT has_column_privilege(current_user, ?, ?, ?)
+                """;
+
+        try (Connection connection = DriverManager.getConnection(
+                url, appUser, appPassword
+        );
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, table);
+            statement.setString(2, column);
+            statement.setString(3, privilege);
 
             try (var resultSet = statement.executeQuery()) {
                 assertTrue(resultSet.next());

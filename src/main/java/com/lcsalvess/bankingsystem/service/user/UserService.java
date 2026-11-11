@@ -12,14 +12,13 @@ import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
 import com.lcsalvess.bankingsystem.exception.user.SelfDeactivationNotAllowedException;
 import com.lcsalvess.bankingsystem.exception.user.SelfRoleChangeNotAllowedException;
-import com.lcsalvess.bankingsystem.exception.user.SystemUserCannotBeReactivatedException;
-import com.lcsalvess.bankingsystem.exception.user.SystemUserRoleCannotBeChangedException;
 import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
 import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
 import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.UserSpecifications;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.service.user.generator.EmployeeIdGenerator;
 import com.lcsalvess.bankingsystem.util.normalization.EmailNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.OptionalTextNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.UsernameNormalizer;
@@ -38,20 +37,20 @@ import java.util.Objects;
 @Service
 public class UserService {
 
-    private static final String SYSTEM_MIGRATION_USERNAME =
-            "system_migration";
-
+    private final EmployeeIdGenerator employeeIdGenerator;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
     private final CurrentUserService currentUserService;
 
     public UserService(
+            EmployeeIdGenerator employeeIdGenerator,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             ApplicationEventPublisher eventPublisher,
             CurrentUserService currentUserService
     ) {
+        this.employeeIdGenerator = employeeIdGenerator;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.eventPublisher = eventPublisher;
@@ -73,7 +72,7 @@ public class UserService {
                                 role,
                                 active
                         ),
-                        PageableTieBreaker.withIdTieBreaker(pageable)
+                        PageableTieBreaker.withTieBreaker(pageable, "employeeId")
                 )
                 .map(this::toSummaryResponse);
     }
@@ -86,7 +85,9 @@ public class UserService {
         validateUsernameAvailability(username);
         validateEmailAvailability(email);
 
-        User user = new User(
+        User user = User.createHuman(
+                employeeIdGenerator.generate(),
+                dto.fullName(),
                 username,
                 email,
                 passwordEncoder.encode(dto.password()),
@@ -106,14 +107,8 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponseDTO reactivate(Long userId) {
-        User user = findUserForUpdateOrThrow(userId);
-
-        if (isSystemUser(user)) {
-            throw new SystemUserCannotBeReactivatedException(
-                    ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
-            );
-        }
+    public UserResponseDTO reactivate(String employeeId) {
+        User user = findUserForUpdateOrThrow(employeeId);
 
         if (user.isActive()) {
             return toResponse(user);
@@ -134,16 +129,18 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponseDTO deactivate(Long userId) {
-        validateNotSelfDeactivation(userId);
+    public UserResponseDTO deactivate(String employeeId) {
+        validateNotSelfDeactivation(employeeId);
+
         // The lock is acquired BEFORE loading the target. This ensures that
         // administrator entities enter the persistence context with the latest
         // committed state, so a concurrent deactivation of the same user is treated
         // as "already deactivated" (idempotent) rather than resulting in an
         // incorrect 409 response.
-        List<User> activeAdmins = lockActiveAdminsIfTargetIsAdmin(userId);
+        List<User> activeAdmins =
+                lockActiveAdminsIfTargetIsAdmin(employeeId);
 
-        User user = findUserForUpdateOrThrow(userId);
+        User user = findUserForUpdateOrThrow(employeeId);
 
         if (!user.isActive()) {
             return toResponse(user);
@@ -166,22 +163,17 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponseDTO changeRole(Long userId, Role newRole) {
-        validateNotSelfRoleChange(userId);
+    public UserResponseDTO changeRole(String employeeId, Role newRole) {
+        validateNotSelfRoleChange(employeeId);
 
         // Active administrators are always locked (without a prior role check,
         // which could become stale before acquiring the lock), using the same
         // order as deactivation: administrators by ID, followed by the target,
         // preventing deadlocks.
-        List<User> activeAdmins = userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN);
+        List<User> activeAdmins =
+                userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN);
 
-        User user = findUserForUpdateOrThrow(userId);
-
-        if (isSystemUser(user)) {
-            throw new SystemUserRoleCannotBeChangedException(
-                    ApiErrorMessages.SYSTEM_USER_ROLE_CANNOT_BE_CHANGED
-            );
-        }
+        User user = findUserForUpdateOrThrow(employeeId);
 
         // The caller must remain an active administrator after acquiring the lock.
         // Since the target can never be the caller, at least one active administrator
@@ -221,8 +213,8 @@ public class UserService {
         }
     }
 
-    private User findUserForUpdateOrThrow(Long userId) {
-        return userRepository.findByIdForUpdate(userId)
+    private User findUserForUpdateOrThrow(String employeeId) {
+        return userRepository.findByEmployeeIdForUpdate(employeeId)
                 .orElseThrow(() -> new UserNotFoundException(
                         ApiErrorMessages.USER_NOT_FOUND
                 ));
@@ -233,17 +225,24 @@ public class UserService {
      * role changes between this check and locking their row, the subsequent
      * validation fails closed (409), ensuring the system is never left without
      * an administrator.
-     * Role changes do not use this check: they always lock all administrators.
+     *
+     * <p>Role changes do not use this check: they always lock all administrators.
      */
-    private List<User> lockActiveAdminsIfTargetIsAdmin(Long userId) {
-        if (!userRepository.existsByIdAndRole(userId, Role.ADMIN)) {
+    private List<User> lockActiveAdminsIfTargetIsAdmin(String employeeId) {
+        if (!userRepository.existsByEmployeeIdAndRole(
+                employeeId,
+                Role.ADMIN
+        )) {
             return List.of();
         }
 
         return userRepository.findActiveUsersByRoleForUpdate(Role.ADMIN);
     }
 
-    private void validateNotLastActiveAdmin(User user, List<User> activeAdmins) {
+    private void validateNotLastActiveAdmin(
+            User user,
+            List<User> activeAdmins
+    ) {
         if (user.getRole() != Role.ADMIN) {
             return;
         }
@@ -255,11 +254,15 @@ public class UserService {
         }
     }
 
-    private void validateNotSelfDeactivation(Long userId) {
+    private void validateNotSelfDeactivation(String employeeId) {
         currentUserService.findCurrentUser()
                 .filter(currentUser -> currentUser.getRole() == Role.ADMIN)
-                .filter(currentUser -> currentUser.getId() != null
-                        && currentUser.getId().equals(userId))
+                .filter(currentUser ->
+                        Objects.equals(
+                                currentUser.getEmployeeId(),
+                                employeeId
+                        )
+                )
                 .ifPresent(currentUser -> {
                     throw new SelfDeactivationNotAllowedException(
                             ApiErrorMessages.SELF_DEACTIVATION_NOT_ALLOWED
@@ -267,10 +270,14 @@ public class UserService {
                 });
     }
 
-    private void validateNotSelfRoleChange(Long userId) {
+    private void validateNotSelfRoleChange(String employeeId) {
         currentUserService.findCurrentUser()
-                .filter(currentUser -> currentUser.getId() != null
-                        && currentUser.getId().equals(userId))
+                .filter(currentUser ->
+                        Objects.equals(
+                                currentUser.getEmployeeId(),
+                                employeeId
+                        )
+                )
                 .ifPresent(currentUser -> {
                     throw new SelfRoleChangeNotAllowedException(
                             ApiErrorMessages.SELF_ROLE_CHANGE_NOT_ALLOWED
@@ -285,19 +292,16 @@ public class UserService {
                 .anyMatch(admin -> Objects.equals(admin.getId(), callerId));
 
         if (!callerIsActiveAdmin) {
-            throw new AccessDeniedException(ApiErrorMessages.ACCESS_DENIED_RESOURCE);
+            throw new AccessDeniedException(
+                    ApiErrorMessages.ACCESS_DENIED_RESOURCE
+            );
         }
-    }
-
-    private static boolean isSystemUser(User user) {
-        return SYSTEM_MIGRATION_USERNAME.equals(
-                UsernameNormalizer.normalize(user.getUsername())
-        );
     }
 
     private UserSummaryResponseDTO toSummaryResponse(User user) {
         return new UserSummaryResponseDTO(
-                user.getId(),
+                user.getEmployeeId(),
+                user.getFullName(),
                 user.getUsername(),
                 user.getEmail(),
                 user.getRole(),
@@ -307,6 +311,8 @@ public class UserService {
 
     private UserResponseDTO toResponse(User user) {
         return new UserResponseDTO(
+                user.getEmployeeId(),
+                user.getFullName(),
                 user.getUsername(),
                 user.getEmail(),
                 user.getRole(),

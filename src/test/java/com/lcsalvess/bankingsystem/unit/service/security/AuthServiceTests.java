@@ -448,9 +448,11 @@ class AuthServiceTests {
     }
 
     private static User createEntityUser() {
-        return new User(
+        return User.createHuman(
+                "EMP-TEST-001",
+                "Joe Doe",
                 TEST_USERNAME,
-                "teste@teste.com.br",
+                "joe.doe@example.com",
                 "encoded-password",
                 Role.EMPLOYEE
         );

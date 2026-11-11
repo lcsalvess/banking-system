@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.entity.user;
 
 import com.lcsalvess.bankingsystem.util.normalization.EmailNormalizer;
+import com.lcsalvess.bankingsystem.util.normalization.FullNameNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.UsernameNormalizer;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,12 +30,24 @@ import java.util.Objects;
 @DynamicUpdate
 public class User implements UserDetails {
 
+    private static final int MAX_EMPLOYEE_ID_LENGTH = 30;
+
     @Serial
     private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(
+            name = "employee_id",
+            length = MAX_EMPLOYEE_ID_LENGTH,
+            updatable = false
+    )
+    private String employeeId;
+
+    @Column(name = "full_name", length = 150)
+    private String fullName;
 
     @Column(nullable = false, length = 20)
     private String username;
@@ -44,6 +57,16 @@ public class User implements UserDetails {
 
     @Column(nullable = false)
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "user_type",
+            nullable = false,
+            length = 20,
+            insertable = false,
+            updatable = false
+    )
+    private UserType userType = UserType.HUMAN;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -86,11 +109,76 @@ public class User implements UserDetails {
     protected User() {
     }
 
-    public User(String username, String email, String password, Role role) {
+    public static User createHuman(
+            String employeeId,
+            String fullName,
+            String username,
+            String email,
+            String password,
+            Role role
+    ) {
+        return new User(
+                employeeId,
+                fullName,
+                username,
+                email,
+                password,
+                role
+        );
+    }
+
+    private User(
+            String employeeId,
+            String fullName,
+            String username,
+            String email,
+            String password,
+            Role role
+    ) {
+        validateEmployeeId(employeeId);
+
+        this.employeeId = employeeId;
+        this.fullName = FullNameNormalizer.normalize(fullName);
         this.username = UsernameNormalizer.normalize(username);
         this.email = EmailNormalizer.normalize(email);
-        this.password = password;
-        this.role = role;
+        this.password = Objects.requireNonNull(
+                password,
+                "Password is required."
+        );
+        this.role = Objects.requireNonNull(
+                role,
+                "Role is required."
+        );
+    }
+
+    private static void validateEmployeeId(String employeeId) {
+        if (employeeId == null || employeeId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Employee ID is required."
+            );
+        }
+
+        if (employeeId.codePointCount(0, employeeId.length())
+                > MAX_EMPLOYEE_ID_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Employee ID must not exceed "
+                            + MAX_EMPLOYEE_ID_LENGTH
+                            + " characters."
+            );
+        }
+    }
+
+    /**
+     * Updates the full name of a human user.
+     */
+    public void updateFullName(String fullName) {
+        if (this.userType != UserType.HUMAN) {
+            throw new IllegalStateException(
+                    "System users cannot have their profile updated."
+            );
+        }
+
+        this.fullName = FullNameNormalizer.normalize(fullName);
     }
 
     public void reactivate() {
@@ -135,6 +223,18 @@ public class User implements UserDetails {
         return id;
     }
 
+    public String getEmployeeId() {
+        return employeeId;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public UserType getUserType() {
+        return userType;
+    }
+
     @Override
     @NonNull
     public String getUsername() {
@@ -153,7 +253,9 @@ public class User implements UserDetails {
     @Override
     @NonNull
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+        return List.of(
+                new SimpleGrantedAuthority("ROLE_" + role.name())
+        );
     }
 
     @Override

@@ -30,7 +30,9 @@ class TransactionFactoryTests {
     private static final LocalDate YIELD_DATE = LocalDate.of(2026, 10, 24);
     private static final BigDecimal AMOUNT = new BigDecimal("10.00");
     private static final BigDecimal BALANCE = new BigDecimal("90.00");
-    private static final User USER = new User(
+    private static final User USER = User.createHuman(
+            "EMP-TEST-001",
+            "Employee Test",
             "employee",
             "employee@example.com",
             "not-a-real-password-hash",

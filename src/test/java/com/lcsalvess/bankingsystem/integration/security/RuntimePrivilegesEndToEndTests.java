@@ -20,8 +20,8 @@ import com.lcsalvess.bankingsystem.repository.AddressRepository;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
-import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
+import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
@@ -29,6 +29,7 @@ import com.lcsalvess.bankingsystem.service.security.PasswordChangeService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
 import com.lcsalvess.bankingsystem.service.user.UserService;
+import com.lcsalvess.bankingsystem.service.user.generator.EmployeeIdGenerator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -57,23 +58,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 /**
- * Roda os fluxos reais da aplicação com o datasource conectado como
- * {@code banking_app} (privilégios de UPDATE por coluna) e o Flyway como
- * {@code banking_migrator}, como em produção.
+ * Runs real application flows with the datasource connected as
+ * {@code banking_app} (column-level UPDATE privileges) and Flyway as
+ * {@code banking_migrator}, as in production.
  *
- * <p>Os demais testes de integração rodam como dono do schema, então um
- * UPDATE em coluna sem GRANT só apareceria em produção. Aqui, qualquer fluxo
- * que suje uma coluna fora da política falha com "permission denied".
+ * <p>Other integration tests run as the schema owner, so an UPDATE on a
+ * column without a GRANT would only fail in production. Here, any flow
+ * that modifies a column outside the policy fails with "permission denied".
  *
- * <p>O perfil {@code privilege-e2e} não existe como arquivo: serve só para
- * sobrescrever um {@code SPRING_PROFILES_ACTIVE=test} herdado do ambiente e
- * manter ativos os componentes {@code @Profile("!test")}, como em produção.
+ * <p>The {@code privilege-e2e} profile does not exist as a configuration file.
+ * It only overrides a possibly inherited {@code SPRING_PROFILES_ACTIVE=test}
+ * environment setting and keeps {@code @Profile("!test")} components active.
  *
- * <p>O runtime não tem DELETE, então os dados criados aqui ficam no banco; os
- * identificadores são únicos por execução. Use um banco descartável. É
- * ignorado quando {@code PRIVILEGE_TEST_DB_URL} não está definida; o job
- * {@code least-privilege} do CI as define e provisiona as roles com
- * {@code scripts/db/bootstrap-roles.sql}.
+ * <p>The runtime role does not have DELETE privileges, so data created here
+ * remains in the database. Identifiers are unique per execution. Use a
+ * disposable database. This test is skipped when {@code PRIVILEGE_TEST_DB_URL}
+ * is not defined; the CI {@code least-privilege} job configures it and
+ * provisions the roles through {@code scripts/db/bootstrap-roles.sql}.
  */
 @SpringBootTest
 @ActiveProfiles("privilege-e2e")
@@ -128,6 +129,9 @@ class RuntimePrivilegesEndToEndTests {
 
     @Autowired
     private AccountNumberGenerator accountNumberGenerator;
+
+    @Autowired
+    private EmployeeIdGenerator employeeIdGenerator;
 
     @Autowired
     private UserRepository userRepository;
@@ -289,7 +293,7 @@ class RuntimePrivilegesEndToEndTests {
 
         User target = createUser(Role.EMPLOYEE);
 
-        userService.deactivate(target.getId());
+        userService.deactivate(target.getEmployeeId());
 
         User reloaded = userRepository.findById(target.getId()).orElseThrow();
 
@@ -361,10 +365,13 @@ class RuntimePrivilegesEndToEndTests {
 
     private User createUser(Role role) {
         String id = shortId();
+        String username = "e2e-" + id;
 
         return userRepository.saveAndFlush(
-                new User(
-                        "e2e-" + id,
+                User.createHuman(
+                        employeeIdGenerator.generate(),
+                        "Test User",
+                        username,
                         "e2e-" + id + "@test.com",
                         passwordEncoder.encode(PASSWORD),
                         role

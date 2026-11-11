@@ -3,7 +3,9 @@ package com.lcsalvess.bankingsystem.unit.bootstrap;
 import com.lcsalvess.bankingsystem.bootstrap.AdminBootstrapRunner;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.UserType;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.service.user.generator.EmployeeIdGenerator;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -42,19 +44,25 @@ class AdminBootstrapRunnerTests {
     private static final String PROVIDER =
             "com.lcsalvess.bankingsystem.unit.bootstrap.AdminBootstrapRunnerTests#";
 
+    private static final String VALID_FULL_NAME = "  Administrator   Root  ";
+    private static final String EXPECTED_FULL_NAME = "Administrator Root";
     private static final String VALID_USERNAME = "Admin.Root";
     private static final String VALID_EMAIL = "Admin@Example.com";
     private static final String VALID_PASSWORD = "S3nh@-Forte-123";
+    private static final String VALID_EMPLOYEE_ID = "EMP-000001";
     private static final String ENCODED_PASSWORD = "encoded-password";
 
     private static final String INVALID_CREDENTIALS_PREFIX =
-            "Credenciais do administrador inicial inválidas";
+            "Initial administrator credentials are invalid";
 
     private static ValidatorFactory validatorFactory;
     private static Validator validator;
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private EmployeeIdGenerator employeeIdGenerator;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -74,7 +82,12 @@ class AdminBootstrapRunnerTests {
 
     @BeforeEach
     void setUp() {
-        runner = new AdminBootstrapRunner(userRepository, passwordEncoder, validator);
+        runner = new AdminBootstrapRunner(
+                userRepository,
+                employeeIdGenerator,
+                passwordEncoder,
+                validator
+        );
     }
 
     @Nested
@@ -84,27 +97,27 @@ class AdminBootstrapRunnerTests {
         @Test
         @DisplayName("Should skip the bootstrap without touching credentials")
         void shouldSkipWhenAdminAlreadyExists() {
-            configure(VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, true);
+            configure(VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, true);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(true);
 
             runner.run();
 
             verify(userRepository).existsByRole(Role.ADMIN);
             verifyNoMoreInteractions(userRepository);
-            verifyNoInteractions(passwordEncoder);
+            verifyNoInteractions(employeeIdGenerator, passwordEncoder);
         }
 
         @Test
         @DisplayName("Should skip even when the configured credentials are invalid")
         void shouldSkipWhenAdminExistsAndCredentialsAreInvalid() {
-            configure("x".repeat(21), "invalid", "short", true);
+            configure("12345", "x".repeat(21), "invalid", "short", true);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(true);
 
             runner.run();
 
             verify(userRepository).existsByRole(Role.ADMIN);
             verifyNoMoreInteractions(userRepository);
-            verifyNoInteractions(passwordEncoder);
+            verifyNoInteractions(employeeIdGenerator, passwordEncoder);
         }
     }
 
@@ -116,37 +129,46 @@ class AdminBootstrapRunnerTests {
         @MethodSource(PROVIDER + "missingCredentials")
         @DisplayName("Should skip with a warning when the bootstrap is not required")
         void shouldSkipWhenBootstrapIsNotRequired(
-                String scenario, String username, String email, String password) {
+                String scenario,
+                String fullName,
+                String username,
+                String email,
+                String password) {
 
-            configure(username, email, password, false);
+            configure(fullName, username, email, password, false);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
 
             runner.run();
 
             verify(userRepository).existsByRole(Role.ADMIN);
             verifyNoMoreInteractions(userRepository);
-            verifyNoInteractions(passwordEncoder);
+            verifyNoInteractions(employeeIdGenerator, passwordEncoder);
         }
 
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "missingCredentials")
         @DisplayName("Should fail the startup when the bootstrap is required")
         void shouldFailWhenBootstrapIsRequired(
-                String scenario, String username, String email, String password) {
+                String scenario,
+                String fullName,
+                String username,
+                String email,
+                String password) {
 
-            configure(username, email, password, true);
+            configure(fullName, username, email, password, true);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
 
             IllegalStateException exception =
                     assertThrows(IllegalStateException.class, () -> runner.run());
 
+            assertTrue(exception.getMessage().contains("ADMIN_FULL_NAME"));
             assertTrue(exception.getMessage().contains("ADMIN_USERNAME"));
             assertTrue(exception.getMessage().contains("ADMIN_EMAIL"));
             assertTrue(exception.getMessage().contains("ADMIN_PASSWORD"));
 
             verify(userRepository).existsByRole(Role.ADMIN);
             verifyNoMoreInteractions(userRepository);
-            verifyNoInteractions(passwordEncoder);
+            verifyNoInteractions(employeeIdGenerator, passwordEncoder);
         }
     }
 
@@ -156,15 +178,16 @@ class AdminBootstrapRunnerTests {
 
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "invalidCredentials")
-        @DisplayName("Should fail the startup without encoding or saving")
+        @DisplayName("Should fail the startup without generating an employee ID, encoding or saving")
         void shouldFailWhenCredentialsAreInvalid(
                 String scenario,
+                String fullName,
                 String username,
                 String email,
                 String password,
                 String expectedMessage) {
 
-            configure(username, email, password, false);
+            configure(fullName, username, email, password, false);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
 
             IllegalStateException exception =
@@ -175,7 +198,7 @@ class AdminBootstrapRunnerTests {
 
             verify(userRepository).existsByRole(Role.ADMIN);
             verifyNoMoreInteractions(userRepository);
-            verifyNoInteractions(passwordEncoder);
+            verifyNoInteractions(employeeIdGenerator, passwordEncoder);
         }
 
         @Test
@@ -183,29 +206,39 @@ class AdminBootstrapRunnerTests {
         void shouldNotExposePasswordInTheMessage() {
             String shortPassword = "abc";
 
-            configure(VALID_USERNAME, VALID_EMAIL, shortPassword, false);
+            configure(VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, shortPassword, false);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
 
             IllegalStateException exception =
                     assertThrows(IllegalStateException.class, () -> runner.run());
 
             assertFalse(exception.getMessage().contains(shortPassword));
+
+            verify(userRepository).existsByRole(Role.ADMIN);
+            verifyNoMoreInteractions(userRepository);
+            verifyNoInteractions(employeeIdGenerator, passwordEncoder);
         }
 
         @Test
         @DisplayName("Should report every violation at once")
         void shouldReportAllViolations() {
-            configure("x".repeat(21), "invalid", "short", false);
+            configure("12345", "x".repeat(21), "invalid", "short", false);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
 
             IllegalStateException exception =
                     assertThrows(IllegalStateException.class, () -> runner.run());
 
             assertTrue(exception.getMessage()
+                    .contains(ValidationMessages.INVALID_FULL_NAME_NUMERIC));
+            assertTrue(exception.getMessage()
                     .contains(ValidationMessages.INVALID_USERNAME_LENGTH));
             assertTrue(exception.getMessage().contains(ValidationMessages.INVALID_EMAIL));
             assertTrue(exception.getMessage()
                     .contains(ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG));
+
+            verify(userRepository).existsByRole(Role.ADMIN);
+            verifyNoMoreInteractions(userRepository);
+            verifyNoInteractions(employeeIdGenerator, passwordEncoder);
         }
     }
 
@@ -216,8 +249,9 @@ class AdminBootstrapRunnerTests {
         @Test
         @DisplayName("Should create the administrator with normalized identity and encoded password")
         void shouldCreateAdministrator() {
-            configure(VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, true);
+            configure(VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, true);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+            when(employeeIdGenerator.generate()).thenReturn(VALID_EMPLOYEE_ID);
             when(passwordEncoder.encode(VALID_PASSWORD)).thenReturn(ENCODED_PASSWORD);
 
             runner.run();
@@ -225,31 +259,37 @@ class AdminBootstrapRunnerTests {
             ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
 
             verify(userRepository).existsByRole(Role.ADMIN);
+            verify(employeeIdGenerator).generate();
             verify(passwordEncoder).encode(VALID_PASSWORD);
             verify(userRepository).save(captor.capture());
-            verifyNoMoreInteractions(userRepository, passwordEncoder);
+            verifyNoMoreInteractions(userRepository, employeeIdGenerator, passwordEncoder);
 
             User saved = captor.getValue();
 
+            assertEquals(VALID_EMPLOYEE_ID, saved.getEmployeeId());
+            assertEquals(EXPECTED_FULL_NAME, saved.getFullName());
             assertEquals("admin.root", saved.getUsername());
             assertEquals("admin@example.com", saved.getEmail());
             assertEquals(ENCODED_PASSWORD, saved.getPassword());
             assertEquals(Role.ADMIN, saved.getRole());
+            assertEquals(UserType.HUMAN, saved.getUserType());
         }
 
         @Test
         @DisplayName("Should create the administrator when the bootstrap is not required")
         void shouldCreateAdministratorWhenNotRequired() {
-            configure(VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, false);
+            configure(VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, false);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+            when(employeeIdGenerator.generate()).thenReturn(VALID_EMPLOYEE_ID);
             when(passwordEncoder.encode(VALID_PASSWORD)).thenReturn(ENCODED_PASSWORD);
 
             runner.run();
 
             verify(userRepository).existsByRole(Role.ADMIN);
+            verify(employeeIdGenerator).generate();
             verify(passwordEncoder).encode(VALID_PASSWORD);
             verify(userRepository).save(any(User.class));
-            verifyNoMoreInteractions(userRepository, passwordEncoder);
+            verifyNoMoreInteractions(userRepository, employeeIdGenerator, passwordEncoder);
         }
 
         @Test
@@ -259,12 +299,15 @@ class AdminBootstrapRunnerTests {
 
             assertEquals(64, password.length());
 
-            configure(VALID_USERNAME, VALID_EMAIL, password, false);
+            configure(VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, password, false);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+            when(employeeIdGenerator.generate()).thenReturn(VALID_EMPLOYEE_ID);
             when(passwordEncoder.encode(password)).thenReturn(ENCODED_PASSWORD);
 
             runner.run();
 
+            verify(employeeIdGenerator).generate();
+            verify(passwordEncoder).encode(password);
             verify(userRepository).save(any(User.class));
         }
 
@@ -273,12 +316,15 @@ class AdminBootstrapRunnerTests {
         void shouldAcceptUsernameWithExactlyMaxLength() {
             String username = "a".repeat(20);
 
-            configure(username, VALID_EMAIL, VALID_PASSWORD, false);
+            configure(VALID_FULL_NAME, username, VALID_EMAIL, VALID_PASSWORD, false);
             when(userRepository.existsByRole(Role.ADMIN)).thenReturn(false);
+            when(employeeIdGenerator.generate()).thenReturn(VALID_EMPLOYEE_ID);
             when(passwordEncoder.encode(VALID_PASSWORD)).thenReturn(ENCODED_PASSWORD);
 
             runner.run();
 
+            verify(employeeIdGenerator).generate();
+            verify(passwordEncoder).encode(VALID_PASSWORD);
             verify(userRepository).save(any(User.class));
         }
     }
@@ -288,14 +334,16 @@ class AdminBootstrapRunnerTests {
     @SuppressWarnings("unused")
     static Stream<Arguments> missingCredentials() {
         return Stream.of(
-                Arguments.of("all null", null, null, null),
-                Arguments.of("all empty", "", "", ""),
-                Arguments.of("username blank", "   ", VALID_EMAIL, VALID_PASSWORD),
-                Arguments.of("username missing", null, VALID_EMAIL, VALID_PASSWORD),
-                Arguments.of("e-mail blank", VALID_USERNAME, "   ", VALID_PASSWORD),
-                Arguments.of("e-mail missing", VALID_USERNAME, null, VALID_PASSWORD),
-                Arguments.of("password blank", VALID_USERNAME, VALID_EMAIL, "   "),
-                Arguments.of("password missing", VALID_USERNAME, VALID_EMAIL, null)
+                Arguments.of("all null", null, null, null, null, null),
+                Arguments.of("all empty", "", "", "", "", ""),
+                Arguments.of("full name blank", "   ", VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD),
+                Arguments.of("full name missing", null, VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD),
+                Arguments.of("username blank", VALID_FULL_NAME, "   ", VALID_EMAIL, VALID_PASSWORD),
+                Arguments.of("username missing", VALID_FULL_NAME, null, VALID_EMAIL, VALID_PASSWORD),
+                Arguments.of("e-mail blank", VALID_FULL_NAME, VALID_USERNAME, "   ", VALID_PASSWORD),
+                Arguments.of("e-mail missing", VALID_FULL_NAME, VALID_USERNAME, null, VALID_PASSWORD),
+                Arguments.of("password blank", VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, "   "),
+                Arguments.of("password missing", VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, null)
         );
     }
 
@@ -306,34 +354,55 @@ class AdminBootstrapRunnerTests {
         String longEmail = "a".repeat(64) + "@" + "b".repeat(186) + ".com";
 
         return Stream.of(
+                Arguments.of("full name containing only numbers",
+                        "12345", VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD,
+                        ValidationMessages.INVALID_FULL_NAME_NUMERIC),
+                Arguments.of("full name with 151 characters",
+                        "A".repeat(151), VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD,
+                        ValidationMessages.INVALID_FULL_NAME_LENGTH.formatted(150)),
                 Arguments.of("username with 21 characters",
-                        "a".repeat(21), VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_LENGTH),
+                        VALID_FULL_NAME, "a".repeat(21), VALID_EMAIL, VALID_PASSWORD,
+                        ValidationMessages.INVALID_USERNAME_LENGTH),
                 Arguments.of("username with whitespace",
-                        "admin root", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_FORMAT),
+                        VALID_FULL_NAME, "admin root", VALID_EMAIL, VALID_PASSWORD,
+                        ValidationMessages.INVALID_USERNAME_FORMAT),
                 Arguments.of("username with accented character",
-                        "admín", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_FORMAT),
+                        VALID_FULL_NAME, "admín", VALID_EMAIL, VALID_PASSWORD,
+                        ValidationMessages.INVALID_USERNAME_FORMAT),
                 Arguments.of("username with symbol",
-                        "admin@root", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.INVALID_USERNAME_FORMAT),
+                        VALID_FULL_NAME, "admin@root", VALID_EMAIL, VALID_PASSWORD,
+                        ValidationMessages.INVALID_USERNAME_FORMAT),
                 Arguments.of("username reserved for the system",
-                        "SYSTEM", VALID_EMAIL, VALID_PASSWORD, ValidationMessages.RESERVED_USERNAME),
+                        VALID_FULL_NAME, "SYSTEM", VALID_EMAIL, VALID_PASSWORD,
+                        ValidationMessages.RESERVED_USERNAME),
                 Arguments.of("e-mail without at sign",
-                        VALID_USERNAME, "admin.example.com", VALID_PASSWORD, ValidationMessages.INVALID_EMAIL),
+                        VALID_FULL_NAME, VALID_USERNAME, "admin.example.com", VALID_PASSWORD,
+                        ValidationMessages.INVALID_EMAIL),
                 Arguments.of("e-mail above 254 characters",
-                        VALID_USERNAME, longEmail, VALID_PASSWORD, ValidationMessages.INVALID_EMAIL_LENGTH),
+                        VALID_FULL_NAME, VALID_USERNAME, longEmail, VALID_PASSWORD,
+                        ValidationMessages.INVALID_EMAIL_LENGTH),
                 Arguments.of("password with 7 characters",
-                        VALID_USERNAME, VALID_EMAIL, "1234567", ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG),
+                        VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, "1234567",
+                        ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG),
                 Arguments.of("password with 73 bytes",
-                        VALID_USERNAME, VALID_EMAIL, "a".repeat(73), ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH),
+                        VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, "a".repeat(73),
+                        ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH),
                 Arguments.of("password with 74 bytes in 37 multibyte characters",
-                        VALID_USERNAME, VALID_EMAIL, "é".repeat(37), ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH)
+                        VALID_FULL_NAME, VALID_USERNAME, VALID_EMAIL, "é".repeat(37),
+                        ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH)
         );
     }
 
     // ---------- helpers ----------
 
     private void configure(
-            String username, String email, String password, boolean bootstrapRequired) {
+            String fullName,
+            String username,
+            String email,
+            String password,
+            boolean bootstrapRequired) {
 
+        ReflectionTestUtils.setField(runner, "adminFullName", fullName);
         ReflectionTestUtils.setField(runner, "adminUsername", username);
         ReflectionTestUtils.setField(runner, "adminEmail", email);
         ReflectionTestUtils.setField(runner, "adminPassword", password);

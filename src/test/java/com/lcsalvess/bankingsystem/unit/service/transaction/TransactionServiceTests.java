@@ -65,11 +65,13 @@ public class TransactionServiceTests {
     private static final String PROVIDER =
             "com.lcsalvess.bankingsystem.unit.service.transaction.TransactionServiceTests#";
 
-    private static final String USERNAME = "test-user";
+    private static final String USERNAME = "joe-doe";
 
-    private static final User TEST_USER = new User(
+    private static final User TEST_USER = User.createHuman(
+            "EMP-TEST-001",
+            "Joe Doe",
             USERNAME,
-            "test-user@test.com",
+            "joe.doe@example.com",
             "test-password",
             Role.EMPLOYEE
     );

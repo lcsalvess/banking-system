@@ -62,9 +62,11 @@ class AuditTrailFilterTests {
     void setUp() {
         filter = new AuditTrailFilter(recorder);
 
-        actor = new User(
-                "lucas",
-                "lucas@example.com",
+        actor = User.createHuman(
+                "EMP-TEST-001",
+                "Joe Doe",
+                "joe",
+                "joe@example.com",
                 "hash",
                 Role.EMPLOYEE
         );

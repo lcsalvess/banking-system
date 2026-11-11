@@ -232,7 +232,15 @@ class AuditEventSnapshotEndpointIntegrationTests {
                 .replace("-", "")
                 .substring(0, 10);
 
-        User auditor = userRepository.save(new User(
+        String employeeId = "EMP-"
+                + UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12);
+
+        User auditor = userRepository.save(User.createHuman(
+                employeeId,
+                "End-to-End Test Auditor",
                 username,
                 username + "@test.com",
                 passwordEncoder.encode(PASSWORD),

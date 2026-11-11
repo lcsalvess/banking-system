@@ -116,7 +116,9 @@ class TransactionIdempotencyIntegrationTests {
         clientSequence = 0;
 
         testUser = userRepository.saveAndFlush(
-                new User(
+                User.createHuman(
+                        "EMP-IDEMPOTENCY-001",
+                        "Idempotency Test User",
                         "idempotency-user",
                         "idempotency-user@test.com",
                         "test-password",
@@ -244,7 +246,9 @@ class TransactionIdempotencyIntegrationTests {
             UUID idempotencyKey = UUID.randomUUID();
 
             User otherUser = userRepository.saveAndFlush(
-                    new User(
+                    User.createHuman(
+                            "EMP-IDEMPOTENCY-002",
+                            "Second Idempotency Test User",
                             "idempotency-user-2",
                             "idempotency-user-2@test.com",
                             "test-password",

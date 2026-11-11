@@ -58,9 +58,11 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TransactionQueryServiceTests {
 
-    private static final User TEST_USER = new User(
-            "test-user",
-            "test-user@test.com",
+    private static final User TEST_USER = User.createHuman(
+            "EMP-TEST-001",
+            "Joe Doe",
+            "joe.doe",
+            "joe.doe@example.com",
             "test-password",
             Role.EMPLOYEE
     );

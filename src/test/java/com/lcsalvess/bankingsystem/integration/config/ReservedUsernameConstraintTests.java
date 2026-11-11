@@ -15,9 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Insere usuários direto no PostgreSQL, sem passar pelo Bean Validation, para
- * provar que a regra do username reservado também vale no banco. Cada teste
- * roda em uma transação que sofre rollback, então nada é persistido.
+ * Inserts users directly into PostgreSQL, bypassing Bean Validation, to
+ * prove that the reserved username rule is also enforced by the database.
+ * Each test runs in a transaction that is rolled back, so no user is persisted.
  */
 @ActiveProfiles("test")
 @SpringBootTest
@@ -54,8 +54,28 @@ class ReservedUsernameConstraintTests {
     private void insertUser(String username) {
         jdbcTemplate.update(
                 """
-                INSERT INTO users (username, email, password, role, active, created_at, updated_at)
-                VALUES (?, ?, 'not-a-real-hash', 'EMPLOYEE', TRUE, now(), now())
+                INSERT INTO users (
+                    employee_id,
+                    full_name,
+                    username,
+                    email,
+                    password,
+                    role,
+                    active,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    public.next_employee_id(),
+                    'Joe Doe',
+                    ?,
+                    ?,
+                    'not-a-real-hash',
+                    'EMPLOYEE',
+                    TRUE,
+                    now(),
+                    now()
+                )
                 """,
                 username,
                 "reserved-username-test@example.invalid"

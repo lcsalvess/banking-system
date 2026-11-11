@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,7 +59,7 @@ class JwtServiceTests {
 
     private static final String ISSUER = "banking-system-test";
     private static final long EXPIRATION_IN_SECONDS = 3600L;
-    private static final String USERNAME = "usuario.teste";
+    private static final String USERNAME = "joe.doe";
 
     private static final String BLANK_SECRET_MESSAGE =
             "O segredo JWT não pode ser nulo ou vazio.";
@@ -460,7 +461,15 @@ class JwtServiceTests {
     }
 
     private static User createUser(String username) {
-        return new User(
+        String employeeId = "EMP-"
+                + UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12);
+
+        return User.createHuman(
+                employeeId,
+                "Joe Doe",
                 username,
                 username + "@email.com",
                 "encoded-password",

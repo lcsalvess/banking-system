@@ -6,6 +6,22 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
 public record UserResponseDTO(
+
+        @Schema(
+                description = "Unique employee identifier assigned to the user.",
+                example = "EMP-000004",
+                maxLength = 30
+        )
+        String employeeId,
+
+        @Schema(
+                description = "User's full name. May be null for legacy accounts "
+                        + "whose names have not yet been populated.",
+                example = "John Michael Doe",
+                maxLength = 150
+        )
+        String fullName,
+
         @Schema(
                 description = "Username assigned to the user.",
                 example = "john.doe"

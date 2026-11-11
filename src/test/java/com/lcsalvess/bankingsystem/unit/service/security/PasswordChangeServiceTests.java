@@ -425,9 +425,11 @@ class PasswordChangeServiceTests {
     }
 
     private User createUser(String passwordHash) {
-        User user = new User(
-                "usuario.teste",
-                "usuario@teste.com",
+        User user = User.createHuman(
+                "EMP-TEST-" + USER_ID,
+                "Joe Doe",
+                "joe.doe",
+                "joe.doe@teste.com",
                 passwordHash,
                 Role.EMPLOYEE
         );

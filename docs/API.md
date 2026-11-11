@@ -68,6 +68,10 @@ To guarantee deterministic pagination, each endpoint uses a stable unique tie-br
 | `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate`                                                                           | `createdAt`, `id`, `type`, `amount`                                                                                               | `createdAt` descending, then `id` descending | 10           |
 | `GET /api/v1/audit-events`                          | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
 
+When creating a HUMAN user, `fullName` is required and
+must not be blank. The `employeeId` is generated automatically
+and must not be supplied by the client.
+
 For the users endpoint, `employeeId` is used as the pagination tie-breaker because it is unique among human users. The internal `id` is not exposed as a sortable field or used as the tie-breaker.
 
 On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Dates are interpreted in the `America/Sao_Paulo` timezone: `startDate` includes transactions from the beginning of that local calendar day, and `endDate` includes the entire day, implemented using an exclusive upper bound at the beginning of the following day. Both dates must be between `2020-01-01` and the current date in the application timezone, and `startDate` cannot be after `endDate` (`400 Bad Request`).

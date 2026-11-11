@@ -14,7 +14,6 @@ when running with the `local` profile.
 | PATCH  | `/api/v1/users/{employeeId}/deactivate`                    | Deactivate a user account                           | `ADMIN`       |
 | PATCH  | `/api/v1/users/{employeeId}/reactivate`                    | Reactivate a user account                           | `ADMIN`       |
 | PATCH  | `/api/v1/users/{employeeId}/role`                          | Change the role of a user                           | `ADMIN`       |
-| PATCH | `/api/v1/users/{employeeId}/full-name` | Populate a legacy user's missing full name (temporary) | `ADMIN` |
 | POST   | `/api/v1/clients`                                      | Register a client                                   | `EMPLOYEE`    |
 | GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients                | `EMPLOYEE`    |
 | GET    | `/api/v1/clients/{clientId}`                                 | Get a client by ID                                  | `EMPLOYEE`    |
@@ -39,7 +38,7 @@ An administrator can deactivate other users but cannot deactivate
 their own account. Such a request returns `403 Forbidden`.
 The last active administrator also cannot be deactivated.
 
-`PATCH /api/v1/users/{userId}/role` receives `{"role": "ADMIN|EMPLOYEE|AUDITOR"}`. An administrator cannot change their own role (`403 Forbidden`), and the role of the technical `system_migration` user cannot be changed (`409 Conflict`). Requesting the role the user already has returns the user unchanged. A successful change revokes every token issued to that user, so they must authenticate again.
+`PATCH /api/v1/users/{employeeId}/role` receives `{"role": "ADMIN|EMPLOYEE|AUDITOR"}`. An administrator cannot change their own role (`403 Forbidden`), and the role of the technical `system_migration` user cannot be changed (`409 Conflict`). Requesting the role the user already has returns the user unchanged. A successful change revokes every token issued to that user, so they must authenticate again.
 
 `POST /api/v1/auth/login` returns `401 Unauthorized` with a generic message for invalid credentials, a disabled account, or an unknown username, so the response does not reveal whether the account exists. Every login outcome is recorded in the audit trail (see [Audit Trail](BUSINESS_RULES.md#audit-trail)).
 
@@ -58,23 +57,18 @@ Request bodies are strict about JSON types: text fields reject numbers and boole
 
 List endpoints accept `page`, `size`, and `sort` (for example `sort=balance,desc`). The maximum page size is 100, and larger values are capped. Sorting by a property outside the list of an endpoint returns `400 Bad Request`.
 
-When the requested sort does not include `id`, it is appended as a tie-breaker to provide a stable order across pages.
-If `id` is explicitly included, its requested direction and position are preserved.
+To guarantee deterministic pagination, each endpoint uses a stable unique tie-breaker whenever it is not already part of the effective sort. The tie-breaker may differ between endpoints, as described in the table below.
 
 | Endpoint                                            | Filters                                                                                                  | Sortable fields                                                                                                                   | Default sort                                 | Default size |
 |-----------------------------------------------------|----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|--------------|
-| `GET /api/v1/users` | `search`, `role`, `active` | `employeeId`, `fullName`, `username`, `email`, `role`, `active` | `employeeId` ascending, then internal `id` ascending | 20 |
+| `GET /api/v1/users` | `search`, `role`, `active` | `employeeId`, `fullName`, `username`, `email`, `role`, `active` | `employeeId` ascending | 20 |
 | `GET /api/v1/clients`                               | `name`                                                                                                   | `id`, `name`                                                                                                                      | `id` ascending                               | 10           |
 | `GET /api/v1/accounts`                              | -                                                                                                        | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
 | `GET /api/v1/clients/{clientId}/accounts`           | `type`, `status`                                                                                         | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
 | `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate`                                                                           | `createdAt`, `id`, `type`, `amount`                                                                                               | `createdAt` descending, then `id` descending | 10           |
 | `GET /api/v1/audit-events`                          | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
 
-To guarantee deterministic pagination, the internal `id` is appended as a tie-breaker whenever it is not already part of the effective sort.
-
-An explicitly requested `id` sort is supported only by endpoints that expose `id` in their sortable-field whitelist.
-
-For the users endpoint, `id` is not publicly sortable. It is appended internally as an ascending tie-breaker. The default sort is `employeeId` ascending, followed by internal `id` ascending.
+For the users endpoint, `employeeId` is used as the pagination tie-breaker because it is unique among human users. The internal `id` is not exposed as a sortable field or used as the tie-breaker.
 
 On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Dates are interpreted in the `America/Sao_Paulo` timezone: `startDate` includes transactions from the beginning of that local calendar day, and `endDate` includes the entire day, implemented using an exclusive upper bound at the beginning of the following day. Both dates must be between `2020-01-01` and the current date in the application timezone, and `startDate` cannot be after `endDate` (`400 Bad Request`).
 
@@ -97,7 +91,9 @@ The endpoint supports the following optional filters:
 
 Each event contains `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, and `createdAt`. Security and HTTP events also contain `ipAddress`, `reason`, and `httpStatus`. Fields without a value are omitted from the response.
 
-The event types currently generated are the business events (`USER_CREATED`, `USER_FULL_NAME_POPULATED`, `USER_DEACTIVATED`, `USER_REACTIVATED`, `USER_PASSWORD_CHANGED`, `USER_ROLE_CHANGED`, `CLIENT_CREATED`, `CLIENT_UPDATED`, `ACCOUNT_CREATED`, `ACCOUNT_CANCELLED`, `DEPOSIT`, `WITHDRAWAL`, and `TRANSFER`) and the security events `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGIN_BLOCKED`, and `HTTP_REQUEST_COMPLETED`. A request normally produces a business or login event and an `HTTP_REQUEST_COMPLETED` event with the same `correlationId`.
+The event types currently generated are the business events (`USER_CREATED`,  `USER_DEACTIVATED`, `USER_REACTIVATED`, `USER_PASSWORD_CHANGED`, `USER_ROLE_CHANGED`, `CLIENT_CREATED`, `CLIENT_UPDATED`, `ACCOUNT_CREATED`, `ACCOUNT_CANCELLED`, `DEPOSIT`, `WITHDRAWAL`, and `TRANSFER`) and the security events `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGIN_BLOCKED`, and `HTTP_REQUEST_COMPLETED`. A request normally produces a business or login event and an `HTTP_REQUEST_COMPLETED` event with the same `correlationId`.
+
+The `USER_FULL_NAME_POPULATED` event may still appear in historical audit records. It is retained for backward compatibility but is no longer generated by the application.
 
 Blank optional text filters are ignored. Invalid filters, dates,
 pagination, or sorting parameters return `400 Bad Request`.
@@ -130,7 +126,7 @@ header, with the same filters and sort, to read other pages of the same result:
 
 ## Address Lookup Integration
 
-Address lookup is not exposed as a standalone endpoint. It is performed internally by `POST /api/v1/clients` and by `PATCH /api/v1/clients/{id}` when address data is included. The client operations can return `404 Not Found` when the postal code is not found or `503 Service Unavailable` when the address providers cannot resolve it due to failures.
+Address lookup is not exposed as a standalone endpoint. It is performed internally by `POST /api/v1/clients` and by `PATCH /api/v1/clients/{clientId}` when address data is included. The client operations can return `404 Not Found` when the postal code is not found or `503 Service Unavailable` when the address providers cannot resolve it due to failures.
 
 ## Actuator Endpoints
 
@@ -158,7 +154,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 curl -X POST http://localhost:8080/api/v1/users \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
-  -d '{"username": "employee", "email": "employee@example.com", "password": "SecurePass123!", "role": "EMPLOYEE"}'
+  -d '{"fullName": "Employee Name", "username": "employee", "email": "employee@example.com", "password": "SecurePass123!", "role": "EMPLOYEE"}'
 
 # 3. Log in as the employee, who operates clients, accounts, and transactions
 curl -X POST http://localhost:8080/api/v1/auth/login \
@@ -189,11 +185,11 @@ curl -X PATCH http://localhost:8080/api/v1/auth/password \
   -d '{"currentPassword": "SecurePass123!", "newPassword": "EvenMoreSecure456!"}'
 
 # 8. Deactivate a user (ADMIN only)
-curl -X PATCH 'http://localhost:8080/api/v1/users/<user-id>/deactivate' \
+curl -X PATCH 'http://localhost:8080/api/v1/users/<employee-id>/deactivate' \
   -H "Authorization: Bearer <admin-token>"
 
 # 9. Change a user's role (ADMIN only, never your own)
-curl -X PATCH 'http://localhost:8080/api/v1/users/<user-id>/role' \
+curl -X PATCH 'http://localhost:8080/api/v1/users/<employee-id>/role' \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"role": "AUDITOR"}'

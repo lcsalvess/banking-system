@@ -132,15 +132,16 @@ $$
             ON TABLE public.savings_accounts TO banking_app;
 
         -- Users: only authentication status, password-related fields,
-        -- role and full name can be updated.
+        -- and role can be updated by the runtime role.
+        --
+        -- full_name is insert-only after the legacy backfill.
         -- employee_id and user_type remain immutable.
         GRANT UPDATE (
                       password,
                       active,
                       token_version,
                       updated_at,
-                      role,
-                      full_name
+                      role
             )
             ON TABLE public.users TO banking_app;
 

@@ -51,7 +51,6 @@ class AuditEventListenerTests {
     @ParameterizedTest(name = "{0} -> {1}")
     @CsvSource({
             "CREATED, USER_CREATED",
-            "FULL_NAME_POPULATED, USER_FULL_NAME_POPULATED",
             "DEACTIVATED, USER_DEACTIVATED",
             "REACTIVATED, USER_REACTIVATED",
             "PASSWORD_CHANGED, USER_PASSWORD_CHANGED"

@@ -100,7 +100,6 @@ public class AuditEventListener {
             case DEACTIVATED -> AuditEventType.USER_DEACTIVATED;
             case REACTIVATED -> AuditEventType.USER_REACTIVATED;
             case PASSWORD_CHANGED -> AuditEventType.USER_PASSWORD_CHANGED;
-            case FULL_NAME_POPULATED -> AuditEventType.USER_FULL_NAME_POPULATED;
         };
     }
 

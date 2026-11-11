@@ -123,13 +123,10 @@
   were found. Both constraints are now validated against all
   existing rows, while continuing to enforce the same rules
   on new and updated records.
-- `V32__add_accounts_client_id_index.sql` creates the index `idx_accounts_client_id` on `accounts (client_id)`, which
-  supports the listing of the accounts of a client. It uses a plain `CREATE INDEX`, which blocks writes to `accounts`
-  while the index is built; on a large existing table, create the index `CONCURRENTLY` before deploying.
-- Schema changes must be added as new versioned migrations (`V33__description.sql`, and so on). Migrations that were
-  already applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database
-  privileges; do not edit them. Changes to the runtime role's privilege policy go in
-  `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
+- `V32__add_accounts_client_id_index.sql` creates the index `idx_accounts_client_id` on `accounts (client_id)`, which supports listing accounts belonging to a client. It uses a plain `CREATE INDEX`, which blocks writes to `accounts` while the index is being built. For large existing tables, consider creating the index concurrently as a separate deployment operation.
+- `V33__add_user_identity_metadata.sql` introduces user identity metadata by adding `user_type`, `employee_id`, and `full_name` to `users`. It distinguishes HUMAN users from SYSTEM users, assigns deterministic employee IDs to existing HUMAN users, and introduces a PostgreSQL sequence and `next_employee_id()` function for generating new employee IDs. Constraints and triggers enforce identity consistency and prevent changes to immutable identity attributes. Legacy HUMAN users may temporarily have a NULL `full_name` until their records are populated. SYSTEM users must have NULL `employee_id` and `full_name`.
+- `V34__require_full_name_for_human_users.sql` enforces that every HUMAN user has a non-null `full_name`, while SYSTEM users must retain NULL. It adds the check constraint as `NOT VALID` and validates it separately to reduce the impact of locking during deployment. The constraint assumes all existing HUMAN users have already been populated.
+- Schema changes must be added as new versioned migrations (`V35__description.sql`, and so on). Migrations that have already been applied must not be edited, because Flyway validates their checksums. V20 and V21 also change database privileges; do not edit them. Changes to the runtime role's privilege policy belong in `db/callback/afterMigrate__apply_runtime_privileges.sql`, not in new migrations.
 
 ## Database roles and privileges
 

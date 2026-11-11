@@ -168,25 +168,6 @@ public class User implements UserDetails {
         }
     }
 
-    /**
-     * Populates the full name of a legacy human user.
-     */
-    public void populateFullName(String fullName) {
-        if (this.userType != UserType.HUMAN) {
-            throw new IllegalStateException(
-                    "System users cannot have a full name."
-            );
-        }
-
-        if (this.fullName != null) {
-            throw new IllegalStateException(
-                    "The user's full name has already been populated."
-            );
-        }
-
-        this.fullName = FullNameNormalizer.normalize(fullName);
-    }
-
     public void reactivate() {
         this.active = true;
     }

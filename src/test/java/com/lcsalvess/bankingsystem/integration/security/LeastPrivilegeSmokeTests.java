@@ -127,14 +127,14 @@ class LeastPrivilegeSmokeTests {
                         + "last_yield_processed_date = last_yield_processed_date "
                         + "WHERE false",
 
-                // Users: permitted UPDATE columns
+                // Users: permitted UPDATE columns.
+                // full_name is intentionally excluded after the legacy backfill.
                 "UPDATE public.users "
                         + "SET password = password, "
                         + "active = active, "
                         + "token_version = token_version, "
                         + "updated_at = updated_at, "
-                        + "role = role, "
-                        + "full_name = full_name "
+                        + "role = role "
                         + "WHERE false",
 
                 // Employee ID generation: function execution is permitted.
@@ -224,6 +224,16 @@ class LeastPrivilegeSmokeTests {
                 "The runtime role must not be allowed to insert user_type."
         );
 
+        // full_name is insert-only after the legacy backfill.
+        assertFalse(
+                appHasColumnPrivilege(
+                        "public.users",
+                        "full_name",
+                        "UPDATE"
+                ),
+                "The runtime role must not be allowed to update full_name."
+        );
+
         // The employee sequence must not be directly accessible.
         for (String privilege : List.of("USAGE", "SELECT", "UPDATE")) {
             assertFalse(
@@ -282,6 +292,7 @@ class LeastPrivilegeSmokeTests {
                 "UPDATE public.savings_accounts SET id = id WHERE false",
                 "UPDATE public.users SET username = username WHERE false",
                 "UPDATE public.users SET email = email WHERE false",
+                "UPDATE public.users SET full_name = full_name WHERE false",
                 "UPDATE public.users SET created_at = created_at WHERE false",
                 "UPDATE public.users SET employee_id = employee_id WHERE false",
                 "UPDATE public.users SET user_type = user_type WHERE false",
@@ -289,33 +300,33 @@ class LeastPrivilegeSmokeTests {
 
                 // Explicit user_type insertion is forbidden.
                 """
-                INSERT INTO public.users (
-                    employee_id,
-                    full_name,
-                    username,
-                    email,
-                    password,
-                    user_type,
-                    role,
-                    active,
-                    token_version,
-                    created_at,
-                    updated_at
-                )
-                VALUES (
-                    'EMP-999999',
-                    'Joe Doe',
-                    'privilege-probe',
-                    'privilege-probe@example.com',
-                    'encoded-password',
-                    'HUMAN',
-                    'EMPLOYEE',
-                    TRUE,
-                    0,
-                    CURRENT_TIMESTAMP,
-                    CURRENT_TIMESTAMP
-                )
-                """,
+                        INSERT INTO public.users (
+                            employee_id,
+                            full_name,
+                            username,
+                            email,
+                            password,
+                            user_type,
+                            role,
+                            active,
+                            token_version,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (
+                            'EMP-999999',
+                            'Joe Doe',
+                            'privilege-probe',
+                            'privilege-probe@example.com',
+                            'encoded-password',
+                            'HUMAN',
+                            'EMPLOYEE',
+                            TRUE,
+                            0,
+                            CURRENT_TIMESTAMP,
+                            CURRENT_TIMESTAMP
+                        )
+                        """,
 
                 // Direct employee sequence access is forbidden.
                 "SELECT nextval('public.employee_id_seq')",

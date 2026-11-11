@@ -1,6 +1,5 @@
 package com.lcsalvess.bankingsystem.controller;
 
-import com.lcsalvess.bankingsystem.dto.request.user.UserFullNameUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
@@ -129,54 +128,6 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponseDTO create(@RequestBody @Valid UserRequestDTO dto) {
         return userService.create(dto);
-    }
-
-    @Operation(
-            summary = "Populate a legacy user's full name",
-            description = """
-                Temporary endpoint used to populate the missing full name
-                of legacy human user accounts.
-                Existing full names cannot be overwritten.
-                Only users with the ADMIN role are authorized.
-                """,
-            deprecated = true
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Full name populated successfully."
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid request body or full name."
-            ),
-            @ApiResponse(
-                    responseCode = "403",
-                    description = "The authenticated user does not have ADMIN permission."
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "User not found."
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "The user's full name has already been populated."
-            )
-    })
-    @PatchMapping("/{employeeId}/full-name")
-    @PreAuthorize("hasRole('ADMIN')")
-    public UserResponseDTO populateFullName(
-            @Parameter(
-                    description = "Employee identifier assigned to the user.",
-                    example = "EMP-000004"
-            )
-            @PathVariable("employeeId") String employeeId,
-            @RequestBody @Valid UserFullNameUpdateRequestDTO dto
-    ) {
-        return userService.populateFullName(
-                employeeId,
-                dto.fullName()
-        );
     }
 
     @Operation(

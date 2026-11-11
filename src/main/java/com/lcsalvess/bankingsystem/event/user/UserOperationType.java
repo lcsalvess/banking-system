@@ -4,6 +4,5 @@ public enum UserOperationType {
     CREATED,
     DEACTIVATED,
     REACTIVATED,
-    PASSWORD_CHANGED,
-    FULL_NAME_POPULATED
+    PASSWORD_CHANGED
 }

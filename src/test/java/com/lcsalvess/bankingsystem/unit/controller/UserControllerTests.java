@@ -2,7 +2,6 @@ package com.lcsalvess.bankingsystem.unit.controller;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.UserController;
-import com.lcsalvess.bankingsystem.dto.request.user.UserFullNameUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
@@ -13,7 +12,6 @@ import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedEx
 import com.lcsalvess.bankingsystem.exception.user.SelfDeactivationNotAllowedException;
 import com.lcsalvess.bankingsystem.exception.user.SelfRoleChangeNotAllowedException;
 import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
-import com.lcsalvess.bankingsystem.exception.user.UserFullNameAlreadySetException;
 import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
 import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.service.user.UserService;
@@ -70,7 +68,6 @@ public class UserControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.UserControllerTests#";
     private static final String USERS_URL = "/api/v1/users";
-    private static final String FULL_NAME_URL = "/api/v1/users/{employeeId}/full-name";
     private static final String REACTIVATE_URL = "/api/v1/users/{employeeId}/reactivate";
     private static final String DEACTIVATE_URL = "/api/v1/users/{employeeId}/deactivate";
     private static final String ROLE_URL = "/api/v1/users/{employeeId}/role";
@@ -470,135 +467,6 @@ public class UserControllerTests {
             performErrorResponse(postUser(request), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
 
             verify(userService).create(request);
-            verifyNoMoreInteractions(userService);
-        }
-    }
-
-    @Nested
-    @DisplayName("PATCH /api/v1/users/{employeeId}/full-name")
-    class PopulateFullName {
-
-        private MockHttpServletRequestBuilder request(
-                String employeeId,
-                UserFullNameUpdateRequestDTO dto
-        ) throws Exception {
-            return patch(FULL_NAME_URL, employeeId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(dto));
-        }
-
-        @Test
-        @DisplayName("Should populate a legacy user's full name successfully")
-        void shouldPopulateFullNameSuccessfully() throws Exception {
-            UserResponseDTO expected = userResponse(true);
-
-            UserFullNameUpdateRequestDTO request =
-                    new UserFullNameUpdateRequestDTO(VALID_FULL_NAME);
-
-            when(userService.populateFullName(
-                    VALID_EMPLOYEE_ID,
-                    VALID_FULL_NAME
-            )).thenReturn(expected);
-
-            MvcResult result = mockMvc.perform(
-                            request(VALID_EMPLOYEE_ID, request)
-                    )
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.employeeId").value(VALID_EMPLOYEE_ID))
-                    .andExpect(jsonPath("$.fullName").value(VALID_FULL_NAME))
-                    .andReturn();
-
-            assertEquals(expected, readUser(result));
-
-            verify(userService).populateFullName(
-                    VALID_EMPLOYEE_ID,
-                    VALID_FULL_NAME
-            );
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when the full name contains numbers")
-        void shouldReturnBadRequestWhenFullNameContainsNumbers() throws Exception {
-            UserFullNameUpdateRequestDTO request =
-                    new UserFullNameUpdateRequestDTO("Jane Doe 123");
-
-            performValidationError(
-                    mockMvc.perform(request(VALID_EMPLOYEE_ID, request)),
-                    "fullName",
-                    ValidationMessages.INVALID_FULL_NAME_NUMERIC
-            );
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when the full name is missing")
-        void shouldReturnBadRequestWhenFullNameIsMissing() throws Exception {
-            UserFullNameUpdateRequestDTO request =
-                    new UserFullNameUpdateRequestDTO(null);
-
-            performValidationError(
-                    mockMvc.perform(request(VALID_EMPLOYEE_ID, request)),
-                    "fullName",
-                    ValidationMessages.REQUIRED_FULL_NAME
-            );
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when the employee ID does not exist")
-        void shouldReturnNotFoundWhenEmployeeDoesNotExist() throws Exception {
-            UserFullNameUpdateRequestDTO request =
-                    new UserFullNameUpdateRequestDTO(VALID_FULL_NAME);
-
-            when(userService.populateFullName(
-                    UNKNOWN_EMPLOYEE_ID,
-                    VALID_FULL_NAME
-            )).thenThrow(
-                    new UserNotFoundException(ApiErrorMessages.USER_NOT_FOUND)
-            );
-
-            performErrorResponse(
-                    mockMvc.perform(request(UNKNOWN_EMPLOYEE_ID, request)),
-                    404,
-                    ApiErrorMessages.USER_NOT_FOUND
-            );
-
-            verify(userService).populateFullName(
-                    UNKNOWN_EMPLOYEE_ID,
-                    VALID_FULL_NAME
-            );
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when the full name is already populated")
-        void shouldReturnConflictWhenFullNameIsAlreadySet() throws Exception {
-            UserFullNameUpdateRequestDTO request =
-                    new UserFullNameUpdateRequestDTO(VALID_FULL_NAME);
-
-            when(userService.populateFullName(
-                    VALID_EMPLOYEE_ID,
-                    VALID_FULL_NAME
-            )).thenThrow(
-                    new UserFullNameAlreadySetException(
-                            ApiErrorMessages.USER_FULL_NAME_ALREADY_SET
-                    )
-            );
-
-            performErrorResponse(
-                    mockMvc.perform(request(VALID_EMPLOYEE_ID, request)),
-                    409,
-                    ApiErrorMessages.USER_FULL_NAME_ALREADY_SET
-            );
-
-            verify(userService).populateFullName(
-                    VALID_EMPLOYEE_ID,
-                    VALID_FULL_NAME
-            );
             verifyNoMoreInteractions(userService);
         }
     }

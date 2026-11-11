@@ -48,9 +48,6 @@ public final class ApiErrorMessages {
     public static final String SELF_ROLE_CHANGE_NOT_ALLOWED =
             "Um administrador não pode alterar o próprio papel.";
 
-    public static final String USER_FULL_NAME_ALREADY_SET =
-            "O nome completo do usuário já foi preenchido.";
-
     // Authentication and authorization
     public static final String INVALID_CREDENTIALS =
             "Usuário ou senha inválidos.";

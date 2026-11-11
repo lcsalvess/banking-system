@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.entity.audit;
 
 public enum AuditEventType {
     USER_CREATED,
+    USER_FULL_NAME_POPULATED,
     USER_DEACTIVATED,
     USER_REACTIVATED,
     USER_PASSWORD_CHANGED,

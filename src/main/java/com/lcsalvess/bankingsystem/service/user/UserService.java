@@ -13,6 +13,7 @@ import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedEx
 import com.lcsalvess.bankingsystem.exception.user.SelfDeactivationNotAllowedException;
 import com.lcsalvess.bankingsystem.exception.user.SelfRoleChangeNotAllowedException;
 import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.user.UserFullNameAlreadySetException;
 import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
 import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
@@ -104,6 +105,33 @@ public class UserService {
         );
 
         return toResponse(savedUser);
+    }
+
+    @Transactional
+    public UserResponseDTO populateFullName(
+            String employeeId,
+            String fullName
+    ) {
+        User user = findUserForUpdateOrThrow(employeeId);
+
+        if (user.getFullName() != null) {
+            throw new UserFullNameAlreadySetException(
+                    ApiErrorMessages.USER_FULL_NAME_ALREADY_SET
+            );
+        }
+
+        user.populateFullName(fullName);
+
+        userRepository.flush();
+
+        eventPublisher.publishEvent(
+                new UserOperationEvent(
+                        user.getId(),
+                        UserOperationType.FULL_NAME_POPULATED
+                )
+        );
+
+        return toResponse(user);
     }
 
     @Transactional

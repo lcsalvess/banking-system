@@ -169,12 +169,18 @@ public class User implements UserDetails {
     }
 
     /**
-     * Updates the full name of a human user.
+     * Populates the full name of a legacy human user.
      */
-    public void updateFullName(String fullName) {
+    public void populateFullName(String fullName) {
         if (this.userType != UserType.HUMAN) {
             throw new IllegalStateException(
-                    "System users cannot have their profile updated."
+                    "System users cannot have a full name."
+            );
+        }
+
+        if (this.fullName != null) {
+            throw new IllegalStateException(
+                    "The user's full name has already been populated."
             );
         }
 

@@ -11,13 +11,14 @@ when running with the `local` profile.
 | PATCH  | `/api/v1/auth/password`                                | Change the password of the authenticated user       | Authenticated |
 | POST   | `/api/v1/users`                                        | Create a user                                       | `ADMIN`       |
 | GET    | `/api/v1/users`                                        | Retrieve a paginated list of users                  | `ADMIN`       |
-| PATCH  | `/api/v1/users/{userId}/deactivate`                    | Deactivate a user account                           | `ADMIN`       |
-| PATCH  | `/api/v1/users/{userId}/reactivate`                    | Reactivate a user account                           | `ADMIN`       |
-| PATCH  | `/api/v1/users/{userId}/role`                          | Change the role of a user                           | `ADMIN`       |
+| PATCH  | `/api/v1/users/{employeeId}/deactivate`                    | Deactivate a user account                           | `ADMIN`       |
+| PATCH  | `/api/v1/users/{employeeId}/reactivate`                    | Reactivate a user account                           | `ADMIN`       |
+| PATCH  | `/api/v1/users/{employeeId}/role`                          | Change the role of a user                           | `ADMIN`       |
+| PATCH | `/api/v1/users/{employeeId}/full-name` | Populate a legacy user's missing full name (temporary) | `ADMIN` |
 | POST   | `/api/v1/clients`                                      | Register a client                                   | `EMPLOYEE`    |
 | GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients                | `EMPLOYEE`    |
-| GET    | `/api/v1/clients/{id}`                                 | Get a client by ID                                  | `EMPLOYEE`    |
-| PATCH  | `/api/v1/clients/{id}`                                 | Partially update a client                           | `EMPLOYEE`    |
+| GET    | `/api/v1/clients/{clientId}`                                 | Get a client by ID                                  | `EMPLOYEE`    |
+| PATCH  | `/api/v1/clients/{clientId}`                                 | Partially update a client                           | `EMPLOYEE`    |
 | GET    | `/api/v1/clients/{clientId}/accounts`                  | List the accounts of a client (paginated)           | `EMPLOYEE`    |
 | POST   | `/api/v1/accounts`                                     | Create a checking or savings account                | `EMPLOYEE`    |
 | GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts               | `EMPLOYEE`    |
@@ -61,13 +62,19 @@ When the requested sort does not include `id`, it is appended as a tie-breaker t
 If `id` is explicitly included, its requested direction and position are preserved.
 
 | Endpoint                                            | Filters                                                                                                  | Sortable fields                                                                                                                   | Default sort                                 | Default size |
-|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------|--------------|
-| `GET /api/v1/users`                                 | `search`, `role`, `active`                                                                               | `id`, `username`, `email`, `role`, `active`                                                                                       | `id` ascending                               | 20           |
+|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|--------------|
+| `GET /api/v1/users` | `search`, `role`, `active` | `employeeId`, `fullName`, `username`, `email`, `role`, `active` | `employeeId` ascending, then internal `id` ascending | 20 |
 | `GET /api/v1/clients`                               | `name`                                                                                                   | `id`, `name`                                                                                                                      | `id` ascending                               | 10           |
 | `GET /api/v1/accounts`                              | -                                                                                                        | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
 | `GET /api/v1/clients/{clientId}/accounts`           | `type`, `status`                                                                                         | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
 | `GET /api/v1/transactions/accounts/{accountNumber}` | `type`, `startDate`, `endDate`                                                                           | `createdAt`, `id`, `type`, `amount`                                                                                               | `createdAt` descending, then `id` descending | 10           |
 | `GET /api/v1/audit-events`                          | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
+
+To guarantee deterministic pagination, the internal `id` is appended as a tie-breaker whenever it is not already part of the effective sort.
+
+An explicitly requested `id` sort is supported only by endpoints that expose `id` in their sortable-field whitelist.
+
+For the users endpoint, `id` is not publicly sortable. It is appended internally as an ascending tie-breaker. The default sort is `employeeId` ascending, followed by internal `id` ascending.
 
 On the transaction history, `startDate` and `endDate` use the `yyyy-MM-dd` format and are inclusive. Dates are interpreted in the `America/Sao_Paulo` timezone: `startDate` includes transactions from the beginning of that local calendar day, and `endDate` includes the entire day, implemented using an exclusive upper bound at the beginning of the following day. Both dates must be between `2020-01-01` and the current date in the application timezone, and `startDate` cannot be after `endDate` (`400 Bad Request`).
 
@@ -90,7 +97,7 @@ The endpoint supports the following optional filters:
 
 Each event contains `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, and `createdAt`. Security and HTTP events also contain `ipAddress`, `reason`, and `httpStatus`. Fields without a value are omitted from the response.
 
-The event types currently generated are the business events (`USER_CREATED`, `USER_DEACTIVATED`, `USER_REACTIVATED`, `USER_PASSWORD_CHANGED`, `USER_ROLE_CHANGED`, `CLIENT_CREATED`, `CLIENT_UPDATED`, `ACCOUNT_CREATED`, `ACCOUNT_CANCELLED`, `DEPOSIT`, `WITHDRAWAL`, and `TRANSFER`) and the security events `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGIN_BLOCKED`, and `HTTP_REQUEST_COMPLETED`. A request normally produces a business or login event and an `HTTP_REQUEST_COMPLETED` event with the same `correlationId`.
+The event types currently generated are the business events (`USER_CREATED`, `USER_FULL_NAME_POPULATED`, `USER_DEACTIVATED`, `USER_REACTIVATED`, `USER_PASSWORD_CHANGED`, `USER_ROLE_CHANGED`, `CLIENT_CREATED`, `CLIENT_UPDATED`, `ACCOUNT_CREATED`, `ACCOUNT_CANCELLED`, `DEPOSIT`, `WITHDRAWAL`, and `TRANSFER`) and the security events `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGIN_BLOCKED`, and `HTTP_REQUEST_COMPLETED`. A request normally produces a business or login event and an `HTTP_REQUEST_COMPLETED` event with the same `correlationId`.
 
 Blank optional text filters are ignored. Invalid filters, dates,
 pagination, or sorting parameters return `400 Bad Request`.

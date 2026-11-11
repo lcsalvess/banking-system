@@ -12,6 +12,7 @@ import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedEx
 import com.lcsalvess.bankingsystem.exception.user.SelfDeactivationNotAllowedException;
 import com.lcsalvess.bankingsystem.exception.user.SelfRoleChangeNotAllowedException;
 import com.lcsalvess.bankingsystem.exception.user.UserEmailAlreadyExistsException;
+import com.lcsalvess.bankingsystem.exception.user.UserFullNameAlreadySetException;
 import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
 import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
@@ -264,6 +265,84 @@ class UserServiceTests {
                     PASSWORD,
                     Role.ADMIN
             );
+        }
+    }
+
+    @Nested
+    @DisplayName("When populating a legacy user's full name")
+    class PopulateFullNameTests {
+
+        @Test
+        @DisplayName("Should populate a missing full name and publish an audit event")
+        void shouldPopulateMissingFullName() {
+            User legacyUser = createUserWithId(Role.EMPLOYEE, 42L);
+
+            ReflectionTestUtils.setField(legacyUser, "fullName", null);
+
+            when(userRepository.findByEmployeeIdForUpdate(
+                    legacyUser.getEmployeeId()
+            )).thenReturn(Optional.of(legacyUser));
+
+            UserResponseDTO response = userService.populateFullName(
+                    legacyUser.getEmployeeId(),
+                    "  Jane     Doe  "
+            );
+
+            assertEquals("Jane Doe", response.fullName());
+            assertEquals("Jane Doe", legacyUser.getFullName());
+            assertEquals(legacyUser.getEmployeeId(), response.employeeId());
+
+            verify(userRepository).flush();
+
+            verify(eventPublisher).publishEvent(
+                    new UserOperationEvent(
+                            legacyUser.getId(),
+                            UserOperationType.FULL_NAME_POPULATED
+                    )
+            );
+        }
+
+        @Test
+        @DisplayName("Should reject an attempt to overwrite an existing full name")
+        void shouldRejectExistingFullName() {
+            User user = createUserWithId(Role.EMPLOYEE, 42L);
+
+            when(userRepository.findByEmployeeIdForUpdate(
+                    user.getEmployeeId()
+            )).thenReturn(Optional.of(user));
+
+            assertThrows(
+                    UserFullNameAlreadySetException.class,
+                    () -> userService.populateFullName(
+                            user.getEmployeeId(),
+                            "Jane Doe"
+                    )
+            );
+
+            assertEquals(FULL_NAME, user.getFullName());
+
+            verify(userRepository, never()).flush();
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Should throw when the employee ID does not exist")
+        void shouldThrowWhenEmployeeDoesNotExist() {
+            String employeeId = "EMP-UNIT-404";
+
+            when(userRepository.findByEmployeeIdForUpdate(employeeId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(
+                    UserNotFoundException.class,
+                    () -> userService.populateFullName(
+                            employeeId,
+                            "Jane Doe"
+                    )
+            );
+
+            verify(userRepository, never()).flush();
+            verifyNoInteractions(eventPublisher);
         }
     }
 

@@ -74,7 +74,9 @@ class PasswordChangeIntegrationTests {
         ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
 
-        userRepository.save(new User(
+        userRepository.save(User.createHuman(
+                "EMP-TEST-001",
+                "Test User",
                 USERNAME,
                 "test-user@test.com",
                 passwordEncoder.encode(CURRENT_PASSWORD),
@@ -267,7 +269,7 @@ class PasswordChangeIntegrationTests {
 
     @Test
     @DisplayName(
-            "Deve manter tokens antigos inválidos após desativar e reativar o usuário"
+            "Should keep old tokens invalid after deactivating and reactivating the user"
     )
     void shouldKeepOldTokenRevokedAfterReactivation() throws Exception {
         String oldToken = loginAndGetToken(CURRENT_PASSWORD);
@@ -276,8 +278,8 @@ class PasswordChangeIntegrationTests {
                 .findByUsernameIgnoreCase(USERNAME)
                 .orElseThrow();
 
-        userService.deactivate(user.getId());
-        userService.reactivate(user.getId());
+        userService.deactivate(user.getEmployeeId());
+        userService.reactivate(user.getEmployeeId());
 
         User reactivatedUser = userRepository
                 .findByUsernameIgnoreCase(USERNAME)
@@ -288,14 +290,14 @@ class PasswordChangeIntegrationTests {
         assertEquals(
                 1,
                 reactivatedUser.getTokenVersion(),
-                "A desativação deve incrementar a versão de segurança uma vez."
+                "Deactivation should increment the security version exactly once."
         );
 
-        // O token emitido antes da desativação continua inválido.
+        // The token issued before deactivation must remain invalid.
         changePassword(oldToken, CURRENT_PASSWORD, NEW_PASSWORD)
                 .andExpect(status().isUnauthorized());
 
-        // Um novo login deve emitir um token válido.
+        // A new login should issue a valid token.
         login(CURRENT_PASSWORD)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty());

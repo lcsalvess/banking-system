@@ -19,7 +19,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Set;
 
@@ -129,12 +137,12 @@ public class ClientController {
                     description = "Client not found"
             )
     })
-    @GetMapping("/{id}")
+    @GetMapping("/{clientId}")
     public ClientResponseDTO findById(
             @Parameter(description = "Client unique identifier", example = "1")
-            @PathVariable Long id
+            @PathVariable Long clientId
     ) {
-        return clientService.findById(id);
+        return clientService.findById(clientId);
     }
 
     @Operation(
@@ -166,12 +174,12 @@ public class ClientController {
                     description = "Address lookup provider or database is temporarily unavailable."
             )
     })
-    @PatchMapping("/{id}")
+    @PatchMapping("/{clientId}")
     public ClientResponseDTO update(
             @Parameter(description = "Client unique identifier", example = "1")
-            @PathVariable Long id,
+            @PathVariable Long clientId,
             @Valid @RequestBody ClientUpdateRequestDTO dto
     ) {
-        return clientService.update(id, dto);
+        return clientService.update(clientId, dto);
     }
 }

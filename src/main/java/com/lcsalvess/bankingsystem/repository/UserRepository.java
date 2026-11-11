@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.repository;
 
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -15,8 +15,17 @@ import java.util.Optional;
 public interface UserRepository extends
         JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
-    // lower(...) é obrigatório: o IgnoreCase derivado gera upper(...), que não casa
-    // com os índices funcionais uk_users_username e uk_users_email (LOWER(...)).
+    @Query(
+            value = "SELECT public.next_employee_id()",
+            nativeQuery = true
+    )
+    String nextEmployeeId();
+
+    /*
+     * lower(...) is required because the derived IgnoreCase query
+     * generates upper(...), which does not match the functional
+     * indexes uk_users_username and uk_users_email (LOWER(...)).
+     */
 
     @Query("select u from User u where lower(u.username) = lower(:username)")
     Optional<User> findByUsernameIgnoreCase(@Param("username") String username);
@@ -29,7 +38,7 @@ public interface UserRepository extends
 
     boolean existsByRole(Role role);
 
-    boolean existsByIdAndRole(Long id, Role role);
+    boolean existsByEmployeeIdAndRole(String employeeId, Role role);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -43,10 +52,24 @@ public interface UserRepository extends
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-        select u
-        from User u
-        where u.id = :userId
-        """)
+            select u
+            from User u
+            where u.employeeId = :employeeId
+            """)
+    Optional<User> findByEmployeeIdForUpdate(
+            @Param("employeeId") String employeeId
+    );
+
+    /*
+     * Internal database-ID lookup.
+     * Retain while other internal operations still depend on it.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select u
+            from User u
+            where u.id = :userId
+            """)
     Optional<User> findByIdForUpdate(
             @Param("userId") Long userId
     );

@@ -5,20 +5,24 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Garante ordenação total: sem um critério único no final, ordenar por colunas
- * com empates (role, active, balance, type, amount...) faz registros repetirem
- * ou sumirem entre páginas.
+ * Guarantees a total ordering: without a unique trailing criterion, sorting by
+ * columns with ties (role, active, balance, type, amount...) makes records
+ * repeat or disappear between pages.
  */
 public final class PageableTieBreaker {
 
-    private static final String TIE_BREAKER_PROPERTY = "id";
+    private static final String ID_PROPERTY = "id";
 
     private PageableTieBreaker() {
     }
 
     public static Pageable withIdTieBreaker(Pageable pageable) {
+        return withTieBreaker(pageable, ID_PROPERTY);
+    }
+
+    public static Pageable withTieBreaker(Pageable pageable, String property) {
         if (pageable.isUnpaged()
-                || pageable.getSort().getOrderFor(TIE_BREAKER_PROPERTY) != null) {
+                || pageable.getSort().getOrderFor(property) != null) {
             return pageable;
         }
 
@@ -26,7 +30,7 @@ public final class PageableTieBreaker {
                 pageable.getPageNumber(),
                 pageable.getPageSize(),
                 pageable.getSort().and(
-                        Sort.by(Sort.Direction.ASC, TIE_BREAKER_PROPERTY)
+                        Sort.by(Sort.Direction.ASC, property)
                 )
         );
     }

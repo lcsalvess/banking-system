@@ -445,9 +445,17 @@ class AuditEventQuerySnapshotIntegrationTests {
 
         String email = username + "@example.test";
 
+        String employeeId = "EMP-"
+                + UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12);
+
         return transactionTemplate.execute(status ->
                 userRepository.save(
-                        new User(
+                        User.createHuman(
+                                employeeId,
+                                "Snapshot Integration Auditor",
                                 username,
                                 email,
                                 "test-password-hash",

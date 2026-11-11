@@ -1,9 +1,10 @@
 package com.lcsalvess.bankingsystem.bootstrap;
 
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.Role;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.service.user.generator.EmployeeIdGenerator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.jspecify.annotations.NonNull;
@@ -24,8 +25,12 @@ public class AdminBootstrapRunner implements CommandLineRunner {
             LoggerFactory.getLogger(AdminBootstrapRunner.class);
 
     private final UserRepository userRepository;
+    private final EmployeeIdGenerator employeeIdGenerator;
     private final PasswordEncoder passwordEncoder;
     private final Validator validator;
+
+    @Value("${app.admin.full-name:}")
+    private String adminFullName;
 
     @Value("${app.admin.username:}")
     private String adminUsername;
@@ -41,10 +46,12 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
     public AdminBootstrapRunner(
             UserRepository userRepository,
+            EmployeeIdGenerator employeeIdGenerator,
             PasswordEncoder passwordEncoder,
             Validator validator
     ) {
         this.userRepository = userRepository;
+        this.employeeIdGenerator = employeeIdGenerator;
         this.passwordEncoder = passwordEncoder;
         this.validator = validator;
     }
@@ -58,23 +65,27 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
         if (!credentialsConfigured()) {
             String message =
-                    "Nenhum administrador existe e as credenciais iniciais "
-                            + "não foram configuradas.";
+                    "No administrator exists and the initial credentials "
+                            + "have not been configured.";
 
             if (bootstrapRequired) {
                 throw new IllegalStateException(
-                        message + " Configure ADMIN_USERNAME, ADMIN_EMAIL "
-                                + "e ADMIN_PASSWORD antes de iniciar a aplicação."
+                        message + " Configure ADMIN_FULL_NAME, ADMIN_USERNAME, "
+                                + "ADMIN_EMAIL and ADMIN_PASSWORD before starting the application."
                 );
             }
 
-            log.warn("{} Bootstrap ignorado neste ambiente.", message);
+            log.warn("{} Bootstrap skipped in this environment.", message);
             return;
         }
 
         validateCredentials();
 
-        User admin = new User(
+        String employeeId = employeeIdGenerator.generate();
+
+        User admin = User.createHuman(
+                employeeId,
+                adminFullName,
                 adminUsername,
                 adminEmail,
                 passwordEncoder.encode(adminPassword),
@@ -88,6 +99,7 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
     private void validateCredentials() {
         UserRequestDTO candidate = new UserRequestDTO(
+                adminFullName,
                 adminUsername,
                 adminEmail,
                 adminPassword,
@@ -104,13 +116,14 @@ public class AdminBootstrapRunner implements CommandLineRunner {
                     .collect(Collectors.joining(" | "));
 
             throw new IllegalStateException(
-                    "Credenciais do administrador inicial inválidas: " + details
+                    "Initial administrator credentials are invalid: " + details
             );
         }
     }
 
     private boolean credentialsConfigured() {
-        return adminUsername != null && !adminUsername.isBlank()
+        return adminFullName != null && !adminFullName.isBlank()
+                && adminUsername != null && !adminUsername.isBlank()
                 && adminEmail != null && !adminEmail.isBlank()
                 && adminPassword != null && !adminPassword.isBlank();
     }

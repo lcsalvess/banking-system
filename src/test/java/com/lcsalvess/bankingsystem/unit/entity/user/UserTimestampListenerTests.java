@@ -25,6 +25,9 @@ class UserTimestampListenerTests {
     private static final Instant UPDATED_AT_MICROS =
             Instant.parse("2026-10-29T08:00:00.987654Z");
 
+    private static final String EMPLOYEE_ID = "EMP-TEST-TIMESTAMP";
+    private static final String FULL_NAME = "Timestamp Test User";
+
     @Test
     @DisplayName("onCreate sets both timestamps from the clock, truncated to micros")
     void onCreateSetsBothTimestamps() {
@@ -62,7 +65,9 @@ class UserTimestampListenerTests {
     }
 
     private static User newUser() {
-        return new User(
+        return User.createHuman(
+                EMPLOYEE_ID,
+                FULL_NAME,
                 "employee",
                 "employee@example.com",
                 "not-a-real-password-hash",

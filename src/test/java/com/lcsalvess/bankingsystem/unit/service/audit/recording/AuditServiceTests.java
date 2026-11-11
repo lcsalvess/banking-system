@@ -45,6 +45,8 @@ class AuditServiceTests {
     private static final String CORRELATION_ID =
             "2f9f7c1e-3b8a-4d55-9a53-0c8f1e6b7a10";
 
+    private static final String USERNAME = "joe.doe";
+
     @Mock
     private AuditEventRepository auditEventRepository;
 
@@ -76,7 +78,7 @@ class AuditServiceTests {
         @DisplayName("Should record the authenticated user as the actor")
         void shouldRecordAuthenticatedUserAsActor() {
             when(currentUserService.findCurrentUser())
-                    .thenReturn(Optional.of(user(7L, "lucas")));
+                    .thenReturn(Optional.of(user(7L, USERNAME)));
 
             auditService.recordSuccess(
                     AuditEventType.USER_CREATED,
@@ -90,7 +92,7 @@ class AuditServiceTests {
             assertEquals(AuditOutcome.SUCCESS, saved.getOutcome());
             assertEquals(AuditActorType.USER, saved.getActorType());
             assertEquals(7L, saved.getActorUserId());
-            assertEquals("lucas", saved.getActorUsername());
+            assertEquals(USERNAME, saved.getActorUsername());
             assertEquals(AuditEntityType.USER, saved.getEntityType());
             assertEquals("42", saved.getEntityId());
             assertEquals(NOW, saved.getCreatedAt());
@@ -100,7 +102,7 @@ class AuditServiceTests {
         @DisplayName("Should store the reason when one is provided")
         void shouldStoreReasonWhenProvided() {
             when(currentUserService.findCurrentUser())
-                    .thenReturn(Optional.of(user(7L, "lucas")));
+                    .thenReturn(Optional.of(user(7L, USERNAME)));
 
             auditService.recordSuccess(
                     AuditEventType.USER_ROLE_CHANGED,
@@ -121,7 +123,7 @@ class AuditServiceTests {
         @DisplayName("Should leave the reason empty when none is provided")
         void shouldLeaveReasonEmptyWhenNoneIsProvided() {
             when(currentUserService.findCurrentUser())
-                    .thenReturn(Optional.of(user(7L, "lucas")));
+                    .thenReturn(Optional.of(user(7L, USERNAME)));
 
             auditService.recordSuccess(
                     AuditEventType.USER_CREATED,
@@ -212,7 +214,9 @@ class AuditServiceTests {
     }
 
     private User user(Long id, String username) {
-        User user = new User(
+        User user = User.createHuman(
+                "EMP-TEST-" + id,
+                "Joe Doe",
                 username,
                 username + "@example.com",
                 "hash",

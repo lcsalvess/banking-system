@@ -77,7 +77,15 @@ class AuditSecurityEventsIntegrationTests {
     void setUp() {
         username = "it" + UUID.randomUUID().toString().substring(0, 8);
 
-        User user = userRepository.save(new User(
+        String employeeId = "EMP-"
+                + UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12);
+
+        User user = userRepository.save(User.createHuman(
+                employeeId,
+                "Integration Test Employee",
                 username,
                 username + "@test.com",
                 passwordEncoder.encode(PASSWORD),

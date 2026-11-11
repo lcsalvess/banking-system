@@ -22,6 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -41,10 +42,10 @@ class UserRoleChangeConcurrencyTests {
 
     private static final int TIMEOUT_SECONDS = 30;
 
-    // A janela da race é pequena: repetir faz o teste falhar de forma
-    // confiável se o lock for removido, em vez de passar por sorte.
     private static final String REPETITION_NAME =
             "{displayName} [{currentRepetition}/{totalRepetitions}]";
+
+    private static final String EMPLOYEE_ID_PREFIX = "EMP-TEST-";
 
     @Autowired
     private UserRepository userRepository;
@@ -75,8 +76,11 @@ class UserRoleChangeConcurrencyTests {
 
         @RepeatedTest(value = 20, name = REPETITION_NAME)
         @DisplayName("Should keep one active administrator when two administrators demote each other")
-        void shouldKeepOneAdminWhenTwoAdminsDemoteEachOther() throws Exception {
+        void shouldKeepOneAdminWhenTwoAdminsDemoteEachOther()
+                throws Exception {
+
             List<User> admins = createAdmins(2);
+
             User first = admins.get(0);
             User second = admins.get(1);
 
@@ -85,21 +89,24 @@ class UserRoleChangeConcurrencyTests {
                     roleChange(second, first, Role.EMPLOYEE)
             ));
 
-            // Quem perde a corrida já foi rebaixado quando consegue o lock
-            // e é negado, em vez de rebaixar o outro também.
+            // The caller that loses the race is no longer an active administrator
+            // when it acquires the lock, so the operation is denied.
             assertEquals(1L, countSucceeded(results));
             assertEquals(1L, countActiveAdmins());
         }
 
         @RepeatedTest(value = 20, name = REPETITION_NAME)
         @DisplayName("Should never leave the system without an administrator in a demotion chain")
-        void shouldNeverLeaveSystemWithoutAdminInDemotionChain() throws Exception {
+        void shouldNeverLeaveSystemWithoutAdminInDemotionChain()
+                throws Exception {
+
             List<User> admins = createAdmins(3);
+
             User a = admins.get(0);
             User b = admins.get(1);
             User c = admins.get(2);
 
-            // A rebaixa B ao mesmo tempo em que B rebaixa C.
+            // A demotes B while B attempts to demote C.
             List<Boolean> results = runConcurrently(List.of(
                     roleChange(a, b, Role.EMPLOYEE),
                     roleChange(b, c, Role.EMPLOYEE)
@@ -120,13 +127,17 @@ class UserRoleChangeConcurrencyTests {
         @Test
         @DisplayName("Should reject an administrator changing their own role")
         void shouldRejectSelfRoleChange() {
+
             User admin = createAdmins(1).getFirst();
 
             authenticateAs(admin);
 
             assertThrows(
                     SelfRoleChangeNotAllowedException.class,
-                    () -> userService.changeRole(admin.getId(), Role.EMPLOYEE)
+                    () -> userService.changeRole(
+                            admin.getEmployeeId(),
+                            Role.EMPLOYEE
+                    )
             );
 
             assertEquals(Role.ADMIN, roleOf(admin));
@@ -136,12 +147,20 @@ class UserRoleChangeConcurrencyTests {
         @Test
         @DisplayName("Should change the role, revoke tokens and audit the previous and new role")
         void shouldChangeRoleRevokeTokensAndAudit() {
+
             User admin = createAdmins(1).getFirst();
-            User employee = createUser("employee-role-change", Role.EMPLOYEE);
+
+            User employee = createUser(
+                    "employee-role-change",
+                    Role.EMPLOYEE
+            );
 
             authenticateAs(admin);
 
-            userService.changeRole(employee.getId(), Role.AUDITOR);
+            userService.changeRole(
+                    employee.getEmployeeId(),
+                    Role.AUDITOR
+            );
 
             assertEquals(Role.AUDITOR, roleOf(employee));
             assertEquals(1, tokenVersionOf(employee));
@@ -155,25 +174,38 @@ class UserRoleChangeConcurrencyTests {
             assertEquals(1, events.size());
             assertEquals("EMPLOYEE_TO_AUDITOR", events.getFirst().get("reason"));
             assertEquals("SUCCESS", events.getFirst().get("outcome"));
-            assertEquals(admin.getId(), ((Number) events.getFirst().get("actor_user_id")).longValue());
+            assertEquals(
+                    admin.getId(),
+                    ((Number) events.getFirst().get("actor_user_id")).longValue()
+            );
         }
 
         @Test
         @DisplayName("Should deny when the caller is no longer an active administrator")
         void shouldDenyWhenCallerIsNoLongerAdmin() {
-            User admin = createAdmins(1).getFirst();
-            User employee = createUser("employee-role-change", Role.EMPLOYEE);
 
-            // O solicitante foi rebaixado depois de autenticar a requisição.
+            User admin = createAdmins(1).getFirst();
+
+            User employee = createUser(
+                    "employee-role-change",
+                    Role.EMPLOYEE
+            );
+
+            // The caller is demoted after authenticating the request.
             User stale = userRepository.findById(admin.getId()).orElseThrow();
+
             stale.changeRole(Role.EMPLOYEE);
+
             userRepository.saveAndFlush(stale);
 
             authenticateAs(admin);
 
             assertThrows(
                     AccessDeniedException.class,
-                    () -> userService.changeRole(employee.getId(), Role.ADMIN)
+                    () -> userService.changeRole(
+                            employee.getEmployeeId(),
+                            Role.ADMIN
+                    )
             );
 
             assertEquals(Role.EMPLOYEE, roleOf(employee));
@@ -185,20 +217,30 @@ class UserRoleChangeConcurrencyTests {
     // ---------------------------------------------------------------------
 
     /**
-     * Executa a troca como o solicitante. Cada thread tem o próprio
-     * SecurityContext, como numa requisição real. Só a negação por perda do
-     * papel de administrador conta como resultado esperado; qualquer outra
-     * exceção, timeout de lock ou deadlock faz o teste falhar.
+     * Executes a role change as the requesting administrator.
+     * Each thread has its own SecurityContext, as in a real request.
+     * Only denial caused by losing the administrator role is expected.
+     * Any other exception, lock timeout or deadlock fails the test.
      */
-    private Callable<Boolean> roleChange(User caller, User target, Role newRole) {
+    private Callable<Boolean> roleChange(
+            User caller,
+            User target,
+            Role newRole
+    ) {
         return () -> {
             authenticateAs(caller);
 
             try {
-                userService.changeRole(target.getId(), newRole);
+                userService.changeRole(
+                        target.getEmployeeId(),
+                        newRole
+                );
+
                 return true;
+
             } catch (AccessDeniedException exception) {
                 return false;
+
             } finally {
                 SecurityContextHolder.clearContext();
             }
@@ -219,8 +261,9 @@ class UserRoleChangeConcurrencyTests {
     // Concurrency helpers
     // ---------------------------------------------------------------------
 
-    private List<Boolean> runConcurrently(List<Callable<Boolean>> tasks)
-            throws Exception {
+    private List<Boolean> runConcurrently(
+            List<Callable<Boolean>> tasks
+    ) throws Exception {
 
         ExecutorService executor =
                 Executors.newFixedThreadPool(tasks.size());
@@ -247,10 +290,13 @@ class UserRoleChangeConcurrencyTests {
             List<Boolean> results = new ArrayList<>();
 
             for (Future<Boolean> future : futures) {
-                results.add(future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                results.add(
+                        future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                );
             }
 
             return results;
+
         } finally {
             start.countDown();
             executor.shutdownNow();
@@ -270,12 +316,21 @@ class UserRoleChangeConcurrencyTests {
     private List<User> createAdmins(int quantity) {
         return IntStream.rangeClosed(1, quantity)
                 .mapToObj(number ->
-                        createUser("admin-role-" + number, Role.ADMIN))
+                        createUser(
+                                "admin-role-" + number,
+                                Role.ADMIN
+                        )
+                )
                 .toList();
     }
 
     private User createUser(String username, Role role) {
-        User user = new User(
+        String employeeId = EMPLOYEE_ID_PREFIX
+                + username.toUpperCase(Locale.ROOT);
+
+        User user = User.createHuman(
+                employeeId,
+                "Concurrency Test User",
                 username,
                 username + "@test.com",
                 "test-password",
@@ -286,11 +341,15 @@ class UserRoleChangeConcurrencyTests {
     }
 
     private Role roleOf(User user) {
-        return userRepository.findById(user.getId()).orElseThrow().getRole();
+        return userRepository.findById(user.getId())
+                .orElseThrow()
+                .getRole();
     }
 
     private int tokenVersionOf(User user) {
-        return userRepository.findById(user.getId()).orElseThrow().getTokenVersion();
+        return userRepository.findById(user.getId())
+                .orElseThrow()
+                .getTokenVersion();
     }
 
     private long countActiveAdmins() {

@@ -36,7 +36,9 @@ class TransactionIdempotencyCleanupIntegrationTests {
         clearIdempotencyRequests();
 
         user = userRepository.saveAndFlush(
-                new User(
+                User.createHuman(
+                        "EMP-IDEM-CLEANUP-001",
+                        "Idempotency Cleanup User",
                         "idem-cleanup-user",
                         "idem-cleanup-user@test.com",
                         "test-password",

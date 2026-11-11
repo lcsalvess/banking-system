@@ -4,11 +4,21 @@ import com.lcsalvess.bankingsystem.entity.user.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record UserSummaryResponseDTO(
+
         @Schema(
-                description = "Unique identifier of the user.",
-                example = "4"
+                description = "Unique employee identifier assigned to the user.",
+                example = "EMP-000004",
+                maxLength = 30
         )
-        Long id,
+        String employeeId,
+
+        @Schema(
+                description = "User's full name. May be null for legacy accounts "
+                        + "whose names have not yet been populated.",
+                example = "John Michael Doe",
+                maxLength = 150
+        )
+        String fullName,
 
         @Schema(
                 description = "Username assigned to the user.",

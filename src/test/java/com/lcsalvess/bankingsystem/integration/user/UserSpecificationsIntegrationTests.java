@@ -32,9 +32,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Cada teste gera um marcador aleatório e usa o e-mail "...@{marcador}.test" para
- * identificar os usuários que ele mesmo criou. Os resultados são filtrados por esse
- * marcador, então usuários que já existem no banco de teste não interferem.
+ * Each test generates a random marker and uses an email address
+ * with the "...@{marker}.test" domain to identify its own users.
+ * Results are filtered by this marker, ensuring that existing
+ * test database users do not interfere with assertions.
  */
 @ActiveProfiles("test")
 @SpringBootTest
@@ -43,6 +44,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UserSpecificationsIntegrationTests {
 
     private static final String PASSWORD = "test-password";
+    private static final String EMPLOYEE_ID_PREFIX = "EMP-";
+    private static final String DEFAULT_FULL_NAME = "Integration Test User";
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -51,8 +54,60 @@ class UserSpecificationsIntegrationTests {
     private UserRepository userRepository;
 
     @Nested
-    @DisplayName("Filtro de busca")
+    @DisplayName("Search filter")
     class SearchFilterTests {
+
+        @Test
+        @DisplayName("Should match the employee ID case-insensitively")
+        void shouldMatchEmployeeIdIgnoringCase() {
+            String marker = uniqueMarker();
+
+            persistUsers(
+                    user(marker, "alice-" + marker, "u1", Role.EMPLOYEE),
+                    user(marker, "bob-" + marker, "u2", Role.EMPLOYEE)
+            );
+
+            Page<User> result = findUsers(
+                    (EMPLOYEE_ID_PREFIX + marker + "-u1").toLowerCase(Locale.ROOT),
+                    null,
+                    null
+            );
+
+            assertEquals(
+                    Set.of("alice-" + marker),
+                    ownedUsernames(result, marker)
+            );
+        }
+
+        @Test
+        @DisplayName("Should match the full name case-insensitively")
+        void shouldMatchFullNameIgnoringCase() {
+            String marker = uniqueMarker();
+
+            persistUsers(
+                    user(
+                            marker,
+                            "person-" + marker,
+                            "u1",
+                            "Alice Maria da Silva",
+                            Role.EMPLOYEE
+                    ),
+                    user(
+                            marker,
+                            "another-" + marker,
+                            "u2",
+                            "Beatriz Costa",
+                            Role.EMPLOYEE
+                    )
+            );
+
+            Page<User> result = findUsers("MARIA", null, null);
+
+            assertEquals(
+                    Set.of("person-" + marker),
+                    ownedUsernames(result, marker)
+            );
+        }
 
         @Test
         @DisplayName("Should match the username case-insensitively")
@@ -172,7 +227,7 @@ class UserSpecificationsIntegrationTests {
         }
 
         @Test
-        @DisplayName("Should return nothing when no username or email matches")
+        @DisplayName("Should return nothing when no searchable field matches")
         void shouldReturnNothingWhenNothingMatches() {
             String marker = uniqueMarker();
 
@@ -187,7 +242,7 @@ class UserSpecificationsIntegrationTests {
     }
 
     @Nested
-    @DisplayName("Filtro por perfil")
+    @DisplayName("Role filter")
     class RoleFilterTests {
 
         @ParameterizedTest(name = "{0}")
@@ -213,7 +268,7 @@ class UserSpecificationsIntegrationTests {
     }
 
     @Nested
-    @DisplayName("Filtro por situação")
+    @DisplayName("Active status filter")
     class ActiveFilterTests {
 
         @ParameterizedTest(name = "active = {0}")
@@ -240,7 +295,7 @@ class UserSpecificationsIntegrationTests {
     }
 
     @Nested
-    @DisplayName("Filtros combinados")
+    @DisplayName("Combined filters")
     class CombinedFiltersTests {
 
         @Test
@@ -264,7 +319,7 @@ class UserSpecificationsIntegrationTests {
         }
 
         @Test
-        @DisplayName("Should not filter anything when every filter is null")
+        @DisplayName("Should not filter anything when every optional filter is null")
         void shouldNotFilterWhenEveryFilterIsNull() {
             String marker = uniqueMarker();
 
@@ -288,7 +343,7 @@ class UserSpecificationsIntegrationTests {
     }
 
     @Nested
-    @DisplayName("Paginação")
+    @DisplayName("Pagination")
     class PaginationTests {
 
         @Test
@@ -345,7 +400,30 @@ class UserSpecificationsIntegrationTests {
             String emailLocalPart,
             Role role
     ) {
-        return new User(
+        return user(
+                marker,
+                username,
+                emailLocalPart,
+                DEFAULT_FULL_NAME,
+                role
+        );
+    }
+
+    private static User user(
+            String marker,
+            String username,
+            String emailLocalPart,
+            String fullName,
+            Role role
+    ) {
+        String employeeId = EMPLOYEE_ID_PREFIX
+                + marker
+                + "-"
+                + emailLocalPart.toUpperCase(Locale.ROOT);
+
+        return User.createHuman(
+                employeeId,
+                fullName,
                 username,
                 emailLocalPart + domain(marker),
                 PASSWORD,
@@ -380,7 +458,7 @@ class UserSpecificationsIntegrationTests {
         return "@" + marker + ".test";
     }
 
-    // 9 caracteres: cabe no limite de 20 do username mesmo com prefixos e sufixos.
+    // 9 characters: fits the 20-character username limit, including prefixes and suffixes.
     private static String uniqueMarker() {
         return "m" + UUID.randomUUID().toString().substring(0, 8);
     }

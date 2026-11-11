@@ -5,7 +5,7 @@ public final class ValidationMessages {
     private ValidationMessages() {
     }
 
-    // ==================== SENHAS ====================
+    // ==================== PASSWORDS ====================
 
     public static final String REQUIRED_PASSWORD =
             "A senha é obrigatória.";
@@ -25,7 +25,7 @@ public final class ValidationMessages {
     public static final String INVALID_PASSWORD_STRENGTH =
             "A senha deve conter pelo menos uma letra maiúscula, uma letra minúscula, um número e um caractere especial.";
 
-    // ==================== USUÁRIOS ====================
+    // ==================== USERS ====================
 
     public static final String REQUIRED_USERNAME =
             "O nome de usuário é obrigatório.";
@@ -42,7 +42,28 @@ public final class ValidationMessages {
     public static final String REQUIRED_USER_ROLE =
             "O perfil do usuário é obrigatório.";
 
-    // ==================== CLIENTES ====================
+    public static final String REQUIRED_FULL_NAME =
+            "O nome completo é obrigatório.";
+
+    public static final String INVALID_FULL_NAME =
+            "O nome completo é inválido.";
+
+    public static final String INVALID_FULL_NAME_BLANK =
+            "O nome completo não pode ser vazio.";
+
+    public static final String INVALID_FULL_NAME_CHARACTERS =
+            "O nome completo contém caracteres inválidos.";
+
+    public static final String INVALID_FULL_NAME_NUMERIC =
+            "O nome completo não pode conter números.";
+
+    public static final String INVALID_FULL_NAME_NO_LETTERS =
+            "O nome completo deve conter pelo menos uma letra.";
+
+    public static final String INVALID_FULL_NAME_LENGTH =
+            "O nome completo deve ter no máximo %d caracteres.";
+
+    // ==================== CLIENTS ====================
 
     public static final String REQUIRED_CLIENT_NAME =
             "O nome é obrigatório.";
@@ -80,7 +101,7 @@ public final class ValidationMessages {
     public static final String INVALID_PHONE_NUMBER_FORMAT =
             "O telefone deve conter de 10 a 11 números, incluindo o DDD.";
 
-    // ==================== ENDEREÇOS ====================
+    // ==================== ADDRESSES ====================
 
     public static final String REQUIRED_ADDRESS =
             "Os dados de endereço são obrigatórios.";
@@ -115,7 +136,7 @@ public final class ValidationMessages {
     public static final String INVALID_COMPLEMENT_LENGTH =
             "O complemento deve ter no máximo 100 caracteres.";
 
-    // ==================== CONTAS ====================
+    // ==================== ACCOUNTS ====================
 
     public static final String REQUIRED_HOLDER_ID =
             "O ID do titular é obrigatório.";
@@ -132,7 +153,7 @@ public final class ValidationMessages {
     public static final String INVALID_ACCOUNT_CHECK_DIGIT_LENGTH =
             "O dígito verificador da conta deve conter exatamente 1 dígito.";
 
-    // ==================== TRANSFERÊNCIAS ====================
+    // ==================== TRANSFERS ====================
 
     public static final String REQUIRED_SOURCE_ACCOUNT_NUMBER =
             "O número da conta de origem é obrigatório.";
@@ -152,7 +173,7 @@ public final class ValidationMessages {
     public static final String POSITIVE_TRANSFER_AMOUNT =
             "O valor da transferência deve ser maior que zero.";
 
-    // ==================== OPERAÇÕES DE CONTA ====================
+    // ==================== ACCOUNT OPERATIONS ====================
 
     public static final String REQUIRED_ACCOUNT_NUMBER =
             "O número da conta é obrigatório.";
@@ -166,7 +187,7 @@ public final class ValidationMessages {
     public static final String POSITIVE_OPERATION_AMOUNT =
             "O valor da operação deve ser maior que zero.";
 
-    // ==================== VALORES MONETÁRIOS ====================
+    // ==================== MONETARY VALUES ====================
 
     public static final String INVALID_AMOUNT_PRECISION =
             "O valor deve ter no máximo 13 dígitos inteiros e 2 casas decimais.";

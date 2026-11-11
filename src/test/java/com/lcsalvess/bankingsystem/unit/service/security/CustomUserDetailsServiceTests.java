@@ -37,11 +37,13 @@ class CustomUserDetailsServiceTests {
         @Test
         @DisplayName("Deve retornar usuário quando o username existe")
         void shouldReturnUserWhenUsernameExists() {
-            String username = "usuario.teste";
+            String username = "joe.doe";
 
-            User user = new User(
+            User user = User.createHuman(
+                    "EMP-TEST-001",
+                    "Joe Doe",
                     username,
-                    "teste@teste.com.br",
+                    "joe.doe@example.com",
                     "encoded-password",
                     Role.EMPLOYEE
             );

@@ -44,6 +44,8 @@ class AuditTrailRecorderTests {
 
     private static final String IP = "192.0.2.10";
 
+    private static final String USERNAME = "joe.doe";
+
     @Mock
     private AuditService auditService;
 
@@ -63,13 +65,17 @@ class AuditTrailRecorderTests {
     }
 
     private static User user() {
-        User user = new User(
-                "lucas",
-                "lucas@example.com",
+        User user = User.createHuman(
+                "EMP-TEST-007",
+                "Joe Doe",
+                USERNAME,
+                "joe.doe@example.com",
                 "hash",
                 Role.EMPLOYEE
         );
+
         ReflectionTestUtils.setField(user, "id", 7L);
+
         return user;
     }
 
@@ -98,9 +104,9 @@ class AuditTrailRecorderTests {
         assertEquals(AuditOutcome.SUCCESS, record.outcome());
         assertEquals(AuditActorType.USER, record.actorType());
         assertEquals(7L, record.actorUserId());
-        assertEquals("lucas", record.actorUsername());
+        assertEquals(USERNAME, record.actorUsername());
         assertEquals(AuditEntityType.AUTHENTICATION, record.entityType());
-        assertEquals("lucas", record.entityId());
+        assertEquals(USERNAME, record.entityId());
         assertEquals(IP, record.ipAddress().getHostAddress());
         assertNull(record.reason());
     }
@@ -361,7 +367,7 @@ class AuditTrailRecorderTests {
         assertEquals(AuditOutcome.SUCCESS, record.outcome());
         assertEquals(AuditActorType.USER, record.actorType());
         assertEquals(7L, record.actorUserId());
-        assertEquals("lucas", record.actorUsername());
+        assertEquals(USERNAME, record.actorUsername());
         assertEquals(AuditEntityType.ENDPOINT, record.entityType());
         assertEquals("POST /api/v1/clients", record.entityId());
         assertEquals(201, record.httpStatus());

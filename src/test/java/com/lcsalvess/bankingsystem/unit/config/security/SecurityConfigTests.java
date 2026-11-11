@@ -1030,15 +1030,24 @@ class SecurityConfigTests {
     }
 
     private static User createUser(Role role) {
-        return new User(USERNAME, "usuario.teste@email.com", "encoded-password", role);
+        return createUser(role, "encoded-password");
+    }
+
+    private static User createUser(Role role, String encodedPassword) {
+        return User.createHuman(
+                "EMP-TEST-001",
+                "Test User",
+                USERNAME,
+                "usuario.teste@email.com",
+                encodedPassword,
+                role
+        );
     }
 
     private User createUserWithEncodedPassword() {
-        return new User(
-                USERNAME,
-                "usuario.teste@email.com",
-                passwordEncoder.encode(PASSWORD),
-                Role.EMPLOYEE
+        return createUser(
+                Role.EMPLOYEE,
+                passwordEncoder.encode(PASSWORD)
         );
     }
 }

@@ -62,11 +62,13 @@ class AuthControllerTests {
         ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
 
-        // Limpa as tentativas de login dos usuários utilizados nos testes.
+        // Clear login attempts for the users used in the tests.
         rateLimitProtectionService.clearFailures("test-user");
         rateLimitProtectionService.clearFailures("test-invalid-user");
 
-        User user = new User(
+        User user = User.createHuman(
+                "EMP-TEST-001",
+                "Test User",
                 "test-user",
                 "test-user@test.com",
                 passwordEncoder.encode("test-password"),

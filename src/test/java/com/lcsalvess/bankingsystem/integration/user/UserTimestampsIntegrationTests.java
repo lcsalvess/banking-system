@@ -36,6 +36,9 @@ class UserTimestampsIntegrationTests {
     private static final Instant UPDATED_AT_MICROS =
             Instant.parse("2026-10-29T08:00:00.987654Z");
 
+    private static final String EMPLOYEE_ID = "EMP-TEST-CLOCK";
+    private static final String FULL_NAME = "Clock Test User";
+
     @Autowired
     private UserRepository userRepository;
 
@@ -49,7 +52,9 @@ class UserTimestampsIntegrationTests {
         mutableClock.freezeAt(CREATED_AT);
 
         userId = userRepository.saveAndFlush(
-                new User(
+                User.createHuman(
+                        EMPLOYEE_ID,
+                        FULL_NAME,
                         "user-clock-it",
                         "user-clock-it@test.com",
                         "test-password",
@@ -93,8 +98,8 @@ class UserTimestampsIntegrationTests {
     }
 
     private User reload() {
-        // O teste não é transacional: cada chamada do repositório usa um
-        // EntityManager novo, então o usuário é lido do banco.
+        // The test is not transactional: each repository call uses a new
+        // EntityManager, so the user is retrieved directly from the database.
         User user = userRepository.findById(userId).orElse(null);
 
         assertNotNull(user);
@@ -102,9 +107,9 @@ class UserTimestampsIntegrationTests {
     }
 
     /**
-     * Relógio da aplicação para este teste. Usa o horário real, exceto
-     * enquanto um instante fixo estiver definido, para não alterar o
-     * comportamento dos componentes que usam o Clock na inicialização.
+     * Application clock for this test. Uses the actual system time except
+     * while a fixed instant is configured, avoiding changes to components
+     * that depend on Clock during application initialization.
      */
     static final class MutableClock extends Clock {
 

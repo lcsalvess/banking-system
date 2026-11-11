@@ -143,7 +143,9 @@ class TransactionConcurrencyTests {
         clientSequence = 0;
 
         User testUser = userRepository.saveAndFlush(
-                new User(
+                User.createHuman(
+                        "EMP-TEST-001",
+                        "Test User",
                         "test-user",
                         "test-user@test.com",
                         "test-password",

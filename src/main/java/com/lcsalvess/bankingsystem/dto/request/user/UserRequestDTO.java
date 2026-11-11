@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.dto.request.user;
 
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
+import com.lcsalvess.bankingsystem.validation.fullname.ValidFullName;
 import com.lcsalvess.bankingsystem.validation.passwordbytelength.PasswordByteLength;
 import com.lcsalvess.bankingsystem.validation.passwordstrength.StrongPassword;
 import com.lcsalvess.bankingsystem.validation.reservedusername.NotReservedUsername;
@@ -9,6 +10,16 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
 public record UserRequestDTO(
+
+        @Schema(
+                description = "User's full name.",
+                example = "John Michael Doe",
+                maxLength = 150
+        )
+        @NotBlank(message = ValidationMessages.REQUIRED_FULL_NAME)
+        @ValidFullName
+        String fullName,
+
         @Schema(
                 description = "Unique username. Only letters, numbers, dots, underscores and hyphens are allowed. The name \"system\" is reserved.",
                 example = "john.doe",

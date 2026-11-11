@@ -41,7 +41,8 @@ import java.util.Set;
 @RequestMapping("/api/v1/users")
 public class UserController {
 
-    private static final String SORTABLE = "id,username,email,role,active";
+    private static final String SORTABLE =
+            "employeeId,fullName,username,email,role,active";
 
     private static final Set<String> SORTABLE_PROPERTIES =
             Set.of(SORTABLE.split(","));
@@ -55,14 +56,15 @@ public class UserController {
     @Operation(
             summary = "List users",
             description = """
-                Retrieves a paginated list of users with optional filters.
+                Retrieves a paginated list of human users with optional filters.
+                Search supports employee ID, full name, username and email.
                 The default page size is 20, and the default sort order is
-                ascending by ID. The maximum page size is 100.
+                ascending by employee ID. The maximum page size is 100.
                 """
     )
     @SortableBy(
             value = SORTABLE,
-            defaultSort = "id,ASC"
+            defaultSort = "employeeId,ASC"
     )
     @ApiResponses({
             @ApiResponse(
@@ -82,8 +84,8 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public Page<UserSummaryResponseDTO> findAll(
             @Parameter(
-                    description = "Search by username or email",
-                    example = "lucas"
+                    description = "Search by employee ID, full name, username or email.",
+                    example = "john"
             )
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Role role,
@@ -91,7 +93,7 @@ public class UserController {
             @ParameterObject
             @PageableDefault(
                     size = 20,
-                    sort = "id",
+                    sort = "employeeId",
                     direction = Sort.Direction.ASC
             )
             Pageable pageable
@@ -103,7 +105,8 @@ public class UserController {
 
     @Operation(
             summary = "Create a user",
-            description = "Creates a new user account. Only users with the ADMIN role "
+            description = "Creates a new human user account. The employee ID is "
+                    + "generated automatically. Only users with the ADMIN role "
                     + "are authorized to perform this operation."
     )
     @ApiResponses({
@@ -129,9 +132,9 @@ public class UserController {
 
     @Operation(
             summary = "Reactivate a user",
-            description = "Reactivates an existing inactive user account. "
-                    + "Only users with the ADMIN role are authorized "
-                    + "to perform this operation."
+            description = "Reactivates an existing inactive user account using "
+                    + "their employee ID. Only users with the ADMIN role "
+                    + "are authorized to perform this operation."
     )
     @ApiResponses({
             @ApiResponse(
@@ -147,16 +150,23 @@ public class UserController {
                     description = "User not found."
             )
     })
-    @PatchMapping("/{userId}/reactivate")
+    @PatchMapping("/{employeeId}/reactivate")
     @PreAuthorize("hasRole('ADMIN')")
-    public UserResponseDTO reactivate(@PathVariable Long userId) {
-        return userService.reactivate(userId);
+    public UserResponseDTO reactivate(
+            @Parameter(
+                    description = "Employee identifier assigned to the user.",
+                    example = "EMP-000004"
+            )
+            @PathVariable("employeeId") String employeeId
+    ) {
+        return userService.reactivate(employeeId);
     }
 
     @Operation(
             summary = "Deactivate a user",
             description = "Deactivates an existing user without deleting their data. "
-                    + "Only users with the ADMIN role are authorized to perform this operation."
+                    + "The user is identified by their employee ID. Only users "
+                    + "with the ADMIN role are authorized to perform this operation."
     )
     @ApiResponses({
             @ApiResponse(
@@ -176,19 +186,26 @@ public class UserController {
                     description = "The last active administrator cannot be deactivated."
             )
     })
-    @PatchMapping("/{userId}/deactivate")
+    @PatchMapping("/{employeeId}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
-    public UserResponseDTO deactivate(@PathVariable Long userId) {
-        return userService.deactivate(userId);
+    public UserResponseDTO deactivate(
+            @Parameter(
+                    description = "Employee identifier assigned to the user.",
+                    example = "EMP-000004"
+            )
+            @PathVariable("employeeId") String employeeId
+    ) {
+        return userService.deactivate(employeeId);
     }
+
 
     @Operation(
             summary = "Change a user's role",
-            description = "Changes the role of an existing user and revokes the tokens "
-                    + "issued to them, so they must authenticate again. Only users with "
-                    + "the ADMIN role are authorized to perform this operation. "
-                    + "An administrator cannot change their own role, and the role of "
-                    + "the technical system user cannot be changed."
+            description = "Changes the role of an existing user identified by "
+                    + "their employee ID and revokes previously issued tokens, "
+                    + "requiring reauthentication. Only users with the ADMIN role "
+                    + "are authorized to perform this operation. An administrator "
+                    + "cannot change their own role."
     )
     @ApiResponses({
             @ApiResponse(
@@ -197,7 +214,7 @@ public class UserController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid user ID or request body."
+                    description = "Invalid request body."
             ),
             @ApiResponse(
                     responseCode = "403",
@@ -210,15 +227,19 @@ public class UserController {
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "The role of the technical system user cannot be changed."
+                    description = "The requested role change would leave the system without an active administrator."
             )
     })
-    @PatchMapping("/{userId}/role")
+    @PatchMapping("/{employeeId}/role")
     @PreAuthorize("hasRole('ADMIN')")
     public UserResponseDTO changeRole(
-            @PathVariable Long userId,
+            @Parameter(
+                    description = "Employee identifier assigned to the user.",
+                    example = "EMP-000004"
+            )
+            @PathVariable("employeeId") String employeeId,
             @RequestBody @Valid UserRoleUpdateRequestDTO dto
     ) {
-        return userService.changeRole(userId, dto.role());
+        return userService.changeRole(employeeId, dto.role());
     }
 }

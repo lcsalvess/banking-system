@@ -69,7 +69,7 @@ public class ClientControllerTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.ClientControllerTests#";
     private static final String CLIENTS_URL = "/api/v1/clients";
-    private static final String CLIENT_URL = "/api/v1/clients/{id}";
+    private static final String CLIENT_URL = "/api/v1/clients/{clientId}";
 
     private static final String VALID_NAME = "Cliente Teste";
     private static final String VALID_CPF = "52998224725";
@@ -214,7 +214,7 @@ public class ClientControllerTests {
     }
 
     @Nested
-    @DisplayName("GET /api/v1/clients/{id}")
+    @DisplayName("GET /api/v1/clients/{clientId}")
     class FindById {
 
         @Test
@@ -383,7 +383,7 @@ public class ClientControllerTests {
     }
 
     @Nested
-    @DisplayName("PATCH /api/v1/clients/{id}")
+    @DisplayName("PATCH /api/v1/clients/{clientId}")
     class Update {
 
         @Test

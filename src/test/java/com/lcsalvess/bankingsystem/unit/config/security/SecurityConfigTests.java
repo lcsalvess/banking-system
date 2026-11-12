@@ -143,7 +143,7 @@ class SecurityConfigTests {
     private static final String USERNAME = "usuario.teste";
     private static final String PASSWORD = "Senha123";
     private static final String PROTECTED_URL = "/api/v1/transactions/probe";
-    private static final String POST_PROTECTED_URL = "/api/v1/transactions/deposit";
+    private static final String POST_PROTECTED_URL = "/api/v1/transactions/deposits";
     private static final String ADMIN_URL = "/api/v1/users/test-probe";
     private static final String LOGIN_URL = "/api/v1/auth/login";
     private static final String AUTH_PROBE_URL = "/api/v1/auth/probe";

@@ -414,7 +414,7 @@ class AuditTrailRecorderTests {
         recorder.recordHttpRequestCompleted(
                 user(),
                 "POST",
-                "/api/v1/transactions/withdraw",
+                "/api/v1/transactions/withdrawals",
                 IP,
                 409,
                 "INSUFFICIENT_BALANCE",

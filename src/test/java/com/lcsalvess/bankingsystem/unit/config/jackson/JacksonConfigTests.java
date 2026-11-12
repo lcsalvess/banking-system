@@ -6,8 +6,8 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationReque
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -68,10 +68,10 @@ class JacksonConfigTests {
     private TransactionIdempotencyService transactionIdempotencyService;
 
     @Nested
-    @DisplayName("POST /api/v1/transactions/deposit")
+    @DisplayName("POST /api/v1/transactions/deposits")
     class Deposit {
 
-        private static final String URL = "/api/v1/transactions/deposit";
+        private static final String URL = "/api/v1/transactions/deposits";
 
         @Test
         @DisplayName("Should accept strings for identifiers and a number for the amount")

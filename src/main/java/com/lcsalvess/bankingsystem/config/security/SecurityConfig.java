@@ -120,9 +120,9 @@ public class SecurityConfig {
                     // Financial operations: employees only.
                     auth.requestMatchers(
                             HttpMethod.POST,
-                            "/api/v1/transactions/deposit",
-                            "/api/v1/transactions/withdraw",
-                            "/api/v1/transactions/transfer"
+                            "/api/v1/transactions/deposits",
+                            "/api/v1/transactions/withdrawals",
+                            "/api/v1/transactions/transfers"
                     ).hasRole("EMPLOYEE");
 
                     // Transaction history and lookup: employees only.

@@ -27,9 +27,9 @@ import static com.lcsalvess.bankingsystem.config.openapi.OpenApiConstants.JSON_M
 public class TransactionExamplesCustomizer implements OpenApiCustomizer {
 
     private static final Map<String, String> TYPE_BY_PATH = Map.of(
-            "/api/v1/transactions/deposit", "DEPOSIT",
-            "/api/v1/transactions/withdraw", "WITHDRAWAL",
-            "/api/v1/transactions/transfer", "TRANSFER_SENT"
+            "/api/v1/transactions/deposits", "DEPOSIT",
+            "/api/v1/transactions/withdrawals", "WITHDRAWAL",
+            "/api/v1/transactions/transfers", "TRANSFER_SENT"
     );
 
     @Override

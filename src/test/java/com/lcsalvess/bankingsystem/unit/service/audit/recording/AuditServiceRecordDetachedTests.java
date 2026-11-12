@@ -89,7 +89,7 @@ class AuditServiceRecordDetachedTests {
                 7L,
                 "lucas",
                 AuditEntityType.ENDPOINT,
-                "POST /api/v1/transactions/withdraw",
+                "POST /api/v1/transactions/withdrawals",
                 "INSUFFICIENT_BALANCE",
                 IP,
                 409,
@@ -122,7 +122,7 @@ class AuditServiceRecordDetachedTests {
         assertEquals("lucas", event.getActorUsername());
         assertEquals(AuditEntityType.ENDPOINT, event.getEntityType());
         assertEquals(
-                "POST /api/v1/transactions/withdraw",
+                "POST /api/v1/transactions/withdrawals",
                 event.getEntityId()
         );
         assertEquals("INSUFFICIENT_BALANCE", event.getReason());

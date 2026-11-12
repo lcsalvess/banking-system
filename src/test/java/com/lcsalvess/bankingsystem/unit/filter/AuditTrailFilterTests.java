@@ -45,7 +45,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 class AuditTrailFilterTests {
 
     private static final String PATH =
-            "/api/v1/transactions/withdraw";
+            "/api/v1/transactions/withdrawals";
 
     private static final String IP = "192.0.2.10";
 

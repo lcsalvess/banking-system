@@ -36,7 +36,7 @@ import java.util.Set;
 
 @Tag(
         name = "Transactions",
-        description = "Account transaction history."
+        description = "Deposits, withdrawals, transfers and transaction history."
 )
 @Validated
 @RestController

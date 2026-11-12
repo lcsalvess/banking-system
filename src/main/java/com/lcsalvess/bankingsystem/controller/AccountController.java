@@ -26,7 +26,7 @@ import java.util.Set;
 
 @Tag(
         name = "Accounts",
-        description = "Bank account management and operations."
+        description = "Bank account management and retrieval, including accounts associated with a client."
 )
 @PreAuthorize("hasRole('EMPLOYEE')")
 @Validated

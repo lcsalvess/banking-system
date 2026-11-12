@@ -1,7 +1,7 @@
-package com.lcsalvess.bankingsystem.unit.controller;
+package com.lcsalvess.bankingsystem.unit.controller.client;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
-import com.lcsalvess.bankingsystem.controller.ClientController;
+import com.lcsalvess.bankingsystem.controller.client.ClientController;
 import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.address.AddressUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.client.ClientRequestDTO;
@@ -67,7 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 public class ClientControllerTests {
 
-    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.ClientControllerTests#";
+    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.client.ClientControllerTests#";
     private static final String CLIENTS_URL = "/api/v1/clients";
     private static final String CLIENT_URL = "/api/v1/clients/{clientId}";
 

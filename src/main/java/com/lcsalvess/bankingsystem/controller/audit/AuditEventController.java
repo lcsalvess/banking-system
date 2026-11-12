@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.controller;
+package com.lcsalvess.bankingsystem.controller.audit;
 
 import com.lcsalvess.bankingsystem.dto.request.audit.AuditEventQueryRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDTO;

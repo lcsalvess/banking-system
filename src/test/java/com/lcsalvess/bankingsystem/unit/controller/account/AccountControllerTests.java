@@ -1,7 +1,7 @@
-package com.lcsalvess.bankingsystem.unit.controller;
+package com.lcsalvess.bankingsystem.unit.controller.account;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
-import com.lcsalvess.bankingsystem.controller.AccountController;
+import com.lcsalvess.bankingsystem.controller.account.AccountController;
 import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
@@ -49,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 public class AccountControllerTests {
 
-    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.AccountControllerTests#";
+    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.account.AccountControllerTests#";
 
     @Autowired
     private MockMvc mockMvc;

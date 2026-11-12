@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.controller;
+package com.lcsalvess.bankingsystem.controller.user;
 
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDTO;

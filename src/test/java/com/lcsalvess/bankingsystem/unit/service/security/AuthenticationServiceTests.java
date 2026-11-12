@@ -9,7 +9,7 @@ import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException
 import com.lcsalvess.bankingsystem.exception.security.RateLimitOperation;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
-import com.lcsalvess.bankingsystem.service.security.AuthService;
+import com.lcsalvess.bankingsystem.service.security.AuthenticationService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
@@ -50,10 +50,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class AuthServiceTests {
+class AuthenticationServiceTests {
 
     private static final String PROVIDER =
-            "com.lcsalvess.bankingsystem.unit.service.security.AuthServiceTests#";
+            "com.lcsalvess.bankingsystem.unit.service.security.AuthenticationServiceTests#";
 
     private static final String TEST_CLIENT_IP = "192.0.2.1";
     private static final String TEST_USERNAME = "test.user";
@@ -83,14 +83,14 @@ class AuthServiceTests {
     @Mock
     private AuditTrailRecorder auditTrailRecorder;
 
-    private AuthService authService;
+    private AuthenticationService authService;
 
     @BeforeEach
     void setUp() {
         when(passwordEncoder.encode(anyString()))
                 .thenReturn("dummy-hash");
 
-        authService = new AuthService(
+        authService = new AuthenticationService(
                 authManager,
                 jwtService,
                 passwordEncoder,

@@ -1,7 +1,7 @@
-package com.lcsalvess.bankingsystem.unit.controller;
+package com.lcsalvess.bankingsystem.unit.controller.user;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
-import com.lcsalvess.bankingsystem.controller.UserController;
+import com.lcsalvess.bankingsystem.controller.user.UserController;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
@@ -66,7 +66,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 public class UserControllerTests {
 
-    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.UserControllerTests#";
+    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.user.UserControllerTests#";
     private static final String USERS_URL = "/api/v1/users";
     private static final String REACTIVATE_URL = "/api/v1/users/{employeeId}/reactivate";
     private static final String DEACTIVATE_URL = "/api/v1/users/{employeeId}/deactivate";

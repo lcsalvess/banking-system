@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.controller;
+package com.lcsalvess.bankingsystem.controller.transaction;
 
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;

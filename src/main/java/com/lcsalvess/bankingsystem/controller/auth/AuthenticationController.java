@@ -1,9 +1,9 @@
-package com.lcsalvess.bankingsystem.controller;
+package com.lcsalvess.bankingsystem.controller.auth;
 
 import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
-import com.lcsalvess.bankingsystem.service.security.AuthService;
+import com.lcsalvess.bankingsystem.service.security.AuthenticationService;
 import com.lcsalvess.bankingsystem.service.security.PasswordChangeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
@@ -28,13 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 )
 @RestController
 @RequestMapping("/api/v1/auth")
-public class AuthController {
+public class AuthenticationController {
 
-    private final AuthService authService;
+    private final AuthenticationService authService;
     private final PasswordChangeService passwordChangeService;
 
-    public AuthController(
-            AuthService authService,
+    public AuthenticationController(
+            AuthenticationService authService,
             PasswordChangeService passwordChangeService
     ) {
         this.authService = authService;

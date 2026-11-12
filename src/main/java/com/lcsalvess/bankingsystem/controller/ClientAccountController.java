@@ -25,8 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Set;
 
 @Tag(
-        name = "Client Accounts",
-        description = "Bank account operations associated with a specific client."
+        name = "Accounts",
+        description = "Bank account management and retrieval, including accounts associated with a client."
 )
 @PreAuthorize("hasRole('EMPLOYEE')")
 @RestController

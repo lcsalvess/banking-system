@@ -22,9 +22,9 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 @Service
-public class AuthService {
+public class AuthenticationService {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final Logger log = LoggerFactory.getLogger(AuthenticationService.class);
 
     private final AuthenticationManager authManager;
     private final JwtService jwtService;
@@ -33,7 +33,7 @@ public class AuthService {
     private final AuditTrailRecorder auditTrailRecorder;
     private final String dummyPasswordHash;
 
-    public AuthService(
+    public AuthenticationService(
             AuthenticationManager authManager,
             JwtService jwtService,
             PasswordEncoder passwordEncoder,

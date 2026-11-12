@@ -1,7 +1,7 @@
-package com.lcsalvess.bankingsystem.unit.controller;
+package com.lcsalvess.bankingsystem.unit.controller.transaction;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
-import com.lcsalvess.bankingsystem.controller.AccountTransactionController;
+import com.lcsalvess.bankingsystem.controller.transaction.AccountTransactionController;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
@@ -67,7 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AccountTransactionControllerTests {
 
     private static final String PROVIDER =
-            "com.lcsalvess.bankingsystem.unit.controller.AccountTransactionControllerTests#";
+            "com.lcsalvess.bankingsystem.unit.controller.transaction.AccountTransactionControllerTests#";
 
     private static final String SNAPSHOT_HEADER = "X-Transaction-Snapshot";
 

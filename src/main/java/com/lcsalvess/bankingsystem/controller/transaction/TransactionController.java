@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.controller;
+package com.lcsalvess.bankingsystem.controller.transaction;
 
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;

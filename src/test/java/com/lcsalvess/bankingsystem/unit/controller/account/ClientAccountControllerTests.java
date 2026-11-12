@@ -1,7 +1,7 @@
-package com.lcsalvess.bankingsystem.unit.controller;
+package com.lcsalvess.bankingsystem.unit.controller.account;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
-import com.lcsalvess.bankingsystem.controller.ClientAccountController;
+import com.lcsalvess.bankingsystem.controller.account.ClientAccountController;
 import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;

@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.unit.controller;
+package com.lcsalvess.bankingsystem.unit.controller.auth;
 
 import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
 import com.lcsalvess.bankingsystem.entity.user.Role;
@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
-class AuthControllerTests {
+class AuthenticationControllerTests {
 
     private static final AtomicInteger TEST_IP_COUNTER =
             new AtomicInteger(1);

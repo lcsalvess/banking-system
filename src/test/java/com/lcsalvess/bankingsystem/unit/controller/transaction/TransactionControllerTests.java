@@ -1,7 +1,7 @@
-package com.lcsalvess.bankingsystem.unit.controller;
+package com.lcsalvess.bankingsystem.unit.controller.transaction;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
-import com.lcsalvess.bankingsystem.controller.TransactionController;
+import com.lcsalvess.bankingsystem.controller.transaction.TransactionController;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
@@ -59,7 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class TransactionControllerTests {
 
     private static final String PROVIDER =
-            "com.lcsalvess.bankingsystem.unit.controller.TransactionControllerTests#";
+            "com.lcsalvess.bankingsystem.unit.controller.transaction.TransactionControllerTests#";
 
     private static final String IDEMPOTENCY_HEADER = "Idempotency-Key";
 

@@ -1,7 +1,7 @@
-package com.lcsalvess.bankingsystem.unit.controller;
+package com.lcsalvess.bankingsystem.unit.controller.audit;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
-import com.lcsalvess.bankingsystem.controller.AuditEventController;
+import com.lcsalvess.bankingsystem.controller.audit.AuditEventController;
 import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDTO;
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;

@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.config.jackson;
 
 import com.lcsalvess.bankingsystem.config.jackson.JacksonConfig;
-import com.lcsalvess.bankingsystem.controller.TransactionController;
+import com.lcsalvess.bankingsystem.controller.transaction.TransactionController;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;

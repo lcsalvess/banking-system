@@ -8,7 +8,6 @@ import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionOperationEvent;
 import com.lcsalvess.bankingsystem.event.transaction.TransactionTransferEvent;
@@ -24,6 +23,7 @@ import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.LockedAccounts;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -65,16 +65,7 @@ public class TransactionServiceTests {
     private static final String PROVIDER =
             "com.lcsalvess.bankingsystem.unit.service.transaction.TransactionServiceTests#";
 
-    private static final String USERNAME = "joe-doe";
-
-    private static final User TEST_USER = User.createHuman(
-            "EMP-TEST-001",
-            "Joe Doe",
-            USERNAME,
-            "joe.doe@example.com",
-            "test-password",
-            Role.EMPLOYEE
-    );
+    private static final User TEST_USER = UserTestFactory.aUser().build();
 
     private static final String ACCOUNT_NUMBER = "00001";
     private static final String ACCOUNT_DIGIT = "9";
@@ -88,8 +79,8 @@ public class TransactionServiceTests {
 
     private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
 
-    // 23:30 em São Paulo já é o dia seguinte em UTC.
-    // Isso ajuda a detectar problemas de fuso horário.
+    // 23:30 in São Paulo is already the following day in UTC.
+    // This helps detect time zone issues.
     private static final LocalDateTime NOW =
             LocalDateTime.of(2026, 1, 15, 23, 30);
 
@@ -152,7 +143,7 @@ public class TransactionServiceTests {
                             TransactionType.DEPOSIT,
                             ACCOUNT_NUMBER,
                             OPERATION_AMOUNT,
-                            USERNAME,
+                            TEST_USER.getUsername(),
                             transactionCaptor.getValue().getTransactionCode()
                     )
             );
@@ -281,7 +272,7 @@ public class TransactionServiceTests {
                             TransactionType.WITHDRAWAL,
                             ACCOUNT_NUMBER,
                             amount,
-                            USERNAME,
+                            TEST_USER.getUsername(),
                             transactionCaptor.getValue().getTransactionCode()
                     )
             );
@@ -398,7 +389,7 @@ public class TransactionServiceTests {
                             ACCOUNT_NUMBER,
                             DESTINATION_NUMBER,
                             amount,
-                            USERNAME,
+                            TEST_USER.getUsername(),
                             transactionCaptor.getAllValues().getFirst().getTransferCode()
                     )
             );
@@ -616,7 +607,7 @@ public class TransactionServiceTests {
         );
     }
 
-    // Saldo inicial da conta de origem: 100.00.
+    // Initial source account balance: 100.00.
     @SuppressWarnings("unused")
     static Stream<Arguments> amountsAboveBalance() {
         return Stream.of(
@@ -647,7 +638,7 @@ public class TransactionServiceTests {
         );
     }
 
-    // Saldos iniciais: origem 100.00, destino 50.00.
+    // Initial balances: source 100.00, destination 50.00.
     @SuppressWarnings("unused")
     static Stream<Arguments> transfers() {
         return Stream.of(
@@ -748,7 +739,7 @@ public class TransactionServiceTests {
         );
     }
 
-    // Este helper continua sendo exclusivo de transações realizadas por usuários.
+    // This helper remains exclusive to user-performed transactions.
     private static void assertTransaction(
             Transaction transaction,
             TransactionType type,
@@ -826,7 +817,7 @@ public class TransactionServiceTests {
             Long id,
             String balance
     ) {
-        // O serviço não acessa o cliente da conta nesses testes.
+        // The service does not access the account's client in these tests.
         CheckingAccount account = new CheckingAccount(
                 null,
                 number,

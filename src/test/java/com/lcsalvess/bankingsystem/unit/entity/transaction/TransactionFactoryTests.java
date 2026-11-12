@@ -4,8 +4,8 @@ import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,14 +30,7 @@ class TransactionFactoryTests {
     private static final LocalDate YIELD_DATE = LocalDate.of(2026, 10, 24);
     private static final BigDecimal AMOUNT = new BigDecimal("10.00");
     private static final BigDecimal BALANCE = new BigDecimal("90.00");
-    private static final User USER = User.createHuman(
-            "EMP-TEST-001",
-            "Employee Test",
-            "employee",
-            "employee@example.com",
-            "not-a-real-password-hash",
-            Role.EMPLOYEE
-    );
+    private static final User USER = UserTestFactory.aUser().build();
     private static final CheckingAccount ACCOUNT =
             new CheckingAccount(null, "00001", "0");
     private static final SavingsAccount SAVINGS_ACCOUNT =

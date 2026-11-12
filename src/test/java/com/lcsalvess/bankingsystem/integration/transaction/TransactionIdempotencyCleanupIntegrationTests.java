@@ -1,9 +1,9 @@
 package com.lcsalvess.bankingsystem.integration.transaction;
 
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRepository;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -35,15 +37,17 @@ class TransactionIdempotencyCleanupIntegrationTests {
     void setUp() {
         clearIdempotencyRequests();
 
+        String uniqueId = UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12);
+
         user = userRepository.saveAndFlush(
-                User.createHuman(
-                        "EMP-IDEM-CLEANUP-001",
-                        "Idempotency Cleanup User",
-                        "idem-cleanup-user",
-                        "idem-cleanup-user@test.com",
-                        "test-password",
-                        Role.EMPLOYEE
-                )
+                UserTestFactory.aUser()
+                        .withEmployeeId("EMP-" + uniqueId)
+                        .withUsername("idem-" + uniqueId)
+                        .withEmail("idem-cleanup-" + uniqueId + "@test.com")
+                        .build()
         );
     }
 
@@ -69,21 +73,21 @@ class TransactionIdempotencyCleanupIntegrationTests {
     private void insertRequest(long userId, int ageInDays) {
         jdbcTemplate.update(
                 """
-                                        INSERT INTO transaction_idempotency_requests (
-                                            user_id,
-                                            idempotency_key,
-                                            operation_type,
-                                            request_hash,
-                                            created_at
-                                        )
-                        VALUES (
-                            ?,
-                            gen_random_uuid(),
-                            'DEPOSIT',
-                            repeat('0', 64),
-                            CURRENT_TIMESTAMP - make_interval(days => ?)
-                        )
-                        """,
+                INSERT INTO transaction_idempotency_requests (
+                    user_id,
+                    idempotency_key,
+                    operation_type,
+                    request_hash,
+                    created_at
+                )
+                VALUES (
+                    ?,
+                    gen_random_uuid(),
+                    'DEPOSIT',
+                    repeat('0', 64),
+                    CURRENT_TIMESTAMP - make_interval(days => ?)
+                )
+                """,
                 userId,
                 ageInDays
         );

@@ -4,12 +4,12 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitScope;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditService;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.service.audit.recording.DetachedAuditRecord;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +22,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.QueryTimeoutException;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.time.Duration;
@@ -44,14 +43,13 @@ class AuditTrailRecorderTests {
 
     private static final String IP = "192.0.2.10";
 
-    private static final String USERNAME = "joe.doe";
-
     @Mock
     private AuditService auditService;
 
     private SimpleMeterRegistry meterRegistry;
     private AtomicLong nanos;
     private AuditTrailRecorder recorder;
+    private User actor;
 
     @BeforeEach
     void setUp() {
@@ -62,29 +60,17 @@ class AuditTrailRecorderTests {
                 meterRegistry,
                 nanos::get
         );
+
+        actor = UserTestFactory.aUser()
+                .withId(7L)
+                .build();
     }
 
-    private static User user() {
-        User user = User.createHuman(
-                "EMP-TEST-007",
-                "Joe Doe",
-                USERNAME,
-                "joe.doe@example.com",
-                "hash",
-                Role.EMPLOYEE
-        );
-
-        ReflectionTestUtils.setField(user, "id", 7L);
-
-        return user;
-    }
-
-    private DetachedAuditRecord lastRecord(int expectedTimes) {
+    private DetachedAuditRecord lastRecord() {
         ArgumentCaptor<DetachedAuditRecord> captor =
                 ArgumentCaptor.forClass(DetachedAuditRecord.class);
 
-        verify(auditService, times(expectedTimes))
-                .recordDetached(captor.capture());
+        verify(auditService).recordDetached(captor.capture());
 
         return captor.getValue();
     }
@@ -96,17 +82,17 @@ class AuditTrailRecorderTests {
     @Test
     @DisplayName("Should record a successful login for the user")
     void shouldRecordLoginSuccess() {
-        recorder.recordLoginSuccess(user(), IP);
+        recorder.recordLoginSuccess(actor, IP);
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(AuditEventType.LOGIN_SUCCESS, record.eventType());
         assertEquals(AuditOutcome.SUCCESS, record.outcome());
         assertEquals(AuditActorType.USER, record.actorType());
         assertEquals(7L, record.actorUserId());
-        assertEquals(USERNAME, record.actorUsername());
+        assertEquals(actor.getUsername(), record.actorUsername());
         assertEquals(AuditEntityType.AUTHENTICATION, record.entityType());
-        assertEquals(USERNAME, record.entityId());
+        assertEquals(actor.getUsername(), record.entityId());
         assertEquals(IP, record.ipAddress().getHostAddress());
         assertNull(record.reason());
     }
@@ -116,7 +102,7 @@ class AuditTrailRecorderTests {
     void shouldRecordLoginFailure() {
         recorder.recordLoginFailure("ghost", IP, "INVALID_CREDENTIALS");
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(AuditEventType.LOGIN_FAILURE, record.eventType());
         assertEquals(AuditOutcome.FAILURE, record.outcome());
@@ -137,7 +123,7 @@ class AuditTrailRecorderTests {
                 RateLimitScope.USERNAME_AND_IP
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(AuditEventType.LOGIN_BLOCKED, record.eventType());
         assertEquals(AuditOutcome.DENIED, record.outcome());
@@ -155,7 +141,7 @@ class AuditTrailRecorderTests {
                 "INVALID_CREDENTIALS"
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertArrayEquals(
                 new byte[]{
@@ -177,7 +163,7 @@ class AuditTrailRecorderTests {
                 "INVALID_CREDENTIALS"
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertArrayEquals(
                 new byte[]{
@@ -215,7 +201,7 @@ class AuditTrailRecorderTests {
                 )
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertNull(record.ipAddress());
         assertEquals("INVALID_CREDENTIALS", record.reason());
@@ -230,7 +216,7 @@ class AuditTrailRecorderTests {
                 "INVALID_CREDENTIALS"
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertNull(record.ipAddress());
         assertEquals("INVALID_CREDENTIALS", record.reason());
@@ -349,7 +335,7 @@ class AuditTrailRecorderTests {
         UUID correlationId = UUID.randomUUID();
 
         recorder.recordHttpRequestCompleted(
-                user(),
+                actor,
                 "POST",
                 "/api/v1/clients",
                 IP,
@@ -358,7 +344,7 @@ class AuditTrailRecorderTests {
                 correlationId
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(
                 AuditEventType.HTTP_REQUEST_COMPLETED,
@@ -367,7 +353,7 @@ class AuditTrailRecorderTests {
         assertEquals(AuditOutcome.SUCCESS, record.outcome());
         assertEquals(AuditActorType.USER, record.actorType());
         assertEquals(7L, record.actorUserId());
-        assertEquals(USERNAME, record.actorUsername());
+        assertEquals(actor.getUsername(), record.actorUsername());
         assertEquals(AuditEntityType.ENDPOINT, record.entityType());
         assertEquals("POST /api/v1/clients", record.entityId());
         assertEquals(201, record.httpStatus());
@@ -391,7 +377,7 @@ class AuditTrailRecorderTests {
                 correlationId
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(
                 AuditEventType.HTTP_REQUEST_COMPLETED,
@@ -412,7 +398,7 @@ class AuditTrailRecorderTests {
         UUID correlationId = UUID.randomUUID();
 
         recorder.recordHttpRequestCompleted(
-                user(),
+                actor,
                 "POST",
                 "/api/v1/transactions/withdrawals",
                 IP,
@@ -421,7 +407,7 @@ class AuditTrailRecorderTests {
                 correlationId
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(
                 AuditEventType.HTTP_REQUEST_COMPLETED,
@@ -439,7 +425,7 @@ class AuditTrailRecorderTests {
         UUID correlationId = UUID.randomUUID();
 
         recorder.recordHttpRequestCompleted(
-                user(),
+                actor,
                 "GET",
                 "/api/v1/clients",
                 IP,
@@ -448,7 +434,7 @@ class AuditTrailRecorderTests {
                 correlationId
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(
                 AuditEventType.HTTP_REQUEST_COMPLETED,
@@ -480,7 +466,7 @@ class AuditTrailRecorderTests {
     @Test
     @DisplayName("Should not count a failure when the write succeeds")
     void shouldNotCountFailureOnSuccess() {
-        recorder.recordLoginSuccess(user(), IP);
+        recorder.recordLoginSuccess(actor, IP);
 
         assertEquals(0.0, counter("audit.detached.write.failures"));
         verify(auditService, times(1)).recordDetached(any());
@@ -521,8 +507,6 @@ class AuditTrailRecorderTests {
     @Test
     @DisplayName("Should keep client errors of different subjects apart")
     void shouldNotDeduplicateDifferentHttpFailures() {
-        User actor = user();
-
         recorder.recordHttpRequestCompleted(
                 actor, "GET", "/api/v1/users/{id}", IP, 403, null, null
         );
@@ -541,10 +525,10 @@ class AuditTrailRecorderTests {
     @DisplayName("Should never deduplicate successes, 401 or server errors")
     void shouldNotDeduplicateOtherHttpOutcomes(int status) {
         recorder.recordHttpRequestCompleted(
-                user(), "POST", "/api/v1/auth/login", IP, status, null, null
+                actor, "POST", "/api/v1/auth/login", IP, status, null, null
         );
         recorder.recordHttpRequestCompleted(
-                user(), "POST", "/api/v1/auth/login", IP, status, null, null
+                actor, "POST", "/api/v1/auth/login", IP, status, null, null
         );
 
         verify(auditService, times(2)).recordDetached(any());
@@ -624,7 +608,7 @@ class AuditTrailRecorderTests {
                 "INVALID_CREDENTIALS"
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertNull(record.ipAddress());
         assertEquals("INVALID_CREDENTIALS", record.reason());
@@ -656,7 +640,7 @@ class AuditTrailRecorderTests {
         verify(auditService, times(1)).recordDetached(any());
         assertEquals(1.0, counter("audit.detached.deduplicated"));
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
         assertNull(record.ipAddress());
     }
 
@@ -669,7 +653,7 @@ class AuditTrailRecorderTests {
                 RateLimitScope.USERNAME
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertNull(record.ipAddress());
         assertEquals("RATE_LIMIT_USERNAME", record.reason());
@@ -729,7 +713,7 @@ class AuditTrailRecorderTests {
                 null
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(AuditOutcome.DENIED, record.outcome());
         assertEquals(status, record.httpStatus());
@@ -754,7 +738,7 @@ class AuditTrailRecorderTests {
                 null
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(AuditOutcome.FAILURE, record.outcome());
         assertEquals("HTTP_UNEXPECTED_STATUS", record.reason());
@@ -770,7 +754,7 @@ class AuditTrailRecorderTests {
                 "INVALID_CREDENTIALS"
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertNull(record.ipAddress());
         assertEquals("INVALID_CREDENTIALS", record.reason());
@@ -780,7 +764,7 @@ class AuditTrailRecorderTests {
     @DisplayName("Should use generic reason when the supplied failure reason is blank")
     void shouldUseGenericReasonWhenFailureReasonIsBlank() {
         recorder.recordHttpRequestCompleted(
-                user(),
+                actor,
                 "POST",
                 "/api/v1/clients",
                 IP,
@@ -789,7 +773,7 @@ class AuditTrailRecorderTests {
                 null
         );
 
-        DetachedAuditRecord record = lastRecord(1);
+        DetachedAuditRecord record = lastRecord();
 
         assertEquals(AuditOutcome.FAILURE, record.outcome());
         assertEquals("HTTP_CLIENT_ERROR", record.reason());

@@ -2,7 +2,6 @@ package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
@@ -13,6 +12,7 @@ import com.lcsalvess.bankingsystem.service.security.AuthenticationService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.LoginAttempt;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -56,14 +56,9 @@ class AuthenticationServiceTests {
             "com.lcsalvess.bankingsystem.unit.service.security.AuthenticationServiceTests#";
 
     private static final String TEST_CLIENT_IP = "192.0.2.1";
-    private static final String TEST_USERNAME = "test.user";
 
-    private static final LoginAttempt TEST_ATTEMPT = new LoginAttempt(
-            "username-ip:test.user|192.0.2.1",
-            Instant.parse("2026-01-01T12:00:00Z"),
-            "username:test.user",
-            Instant.parse("2026-01-01T12:00:00Z")
-    );
+    private static final Instant ATTEMPT_TIME =
+            Instant.parse("2026-01-01T12:00:00Z");
 
     @Mock
     private AuthenticationManager authManager;
@@ -84,6 +79,8 @@ class AuthenticationServiceTests {
     private AuditTrailRecorder auditTrailRecorder;
 
     private AuthenticationService authService;
+    private User testUser;
+    private LoginAttempt testAttempt;
 
     @BeforeEach
     void setUp() {
@@ -97,18 +94,27 @@ class AuthenticationServiceTests {
                 rateLimitProtectionService,
                 auditTrailRecorder
         );
+
+        testUser = UserTestFactory.aUser()
+                .build();
+
+        testAttempt = new LoginAttempt(
+                "username-ip:" + testUser.getUsername() + "|" + TEST_CLIENT_IP,
+                ATTEMPT_TIME,
+                "username:" + testUser.getUsername(),
+                ATTEMPT_TIME
+        );
     }
 
     @Nested
-    @DisplayName("Ao autenticar um usuário")
+    @DisplayName("When authenticating a user")
     class AuthenticateTests {
 
         @Test
-        @DisplayName("Deve autenticar usuário com credenciais válidas")
+        @DisplayName("Should authenticate the user with valid credentials")
         void shouldAuthenticateUserSuccessfully() {
             String jwtToken = "jwt-token";
             LoginRequestDTO dto = createLoginRequestDTO();
-            User user = createEntityUser();
 
             allowAttempt();
 
@@ -116,16 +122,16 @@ class AuthenticationServiceTests {
                     any(UsernamePasswordAuthenticationToken.class)
             )).thenReturn(authentication);
 
-            when(authentication.getPrincipal()).thenReturn(user);
-            when(jwtService.generateToken(user)).thenReturn(jwtToken);
+            when(authentication.getPrincipal()).thenReturn(testUser);
+            when(jwtService.generateToken(testUser)).thenReturn(jwtToken);
 
             LoginResponseDTO response =
                     authService.authenticate(dto, TEST_CLIENT_IP);
 
             assertEquals(jwtToken, response.token());
-            assertEquals(user.getUsername(), response.username());
-            assertEquals(user.getEmail(), response.email());
-            assertEquals(user.getRole(), response.role());
+            assertEquals(testUser.getUsername(), response.username());
+            assertEquals(testUser.getEmail(), response.email());
+            assertEquals(testUser.getRole(), response.role());
 
             verify(rateLimitProtectionService)
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
@@ -134,20 +140,20 @@ class AuthenticationServiceTests {
                     any(UsernamePasswordAuthenticationToken.class)
             );
 
-            verify(jwtService).generateToken(user);
+            verify(jwtService).generateToken(testUser);
 
             verify(rateLimitProtectionService)
-                    .recordSuccessfulLogin(TEST_ATTEMPT);
+                    .recordSuccessfulLogin(testAttempt);
 
             verify(rateLimitProtectionService, never())
                     .cancelAttempt(any(LoginAttempt.class));
 
             verify(auditTrailRecorder)
-                    .recordLoginSuccess(user, TEST_CLIENT_IP);
+                    .recordLoginSuccess(testUser, TEST_CLIENT_IP);
         }
 
         @Test
-        @DisplayName("Deve lançar exceção e registrar falha quando as credenciais são inválidas")
+        @DisplayName("Should throw and record a failure when credentials are invalid")
         void shouldThrowWhenCredentialsAreInvalid() {
             LoginRequestDTO dto = createLoginRequestDTO();
 
@@ -181,7 +187,7 @@ class AuthenticationServiceTests {
 
             verify(auditTrailRecorder)
                     .recordLoginFailure(
-                            TEST_USERNAME,
+                            testUser.getUsername(),
                             TEST_CLIENT_IP,
                             "INVALID_CREDENTIALS"
                     );
@@ -192,7 +198,7 @@ class AuthenticationServiceTests {
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "accountStatusExceptions")
         @DisplayName(
-                "Deve tratar conta inativa, bloqueada ou expirada como credenciais inválidas"
+                "Should treat inactive, locked, or expired accounts as invalid credentials"
         )
         void shouldTreatAccountStatusFailuresAsInvalidCredentials(
                 String scenario,
@@ -238,7 +244,7 @@ class AuthenticationServiceTests {
 
             verify(auditTrailRecorder)
                     .recordLoginFailure(
-                            TEST_USERNAME,
+                            testUser.getUsername(),
                             TEST_CLIENT_IP,
                             "ACCOUNT_NOT_ENABLED"
                     );
@@ -247,9 +253,7 @@ class AuthenticationServiceTests {
         }
 
         @Test
-        @DisplayName(
-                "Deve desfazer a contagem quando ocorre falha de infraestrutura"
-        )
+        @DisplayName("Should cancel the attempt when an infrastructure failure occurs")
         void shouldCancelAttemptOnInfrastructureFailure() {
             LoginRequestDTO dto = createLoginRequestDTO();
 
@@ -275,7 +279,7 @@ class AuthenticationServiceTests {
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(rateLimitProtectionService)
-                    .cancelAttempt(TEST_ATTEMPT);
+                    .cancelAttempt(testAttempt);
 
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
@@ -284,7 +288,7 @@ class AuthenticationServiceTests {
         }
 
         @Test
-        @DisplayName("Deve propagar exceções inesperadas sem alterá-las e desfazer a contagem")
+        @DisplayName("Should propagate unexpected exceptions unchanged and cancel the attempt")
         void shouldPropagateUnexpectedExceptionsAndCancelAttempt() {
             LoginRequestDTO dto = createLoginRequestDTO();
 
@@ -308,7 +312,7 @@ class AuthenticationServiceTests {
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(rateLimitProtectionService)
-                    .cancelAttempt(TEST_ATTEMPT);
+                    .cancelAttempt(testAttempt);
 
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
@@ -317,7 +321,7 @@ class AuthenticationServiceTests {
         }
 
         @Test
-        @DisplayName("Deve cancelar a tentativa quando o principal da autenticação é nulo")
+        @DisplayName("Should cancel the attempt when the authentication principal is null")
         void shouldCancelAttemptWhenAuthenticationPrincipalIsNull() {
             LoginRequestDTO dto = createLoginRequestDTO();
 
@@ -343,7 +347,7 @@ class AuthenticationServiceTests {
                     .beginAttempt(TEST_CLIENT_IP, dto.username());
 
             verify(rateLimitProtectionService)
-                    .cancelAttempt(TEST_ATTEMPT);
+                    .cancelAttempt(testAttempt);
 
             verify(rateLimitProtectionService, never())
                     .recordSuccessfulLogin(any(LoginAttempt.class));
@@ -353,16 +357,16 @@ class AuthenticationServiceTests {
     }
 
     @Nested
-    @DisplayName("Ao exceder o limite de tentativas de login")
+    @DisplayName("When exceeding the login attempt limit")
     class RateLimitTests {
 
-        @ParameterizedTest(name = "escopo: {0}")
+        @ParameterizedTest(name = "Scope: {0}")
         @EnumSource(
                 value = RateLimitScope.class,
                 mode = EnumSource.Mode.EXCLUDE,
                 names = "USER_ID"
         )
-        @DisplayName("Deve propagar a exceção e registrar o bloqueio sem verificar credenciais")
+        @DisplayName("Should propagate the exception and record the block without checking credentials")
         void shouldRejectBeforeCheckingCredentials(
                 RateLimitScope scope
         ) {
@@ -397,14 +401,14 @@ class AuthenticationServiceTests {
 
             verify(auditTrailRecorder)
                     .recordLoginBlocked(
-                            TEST_USERNAME,
+                            testUser.getUsername(),
                             TEST_CLIENT_IP,
                             scope
                     );
         }
 
         @Test
-        @DisplayName("Não deve comparar a senha com o hash fictício ao rejeitar")
+        @DisplayName("Should not compare the password against the dummy hash when the attempt is rejected")
         void shouldNotRunPasswordCheckWhenRejected() {
             LoginRequestDTO dto = createLoginRequestDTO();
 
@@ -426,7 +430,7 @@ class AuthenticationServiceTests {
 
             verify(auditTrailRecorder)
                     .recordLoginBlocked(
-                            TEST_USERNAME,
+                            testUser.getUsername(),
                             TEST_CLIENT_IP,
                             RateLimitScope.CLIENT_IP
                     );
@@ -436,25 +440,14 @@ class AuthenticationServiceTests {
     private void allowAttempt() {
         when(rateLimitProtectionService.beginAttempt(
                 TEST_CLIENT_IP,
-                TEST_USERNAME
-        )).thenReturn(TEST_ATTEMPT);
+                testUser.getUsername()
+        )).thenReturn(testAttempt);
     }
 
-    private static LoginRequestDTO createLoginRequestDTO() {
+    private LoginRequestDTO createLoginRequestDTO() {
         return new LoginRequestDTO(
-                TEST_USERNAME,
+                testUser.getUsername(),
                 "teste123456"
-        );
-    }
-
-    private static User createEntityUser() {
-        return User.createHuman(
-                "EMP-TEST-001",
-                "Joe Doe",
-                TEST_USERNAME,
-                "joe.doe@example.com",
-                "encoded-password",
-                Role.EMPLOYEE
         );
     }
 
@@ -462,21 +455,21 @@ class AuthenticationServiceTests {
     static Stream<Arguments> accountStatusExceptions() {
         return Stream.of(
                 Arguments.of(
-                        "conta inativa",
+                        "Inactive account",
                         new DisabledException("User is disabled")
                 ),
                 Arguments.of(
-                        "conta bloqueada",
+                        "Locked account",
                         new LockedException("User account is locked")
                 ),
                 Arguments.of(
-                        "conta expirada",
+                        "Expired account",
                         new AccountExpiredException(
                                 "User account has expired"
                         )
                 ),
                 Arguments.of(
-                        "credenciais expiradas",
+                        "Expired credentials",
                         new CredentialsExpiredException(
                                 "User credentials have expired"
                         )

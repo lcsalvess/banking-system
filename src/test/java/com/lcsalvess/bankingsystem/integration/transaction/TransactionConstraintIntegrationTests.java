@@ -7,7 +7,6 @@ import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
 import com.lcsalvess.bankingsystem.repository.ClientRepository;
@@ -15,6 +14,7 @@ import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -84,14 +84,11 @@ class TransactionConstraintIntegrationTests {
         clientSequence = 0;
 
         user = userRepository.saveAndFlush(
-                User.createHuman(
-                        "EMP-TXC-" + testId,
-                        "Transaction Constraint Test User",
-                        "txc-" + testId,
-                        "txc-" + testId + "@test.com",
-                        "test-password",
-                        Role.EMPLOYEE
-                )
+                UserTestFactory.aUser()
+                        .withEmployeeId("EMP-TXC-" + testId)
+                        .withUsername("txc-" + testId)
+                        .withEmail("txc-" + testId + "@test.com")
+                        .build()
         );
 
         client = createClient();

@@ -1,12 +1,12 @@
 package com.lcsalvess.bankingsystem.unit.controller.auth;
 
 import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,6 +39,9 @@ class AuthenticationControllerTests {
     private static final AtomicInteger TEST_IP_COUNTER =
             new AtomicInteger(1);
 
+    private static final String TEST_PASSWORD = "test-password";
+    private static final String NONEXISTENT_USERNAME = "test-invalid-user";
+
     @Autowired
     private UserRepository userRepository;
 
@@ -57,25 +60,22 @@ class AuthenticationControllerTests {
     @Autowired
     private LoginRateLimitProperties rateLimitProperties;
 
+    private User testUser;
+
     @BeforeEach
     void setUp() {
         ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
 
+        testUser = UserTestFactory.aUser()
+                .withEncodedPassword(passwordEncoder.encode(TEST_PASSWORD))
+                .build();
+
         // Clear login attempts for the users used in the tests.
-        rateLimitProtectionService.clearFailures("test-user");
-        rateLimitProtectionService.clearFailures("test-invalid-user");
+        rateLimitProtectionService.clearFailures(testUser.getUsername());
+        rateLimitProtectionService.clearFailures(NONEXISTENT_USERNAME);
 
-        User user = User.createHuman(
-                "EMP-TEST-001",
-                "Test User",
-                "test-user",
-                "test-user@test.com",
-                passwordEncoder.encode("test-password"),
-                Role.EMPLOYEE
-        );
-
-        userRepository.save(user);
+        testUser = userRepository.save(testUser);
     }
 
     private String nextTestIp() {
@@ -114,60 +114,60 @@ class AuthenticationControllerTests {
     }
 
     @Nested
-    @DisplayName("Ao tentar autenticar")
+    @DisplayName("When authenticating")
     class AuthTest {
 
         private static final String URL = "/api/v1/auth/login";
 
         @Test
-        @DisplayName("Deve autenticar com credenciais válidas")
+        @DisplayName("Should authenticate with valid credentials")
         void shouldAuthenticateWithValidCredentials() throws Exception {
             mockMvc.perform(post(URL)
                             .with(withNextTestIp())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {
-                                        "username": "test-user",
-                                        "password": "test-password"
+                                        "username": "%s",
+                                        "password": "%s"
                                     }
-                                    """))
+                                    """.formatted(testUser.getUsername(), TEST_PASSWORD)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.token").isNotEmpty())
-                    .andExpect(jsonPath("$.username").value("test-user"));
+                    .andExpect(jsonPath("$.username").value(testUser.getUsername()));
         }
 
         @Test
-        @DisplayName("Deve rejeitar senha inválida")
+        @DisplayName("Should reject an invalid password")
         void shouldRejectInvalidPassword() throws Exception {
             mockMvc.perform(post(URL)
                             .with(withNextTestIp())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {
-                                        "username": "test-user",
+                                        "username": "%s",
                                         "password": "test-invalid-password"
                                     }
-                                    """))
+                                    """.formatted(testUser.getUsername())))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("Deve rejeitar usuário inexistente")
+        @DisplayName("Should reject a nonexistent user")
         void shouldRejectNonexistentUser() throws Exception {
             mockMvc.perform(post(URL)
                             .with(withNextTestIp())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {
-                                        "username": "test-invalid-user",
+                                        "username": "%s",
                                         "password": "test-invalid-password"
                                     }
-                                    """))
+                                    """.formatted(NONEXISTENT_USERNAME)))
                     .andExpect(status().isUnauthorized());
         }
 
         @Test
-        @DisplayName("Deve rejeitar username em branco")
+        @DisplayName("Should reject a blank username")
         void shouldRejectBlankUsername() throws Exception {
             mockMvc.perform(post(URL)
                             .with(withNextTestIp())
@@ -182,25 +182,25 @@ class AuthenticationControllerTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar senha em branco")
+        @DisplayName("Should reject a blank password")
         void shouldRejectBlankPassword() throws Exception {
             mockMvc.perform(post(URL)
                             .with(withNextTestIp())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {
-                                        "username": "test-user",
+                                        "username": "%s",
                                         "password": ""
                                     }
-                                    """))
+                                    """.formatted(testUser.getUsername())))
                     .andExpect(status().isBadRequest());
         }
 
         @Test
-        @DisplayName("Deve rejeitar usuário inativo")
+        @DisplayName("Should reject an inactive user")
         void shouldRejectDisabledUser() throws Exception {
             User user = userRepository
-                    .findByUsernameIgnoreCase("test-user")
+                    .findByUsernameIgnoreCase(testUser.getUsername())
                     .orElseThrow();
 
             user.deactivate();
@@ -211,10 +211,10 @@ class AuthenticationControllerTests {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {
-                                        "username": "test-user",
-                                        "password": "test-password"
+                                        "username": "%s",
+                                        "password": "%s"
                                     }
-                                    """))
+                                    """.formatted(testUser.getUsername(), TEST_PASSWORD)))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.status").value(401))
                     .andExpect(jsonPath("$.message")
@@ -223,24 +223,22 @@ class AuthenticationControllerTests {
     }
 
     @Nested
-    @DisplayName("Ao exceder o limite de tentativas de login")
+    @DisplayName("When exceeding the login attempt limit")
     class RateLimitTests {
 
-        private static final String USERNAME = "test-user";
-        private static final String PASSWORD = "test-password";
         private static final String WRONG_PASSWORD = "test-wrong-password";
 
         @Test
-        @DisplayName("Deve responder 429 com Retry-After após o limite de tentativas do usuário no mesmo IP")
+        @DisplayName("Should return 429 with Retry-After after exceeding the maximum login attempts from the same IP")
         void shouldRespondTooManyRequestsAfterMaximumAttempts() throws Exception {
             String ip = nextTestIp();
 
             for (int i = 0; i < rateLimitProperties.maxFailedAttempts(); i++) {
-                login(USERNAME, WRONG_PASSWORD, ip)
+                login(testUser.getUsername(), WRONG_PASSWORD, ip)
                         .andExpect(status().isUnauthorized());
             }
 
-            login(USERNAME, WRONG_PASSWORD, ip)
+            login(testUser.getUsername(), WRONG_PASSWORD, ip)
                     .andExpect(status().isTooManyRequests())
                     .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
                     .andExpect(jsonPath("$.status").value(429))
@@ -249,64 +247,64 @@ class AuthenticationControllerTests {
         }
 
         @Test
-        @DisplayName("Deve bloquear também a senha correta enquanto o usuário estiver bloqueado no IP")
+        @DisplayName("Should reject the correct password while the user is locked out from the IP")
         void shouldRejectCorrectPasswordWhileLocked() throws Exception {
             String ip = nextTestIp();
 
             for (int i = 0; i < rateLimitProperties.maxFailedAttempts(); i++) {
-                login(USERNAME, WRONG_PASSWORD, ip)
+                login(testUser.getUsername(), WRONG_PASSWORD, ip)
                         .andExpect(status().isUnauthorized());
             }
 
-            login(USERNAME, PASSWORD, ip)
+            login(testUser.getUsername(), TEST_PASSWORD, ip)
                     .andExpect(status().isTooManyRequests())
                     .andExpect(header().exists(HttpHeaders.RETRY_AFTER));
         }
 
         @Test
-        @DisplayName("Não deve impedir o usuário legítimo de entrar a partir de outro IP")
+        @DisplayName("Should not prevent a legitimate user from logging in from another IP")
         void shouldNotLockLegitimateUserFromAnotherIp() throws Exception {
             String attackerIp = nextTestIp();
             String userIp = nextTestIp();
 
             for (int i = 0; i < rateLimitProperties.maxFailedAttempts(); i++) {
-                login(USERNAME, WRONG_PASSWORD, attackerIp)
+                login(testUser.getUsername(), WRONG_PASSWORD, attackerIp)
                         .andExpect(status().isUnauthorized());
             }
 
-            login(USERNAME, WRONG_PASSWORD, attackerIp)
+            login(testUser.getUsername(), WRONG_PASSWORD, attackerIp)
                     .andExpect(status().isTooManyRequests());
 
-            login(USERNAME, PASSWORD, userIp)
+            login(testUser.getUsername(), TEST_PASSWORD, userIp)
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.token").isNotEmpty());
         }
 
         @Test
-        @DisplayName("Deve zerar a contagem após um login bem-sucedido")
+        @DisplayName("Should reset the failed login attempt count after a successful login")
         void shouldResetCountAfterSuccessfulLogin() throws Exception {
             String ip = nextTestIp();
             int maxAttempts = rateLimitProperties.maxFailedAttempts();
 
             for (int i = 0; i < maxAttempts - 1; i++) {
-                login(USERNAME, WRONG_PASSWORD, ip)
+                login(testUser.getUsername(), WRONG_PASSWORD, ip)
                         .andExpect(status().isUnauthorized());
             }
 
-            login(USERNAME, PASSWORD, ip)
+            login(testUser.getUsername(), TEST_PASSWORD, ip)
                     .andExpect(status().isOk());
 
             for (int i = 0; i < maxAttempts; i++) {
-                login(USERNAME, WRONG_PASSWORD, ip)
+                login(testUser.getUsername(), WRONG_PASSWORD, ip)
                         .andExpect(status().isUnauthorized());
             }
 
-            login(USERNAME, WRONG_PASSWORD, ip)
+            login(testUser.getUsername(), WRONG_PASSWORD, ip)
                     .andExpect(status().isTooManyRequests());
         }
 
         @Test
-        @DisplayName("Deve limitar as requisições de um mesmo IP, ainda que com usuários diferentes")
+        @DisplayName("Should limit requests from the same IP even when different usernames are used")
         void shouldLimitRequestsPerIp() throws Exception {
             String ip = nextTestIp();
             int capacity = rateLimitProperties.ipCapacity();
@@ -314,8 +312,9 @@ class AuthenticationControllerTests {
             int accepted = 0;
             boolean limited = false;
 
-            // O bucket recebe tokens com o tempo, então a tentativa seguinte à
-            // capacidade pode passar se o laço for lento. Por isso há uma folga.
+            // The bucket replenishes tokens over time, so the request immediately
+            // after reaching capacity may succeed if the loop takes too long.
+            // A small margin is therefore included.
             for (int i = 0; i < capacity + 10 && !limited; i++) {
                 ResultActions result = login(
                         "test-iplimit-" + i,
@@ -335,10 +334,10 @@ class AuthenticationControllerTests {
                 }
             }
 
-            assertTrue(limited, "O limite de IP deveria ter sido atingido.");
+            assertTrue(limited, "The IP rate limit should have been reached.");
             assertTrue(
                     accepted >= capacity,
-                    "As requisições dentro da capacidade deveriam ser aceitas."
+                    "Requests within the bucket capacity should be accepted."
             );
         }
     }

@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.integration.user;
 
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,9 +37,6 @@ class UserTimestampsIntegrationTests {
     private static final Instant UPDATED_AT_MICROS =
             Instant.parse("2026-10-29T08:00:00.987654Z");
 
-    private static final String EMPLOYEE_ID = "EMP-TEST-CLOCK";
-    private static final String FULL_NAME = "Clock Test User";
-
     @Autowired
     private UserRepository userRepository;
 
@@ -51,15 +49,17 @@ class UserTimestampsIntegrationTests {
     void setUp() {
         mutableClock.freezeAt(CREATED_AT);
 
+        String uniqueId = UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 8);
+
         userId = userRepository.saveAndFlush(
-                User.createHuman(
-                        EMPLOYEE_ID,
-                        FULL_NAME,
-                        "user-clock-it",
-                        "user-clock-it@test.com",
-                        "test-password",
-                        Role.EMPLOYEE
-                )
+                UserTestFactory.aUser()
+                        .withEmployeeId("EMP-CLOCK-" + uniqueId)
+                        .withUsername("clock-" + uniqueId)
+                        .withEmail("clock-" + uniqueId + "@test.com")
+                        .build()
         ).getId();
     }
 

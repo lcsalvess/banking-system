@@ -5,7 +5,6 @@ import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
@@ -16,6 +15,7 @@ import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifica
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.transaction.query.TransactionPageResult;
 import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -58,14 +58,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TransactionQueryServiceTests {
 
-    private static final User TEST_USER = User.createHuman(
-            "EMP-TEST-001",
-            "Joe Doe",
-            "joe.doe",
-            "joe.doe@example.com",
-            "test-password",
-            Role.EMPLOYEE
-    );
+    private static final User TEST_USER = UserTestFactory.aUser().build();
 
     private static final String ACCOUNT_NUMBER = "00001";
     private static final String ACCOUNT_DIGIT = "9";

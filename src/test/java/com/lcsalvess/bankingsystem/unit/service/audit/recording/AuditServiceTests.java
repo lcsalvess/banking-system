@@ -5,12 +5,12 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEvent;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.repository.audit.AuditEventRepository;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +21,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.MDC;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -45,7 +44,9 @@ class AuditServiceTests {
     private static final String CORRELATION_ID =
             "2f9f7c1e-3b8a-4d55-9a53-0c8f1e6b7a10";
 
-    private static final String USERNAME = "joe.doe";
+    private static final User USER = UserTestFactory.aUser()
+            .withId(7L)
+            .build();
 
     @Mock
     private AuditEventRepository auditEventRepository;
@@ -78,7 +79,7 @@ class AuditServiceTests {
         @DisplayName("Should record the authenticated user as the actor")
         void shouldRecordAuthenticatedUserAsActor() {
             when(currentUserService.findCurrentUser())
-                    .thenReturn(Optional.of(user(7L, USERNAME)));
+                    .thenReturn(Optional.of(USER));
 
             auditService.recordSuccess(
                     AuditEventType.USER_CREATED,
@@ -92,7 +93,7 @@ class AuditServiceTests {
             assertEquals(AuditOutcome.SUCCESS, saved.getOutcome());
             assertEquals(AuditActorType.USER, saved.getActorType());
             assertEquals(7L, saved.getActorUserId());
-            assertEquals(USERNAME, saved.getActorUsername());
+            assertEquals(USER.getUsername(), saved.getActorUsername());
             assertEquals(AuditEntityType.USER, saved.getEntityType());
             assertEquals("42", saved.getEntityId());
             assertEquals(NOW, saved.getCreatedAt());
@@ -102,7 +103,7 @@ class AuditServiceTests {
         @DisplayName("Should store the reason when one is provided")
         void shouldStoreReasonWhenProvided() {
             when(currentUserService.findCurrentUser())
-                    .thenReturn(Optional.of(user(7L, USERNAME)));
+                    .thenReturn(Optional.of(USER));
 
             auditService.recordSuccess(
                     AuditEventType.USER_ROLE_CHANGED,
@@ -123,7 +124,7 @@ class AuditServiceTests {
         @DisplayName("Should leave the reason empty when none is provided")
         void shouldLeaveReasonEmptyWhenNoneIsProvided() {
             when(currentUserService.findCurrentUser())
-                    .thenReturn(Optional.of(user(7L, USERNAME)));
+                    .thenReturn(Optional.of(USER));
 
             auditService.recordSuccess(
                     AuditEventType.USER_CREATED,
@@ -211,20 +212,5 @@ class AuditServiceTests {
         verifyNoMoreInteractions(auditEventRepository, currentUserService);
 
         return captor.getValue();
-    }
-
-    private User user(Long id, String username) {
-        User user = User.createHuman(
-                "EMP-TEST-" + id,
-                "Joe Doe",
-                username,
-                username + "@example.com",
-                "hash",
-                Role.EMPLOYEE
-        );
-
-        ReflectionTestUtils.setField(user, "id", id);
-
-        return user;
     }
 }

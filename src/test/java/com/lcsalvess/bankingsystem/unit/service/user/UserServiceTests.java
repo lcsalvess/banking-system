@@ -18,6 +18,7 @@ import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.user.UserService;
 import com.lcsalvess.bankingsystem.service.user.generator.EmployeeIdGenerator;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -55,9 +55,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class UserServiceTests {
 
-    private static final String FULL_NAME = "Test User";
-    private static final String USERNAME = "test-user";
-    private static final String EMAIL = "test@test.com.br";
     private static final String PASSWORD = "SecurePass123!";
     private static final String ENCODED_PASSWORD = "encoded-password";
 
@@ -161,6 +158,14 @@ class UserServiceTests {
         @DisplayName("Should create a user successfully with valid data")
         void shouldCreateUserSuccessfully() {
             UserRequestDTO dto = createUserRequestDTO();
+            String employeeId = "EMP-UNIT-000001";
+
+            User savedUser = UserTestFactory.aUser()
+                    .withId(1L)
+                    .withEmployeeId(employeeId)
+                    .withEncodedPassword(ENCODED_PASSWORD)
+                    .withRole(dto.role())
+                    .build();
 
             when(userRepository.existsByUsernameIgnoreCase(dto.username()))
                     .thenReturn(false);
@@ -169,28 +174,17 @@ class UserServiceTests {
                     .thenReturn(false);
 
             when(employeeIdGenerator.generate())
-                    .thenReturn("EMP-UNIT-000001");
+                    .thenReturn(employeeId);
 
             when(passwordEncoder.encode(dto.password()))
                     .thenReturn(ENCODED_PASSWORD);
-
-            User savedUser = User.createHuman(
-                    "EMP-UNIT-000001",
-                    dto.fullName(),
-                    dto.username(),
-                    dto.email(),
-                    ENCODED_PASSWORD,
-                    dto.role()
-            );
-
-            ReflectionTestUtils.setField(savedUser, "id", 1L);
 
             when(userRepository.save(any(User.class)))
                     .thenReturn(savedUser);
 
             UserResponseDTO response = userService.create(dto);
 
-            assertEquals("EMP-UNIT-000001", response.employeeId());
+            assertEquals(savedUser.getEmployeeId(), response.employeeId());
             assertEquals(dto.fullName(), response.fullName());
             assertEquals(dto.username(), response.username());
             assertEquals(dto.email(), response.email());
@@ -257,12 +251,16 @@ class UserServiceTests {
         }
 
         private UserRequestDTO createUserRequestDTO() {
+            User user = UserTestFactory.aUser()
+                    .withRole(Role.ADMIN)
+                    .build();
+
             return new UserRequestDTO(
-                    FULL_NAME,
-                    USERNAME,
-                    EMAIL,
+                    user.getFullName(),
+                    user.getUsername(),
+                    user.getEmail(),
                     PASSWORD,
-                    Role.ADMIN
+                    user.getRole()
             );
         }
     }
@@ -807,27 +805,20 @@ class UserServiceTests {
     }
 
     private User createUserWithId(Role role, long id) {
-        User user = createUser(role, true);
-        ReflectionTestUtils.setField(user, "id", id);
-        return user;
+        return userBuilder(role)
+                .withId(id)
+                .build();
     }
 
     private User createUser(Role role, boolean active) {
-        String employeeId = "EMP-UNIT-" + employeeIdSequence.incrementAndGet();
+        return userBuilder(role)
+                .withActive(active)
+                .build();
+    }
 
-        User user = User.createHuman(
-                employeeId,
-                FULL_NAME,
-                USERNAME,
-                EMAIL,
-                ENCODED_PASSWORD,
-                role
-        );
-
-        if (!active) {
-            user.deactivate();
-        }
-
-        return user;
+    private UserTestFactory.Builder userBuilder(Role role) {
+        return UserTestFactory.aUser()
+                .withEmployeeId("EMP-UNIT-" + employeeIdSequence.incrementAndGet())
+                .withRole(role);
     }
 }

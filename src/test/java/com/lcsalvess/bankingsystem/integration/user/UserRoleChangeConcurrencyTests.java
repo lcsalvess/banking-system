@@ -6,6 +6,7 @@ import com.lcsalvess.bankingsystem.exception.user.SelfRoleChangeNotAllowedExcept
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.user.UserService;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,8 +23,8 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -44,8 +45,6 @@ class UserRoleChangeConcurrencyTests {
 
     private static final String REPETITION_NAME =
             "{displayName} [{currentRepetition}/{totalRepetitions}]";
-
-    private static final String EMPLOYEE_ID_PREFIX = "EMP-TEST-";
 
     @Autowired
     private UserRepository userRepository;
@@ -85,8 +84,8 @@ class UserRoleChangeConcurrencyTests {
             User second = admins.get(1);
 
             List<Boolean> results = runConcurrently(List.of(
-                    roleChange(first, second, Role.EMPLOYEE),
-                    roleChange(second, first, Role.EMPLOYEE)
+                    roleChange(first, second),
+                    roleChange(second, first)
             ));
 
             // The caller that loses the race is no longer an active administrator
@@ -108,8 +107,8 @@ class UserRoleChangeConcurrencyTests {
 
             // A demotes B while B attempts to demote C.
             List<Boolean> results = runConcurrently(List.of(
-                    roleChange(a, b, Role.EMPLOYEE),
-                    roleChange(b, c, Role.EMPLOYEE)
+                    roleChange(a, b),
+                    roleChange(b, c)
             ));
 
             long succeeded = countSucceeded(results);
@@ -224,8 +223,7 @@ class UserRoleChangeConcurrencyTests {
      */
     private Callable<Boolean> roleChange(
             User caller,
-            User target,
-            Role newRole
+            User target
     ) {
         return () -> {
             authenticateAs(caller);
@@ -233,7 +231,7 @@ class UserRoleChangeConcurrencyTests {
             try {
                 userService.changeRole(
                         target.getEmployeeId(),
-                        newRole
+                        Role.EMPLOYEE
                 );
 
                 return true;
@@ -325,17 +323,17 @@ class UserRoleChangeConcurrencyTests {
     }
 
     private User createUser(String username, Role role) {
-        String employeeId = EMPLOYEE_ID_PREFIX
-                + username.toUpperCase(Locale.ROOT);
+        String employeeId = "EMP-" + UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12);
 
-        User user = User.createHuman(
-                employeeId,
-                "Concurrency Test User",
-                username,
-                username + "@test.com",
-                "test-password",
-                role
-        );
+        User user = UserTestFactory.aUser()
+                .withEmployeeId(employeeId)
+                .withUsername(username)
+                .withEmail(username + "@test.com")
+                .withRole(role)
+                .build();
 
         return userRepository.saveAndFlush(user);
     }

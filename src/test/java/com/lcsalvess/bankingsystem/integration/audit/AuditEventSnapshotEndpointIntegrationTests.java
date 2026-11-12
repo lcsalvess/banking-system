@@ -10,6 +10,7 @@ import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.audit.AuditEventRepository;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -238,14 +239,16 @@ class AuditEventSnapshotEndpointIntegrationTests {
                 .replace("-", "")
                 .substring(0, 12);
 
-        User auditor = userRepository.save(User.createHuman(
-                employeeId,
-                "End-to-End Test Auditor",
-                username,
-                username + "@test.com",
-                passwordEncoder.encode(PASSWORD),
-                Role.AUDITOR
-        ));
+        User auditor = userRepository.save(
+                UserTestFactory.aUser()
+                        .withEmployeeId(employeeId)
+                        .withFullName("End-to-End Test Auditor")
+                        .withUsername(username)
+                        .withEmail(username + "@test.com")
+                        .withEncodedPassword(passwordEncoder.encode(PASSWORD))
+                        .withRole(Role.AUDITOR)
+                        .build()
+        );
 
         createdAuditorIds.add(auditor.getId());
 

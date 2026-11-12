@@ -99,10 +99,10 @@ public class TransactionControllerTests {
     private TransactionIdempotencyService transactionIdempotencyService;
 
     @Nested
-    @DisplayName("POST /api/v1/transactions/deposit")
+    @DisplayName("POST /api/v1/transactions/deposits")
     class Deposit {
 
-        private static final String URL = "/api/v1/transactions/deposit";
+        private static final String URL = "/api/v1/transactions/deposits";
 
         @Test
         @DisplayName("Should deposit successfully")
@@ -225,10 +225,10 @@ public class TransactionControllerTests {
     }
 
     @Nested
-    @DisplayName("POST /api/v1/transactions/withdraw")
+    @DisplayName("POST /api/v1/transactions/withdrawals")
     class Withdraw {
 
-        private static final String URL = "/api/v1/transactions/withdraw";
+        private static final String URL = "/api/v1/transactions/withdrawals";
 
         @Test
         @DisplayName("Should withdraw successfully")
@@ -370,10 +370,10 @@ public class TransactionControllerTests {
     }
 
     @Nested
-    @DisplayName("POST /api/v1/transactions/transfer")
+    @DisplayName("POST /api/v1/transactions/transfers")
     class Transfer {
 
-        private static final String URL = "/api/v1/transactions/transfer";
+        private static final String URL = "/api/v1/transactions/transfers";
 
         @Test
         @DisplayName("Should transfer successfully")

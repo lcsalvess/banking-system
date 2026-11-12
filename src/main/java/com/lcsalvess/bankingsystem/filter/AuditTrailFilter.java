@@ -65,8 +65,10 @@ public class AuditTrailFilter extends OncePerRequestFilter {
     );
 
     private static final Set<String> KNOWN_ACTIONS = Set.of(
-            "login", "password", "deposit", "withdraw", "transfer",
-            "code", "accounts", "deactivate", "reactivate"
+            "login", "password",
+            "deposits", "withdrawals", "transfers",
+            "code", "accounts",
+            "deactivate", "reactivate", "role"
     );
 
     private static final int MAX_UNMATCHED_SEGMENTS = 4;

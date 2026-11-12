@@ -23,9 +23,9 @@ when running with the `local` profile.
 | GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts               | `EMPLOYEE`    |
 | GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                                      | `EMPLOYEE`    |
 | PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                                   | `EMPLOYEE`    |
-| POST   | `/api/v1/transactions/deposit`                         | Deposit                                             | `EMPLOYEE`    |
-| POST   | `/api/v1/transactions/withdraw`                        | Withdraw                                            | `EMPLOYEE`    |
-| POST   | `/api/v1/transactions/transfer`                        | Transfer between accounts                           | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/deposits`                         | Deposit                                             | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/withdrawals`                        | Withdraw                                            | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/transfers`                        | Transfer between accounts                           | `EMPLOYEE`    |
 | GET    | `/api/v1/transactions/accounts/{accountNumber}?digit=` | Transaction history of an account                   | `EMPLOYEE`    |
 | GET    | `/api/v1/transactions/code/{transactionCode}`          | Get a transaction by its public UUID                | `EMPLOYEE`    |
 | GET    | `/api/v1/audit-events`                                 | Search the audit trail using filters and pagination | `AUDITOR`     |
@@ -166,7 +166,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d '{"username": "employee", "password": "SecurePass123!"}'
 
 # 4. Deposit into an account (each financial request requires an idempotency key)
-curl -X POST http://localhost:8080/api/v1/transactions/deposit \
+curl -X POST http://localhost:8080/api/v1/transactions/deposits \
   -H "Authorization: Bearer <employee-token>" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: 8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210" \

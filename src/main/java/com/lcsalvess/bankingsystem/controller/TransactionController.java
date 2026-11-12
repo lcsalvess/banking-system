@@ -213,7 +213,7 @@ public class TransactionController {
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
-    @PostMapping("/deposit")
+    @PostMapping("/deposits")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO deposit(
             @Parameter(
@@ -253,7 +253,7 @@ public class TransactionController {
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
-    @PostMapping("/withdraw")
+    @PostMapping("/withdrawals")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO withdraw(
             @Parameter(
@@ -293,7 +293,7 @@ public class TransactionController {
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
-    @PostMapping("/transfer")
+    @PostMapping("/transfers")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO transfer(
             @Parameter(

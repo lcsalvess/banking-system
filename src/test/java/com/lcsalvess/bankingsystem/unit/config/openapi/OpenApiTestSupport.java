@@ -33,9 +33,9 @@ final class OpenApiTestSupport {
     static final String CLIENTS_PATH = "/api/v1/clients";
     static final String USERS_PATH = "/api/v1/users";
     static final String AUDIT_EVENTS_PATH = "/api/v1/audit-events";
-    static final String DEPOSIT_PATH = "/api/v1/transactions/deposit";
-    static final String WITHDRAW_PATH = "/api/v1/transactions/withdraw";
-    static final String TRANSFER_PATH = "/api/v1/transactions/transfer";
+    static final String DEPOSIT_PATH = "/api/v1/transactions/deposits";
+    static final String WITHDRAW_PATH = "/api/v1/transactions/withdrawals";
+    static final String TRANSFER_PATH = "/api/v1/transactions/transfers";
 
     static final String ERROR_SCHEMA_NAME = "ApiErrorResponse";
     static final String ERROR_SCHEMA_REF = "#/components/schemas/ApiErrorResponse";

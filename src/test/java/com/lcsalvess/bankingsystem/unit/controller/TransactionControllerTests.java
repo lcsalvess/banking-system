@@ -539,11 +539,11 @@ public class TransactionControllerTests {
     }
 
     @Nested
-    @DisplayName("GET /api/v1/transactions/accounts/{accountNumber}")
+    @DisplayName("GET /api/v1/accounts/{accountNumber}/transactions")
     class FindByAccountNumber {
 
         private static final String URL =
-                "/api/v1/transactions/accounts/{accountNumber}";
+                "/api/v1/accounts/{accountNumber}/transactions";
 
         private static final Pageable DEFAULT_PAGEABLE = PageRequest.of(
                 0, 10, Sort.by(Sort.Direction.DESC, "createdAt", "id")
@@ -868,11 +868,11 @@ public class TransactionControllerTests {
     }
 
     @Nested
-    @DisplayName("GET /api/v1/transactions/code/{transactionCode}")
+    @DisplayName("GET /api/v1/transactions/{transactionCode}")
     class FindByTransactionCode {
 
         private static final String URL =
-                "/api/v1/transactions/code/{transactionCode}";
+                "/api/v1/transactions/{transactionCode}";
 
         @Test
         @DisplayName("Should return transaction successfully")

@@ -94,7 +94,7 @@ public class TransactionController {
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
-    @GetMapping("/accounts/{accountNumber}")
+    @GetMapping("/accounts/{accountNumber}/transactions")
     public ResponseEntity<Page<TransactionResponseDTO>> findByAccountNumber(
             @Parameter(
                     description = "Account number",
@@ -183,7 +183,7 @@ public class TransactionController {
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
-    @GetMapping("/code/{transactionCode}")
+    @GetMapping("/{transactionCode}")
     public TransactionResponseDTO findByTransactionCode(
             @PathVariable UUID transactionCode
     ) {

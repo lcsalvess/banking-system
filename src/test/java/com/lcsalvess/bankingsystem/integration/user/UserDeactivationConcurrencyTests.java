@@ -6,6 +6,7 @@ import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedEx
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.user.UserService;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,8 +39,6 @@ class UserDeactivationConcurrencyTests {
 
     private static final String REPETITION_NAME =
             "{displayName} [{currentRepetition}/{totalRepetitions}]";
-
-    private static final String EMPLOYEE_ID_PREFIX = "EMP-TEST-";
 
     @Autowired
     private UserRepository userRepository;
@@ -132,7 +131,7 @@ class UserDeactivationConcurrencyTests {
             createAdmins(1);
 
             User employee = createUser(
-                    "employee-concurrency",
+                    "employee-1",
                     Role.EMPLOYEE
             );
 
@@ -221,25 +220,22 @@ class UserDeactivationConcurrencyTests {
         return IntStream.rangeClosed(1, quantity)
                 .mapToObj(number ->
                         createUser(
-                                "admin-concurrency-" + number,
+                                "admin-" + number,
                                 Role.ADMIN
                         )
                 )
                 .toList();
     }
 
-    private User createUser(String username, Role role) {
-        String employeeId = EMPLOYEE_ID_PREFIX
-                + username.toUpperCase(Locale.ROOT);
+    private User createUser(String identifier, Role role) {
+        String employeeId = "EMP-" + identifier.toUpperCase(Locale.ROOT);
 
-        User user = User.createHuman(
-                employeeId,
-                "Concurrency Test User",
-                username,
-                username + "@test.com",
-                "test-password",
-                role
-        );
+        User user = UserTestFactory.aUser()
+                .withEmployeeId(employeeId)
+                .withUsername(identifier)
+                .withEmail(identifier + "@test.com")
+                .withRole(role)
+                .build();
 
         return userRepository.saveAndFlush(user);
     }

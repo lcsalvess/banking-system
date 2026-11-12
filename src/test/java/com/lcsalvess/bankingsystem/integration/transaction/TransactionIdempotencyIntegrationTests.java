@@ -9,7 +9,6 @@ import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.transaction.IdempotencyKeyConflictException;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
@@ -24,6 +23,7 @@ import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -115,16 +115,7 @@ class TransactionIdempotencyIntegrationTests {
 
         clientSequence = 0;
 
-        testUser = userRepository.saveAndFlush(
-                User.createHuman(
-                        "EMP-IDEMPOTENCY-001",
-                        "Idempotency Test User",
-                        "idempotency-user",
-                        "idempotency-user@test.com",
-                        "test-password",
-                        Role.EMPLOYEE
-                )
-        );
+        testUser = createUser();
 
         when(currentUserService.getCurrentUser()).thenReturn(testUser);
         when(currentUserService.getUsername()).thenReturn(testUser.getUsername());
@@ -245,16 +236,7 @@ class TransactionIdempotencyIntegrationTests {
             CheckingAccount account = createCheckingAccount("0.00");
             UUID idempotencyKey = UUID.randomUUID();
 
-            User otherUser = userRepository.saveAndFlush(
-                    User.createHuman(
-                            "EMP-IDEMPOTENCY-002",
-                            "Second Idempotency Test User",
-                            "idempotency-user-2",
-                            "idempotency-user-2@test.com",
-                            "test-password",
-                            Role.EMPLOYEE
-                    )
-            );
+            User otherUser = createUser();
 
             TransactionResponseDTO firstResponse =
                     transactionIdempotencyService.deposit(
@@ -663,6 +645,21 @@ class TransactionIdempotencyIntegrationTests {
         );
 
         return clientRepository.saveAndFlush(client);
+    }
+
+    private User createUser() {
+        String uniqueId = UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12);
+
+        return userRepository.saveAndFlush(
+                UserTestFactory.aUser()
+                        .withEmployeeId("EMP-" + uniqueId)
+                        .withUsername("idem-" + uniqueId)
+                        .withEmail("idem-" + uniqueId + "@test.com")
+                        .build()
+        );
     }
 
     private AccountOperationRequestDTO operation(

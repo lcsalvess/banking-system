@@ -1,9 +1,9 @@
 package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.entity.user.User;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -31,22 +31,16 @@ class CustomUserDetailsServiceTests {
     private CustomUserDetailsService customUserDetailsService;
 
     @Nested
-    @DisplayName("Ao buscar usuário por username")
+    @DisplayName("When searching for a user by username")
     class LoadUserByUsernameTests {
 
         @Test
-        @DisplayName("Deve retornar usuário quando o username existe")
+        @DisplayName("Should return the user when the username exists")
         void shouldReturnUserWhenUsernameExists() {
-            String username = "joe.doe";
+            User user = UserTestFactory.aUser()
+                    .build();
 
-            User user = User.createHuman(
-                    "EMP-TEST-001",
-                    "Joe Doe",
-                    username,
-                    "joe.doe@example.com",
-                    "encoded-password",
-                    Role.EMPLOYEE
-            );
+            String username = user.getUsername();
 
             when(userRepository.findByUsernameIgnoreCase(username))
                     .thenReturn(Optional.of(user));
@@ -60,9 +54,9 @@ class CustomUserDetailsServiceTests {
         }
 
         @Test
-        @DisplayName("Deve lançar exceção quando o username não existe")
+        @DisplayName("Should throw an exception when the username does not exist")
         void shouldThrowWhenUsernameDoesNotExist() {
-            String username = "usuario.inexistente";
+            String username = "nonexistent.user";
 
             when(userRepository.findByUsernameIgnoreCase(username))
                     .thenReturn(Optional.empty());

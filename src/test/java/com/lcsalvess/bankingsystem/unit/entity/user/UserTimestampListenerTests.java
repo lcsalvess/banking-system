@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.entity.user;
 
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.UserTimestampListener;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,13 +25,10 @@ class UserTimestampListenerTests {
     private static final Instant UPDATED_AT_MICROS =
             Instant.parse("2026-10-29T08:00:00.987654Z");
 
-    private static final String EMPLOYEE_ID = "EMP-TEST-TIMESTAMP";
-    private static final String FULL_NAME = "Timestamp Test User";
-
     @Test
     @DisplayName("onCreate sets both timestamps from the clock, truncated to micros")
     void onCreateSetsBothTimestamps() {
-        User user = newUser();
+        User user = UserTestFactory.aUser().build();
 
         new UserTimestampListener(fixedClock(CREATED_AT)).onCreate(user);
 
@@ -42,7 +39,7 @@ class UserTimestampListenerTests {
     @Test
     @DisplayName("onUpdate changes only updatedAt")
     void onUpdateChangesOnlyUpdatedAt() {
-        User user = newUser();
+        User user = UserTestFactory.aUser().build();
         new UserTimestampListener(fixedClock(CREATED_AT)).onCreate(user);
 
         new UserTimestampListener(fixedClock(UPDATED_AT)).onUpdate(user);
@@ -54,7 +51,7 @@ class UserTimestampListenerTests {
     @Test
     @DisplayName("a new user has no timestamps until it is persisted")
     void newUserHasNoTimestamps() {
-        User user = newUser();
+        User user = UserTestFactory.aUser().build();
 
         assertNull(user.getCreatedAt());
         assertNull(user.getUpdatedAt());
@@ -62,16 +59,5 @@ class UserTimestampListenerTests {
 
     private static Clock fixedClock(Instant instant) {
         return Clock.fixed(instant, ZoneOffset.UTC);
-    }
-
-    private static User newUser() {
-        return User.createHuman(
-                EMPLOYEE_ID,
-                FULL_NAME,
-                "employee",
-                "employee@example.com",
-                "not-a-real-password-hash",
-                Role.EMPLOYEE
-        );
     }
 }

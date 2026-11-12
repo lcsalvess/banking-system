@@ -1,6 +1,5 @@
 package com.lcsalvess.bankingsystem.unit.filter;
 
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
 import com.lcsalvess.bankingsystem.filter.AuditTrailFilter;
@@ -8,6 +7,7 @@ import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.security.AuditRequestAttributes;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +25,6 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.servlet.HandlerMapping;
 
@@ -62,16 +61,9 @@ class AuditTrailFilterTests {
     void setUp() {
         filter = new AuditTrailFilter(recorder);
 
-        actor = User.createHuman(
-                "EMP-TEST-001",
-                "Joe Doe",
-                "joe",
-                "joe@example.com",
-                "hash",
-                Role.EMPLOYEE
-        );
-
-        ReflectionTestUtils.setField(actor, "id", 7L);
+        actor = UserTestFactory.aUser()
+                .withId(7L)
+                .build();
     }
 
     private MockHttpServletRequest request(

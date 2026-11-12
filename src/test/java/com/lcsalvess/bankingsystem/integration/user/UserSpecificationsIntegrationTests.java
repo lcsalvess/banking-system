@@ -4,6 +4,7 @@ import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.UserSpecifications;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.DisplayName;
@@ -43,9 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("UserSpecifications integration tests")
 class UserSpecificationsIntegrationTests {
 
-    private static final String PASSWORD = "test-password";
     private static final String EMPLOYEE_ID_PREFIX = "EMP-";
-    private static final String DEFAULT_FULL_NAME = "Integration Test User";
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -85,19 +84,17 @@ class UserSpecificationsIntegrationTests {
             String marker = uniqueMarker();
 
             persistUsers(
-                    user(
+                    userWithFullName(
                             marker,
                             "person-" + marker,
                             "u1",
-                            "Alice Maria da Silva",
-                            Role.EMPLOYEE
+                            "Alice Maria da Silva"
                     ),
-                    user(
+                    userWithFullName(
                             marker,
                             "another-" + marker,
                             "u2",
-                            "Beatriz Costa",
-                            Role.EMPLOYEE
+                            "Beatriz Costa"
                     )
             );
 
@@ -400,35 +397,53 @@ class UserSpecificationsIntegrationTests {
             String emailLocalPart,
             Role role
     ) {
-        return user(
+        return buildUser(marker, username, emailLocalPart, null, role);
+    }
+
+    private static User userWithFullName(
+            String marker,
+            String username,
+            String emailLocalPart,
+            String fullName
+    ) {
+        return buildUser(
                 marker,
                 username,
                 emailLocalPart,
-                DEFAULT_FULL_NAME,
-                role
+                fullName,
+                Role.EMPLOYEE
         );
     }
 
-    private static User user(
+    private static User buildUser(
             String marker,
             String username,
             String emailLocalPart,
             String fullName,
             Role role
     ) {
+        String employeeSuffix = emailLocalPart.toUpperCase(Locale.ROOT);
+
+        if (employeeSuffix.length() > 6) {
+            employeeSuffix = employeeSuffix.substring(0, 6);
+        }
+
         String employeeId = EMPLOYEE_ID_PREFIX
                 + marker
                 + "-"
-                + emailLocalPart.toUpperCase(Locale.ROOT);
+                + employeeSuffix;
 
-        return User.createHuman(
-                employeeId,
-                fullName,
-                username,
-                emailLocalPart + domain(marker),
-                PASSWORD,
-                role
-        );
+        var builder = UserTestFactory.aUser()
+                .withEmployeeId(employeeId)
+                .withUsername(username)
+                .withEmail(emailLocalPart + domain(marker))
+                .withRole(role);
+
+        if (fullName != null) {
+            builder.withFullName(fullName);
+        }
+
+        return builder.build();
     }
 
     private static User inactiveUser(

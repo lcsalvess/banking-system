@@ -1,10 +1,11 @@
 package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.config.security.JwtProperties;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
+import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.service.security.JwtClaims;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.IncorrectClaimException;
@@ -36,7 +37,6 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,22 +49,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JwtServiceTests {
 
-    // Base64 de "uma-chave-secreta-com-pelo-menos-32-bytes" (41 bytes -> HS256)
+    // Base64 encoding of "uma-chave-secreta-com-pelo-menos-32-bytes" (41 bytes → HS256)
     private static final String SECRET =
             "dW1hLWNoYXZlLXNlY3JldGEtY29tLXBlbG8tbWVub3MtMzItYnl0ZXM=";
 
-    // Chave diferente, usada para simular tokens emitidos por terceiros
+    // A different key, used to simulate tokens issued by third parties
     private static final String OTHER_SECRET =
             "b3V0cmEtY2hhdmUtc2VjcmV0YS1jb21wbGV0YW1lbnRlLWRpZmVyZW50ZS02NA==";
 
     private static final String ISSUER = "banking-system-test";
     private static final long EXPIRATION_IN_SECONDS = 3600L;
-    private static final String USERNAME = "joe.doe";
-
-    private static final String BLANK_SECRET_MESSAGE =
-            "O segredo JWT não pode ser nulo ou vazio.";
-    private static final String INVALID_SECRET_MESSAGE =
-            "Configuração do segredo JWT inválida.";
 
     private JwtService jwtService;
     private User user;
@@ -72,22 +66,22 @@ class JwtServiceTests {
     @BeforeEach
     void setUp() {
         jwtService = serviceOf(SECRET, EXPIRATION_IN_SECONDS, ISSUER);
-        user = createUser(USERNAME);
+        user = UserTestFactory.aUser().build();
     }
 
     @Nested
-    @DisplayName("Ao criar o serviço")
+    @DisplayName("On service construction")
     class ConstructionTests {
 
         @Test
-        @DisplayName("Deve criar o serviço com configuração válida")
+        @DisplayName("Should create the service with valid configuration")
         void shouldCreateServiceWithValidConfiguration() {
             assertDoesNotThrow(() ->
                     serviceOf(SECRET, EXPIRATION_IN_SECONDS, ISSUER));
         }
 
         @Test
-        @DisplayName("Deve aceitar chave com exatamente 256 bits")
+        @DisplayName("Should accept a key with exactly 256 bits")
         void shouldAcceptKeyWithMinimumSize() {
             String secret = base64OfBytes(32);
 
@@ -95,39 +89,39 @@ class JwtServiceTests {
                     serviceOf(secret, EXPIRATION_IN_SECONDS, ISSUER));
         }
 
-        @ParameterizedTest(name = "segredo = \"{0}\"")
+        @ParameterizedTest(name = "secret = \"{0}\"")
         @NullAndEmptySource
         @ValueSource(strings = {" ", "   ", "\t", "\n"})
-        @DisplayName("Deve rejeitar segredo nulo, vazio ou em branco")
+        @DisplayName("Should reject null, empty, or blank secrets")
         void shouldRejectNullOrBlankSecret(String secret) {
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
                     () -> serviceOf(secret, EXPIRATION_IN_SECONDS, ISSUER)
             );
 
-            assertEquals(BLANK_SECRET_MESSAGE, exception.getMessage());
+            assertEquals(ApiErrorMessages.JWT_SECRET_REQUIRED, exception.getMessage());
         }
 
-        @ParameterizedTest(name = "segredo = \"{0}\"")
+        @ParameterizedTest(name = "secret = \"{0}\"")
         @ValueSource(strings = {"###", "abc", "not valid base64 !!!"})
-        @DisplayName("Deve rejeitar segredo que não é Base64 válido")
+        @DisplayName("Should reject secrets that are not valid Base64")
         void shouldRejectSecretThatIsNotValidBase64(String secret) {
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
                     () -> serviceOf(secret, EXPIRATION_IN_SECONDS, ISSUER)
             );
 
-            assertEquals(INVALID_SECRET_MESSAGE, exception.getMessage());
+            assertEquals(ApiErrorMessages.JWT_SECRET_INVALID_CONFIGURATION, exception.getMessage());
             assertTrue(
                     exception.getCause() instanceof DecodingException
                             || exception.getCause() instanceof WeakKeyException,
-                    "A causa deve ser DecodingException ou WeakKeyException"
+                    "The cause should be DecodingException or WeakKeyException"
             );
         }
 
-        @ParameterizedTest(name = "chave com {0} byte(s)")
+        @ParameterizedTest(name = "key with {0} byte(s)")
         @ValueSource(ints = {1, 16, 31})
-        @DisplayName("Deve rejeitar chave com menos de 256 bits")
+        @DisplayName("Should reject keys shorter than 256 bits")
         void shouldRejectWeakKey(int sizeInBytes) {
             String secret = base64OfBytes(sizeInBytes);
 
@@ -136,12 +130,12 @@ class JwtServiceTests {
                     () -> serviceOf(secret, EXPIRATION_IN_SECONDS, ISSUER)
             );
 
-            assertEquals(INVALID_SECRET_MESSAGE, exception.getMessage());
+            assertEquals(ApiErrorMessages.JWT_SECRET_INVALID_CONFIGURATION, exception.getMessage());
             assertInstanceOf(WeakKeyException.class, exception.getCause());
         }
 
         @Test
-        @DisplayName("Não deve expor o segredo na mensagem de erro")
+        @DisplayName("Should not expose the secret in the error message")
         void shouldNotLeakSecretInErrorMessage() {
             String weakSecret = base64OfBytes(16);
 
@@ -155,11 +149,11 @@ class JwtServiceTests {
     }
 
     @Nested
-    @DisplayName("Ao gerar um token JWT")
+    @DisplayName("On JWT generation")
     class GenerateTokenTests {
 
         @Test
-        @DisplayName("Deve gerar um JWT compacto com três partes")
+        @DisplayName("Should generate a compact JWT with three parts")
         void shouldGenerateCompactJwtWithThreeParts() {
             String token = jwtService.generateToken(user);
 
@@ -169,16 +163,16 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve usar o username como subject e o issuer configurado")
+        @DisplayName("Should use the username as the subject and the configured issuer")
         void shouldSetSubjectAndIssuer() {
             Claims claims = parse(jwtService.generateToken(user)).getPayload();
 
-            assertEquals(USERNAME, claims.getSubject());
+            assertEquals(user.getUsername(), claims.getSubject());
             assertEquals(ISSUER, claims.getIssuer());
         }
 
         @Test
-        @DisplayName("Deve definir iat e exp a partir do Clock injetado")
+        @DisplayName("Should set iat and exp using the injected Clock")
         void shouldSetIssuedAtAndExpirationFromClock() {
             Instant now = Instant.parse("2026-01-15T02:30:00Z");
             JwtService service = serviceOf(SECRET, 3600, ISSUER, fixedClock(now));
@@ -189,9 +183,9 @@ class JwtServiceTests {
             assertEquals(now.plusSeconds(3600), claims.getExpiration().toInstant());
         }
 
-        @ParameterizedTest(name = "expiração = {0}s")
+        @ParameterizedTest(name = "expiration = {0}s")
         @ValueSource(longs = {60, 3600, 86400})
-        @DisplayName("Deve respeitar a expiração configurada")
+        @DisplayName("Should respect the configured expiration")
         void shouldUseConfiguredExpiration(long expirationInSeconds) {
             JwtService service = serviceOf(SECRET, expirationInSeconds, ISSUER);
 
@@ -207,7 +201,7 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve assinar o token com HMAC SHA-256")
+        @DisplayName("Should sign the token using HMAC SHA-256")
         void shouldSignTokenWithHs256() {
             Jws<Claims> jws = parse(jwtService.generateToken(user));
 
@@ -215,7 +209,7 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Não deve incluir dados sensíveis no payload")
+        @DisplayName("Should include only standard claims and the token version")
         void shouldContainOnlyStandardClaims() {
             Claims claims = parse(jwtService.generateToken(user)).getPayload();
 
@@ -223,9 +217,9 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve registrar no claim tv a versão das credenciais do usuário")
+        @DisplayName("Should include the user's credential version in the tv claim")
         void shouldIncludeTokenVersion() {
-            user.changePassword("novo-hash");
+            user.changePassword("new-hash");
 
             Claims claims = parse(jwtService.generateToken(user)).getPayload();
 
@@ -233,40 +227,50 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve gerar tokens diferentes para usuários diferentes")
+        @DisplayName("Should generate different tokens for different users")
         void shouldGenerateDifferentTokensForDifferentUsers() {
-            String first = jwtService.generateToken(createUser("usuario.um"));
-            String second = jwtService.generateToken(createUser("usuario.dois"));
+            User firstUser = UserTestFactory.aUser()
+                    .withUsername("first.user")
+                    .withEmail("first.user@test.com")
+                    .build();
+
+            User secondUser = UserTestFactory.aUser()
+                    .withUsername("second.user")
+                    .withEmail("second.user@test.com")
+                    .build();
+
+            String first = jwtService.generateToken(firstUser);
+            String second = jwtService.generateToken(secondUser);
 
             assertNotEquals(first, second);
         }
     }
 
     @Nested
-    @DisplayName("Ao extrair o username de um token JWT")
+    @DisplayName("When extracting the username from a JWT")
     class ExtractUsernameTests {
 
         @Test
-        @DisplayName("Deve extrair o username de um token válido")
+        @DisplayName("Should extract the username from a valid token")
         void shouldExtractUsernameFromValidToken() {
             String token = jwtService.generateToken(user);
 
-            assertEquals(USERNAME, jwtService.extractUsername(token));
+            assertEquals(user.getUsername(), jwtService.extractUsername(token));
         }
 
         @Test
-        @DisplayName("Deve validar token emitido por outra instância com a mesma configuração")
+        @DisplayName("Should accept a token issued by another instance with the same configuration")
         void shouldAcceptTokenIssuedByAnotherInstanceWithSameConfiguration() {
             JwtService issuer = serviceOf(SECRET, EXPIRATION_IN_SECONDS, ISSUER);
             JwtService validator = serviceOf(SECRET, EXPIRATION_IN_SECONDS, ISSUER);
 
             String token = issuer.generateToken(user);
 
-            assertEquals(USERNAME, validator.extractUsername(token));
+            assertEquals(user.getUsername(), validator.extractUsername(token));
         }
 
         @Test
-        @DisplayName("Deve validar a expiração usando o Clock injetado")
+        @DisplayName("Should validate expiration using the injected Clock")
         void shouldValidateExpirationAgainstInjectedClock() {
             Instant issuedAt = Instant.parse("2026-01-15T02:30:00Z");
             String token = serviceOf(SECRET, 3600, ISSUER, fixedClock(issuedAt)).generateToken(user);
@@ -274,12 +278,12 @@ class JwtServiceTests {
             JwtService beforeExpiration = serviceOf(SECRET, 3600, ISSUER, fixedClock(issuedAt.plusSeconds(3599)));
             JwtService afterExpiration = serviceOf(SECRET, 3600, ISSUER, fixedClock(issuedAt.plusSeconds(3601)));
 
-            assertEquals(USERNAME, beforeExpiration.extractUsername(token));
+            assertEquals(user.getUsername(), beforeExpiration.extractUsername(token));
             assertThrows(ExpiredJwtException.class, () -> afterExpiration.extractUsername(token));
         }
 
         @Test
-        @DisplayName("Deve rejeitar token expirado")
+        @DisplayName("Should reject an expired token")
         void shouldRejectExpiredToken() {
             JwtService service = serviceOf(SECRET, -60, ISSUER);
             String token = service.generateToken(user);
@@ -288,7 +292,7 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar token com payload adulterado")
+        @DisplayName("Should reject a token with a tampered payload")
         void shouldRejectTokenWithTamperedPayload() {
             String[] parts = jwtService.generateToken(user).split("\\.", -1);
             long exp = Instant.now().plusSeconds(3600).getEpochSecond();
@@ -302,7 +306,7 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar token assinado com outra chave")
+        @DisplayName("Should reject a token signed with a different key")
         void shouldRejectTokenSignedWithAnotherKey() {
             JwtService foreign = serviceOf(OTHER_SECRET, EXPIRATION_IN_SECONDS, ISSUER);
             String token = foreign.generateToken(user);
@@ -311,19 +315,19 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar token com issuer diferente")
+        @DisplayName("Should reject a token with a different issuer")
         void shouldRejectTokenWithDifferentIssuer() {
-            JwtService foreign = serviceOf(SECRET, EXPIRATION_IN_SECONDS, "outro-emissor");
+            JwtService foreign = serviceOf(SECRET, EXPIRATION_IN_SECONDS, "another-issuer");
             String token = foreign.generateToken(user);
 
             assertThrows(IncorrectClaimException.class, () -> jwtService.extractUsername(token));
         }
 
         @Test
-        @DisplayName("Deve rejeitar token sem issuer")
+        @DisplayName("Should reject a token without an issuer")
         void shouldRejectTokenWithoutIssuer() {
             String token = Jwts.builder()
-                    .subject(USERNAME)
+                    .subject(user.getUsername())
                     .expiration(inOneHour())
                     .signWith(key(SECRET))
                     .compact();
@@ -332,10 +336,10 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar token sem assinatura")
+        @DisplayName("Should reject an unsigned token")
         void shouldRejectUnsignedToken() {
             String token = Jwts.builder()
-                    .subject(USERNAME)
+                    .subject(user.getUsername())
                     .issuer(ISSUER)
                     .expiration(inOneHour())
                     .compact();
@@ -345,40 +349,40 @@ class JwtServiceTests {
 
         @ParameterizedTest(name = "token = \"{0}\"")
         @ValueSource(strings = {"not-a-jwt", "a.b.c", "a.b", "..", "Bearer token"})
-        @DisplayName("Deve rejeitar token malformado")
+        @DisplayName("Should reject malformed tokens")
         void shouldRejectMalformedToken(String token) {
             assertThrows(JwtException.class, () -> jwtService.extractUsername(token));
         }
 
         @ParameterizedTest(name = "token = \"{0}\"")
         @NullAndEmptySource
-        @DisplayName("Deve rejeitar token nulo ou vazio")
+        @DisplayName("Should reject null or empty tokens")
         void shouldRejectNullOrEmptyToken(String token) {
             assertThrows(IllegalArgumentException.class, () -> jwtService.extractUsername(token));
         }
     }
 
     @Nested
-    @DisplayName("Ao ler os claims de um token JWT")
+    @DisplayName("When reading claims from a JWT")
     class ParseTests {
 
         @Test
-        @DisplayName("Deve devolver o username e a versão do token")
+        @DisplayName("Should return the username and token version")
         void shouldReturnUsernameAndTokenVersion() {
-            user.changePassword("novo-hash");
-            user.changePassword("outro-hash");
+            user.changePassword("new-hash");
+            user.changePassword("another-hash");
 
             JwtClaims claims = jwtService.parse(jwtService.generateToken(user));
 
-            assertEquals(USERNAME, claims.username());
+            assertEquals(user.getUsername(), claims.username());
             assertEquals(2, claims.tokenVersion());
         }
 
         @Test
-        @DisplayName("Deve rejeitar token sem o claim de versão")
+        @DisplayName("Should reject a token without the version claim")
         void shouldRejectTokenWithoutVersionClaim() {
             String tokenWithoutVersion = Jwts.builder()
-                    .subject(USERNAME)
+                    .subject(user.getUsername())
                     .issuer(ISSUER)
                     .issuedAt(Date.from(Instant.now()))
                     .expiration(inOneHour())
@@ -392,10 +396,10 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar token expirado")
+        @DisplayName("Should reject an expired token")
         void shouldRejectExpiredToken() {
             String token = Jwts.builder()
-                    .subject(USERNAME)
+                    .subject(user.getUsername())
                     .issuer(ISSUER)
                     .issuedAt(Date.from(Instant.now().minusSeconds(120)))
                     .expiration(Date.from(Instant.now().minusSeconds(60)))
@@ -407,10 +411,10 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar token assinado com outra chave")
+        @DisplayName("Should reject a token signed with a different key")
         void shouldRejectTokenSignedWithAnotherKey() {
             String token = Jwts.builder()
-                    .subject(USERNAME)
+                    .subject(user.getUsername())
                     .issuer(ISSUER)
                     .issuedAt(Date.from(Instant.now()))
                     .expiration(inOneHour())
@@ -422,10 +426,10 @@ class JwtServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar token com claim tv inválido")
+        @DisplayName("Should reject a token with an invalid tv claim")
         void shouldRejectTokenWithInvalidVersionClaim() {
             String token = Jwts.builder()
-                    .subject(USERNAME)
+                    .subject(user.getUsername())
                     .issuer(ISSUER)
                     .issuedAt(Date.from(Instant.now()))
                     .expiration(inOneHour())
@@ -458,23 +462,6 @@ class JwtServiceTests {
 
     private static Clock fixedClock(Instant instant) {
         return Clock.fixed(instant, ZoneOffset.UTC);
-    }
-
-    private static User createUser(String username) {
-        String employeeId = "EMP-"
-                + UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12);
-
-        return User.createHuman(
-                employeeId,
-                "Joe Doe",
-                username,
-                username + "@email.com",
-                "encoded-password",
-                Role.EMPLOYEE
-        );
     }
 
     private static SecretKey key(String secret) {

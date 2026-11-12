@@ -1,12 +1,12 @@
 package com.lcsalvess.bankingsystem.integration.security;
 
 import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.user.UserService;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,8 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Fluxo completo de troca de senha contra o PostgreSQL: login, troca,
- * revogação dos tokens anteriores e novo login.
+ * End-to-end password change flow against PostgreSQL: login, password change,
+ * revocation of previous tokens, and a new login.
  */
 @ActiveProfiles("test")
 @SpringBootTest
@@ -74,18 +74,19 @@ class PasswordChangeIntegrationTests {
         ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
 
-        userRepository.save(User.createHuman(
-                "EMP-TEST-001",
-                "Test User",
-                USERNAME,
-                "test-user@test.com",
-                passwordEncoder.encode(CURRENT_PASSWORD),
-                Role.EMPLOYEE
-        ));
+        userRepository.save(
+                UserTestFactory.aUser()
+                        .withEmployeeId("EMP-TEST-001")
+                        .withFullName("Test User")
+                        .withUsername(USERNAME)
+                        .withEmail("test-user@test.com")
+                        .withEncodedPassword(passwordEncoder.encode(CURRENT_PASSWORD))
+                        .build()
+        );
     }
 
     @Test
-    @DisplayName("Deve trocar a senha e responder 204 sem corpo")
+    @DisplayName("Should change the password and return 204 without a response body")
     void shouldChangePassword() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -99,7 +100,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve aceitar a nova senha e rejeitar a antiga no login")
+    @DisplayName("Should accept the new password and reject the old password during login")
     void shouldLoginOnlyWithNewPassword() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -113,7 +114,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve invalidar o token usado na troca e qualquer token anterior")
+    @DisplayName("Should invalidate the token used for the password change and all previously issued tokens")
     void shouldRevokeTokensIssuedBeforeTheChange() throws Exception {
         String tokenUsedOnChange = loginAndGetToken(CURRENT_PASSWORD);
         String otherSessionToken = loginAndGetToken(CURRENT_PASSWORD);
@@ -128,7 +129,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve aceitar o token emitido depois da troca de senha")
+    @DisplayName("Should accept a token issued after the password change")
     void shouldAcceptTokenIssuedAfterTheChange() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -142,7 +143,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve rejeitar com 400 quando a senha atual está incorreta")
+    @DisplayName("Should return 400 when the current password is incorrect")
     void shouldRejectWhenCurrentPasswordIsIncorrect() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -151,14 +152,14 @@ class PasswordChangeIntegrationTests {
                 .andExpect(jsonPath("$.message")
                         .value(ApiErrorMessages.INVALID_CURRENT_PASSWORD));
 
-        // Nada mudou: o token e a senha antiga continuam válidos.
+        // Nothing should change: the token and the old password must remain valid.
         login(CURRENT_PASSWORD).andExpect(status().isOk());
         changePassword(token, CURRENT_PASSWORD, NEW_PASSWORD)
                 .andExpect(status().isNoContent());
     }
 
     @Test
-    @DisplayName("Deve responder 429 após tentativas repetidas com a senha atual incorreta, sem bloquear o login")
+    @DisplayName("Should return 429 after repeated incorrect current password attempts without blocking login")
     void shouldRateLimitRepeatedWrongCurrentPassword() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -174,16 +175,16 @@ class PasswordChangeIntegrationTests {
                 .andExpect(jsonPath("$.message")
                         .value(ApiErrorMessages.PASSWORD_CHANGE_RATE_LIMIT_EXCEEDED));
 
-        // Enquanto durar o bloqueio, nem a senha correta é avaliada.
+        // While the account is rate-limited, even the correct password must not be evaluated.
         changePassword(token, CURRENT_PASSWORD, NEW_PASSWORD)
                 .andExpect(status().isTooManyRequests());
 
-        // O bloqueio da troca de senha não afeta o login.
+        // The password change rate limit must not affect login.
         login(CURRENT_PASSWORD).andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("Deve rejeitar com 400 quando a nova senha é igual à atual")
+    @DisplayName("Should return 400 when the new password matches the current password")
     void shouldRejectWhenNewPasswordEqualsCurrent() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -201,7 +202,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve rejeitar com 400 uma nova senha curta")
+    @DisplayName("Should return 400 when the new password is too short")
     void shouldRejectShortNewPassword() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -211,7 +212,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve rejeitar com 400 uma nova senha acima de 64 caracteres")
+    @DisplayName("Should return 400 when the new password exceeds 64 characters")
     void shouldRejectTooLongNewPassword() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -221,18 +222,18 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve rejeitar com 400 uma nova senha acima de 72 bytes")
+    @DisplayName("Should return 400 when the new password exceeds 72 bytes")
     void shouldRejectNewPasswordAbove72Bytes() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
-        // 40 caracteres de 2 bytes = 80 bytes em UTF-8, dentro do limite de 64 caracteres.
+        // 40 two-byte characters = 80 bytes in UTF-8, within the 64-character limit.
         changePassword(token, CURRENT_PASSWORD, "é".repeat(40))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.newPassword").exists());
     }
 
     @Test
-    @DisplayName("Deve rejeitar com 400 campos ausentes")
+    @DisplayName("Should return 400 when required fields are missing")
     void shouldRejectMissingFields() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -246,7 +247,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve responder 401 sem token")
+    @DisplayName("Should return 401 when no token is provided")
     void shouldRejectWithoutToken() throws Exception {
         mockMvc.perform(patch(PASSWORD_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -255,7 +256,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName("Deve responder 401 para usuário desativado")
+    @DisplayName("Should return 401 for a deactivated user")
     void shouldRejectDeactivatedUser() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -268,9 +269,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName(
-            "Should keep old tokens invalid after deactivating and reactivating the user"
-    )
+    @DisplayName("Should keep old tokens invalid after deactivating and reactivating the user")
     void shouldKeepOldTokenRevokedAfterReactivation() throws Exception {
         String oldToken = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -304,9 +303,7 @@ class PasswordChangeIntegrationTests {
     }
 
     @Test
-    @DisplayName(
-            "Deve permitir apenas uma troca de senha quando duas requisições ocorrem simultaneamente"
-    )
+    @DisplayName("Should allow only one password change when two requests are submitted concurrently")
     void shouldSerializeConcurrentPasswordChanges() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
@@ -339,13 +336,13 @@ class PasswordChangeIntegrationTests {
                     )
             );
 
-            // Garante que as duas tarefas estejam prontas antes da largada.
+            // Ensure both tasks are ready before releasing them.
             assertTrue(
                     ready.await(10, TimeUnit.SECONDS),
-                    "As duas requisições deveriam estar prontas para iniciar."
+                    "Both requests should be ready to start."
             );
 
-            // Libera as duas requisições praticamente ao mesmo tempo.
+            // Release both requests at nearly the same time.
             start.countDown();
 
             int firstStatus = firstResult.get(20, TimeUnit.SECONDS);
@@ -353,36 +350,36 @@ class PasswordChangeIntegrationTests {
 
             List<Integer> statuses = List.of(firstStatus, secondStatus);
 
-            // Exatamente uma troca deve ser concluída.
+            // Exactly one password change should succeed.
             assertEquals(
                     1L,
                     statuses.stream()
                             .filter(status -> status == HttpStatus.NO_CONTENT.value())
                             .count(),
-                    "Exatamente uma troca de senha deve ser bem-sucedida."
+                    "Exactly one password change should succeed."
             );
 
-            // A segunda solicitação pode receber 400 se chegar ao serviço
-            // e a senha antiga já não corresponder, ou 401 se o filtro JWT
-            // detectar que o token foi invalidado.
+            // The second request may receive 400 if it reaches the service
+            // after the old password has already changed, or 401 if the JWT filter
+            // detects that the token has been invalidated.
             assertTrue(
                     statuses.stream().allMatch(status ->
                             status == HttpStatus.NO_CONTENT.value()
                                     || status == HttpStatus.BAD_REQUEST.value()
                                     || status == HttpStatus.UNAUTHORIZED.value()
                     ),
-                    "As respostas devem ser 204, 400 ou 401. Recebidas: " + statuses
+                    "Responses must be 204, 400, or 401. Received: " + statuses
             );
 
             User savedUser = userRepository
                     .findByUsernameIgnoreCase(USERNAME)
                     .orElseThrow();
 
-            // A versão não pode sofrer atualização perdida.
+            // The security version must not suffer a lost update.
             assertEquals(
                     1,
                     savedUser.getTokenVersion(),
-                    "A versão das credenciais deve ser incrementada exatamente uma vez."
+                    "The security version must be incremented exactly once."
             );
 
             boolean firstPasswordWon = passwordEncoder.matches(
@@ -395,25 +392,25 @@ class PasswordChangeIntegrationTests {
                     savedUser.getPassword()
             );
 
-            // Exatamente uma das novas senhas deve corresponder ao hash persistido.
+            // Exactly one of the new passwords must match the persisted hash.
             assertTrue(
                     firstPasswordWon ^ secondPasswordWon,
-                    "Apenas uma das novas senhas deve estar armazenada."
+                    "Only one of the new passwords should be stored."
             );
 
             String winningPassword = firstPasswordWon
                     ? firstNewPassword
                     : secondNewPassword;
 
-            // A senha antiga não deve mais autenticar.
+            // The old password must no longer authenticate.
             login(CURRENT_PASSWORD)
                     .andExpect(status().isUnauthorized());
 
-            // A senha vencedora deve autenticar normalmente.
+            // The winning password must authenticate successfully.
             login(winningPassword)
                     .andExpect(status().isOk());
         } finally {
-            // Evita deixar tarefas aguardando caso alguma asserção falhe.
+            // Prevent tasks from remaining blocked if an assertion fails.
             start.countDown();
             executor.shutdownNow();
         }
@@ -472,7 +469,7 @@ class PasswordChangeIntegrationTests {
 
         if (!start.await(10, TimeUnit.SECONDS)) {
             throw new IllegalStateException(
-                    "Tempo excedido aguardando o início do teste concorrente."
+                    "Timed out waiting for the concurrent test to start."
             );
         }
 

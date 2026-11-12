@@ -3,7 +3,6 @@ package com.lcsalvess.bankingsystem.unit.service.security;
 import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
 import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDTO;
 import com.lcsalvess.bankingsystem.entity.user.User;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
@@ -15,9 +14,10 @@ import com.lcsalvess.bankingsystem.exception.user.PasswordUnchangedException;
 import com.lcsalvess.bankingsystem.exception.user.UserNotFoundException;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.service.security.PasswordChangeService;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.PasswordChangeAttempt;
 import com.lcsalvess.bankingsystem.service.security.ratelimit.RateLimitProtectionService;
-import com.lcsalvess.bankingsystem.service.security.PasswordChangeService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +29,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -94,16 +93,23 @@ class PasswordChangeServiceTests {
         lenient().when(rateLimitProtectionService.beginPasswordChangeAttempt(USER_ID))
                 .thenReturn(attempt);
 
-        principal = createUser("stale-hash");
-        persistedUser = createUser(CURRENT_HASH);
+        principal = UserTestFactory.aUser()
+                .withId(USER_ID)
+                .withEncodedPassword("stale-hash")
+                .build();
+
+        persistedUser = UserTestFactory.aUser()
+                .withId(USER_ID)
+                .withEncodedPassword(CURRENT_HASH)
+                .build();
     }
 
     @Nested
-    @DisplayName("Ao trocar a senha")
+    @DisplayName("When changing the password")
     class ChangePasswordTests {
 
         @Test
-        @DisplayName("Deve trocar a senha, subir a versão das credenciais e publicar o evento")
+        @DisplayName("Should change the password, increment the credential version, and publish the event")
         void shouldChangePassword() {
             mockCurrentUserFound();
             when(passwordEncoder.matches(CURRENT_PASSWORD, CURRENT_HASH)).thenReturn(true);
@@ -121,7 +127,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve conferir a senha atual contra o hash do banco, e não contra o principal da requisição")
+        @DisplayName("Should verify the current password against the database hash rather than the request principal hash")
         void shouldCheckCurrentPasswordAgainstPersistedHash() {
             mockCurrentUserFound();
             when(passwordEncoder.matches(CURRENT_PASSWORD, CURRENT_HASH)).thenReturn(true);
@@ -134,7 +140,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar quando a senha atual está incorreta")
+        @DisplayName("Should reject an incorrect current password")
         void shouldRejectWhenCurrentPasswordIsIncorrect() {
             mockCurrentUserFound();
             when(passwordEncoder.matches("wrong-password", CURRENT_HASH)).thenReturn(false);
@@ -155,7 +161,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar quando a nova senha é igual à atual")
+        @DisplayName("Should reject when the new password matches the current password")
         void shouldRejectWhenNewPasswordEqualsCurrent() {
             mockCurrentUserFound();
             when(passwordEncoder.matches(CURRENT_PASSWORD, CURRENT_HASH)).thenReturn(true);
@@ -176,7 +182,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve lançar exceção quando o usuário autenticado não existe mais")
+        @DisplayName("Should throw an exception when the authenticated user no longer exists")
         void shouldThrowWhenAuthenticatedUserNoLongerExists() {
             when(currentUserService.getCurrentUser()).thenReturn(principal);
             when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.empty());
@@ -195,11 +201,11 @@ class PasswordChangeServiceTests {
     }
 
     @Nested
-    @DisplayName("Ao contabilizar tentativas de troca de senha")
+    @DisplayName("When tracking password change attempts")
     class AttemptTrackingTests {
 
         @Test
-        @DisplayName("Deve zerar o contador quando a senha atual é confirmada")
+        @DisplayName("Should reset the counter when the current password is verified")
         void shouldRecordSuccessWhenCurrentPasswordIsConfirmed() {
             mockCurrentUserFound();
             when(passwordEncoder.matches(CURRENT_PASSWORD, CURRENT_HASH)).thenReturn(true);
@@ -215,7 +221,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve zerar o contador mesmo quando a nova senha é igual à atual")
+        @DisplayName("Should reset the counter even when the new password matches the current password")
         void shouldRecordSuccessWhenNewPasswordEqualsCurrent() {
             mockCurrentUserFound();
             when(passwordEncoder.matches(CURRENT_PASSWORD, CURRENT_HASH)).thenReturn(true);
@@ -233,7 +239,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve manter a tentativa contabilizada quando a senha atual está incorreta")
+        @DisplayName("Should keep the attempt counted when the current password is incorrect")
         void shouldKeepAttemptCountedWhenCurrentPasswordIsIncorrect() {
             mockCurrentUserFound();
             when(passwordEncoder.matches("wrong-password", CURRENT_HASH)).thenReturn(false);
@@ -253,7 +259,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve desfazer a contagem quando o usuário autenticado não existe mais")
+        @DisplayName("Should cancel the attempt when the authenticated user no longer exists")
         void shouldCancelAttemptWhenUserNoLongerExists() {
             when(currentUserService.getCurrentUser()).thenReturn(principal);
             when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.empty());
@@ -271,7 +277,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve desfazer a contagem quando ocorre falha de infraestrutura")
+        @DisplayName("Should cancel the attempt when an infrastructure failure occurs")
         void shouldCancelAttemptWhenInfrastructureFails() {
             when(currentUserService.getCurrentUser()).thenReturn(principal);
             when(userRepository.findByIdForUpdate(USER_ID))
@@ -291,7 +297,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve propagar o bloqueio sem consultar o usuário nem executar o BCrypt")
+        @DisplayName("Should propagate the rate limit without querying the user or running BCrypt")
         void shouldPropagateRateLimitWithoutCheckingPassword() {
             when(currentUserService.getCurrentUser()).thenReturn(principal);
             when(rateLimitProtectionService.beginPasswordChangeAttempt(USER_ID))
@@ -316,7 +322,7 @@ class PasswordChangeServiceTests {
     }
 
     @Nested
-    @DisplayName("Ao limitar tentativas com o limitador real")
+    @DisplayName("When enforcing the limit with the real rate limiter")
     class RealRateLimiterTests {
 
         private static final int MAX_FAILED_ATTEMPTS = 3;
@@ -351,7 +357,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Deve bloquear após o limite de senhas atuais incorretas, sem executar o BCrypt")
+        @DisplayName("Should block after the maximum number of incorrect current passwords without running BCrypt")
         void shouldBlockAfterMaxWrongCurrentPasswords() {
             mockCurrentUserFound();
             when(passwordEncoder.matches(WRONG_PASSWORD, CURRENT_HASH)).thenReturn(false);
@@ -381,7 +387,7 @@ class PasswordChangeServiceTests {
         }
 
         @Test
-        @DisplayName("Não deve bloquear quando a senha atual correta zera o contador")
+        @DisplayName("Should not block when a correct current password resets the counter")
         void shouldNotBlockWhenCorrectCurrentPasswordResetsCounter() {
             mockCurrentUserFound();
             when(passwordEncoder.matches(WRONG_PASSWORD, CURRENT_HASH)).thenReturn(false);
@@ -396,8 +402,8 @@ class PasswordChangeServiceTests {
                 );
             }
 
-            // Confirma a senha atual (a nova é igual, então a troca é recusada),
-            // o que zera o contador.
+            // Verify the current password (the change is rejected because the new password is unchanged),
+            // which resets the counter.
             assertThrows(
                     PasswordUnchangedException.class,
                     () -> passwordChangeService.changePassword(
@@ -405,7 +411,7 @@ class PasswordChangeServiceTests {
                     )
             );
 
-            // Sem o reset, esta seria a 4ª tentativa e seria rejeitada com 429.
+            // Without the reset, this would be the fourth attempt and would be rejected with 429.
             assertThrows(
                     InvalidCurrentPasswordException.class,
                     () -> passwordChangeService.changePassword(
@@ -422,20 +428,5 @@ class PasswordChangeServiceTests {
 
     private ChangePasswordRequestDTO request(String currentPassword, String newPassword) {
         return new ChangePasswordRequestDTO(currentPassword, newPassword);
-    }
-
-    private User createUser(String passwordHash) {
-        User user = User.createHuman(
-                "EMP-TEST-" + USER_ID,
-                "Joe Doe",
-                "joe.doe",
-                "joe.doe@teste.com",
-                passwordHash,
-                Role.EMPLOYEE
-        );
-
-        ReflectionTestUtils.setField(user, "id", USER_ID);
-
-        return user;
     }
 }

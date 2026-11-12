@@ -12,7 +12,6 @@ import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.account.AccountHasBalanceException;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
@@ -23,8 +22,8 @@ import com.lcsalvess.bankingsystem.repository.ClientRepository;
 import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
 import com.lcsalvess.bankingsystem.repository.specification.TransactionSpecifications;
-import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
+import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
@@ -34,6 +33,7 @@ import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQuerySer
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -131,6 +131,7 @@ class TransactionConcurrencyTests {
     private CurrentUserService currentUserService;
 
     private int clientSequence;
+    private User testUser;
 
     @BeforeEach
     void setUp() {
@@ -142,15 +143,8 @@ class TransactionConcurrencyTests {
 
         clientSequence = 0;
 
-        User testUser = userRepository.saveAndFlush(
-                User.createHuman(
-                        "EMP-TEST-001",
-                        "Test User",
-                        "test-user",
-                        "test-user@test.com",
-                        "test-password",
-                        Role.EMPLOYEE
-                )
+        testUser = userRepository.saveAndFlush(
+                UserTestFactory.aUser().build()
         );
 
         when(currentUserService.getCurrentUser()).thenReturn(testUser);
@@ -1308,7 +1302,7 @@ class TransactionConcurrencyTests {
 
     private User findTestUser() {
         return userRepository
-                .findByUsernameIgnoreCase("test-user")
+                .findByUsernameIgnoreCase(testUser.getUsername())
                 .orElseThrow();
     }
 

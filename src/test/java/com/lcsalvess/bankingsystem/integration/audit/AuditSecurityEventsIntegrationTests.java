@@ -1,10 +1,10 @@
 package com.lcsalvess.bankingsystem.integration.audit;
 
 import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
-import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.repository.UserRepository;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.jayway.jsonpath.JsonPath.read;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -75,23 +76,24 @@ class AuditSecurityEventsIntegrationTests {
 
     @BeforeEach
     void setUp() {
-        username = "it" + UUID.randomUUID().toString().substring(0, 8);
-
-        String employeeId = "EMP-"
-                + UUID.randomUUID()
+        String uniqueId = UUID.randomUUID()
                 .toString()
-                .replace("-", "")
-                .substring(0, 12);
+                .replace("-", "");
 
-        User user = userRepository.save(User.createHuman(
-                employeeId,
-                "Integration Test Employee",
-                username,
-                username + "@test.com",
-                passwordEncoder.encode(PASSWORD),
-                Role.EMPLOYEE
-        ));
+        String testUsername = "it" + uniqueId.substring(0, 8);
+        String employeeId = "EMP-" + uniqueId.substring(8, 20);
 
+        User user = userRepository.save(
+                UserTestFactory.aUser()
+                        .withEmployeeId(employeeId)
+                        .withFullName("Integration Test Employee")
+                        .withUsername(testUsername)
+                        .withEmail(testUsername + "@test.com")
+                        .withEncodedPassword(passwordEncoder.encode(PASSWORD))
+                        .build()
+        );
+
+        username = user.getUsername();
         userId = user.getId();
     }
 
@@ -501,6 +503,6 @@ class AuditSecurityEventsIntegrationTests {
                 .getResponse()
                 .getContentAsString();
 
-        return com.jayway.jsonpath.JsonPath.read(json, "$.token");
+        return read(json, "$.token");
     }
 }

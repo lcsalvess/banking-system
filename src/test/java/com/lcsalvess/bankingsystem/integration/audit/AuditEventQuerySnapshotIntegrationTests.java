@@ -15,6 +15,7 @@ import com.lcsalvess.bankingsystem.service.audit.contract.AuditEventPageResult;
 import com.lcsalvess.bankingsystem.service.audit.contract.AuditEventQueryFilter;
 import com.lcsalvess.bankingsystem.service.audit.policy.AuditEventQueryPolicy;
 import com.lcsalvess.bankingsystem.service.audit.query.snapshot.AuditEventQuerySnapshotService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -453,14 +454,14 @@ class AuditEventQuerySnapshotIntegrationTests {
 
         return transactionTemplate.execute(status ->
                 userRepository.save(
-                        User.createHuman(
-                                employeeId,
-                                "Snapshot Integration Auditor",
-                                username,
-                                email,
-                                "test-password-hash",
-                                Role.AUDITOR
-                        )
+                        UserTestFactory.aUser()
+                                .withEmployeeId(employeeId)
+                                .withFullName("Snapshot Integration Auditor")
+                                .withUsername(username)
+                                .withEmail(email)
+                                .withEncodedPassword("test-password-hash")
+                                .withRole(Role.AUDITOR)
+                                .build()
                 )
         );
     }

@@ -30,6 +30,7 @@ import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
 import com.lcsalvess.bankingsystem.service.user.UserService;
 import com.lcsalvess.bankingsystem.service.user.generator.EmployeeIdGenerator;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -368,14 +369,14 @@ class RuntimePrivilegesEndToEndTests {
         String username = "e2e-" + id;
 
         return userRepository.saveAndFlush(
-                User.createHuman(
-                        employeeIdGenerator.generate(),
-                        "Test User",
-                        username,
-                        "e2e-" + id + "@test.com",
-                        passwordEncoder.encode(PASSWORD),
-                        role
-                )
+                UserTestFactory.aUser()
+                        .withEmployeeId(employeeIdGenerator.generate())
+                        .withFullName("Test User")
+                        .withUsername(username)
+                        .withEmail("e2e-" + id + "@test.com")
+                        .withEncodedPassword(passwordEncoder.encode(PASSWORD))
+                        .withRole(role)
+                        .build()
         );
     }
 

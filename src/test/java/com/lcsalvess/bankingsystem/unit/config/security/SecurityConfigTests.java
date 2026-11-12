@@ -12,6 +12,7 @@ import com.lcsalvess.bankingsystem.security.RestAccessDeniedHandler;
 import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
+import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import com.lcsalvess.securityprobetest.SecurityProbeController;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -130,18 +131,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class SecurityConfigTests {
 
-    // Base64 de "uma-chave-secreta-com-pelo-menos-32-bytes"
+    // Base64 of "uma-chave-secreta-com-pelo-menos-32-bytes"
     static final String SECRET =
             "dW1hLWNoYXZlLXNlY3JldGEtY29tLXBlbG8tbWVub3MtMzItYnl0ZXM=";
 
-    // Base64 de "outra-chave-secreta-completamente-diferente-64"
+    // Base64 of "outra-chave-secreta-completamente-diferente-64"
     private static final String OTHER_SECRET =
             "b3V0cmEtY2hhdmUtc2VjcmV0YS1jb21wbGV0YW1lbnRlLWRpZmVyZW50ZS02NA==";
 
     static final String ISSUER = "banking-system-test";
 
-    private static final String USERNAME = "usuario.teste";
-    private static final String PASSWORD = "Senha123";
+    private static final String USERNAME = "security.user.test";
+    private static final String PASSWORD = "SecurityPassword123!";
+
     private static final String PROTECTED_URL = "/api/v1/transactions/probe";
     private static final String POST_PROTECTED_URL = "/api/v1/transactions/deposits";
     private static final String ADMIN_URL = "/api/v1/users/test-probe";
@@ -183,7 +185,7 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Proteção da documentação OpenAPI")
+    @DisplayName("OpenAPI documentation protection")
     class OpenApiAuthorizationTests {
 
         @ParameterizedTest(name = "GET {0}")
@@ -193,7 +195,7 @@ class SecurityConfigTests {
                 "/v3/api-docs",
                 "/v3/api-docs/swagger-config"
         })
-        @DisplayName("Deve negar acesso à documentação sem autenticação fora do perfil local")
+        @DisplayName("Should deny unauthenticated access to the documentation outside the local profile")
         void shouldDenyOpenApiRoutesWithoutToken(String url) throws Exception {
             expectUnauthorized(mockMvc.perform(get(url)));
 
@@ -202,42 +204,40 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Rotas públicas")
+    @DisplayName("Public routes")
     class PublicRoutesTests {
 
         @Test
-        @DisplayName("Deve permitir POST /api/v1/auth/login sem token e sem CSRF")
+        @DisplayName("Should allow POST /api/v1/auth/login without a token and without CSRF")
         void shouldAllowLoginWithoutTokenAndWithoutCsrf() throws Exception {
             MvcResult result = mockMvc.perform(post(LOGIN_URL))
                     .andReturn();
 
-            assertNotEquals(401, result.getResponse().getStatus());
-            assertNotEquals(403, result.getResponse().getStatus());
+            assertEquals(404, result.getResponse().getStatus());
 
             verifyNoInteractions(userDetailsService);
         }
 
         @ParameterizedTest(name = "Authorization: {0}")
         @ValueSource(strings = {
-                "Bearer token-invalido",
+                "Bearer invalid-token",
                 "Bearer a.b.c",
                 "Bearer ",
                 "Bearer    "
         })
-        @DisplayName("Deve permitir o login mesmo com um token inválido no header")
+        @DisplayName("Should allow login even with an invalid token in the header")
         void shouldAllowLoginWithInvalidToken(String authorization) throws Exception {
             MvcResult result = mockMvc.perform(post(LOGIN_URL)
                             .header(HttpHeaders.AUTHORIZATION, authorization))
                     .andReturn();
 
-            assertNotEquals(401, result.getResponse().getStatus());
-            assertNotEquals(403, result.getResponse().getStatus());
+            assertEquals(404, result.getResponse().getStatus());
 
             verifyNoInteractions(userDetailsService);
         }
 
         @Test
-        @DisplayName("Deve permitir o login com um token expirado no header")
+        @DisplayName("Should allow login with an expired token in the header")
         void shouldAllowLoginWithExpiredToken() throws Exception {
             String token = serviceOf(SECRET, -60, ISSUER)
                     .generateToken(createUser(Role.EMPLOYEE));
@@ -246,14 +246,13 @@ class SecurityConfigTests {
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                     .andReturn();
 
-            assertNotEquals(401, result.getResponse().getStatus());
-            assertNotEquals(403, result.getResponse().getStatus());
+            assertEquals(404, result.getResponse().getStatus());
 
             verifyNoInteractions(userDetailsService);
         }
 
         @Test
-        @DisplayName("Não deve consultar o usuário no login mesmo com um token válido")
+        @DisplayName("Should not load the user on login even with a valid token")
         void shouldNotLoadUserOnLoginWithValidToken() throws Exception {
             MvcResult result = mockMvc.perform(post(LOGIN_URL)
                             .header(
@@ -262,14 +261,13 @@ class SecurityConfigTests {
                             ))
                     .andReturn();
 
-            assertNotEquals(401, result.getResponse().getStatus());
-            assertNotEquals(403, result.getResponse().getStatus());
+            assertEquals(404, result.getResponse().getStatus());
 
             verifyNoInteractions(userDetailsService);
         }
 
         @Test
-        @DisplayName("Deve proteger outros métodos HTTP no caminho do login")
+        @DisplayName("Should protect other HTTP methods on the login path")
         void shouldProtectOnlyPostOnLogin() throws Exception {
             expectUnauthorized(mockMvc.perform(get(LOGIN_URL)));
 
@@ -277,7 +275,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve exigir autenticação em outras rotas de auth")
+        @DisplayName("Should require authentication on other auth routes")
         void shouldProtectOtherAuthRoutes() throws Exception {
             expectUnauthorized(mockMvc.perform(post(AUTH_PROBE_URL)));
 
@@ -285,21 +283,21 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar token inválido em outras rotas de auth")
+        @DisplayName("Should reject an invalid token on other auth routes")
         void shouldRejectInvalidTokenOnOtherAuthRoutes() throws Exception {
             expectUnauthorized(mockMvc.perform(post(AUTH_PROBE_URL)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer token-invalido")));
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token")));
 
             verifyNoInteractions(userDetailsService);
         }
     }
 
     @Nested
-    @DisplayName("Rotas protegidas sem credenciais válidas")
+    @DisplayName("Protected routes without valid credentials")
     class ProtectedRoutesTests {
 
         @Test
-        @DisplayName("Deve responder 401 em JSON quando não há token")
+        @DisplayName("Should return 401 as JSON when there is no token")
         void shouldReturn401WhenTokenIsMissing() throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)));
 
@@ -311,9 +309,9 @@ class SecurityConfigTests {
                 "/actuator/health",
                 "/actuator/info",
                 "/actuator/metrics",
-                "/api/v1/qualquer-rota"
+                "/api/v1/any-route"
         })
-        @DisplayName("Deve exigir autenticação nas rotas protegidas")
+        @DisplayName("Should require authentication on protected routes")
         void shouldRequireAuthenticationOnProtectedRoutes(String url) throws Exception {
             expectUnauthorized(mockMvc.perform(get(url)));
 
@@ -321,7 +319,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve ignorar esquemas de autorização diferentes de Bearer")
+        @DisplayName("Should ignore authorization schemes other than Bearer")
         void shouldIgnoreNonBearerAuthorizationSchemes() throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
                     .header(HttpHeaders.AUTHORIZATION, "Basic dXN1YXJpbzpzZW5oYQ==")));
@@ -331,11 +329,11 @@ class SecurityConfigTests {
 
         @ParameterizedTest(name = "Authorization: {0}")
         @ValueSource(strings = {
-                "Bearer token-invalido",
+                "Bearer invalid-token",
                 "Bearer a.b.c",
                 "Bearer abc.def"
         })
-        @DisplayName("Deve responder 401 em JSON para token malformado")
+        @DisplayName("Should return 401 as JSON for a malformed token")
         void shouldReturn401ForMalformedToken(String authorization) throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
                     .header(HttpHeaders.AUTHORIZATION, authorization)));
@@ -348,7 +346,7 @@ class SecurityConfigTests {
                 "Bearer ",
                 "Bearer    "
         })
-        @DisplayName("Deve responder 401 em JSON quando o Bearer vem sem token")
+        @DisplayName("Should return 401 as JSON when the Bearer scheme has no token")
         void shouldReturn401WhenBearerHasNoToken(String authorization) throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
                     .header(HttpHeaders.AUTHORIZATION, authorization)));
@@ -357,7 +355,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 para token expirado")
+        @DisplayName("Should return 401 for an expired token")
         void shouldReturn401ForExpiredToken() throws Exception {
             String token = serviceOf(SECRET, -60, ISSUER)
                     .generateToken(createUser(Role.EMPLOYEE));
@@ -369,7 +367,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 para token assinado com outra chave")
+        @DisplayName("Should return 401 for a token signed with another key")
         void shouldReturn401ForTokenSignedWithAnotherKey() throws Exception {
             String token = serviceOf(OTHER_SECRET, 3600, ISSUER)
                     .generateToken(createUser(Role.EMPLOYEE));
@@ -381,9 +379,9 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 para token com issuer diferente")
+        @DisplayName("Should return 401 for a token with a different issuer")
         void shouldReturn401ForTokenWithDifferentIssuer() throws Exception {
-            String token = serviceOf(SECRET, 3600, "outro-emissor")
+            String token = serviceOf(SECRET, 3600, "another-issuer")
                     .generateToken(createUser(Role.EMPLOYEE));
 
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
@@ -393,7 +391,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 quando o usuário do token não existe mais")
+        @DisplayName("Should return 401 when the token user no longer exists")
         void shouldReturn401WhenTokenUserNoLongerExists() throws Exception {
             when(userDetailsService.loadUserByUsername(USERNAME))
                     .thenThrow(new UsernameNotFoundException("Usuário ou senha inválidos."));
@@ -405,7 +403,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 quando o usuário do token está inativo")
+        @DisplayName("Should return 401 when the token user is inactive")
         void shouldReturn401WhenTokenUserIsDisabled() throws Exception {
             User user = createUser(Role.EMPLOYEE);
             user.deactivate();
@@ -419,11 +417,11 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Rotas protegidas com token válido")
+    @DisplayName("Protected routes with a valid token")
     class AuthenticatedRoutesTests {
 
         @Test
-        @DisplayName("Deve autenticar o usuário do token e expô-lo à aplicação")
+        @DisplayName("Should authenticate the token user and expose it to the application")
         void shouldAuthenticateTokenUser() throws Exception {
             User user = createUser(Role.EMPLOYEE);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
@@ -438,7 +436,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve negar uma rota de auth sem regra explícita, mesmo com token válido")
+        @DisplayName("Should deny an auth route without an explicit rule, even with a valid token")
         void shouldDenyUnmatchedAuthRouteForAuthenticatedTokenUser() throws Exception {
             User user = createUser(Role.EMPLOYEE);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
@@ -451,7 +449,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Não deve exigir token CSRF em requisições POST autenticadas")
+        @DisplayName("Should not require a CSRF token on authenticated POST requests")
         void shouldNotRequireCsrfTokenForAuthenticatedPost() throws Exception {
             User user = createUser(Role.EMPLOYEE);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
@@ -463,7 +461,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve ser stateless: sem sessão e sem cookie")
+        @DisplayName("Should be stateless: no session and no cookie")
         void shouldBeStateless() throws Exception {
             User user = createUser(Role.EMPLOYEE);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
@@ -473,12 +471,12 @@ class SecurityConfigTests {
                     .andExpect(status().isOk())
                     .andReturn();
 
-            assertNull(result.getRequest().getSession(false), "Nenhuma sessão deve ser criada");
+            assertNull(result.getRequest().getSession(false), "No session should be created");
             assertNull(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
         }
 
         @Test
-        @DisplayName("Deve negar consulta de transações para ADMIN")
+        @DisplayName("Should deny transaction history access to ADMIN")
         void shouldForbidAdminFromTransactionHistory() throws Exception {
             User admin = createUser(Role.ADMIN);
 
@@ -496,7 +494,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve negar consulta de transações para AUDITOR")
+        @DisplayName("Should deny transaction history access to AUDITOR")
         void shouldForbidAuditorFromTransactionHistory() throws Exception {
             User auditor = createUser(Role.AUDITOR);
 
@@ -514,7 +512,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve permitir AUDITOR na consulta de auditoria")
+        @DisplayName("Should allow AUDITOR on the audit events route")
         void shouldAllowAuditorOnAuditEventsRoute() throws Exception {
             User auditor = createUser(Role.AUDITOR);
 
@@ -533,7 +531,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve negar EMPLOYEE na consulta de auditoria")
+        @DisplayName("Should deny EMPLOYEE on the audit events route")
         void shouldForbidEmployeeOnAuditEventsRoute() throws Exception {
             User employee = createUser(Role.EMPLOYEE);
 
@@ -551,7 +549,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve negar ADMIN na consulta de auditoria")
+        @DisplayName("Should deny ADMIN on the audit events route")
         void shouldForbidAdminOnAuditEventsRoute() throws Exception {
             User admin = createUser(Role.ADMIN);
 
@@ -570,11 +568,11 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Falha de infraestrutura ao carregar o usuário do token")
+    @DisplayName("Infrastructure failure while loading the token user")
     class InfrastructureFailureTests {
 
         @Test
-        @DisplayName("Deve responder 503 em JSON, e não 401, quando o banco está indisponível")
+        @DisplayName("Should return 503 as JSON, not 401, when the database is unavailable")
         void shouldReturn503WhenDatabaseIsUnavailable() throws Exception {
             when(userDetailsService.loadUserByUsername(USERNAME))
                     .thenThrow(new DataAccessResourceFailureException("Sensitive connection detail"));
@@ -586,7 +584,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 503 em JSON quando não é possível abrir a transação")
+        @DisplayName("Should return 503 as JSON when a transaction cannot be opened")
         void shouldReturn503WhenTransactionCannotBeCreated() throws Exception {
             when(userDetailsService.loadUserByUsername(USERNAME))
                     .thenThrow(new CannotCreateTransactionException("Sensitive transaction detail"));
@@ -596,13 +594,15 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Não deve expor detalhes da falha na resposta")
+        @DisplayName("Should not expose failure details in the response")
         void shouldNotExposeFailureDetails() throws Exception {
             when(userDetailsService.loadUserByUsername(USERNAME))
                     .thenThrow(new DataAccessResourceFailureException("Sensitive connection detail"));
 
             mockMvc.perform(get(PROTECTED_URL)
                             .header(HttpHeaders.AUTHORIZATION, bearer(createUser(Role.EMPLOYEE))))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                     .andExpect(content().string(
                             org.hamcrest.Matchers.not(
                                     org.hamcrest.Matchers.containsString("Sensitive connection detail")
@@ -611,7 +611,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve incluir o correlation ID na resposta 503")
+        @DisplayName("Should include the correlation ID in the 503 response")
         void shouldIncludeCorrelationIdOnServiceUnavailableResponse() throws Exception {
             String correlationId = UUID.randomUUID().toString();
 
@@ -629,16 +629,16 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Versão das credenciais do token")
+    @DisplayName("Token credentials version")
     class TokenVersionTests {
 
         @Test
-        @DisplayName("Deve responder 401 para token emitido antes da troca de senha")
+        @DisplayName("Should return 401 for a token issued before the password change")
         void shouldReturn401ForTokenIssuedBeforePasswordChange() throws Exception {
             User user = createUser(Role.EMPLOYEE);
             String tokenBeforeChange = bearer(user);
 
-            user.changePassword("novo-hash");
+            user.changePassword("new-hash");
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
 
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
@@ -646,11 +646,11 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve aceitar token emitido depois da troca de senha")
+        @DisplayName("Should accept a token issued after the password change")
         void shouldAcceptTokenIssuedAfterPasswordChange() throws Exception {
             User user = createUser(Role.EMPLOYEE);
 
-            user.changePassword("novo-hash");
+            user.changePassword("new-hash");
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
 
             mockMvc.perform(get(PROTECTED_URL)
@@ -660,7 +660,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 para token sem o claim de versão")
+        @DisplayName("Should return 401 for a token without the version claim")
         void shouldReturn401ForTokenWithoutVersionClaim() throws Exception {
             expectUnauthorized(mockMvc.perform(get(PROTECTED_URL)
                     .header(
@@ -672,7 +672,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 para token com claim tv inválido")
+        @DisplayName("Should return 401 for a token with an invalid tv claim")
         void shouldReturn401ForTokenWithInvalidVersionClaim() throws Exception {
             String token = Jwts.builder()
                     .subject(USERNAME)
@@ -691,11 +691,11 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Rota de troca de senha")
+    @DisplayName("Password change route")
     class PasswordRouteTests {
 
         @Test
-        @DisplayName("Deve responder 401 em JSON sem token")
+        @DisplayName("Should return 401 as JSON without a token")
         void shouldReturn401WithoutToken() throws Exception {
             expectUnauthorized(mockMvc.perform(patch(PASSWORD_URL)));
 
@@ -703,16 +703,16 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 com token inválido")
+        @DisplayName("Should return 401 with an invalid token")
         void shouldReturn401WithInvalidToken() throws Exception {
             expectUnauthorized(mockMvc.perform(patch(PASSWORD_URL)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer token-invalido")));
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token")));
 
             verifyNoInteractions(userDetailsService);
         }
 
         @Test
-        @DisplayName("Deve permitir EMPLOYEE autenticado, sem exigir CSRF")
+        @DisplayName("Should allow an authenticated EMPLOYEE, without requiring CSRF")
         void shouldAllowAuthenticatedEmployee() throws Exception {
             User employee = createUser(Role.EMPLOYEE);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(employee);
@@ -724,7 +724,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve permitir ADMIN autenticado")
+        @DisplayName("Should allow an authenticated ADMIN")
         void shouldAllowAuthenticatedAdmin() throws Exception {
             User admin = createUser(Role.ADMIN);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(admin);
@@ -735,12 +735,12 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401 para token anterior à última troca de senha")
+        @DisplayName("Should return 401 for a token issued before the last password change")
         void shouldReturn401ForRevokedToken() throws Exception {
             User employee = createUser(Role.EMPLOYEE);
             String revokedToken = bearer(employee);
 
-            employee.changePassword("novo-hash");
+            employee.changePassword("new-hash");
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(employee);
 
             expectUnauthorized(mockMvc.perform(patch(PASSWORD_URL)
@@ -749,11 +749,11 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Autorização por perfil (@EnableMethodSecurity)")
+    @DisplayName("Role-based authorization (@EnableMethodSecurity)")
     class MethodSecurityTests {
 
         @Test
-        @DisplayName("Deve permitir ADMIN em rota restrita a administradores")
+        @DisplayName("Should allow ADMIN on an admin-only route")
         void shouldAllowAdminOnAdminRoute() throws Exception {
             User admin = createUser(Role.ADMIN);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(admin);
@@ -765,7 +765,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 403 para EMPLOYEE em rota restrita a administradores")
+        @DisplayName("Should return 403 for EMPLOYEE on an admin-only route")
         void shouldForbidEmployeeOnAdminRoute() throws Exception {
             User employee = createUser(Role.EMPLOYEE);
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(employee);
@@ -776,18 +776,18 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve responder 401, e não 403, para anônimo em rota restrita a administradores")
+        @DisplayName("Should return 401, not 403, for an anonymous user on an admin-only route")
         void shouldReturn401ForAnonymousOnAdminRoute() throws Exception {
             expectUnauthorized(mockMvc.perform(get(ADMIN_URL)));
         }
     }
 
     @Nested
-    @DisplayName("Autorização do Actuator")
+    @DisplayName("Actuator authorization")
     class ActuatorAuthorizationTests {
 
         @Test
-        @DisplayName("Deve responder 403 em JSON para EMPLOYEE nas métricas")
+        @DisplayName("Should return 403 as JSON for EMPLOYEE on metrics")
         void shouldReturn403JsonForEmployeeOnActuatorMetrics() throws Exception {
             User employee = createUser(Role.EMPLOYEE);
 
@@ -810,7 +810,7 @@ class SecurityConfigTests {
                 "/actuator/health/liveness",
                 "/actuator/health/readiness"
         })
-        @DisplayName("Deve permitir as health probes sem token")
+        @DisplayName("Should allow health probes without a token")
         void shouldAllowHealthProbesWithoutToken(String url) throws Exception {
             MvcResult result = mockMvc.perform(get(url))
                     .andReturn();
@@ -818,20 +818,20 @@ class SecurityConfigTests {
             int statusCode = result.getResponse().getStatus();
 
             assertNotEquals(401, statusCode,
-                    "A probe não deve exigir autenticação");
+                    "The probe must not require authentication");
             assertNotEquals(403, statusCode,
-                    "A probe não deve ser bloqueada pela autorização");
+                    "The probe must not be blocked by authorization");
 
             verifyNoInteractions(userDetailsService);
         }
     }
 
     @Nested
-    @DisplayName("Correlation ID na cadeia de filtros")
+    @DisplayName("Correlation ID in the filter chain")
     class CorrelationIdTests {
 
         @Test
-        @DisplayName("Deve gerar o header quando a requisição não o envia")
+        @DisplayName("Should generate the header when the request does not send it")
         void shouldGenerateCorrelationIdWhenMissing() throws Exception {
             MvcResult result = mockMvc.perform(post(PROTECTED_URL))
                     .andExpect(status().isUnauthorized())
@@ -845,7 +845,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve repetir o header recebido quando for um UUID válido")
+        @DisplayName("Should echo the received header when it is a valid UUID")
         void shouldEchoValidCorrelationId() throws Exception {
             String correlationId = UUID.randomUUID().toString();
 
@@ -861,7 +861,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve incluir o header também nas respostas 401")
+        @DisplayName("Should also include the header in 401 responses")
         void shouldIncludeCorrelationIdOnUnauthorizedResponses() throws Exception {
             String correlationId = UUID.randomUUID().toString();
 
@@ -874,13 +874,13 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve incluir o header em respostas de token inválido rejeitado pelo filtro JWT")
+        @DisplayName("Should include the header in responses where the JWT filter rejects the token")
         void shouldIncludeCorrelationIdWhenJwtFilterRejectsToken() throws Exception {
             String correlationId = UUID.randomUUID().toString();
 
             MvcResult result = mockMvc.perform(get(PROTECTED_URL)
                             .header(CORRELATION_ID_HEADER, correlationId)
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer token-invalido"))
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
                     .andExpect(status().isUnauthorized())
                     .andReturn();
 
@@ -888,7 +888,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve manter o registro automático do filtro desabilitado")
+        @DisplayName("Should keep the filter's automatic servlet registration disabled")
         void shouldKeepServletRegistrationDisabled() {
             assertFalse(correlationIdFilterRegistration.isEnabled());
             assertInstanceOf(CorrelationIdFilter.class, correlationIdFilterRegistration.getFilter());
@@ -896,25 +896,25 @@ class SecurityConfigTests {
     }
 
     @Nested
-    @DisplayName("Beans de autenticação")
+    @DisplayName("Authentication beans")
     class AuthenticationBeansTests {
 
         @Test
-        @DisplayName("Deve usar BCrypt como PasswordEncoder")
+        @DisplayName("Should use BCrypt as the PasswordEncoder")
         void shouldUseBCryptPasswordEncoder() {
             assertInstanceOf(BCryptPasswordEncoder.class, passwordEncoder);
 
             String hash = passwordEncoder.encode(PASSWORD);
 
-            assertTrue(hash.startsWith("$2"), "O hash deve estar no formato BCrypt");
+            assertTrue(hash.startsWith("$2"), "The hash must be in BCrypt format");
             assertNotEquals(PASSWORD, hash);
             assertTrue(passwordEncoder.matches(PASSWORD, hash));
-            assertFalse(passwordEncoder.matches("SenhaErrada", hash));
-            assertNotEquals(hash, passwordEncoder.encode(PASSWORD), "O salt deve variar a cada hash");
+            assertFalse(passwordEncoder.matches("WrongPassword", hash));
+            assertNotEquals(hash, passwordEncoder.encode(PASSWORD), "The salt must vary on each hash");
         }
 
         @Test
-        @DisplayName("Deve autenticar com credenciais válidas")
+        @DisplayName("Should authenticate with valid credentials")
         void shouldAuthenticateWithValidCredentials() {
             User user = createUserWithEncodedPassword();
             when(userDetailsService.loadUserByUsername(USERNAME)).thenReturn(user);
@@ -928,29 +928,29 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar senha incorreta")
+        @DisplayName("Should reject a wrong password")
         void shouldRejectWrongPassword() {
             when(userDetailsService.loadUserByUsername(USERNAME))
                     .thenReturn(createUserWithEncodedPassword());
 
             assertThrows(BadCredentialsException.class, () ->
                     authenticationManager.authenticate(
-                            UsernamePasswordAuthenticationToken.unauthenticated(USERNAME, "SenhaErrada")));
+                            UsernamePasswordAuthenticationToken.unauthenticated(USERNAME, "WrongPassword")));
         }
 
         @Test
-        @DisplayName("Deve tratar usuário inexistente como credenciais inválidas")
+        @DisplayName("Should treat an unknown user as bad credentials")
         void shouldTreatUnknownUserAsBadCredentials() {
             when(userDetailsService.loadUserByUsername(anyString()))
                     .thenThrow(new UsernameNotFoundException("Usuário ou senha inválidos."));
 
             assertThrows(BadCredentialsException.class, () ->
                     authenticationManager.authenticate(
-                            UsernamePasswordAuthenticationToken.unauthenticated("inexistente", PASSWORD)));
+                            UsernamePasswordAuthenticationToken.unauthenticated("nonexistent", PASSWORD)));
         }
 
         @Test
-        @DisplayName("Deve sinalizar falha de banco como InternalAuthenticationServiceException, e não como credencial inválida")
+        @DisplayName("Should report a database failure as InternalAuthenticationServiceException, not as invalid credentials")
         void shouldWrapDatabaseFailureAsInternalAuthenticationServiceException() {
             when(userDetailsService.loadUserByUsername(USERNAME))
                     .thenThrow(new DataAccessResourceFailureException("db down"));
@@ -966,7 +966,7 @@ class SecurityConfigTests {
         }
 
         @Test
-        @DisplayName("Deve rejeitar usuário inativo mesmo com a senha correta")
+        @DisplayName("Should reject an inactive user even with the correct password")
         void shouldRejectDisabledUserEvenWithCorrectPassword() {
             User user = createUserWithEncodedPassword();
             user.deactivate();
@@ -976,14 +976,14 @@ class SecurityConfigTests {
             when(userDetailsService.loadUserByUsername(USERNAME))
                     .thenReturn(user);
 
-            assertSame(user, userDetailsService.loadUserByUsername(USERNAME));
-
             assertThrows(DisabledException.class, () ->
                     authenticationManager.authenticate(
                             UsernamePasswordAuthenticationToken.unauthenticated(
                                     USERNAME, PASSWORD
                             )
                     ));
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
         }
     }
 
@@ -1030,24 +1030,21 @@ class SecurityConfigTests {
     }
 
     private static User createUser(Role role) {
-        return createUser(role, "encoded-password");
+        return UserTestFactory.aUser()
+                .withUsername(USERNAME)
+                .withRole(role)
+                .build();
     }
 
-    private static User createUser(Role role, String encodedPassword) {
-        return User.createHuman(
-                "EMP-TEST-001",
-                "Test User",
-                USERNAME,
-                "usuario.teste@email.com",
-                encodedPassword,
-                role
-        );
+    private static User createUser(String encodedPassword) {
+        return UserTestFactory.aUser()
+                .withUsername(USERNAME)
+                .withEncodedPassword(encodedPassword)
+                .withRole(Role.EMPLOYEE)
+                .build();
     }
 
     private User createUserWithEncodedPassword() {
-        return createUser(
-                Role.EMPLOYEE,
-                passwordEncoder.encode(PASSWORD)
-        );
+        return createUser(passwordEncoder.encode(PASSWORD));
     }
 }

@@ -59,6 +59,36 @@ Operations are logged through Spring application events:
 - The header value is reused only when it is a canonical UUID and is normalized to lowercase. A missing, blank, or invalid value is replaced by a new random UUID.
 - The ID is returned in the `X-Correlation-ID` response header, stored in the logging MDC as `correlationId`, included in log lines, and removed when the request ends.
 
+## Administrator Bootstrap and Recovery
+
+At least one active `ADMIN` account is required for administrator-managed operations. Startup may continue without an active administrator only when no `ADMIN` account exists and bootstrap is optional. The startup behavior is determined by the administrator bootstrap configuration described in the [Development Guide](DEVELOPMENT.md#initial-administrator-bootstrap).
+
+During startup, `AdminBootstrapRunner` checks for an active administrator:
+
+- If an active administrator exists, bootstrap is skipped.
+- If administrator accounts exist but none are active, startup fails. The application does not automatically create another administrator.
+- If no administrator account exists, bootstrap follows the configuration described in the [Development Guide](DEVELOPMENT.md#initial-administrator-bootstrap).
+
+### Recovering Access When All Administrators Are Inactive
+
+The regular user reactivation endpoint (`PATCH /api/v1/users/{employeeId}/reactivate`) requires an authenticated `ADMIN` account. It cannot be used when all administrators are inactive.
+
+In this situation, administrator access must be restored through a controlled database recovery procedure:
+
+1. Stop all application instances to prevent concurrent application operations.
+2. Create a database backup before making changes.
+3. Identify an existing, trusted human administrator using the `employee_id`, full name, and username. Do not create another administrator or reactivate an account without verifying its ownership.
+4. Connect to PostgreSQL using an authorized administrative database account, not the application's runtime credentials (`banking_app`).
+5. Reactivate only the selected account after confirming that it belongs to a human user with the `ADMIN` role and is currently inactive. Update its `active` status and `updated_at`, and increment `token_version` to invalidate previously issued tokens.
+6. Insert a corresponding `USER_REACTIVATED` event into the append-only `audit_events` table in the same database transaction. Use `OPERATIONAL_RECOVERY` as the reason and identify the affected user through the internal database ID. Set the actor type to `ANONYMOUS`, with `actor_user_id` and `actor_username` set to `NULL`, because the operation did not originate from an authenticated application user.
+7. Verify that exactly one user was updated and that the audit event was inserted successfully. Commit the transaction only after these checks succeed; otherwise, roll it back.
+8. Record the database operator, recovery reason, affected employee ID, and change reference in the operational change log.
+9. Restart the application and verify that startup succeeds, readiness is healthy, and the restored administrator can authenticate.
+
+This procedure restores an existing administrator account; it does not reset its password or create a new administrator. Password recovery, when necessary, must follow a separate authorized procedure.
+
+After recovery, normal user management should be performed through the application API.
+
 ## Observability
 
 - Spring Boot Actuator exposes `health`, `info`, and `metrics`. The `health` and `info` endpoints require an `EMPLOYEE` or `ADMIN` token, while `metrics` requires `ADMIN`. Health details are shown only to authorized users.

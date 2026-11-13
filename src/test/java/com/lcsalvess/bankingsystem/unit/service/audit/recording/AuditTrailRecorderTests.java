@@ -25,6 +25,7 @@ import org.springframework.dao.QueryTimeoutException;
 import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -777,5 +778,29 @@ class AuditTrailRecorderTests {
 
         assertEquals(AuditOutcome.FAILURE, record.outcome());
         assertEquals("HTTP_CLIENT_ERROR", record.reason());
+    }
+
+    @Test
+    @DisplayName("Should record a daily yield run as a system event")
+    void shouldRecordYieldRun() {
+        recorder.recordYieldRun(
+                LocalDate.of(2026, 11, 13),
+                AuditOutcome.FAILURE,
+                "COMPLETED_WITH_FAILURES"
+        );
+
+        DetachedAuditRecord record = lastRecord();
+
+        assertEquals(AuditEventType.YIELD_RUN, record.eventType());
+        assertEquals(AuditOutcome.FAILURE, record.outcome());
+        assertEquals(AuditActorType.SYSTEM, record.actorType());
+        assertNull(record.actorUserId());
+        assertNull(record.actorUsername());
+        assertEquals(AuditEntityType.YIELD_RUN, record.entityType());
+        assertEquals("2026-11-13", record.entityId());
+        assertEquals("COMPLETED_WITH_FAILURES", record.reason());
+        assertNull(record.ipAddress());
+        assertNull(record.httpStatus());
+        assertNull(record.correlationId());
     }
 }

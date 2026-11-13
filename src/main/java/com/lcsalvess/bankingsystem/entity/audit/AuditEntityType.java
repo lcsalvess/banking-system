@@ -5,6 +5,7 @@ public enum AuditEntityType {
     CLIENT,
     ACCOUNT,
     TRANSACTION,
+    YIELD_RUN,
     TRANSFER,
     AUTHENTICATION,
     ENDPOINT

@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.Objects;
+
 /**
  * Records the audit event in BEFORE_COMMIT, within the operation's transaction.
  * Existing logging listeners remain in AFTER_COMMIT: logging is informational,
@@ -72,9 +74,15 @@ public class AuditEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void handleTransactionOperation(TransactionOperationEvent event) {
-        // O rendimento é uma transação por conta por dia, e o próprio
-        // ledger já o marca com performed_by_system.
         if (event.type() == TransactionType.YIELD) {
+            auditService.recordSystemSuccess(
+                    AuditEventType.YIELD,
+                    AuditEntityType.TRANSACTION,
+                    Objects.requireNonNull(
+                            event.transactionCode(),
+                            "The yield transaction code is required."
+                    ).toString()
+            );
             return;
         }
 

@@ -14,6 +14,8 @@ public enum AuditEventType {
     DEPOSIT,
     WITHDRAWAL,
     TRANSFER,
+    YIELD,
+    YIELD_RUN,
     LOGIN_SUCCESS,
     LOGIN_FAILURE,
     LOGIN_BLOCKED,

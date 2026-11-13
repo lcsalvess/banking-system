@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -161,17 +162,43 @@ class AuditEventListenerTests {
     }
 
     @Test
-    @DisplayName("Should not audit the daily yield")
-    void shouldNotAuditDailyYield() {
+    @DisplayName("Should audit the daily yield as a system event, with the transaction code as the entity")
+    void shouldAuditDailyYieldAsSystemEvent() {
+        UUID transactionCode = UUID.randomUUID();
+
         listener.handleTransactionOperation(
                 new TransactionOperationEvent(
                         TransactionType.YIELD,
                         ACCOUNT_NUMBER,
                         AMOUNT,
-                        "SYSTEM"
+                        "SYSTEM",
+                        transactionCode
                 )
         );
 
+        verify(auditService).recordSystemSuccess(
+                AuditEventType.YIELD,
+                AuditEntityType.TRANSACTION,
+                transactionCode.toString()
+        );
+        verifyNoMoreInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("Should reject a daily yield event without a transaction code")
+    void shouldRejectDailyYieldWithoutTransactionCode() {
+        TransactionOperationEvent event = new TransactionOperationEvent(
+                TransactionType.YIELD,
+                ACCOUNT_NUMBER,
+                AMOUNT,
+                "SYSTEM",
+                null
+        );
+
+        assertThrows(
+                NullPointerException.class,
+                () -> listener.handleTransactionOperation(event)
+        );
         verifyNoInteractions(auditService);
     }
 

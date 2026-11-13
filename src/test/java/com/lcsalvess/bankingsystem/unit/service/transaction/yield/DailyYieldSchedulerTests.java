@@ -5,10 +5,14 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
+import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
+import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldProcessingResult;
-import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldRunStatus;
 import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldScheduler;
+import com.lcsalvess.bankingsystem.service.transaction.yield.DailyYieldService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,6 +22,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,10 +33,17 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -58,6 +70,9 @@ class DailyYieldSchedulerTests {
     private AccountRepository accountRepository;
 
     @Mock
+    private AuditTrailRecorder auditTrailRecorder;
+
+    @Mock
     private DailyYieldService dailyYieldService;
 
     private DailyYieldScheduler scheduler;
@@ -67,6 +82,7 @@ class DailyYieldSchedulerTests {
         scheduler = new DailyYieldScheduler(
                 accountRepository,
                 dailyYieldService,
+                auditTrailRecorder,
                 CLOCK
         );
     }
@@ -109,7 +125,7 @@ class DailyYieldSchedulerTests {
             verifyBatchLookups();
 
             verifyNoMoreInteractions(accountRepository);
-            verifyNoInteractions(dailyYieldService);
+            verifyNoInteractions(dailyYieldService, auditTrailRecorder);
         }
 
         @Test
@@ -388,6 +404,198 @@ class DailyYieldSchedulerTests {
             verifyBatchLookups(1L);
 
             verifyNoMoreInteractions(accountRepository, dailyYieldService);
+        }
+    }
+
+    @Nested
+    @DisplayName("Run audit recording")
+    class RunAuditRecording {
+
+        @Test
+        @DisplayName("Should record a successfully completed run")
+        void shouldRecordCompletedRun() {
+            SavingsAccount account = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            givenAccounts(account);
+            givenYieldResult(
+                    account,
+                    TODAY,
+                    DailyYieldProcessingResult.APPLIED
+            );
+
+            scheduler.processDailyYields();
+
+            verify(auditTrailRecorder).recordYieldRun(
+                    TODAY,
+                    AuditOutcome.SUCCESS,
+                    DailyYieldRunStatus.COMPLETED.name()
+            );
+        }
+
+        @Test
+        @DisplayName("Should record a completed run with failures")
+        void shouldRecordCompletedRunWithFailures() {
+            SavingsAccount account = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            givenAccounts(account);
+
+            when(dailyYieldService.processDailyYieldForDate(
+                    account.getAccountNumber(),
+                    account.getDigit(),
+                    TODAY
+            )).thenThrow(
+                    new IllegalStateException("Simulated processing failure")
+            );
+
+            scheduler.processDailyYields();
+
+            verify(auditTrailRecorder).recordYieldRun(
+                    TODAY,
+                    AuditOutcome.FAILURE,
+                    DailyYieldRunStatus.COMPLETED_WITH_FAILURES.name()
+            );
+        }
+
+        @Test
+        @DisplayName("Should record an aborted run")
+        void shouldRecordAbortedRun() {
+            SavingsAccount account = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            givenBatchLookupFailure(account);
+
+            givenYieldResult(
+                    account,
+                    TODAY,
+                    DailyYieldProcessingResult.APPLIED
+            );
+
+            scheduler.processDailyYields();
+
+            verify(auditTrailRecorder).recordYieldRun(
+                    TODAY,
+                    AuditOutcome.FAILURE,
+                    DailyYieldRunStatus.ABORTED.name()
+            );
+        }
+
+        @Test
+        @DisplayName("Should record an aborted run even when no accounts were attempted")
+        void shouldRecordAbortedRunWithoutAttempts() {
+            when(accountRepository.findNextSavingsAccountsByStatus(
+                    eq(AccountStatus.ACTIVE),
+                    eq(0L),
+                    any(Pageable.class)
+            )).thenThrow(
+                    new IllegalStateException("Simulated batch lookup failure")
+            );
+
+            scheduler.processDailyYields();
+
+            verify(auditTrailRecorder).recordYieldRun(
+                    TODAY,
+                    AuditOutcome.FAILURE,
+                    DailyYieldRunStatus.ABORTED.name()
+            );
+
+            verifyNoInteractions(dailyYieldService);
+        }
+
+        @Test
+        @DisplayName("Should not record a run when there are no pending dates")
+        void shouldNotRecordRunWhenThereAreNoPendingDates() {
+            SavingsAccount account = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            ReflectionTestUtils.setField(
+                    account,
+                    "lastYieldProcessedDate",
+                    TODAY
+            );
+
+            givenAccounts(account);
+
+            scheduler.processDailyYields();
+
+            verifyBatchLookups(1L);
+
+            verifyNoInteractions(dailyYieldService, auditTrailRecorder);
+        }
+    }
+
+    @Nested
+    @DisplayName("Correlation ID")
+    class CorrelationId {
+
+        @Test
+        @DisplayName("Should use the same correlation ID for yield processing and run audit")
+        void shouldUseSameCorrelationIdForYieldProcessingAndRunAudit() {
+            SavingsAccount account = savingsAccount(
+                    1L, "00001", "1"
+            );
+
+            givenAccounts(account);
+
+            AtomicReference<String> processingCorrelationId =
+                    new AtomicReference<>();
+
+            AtomicReference<String> runAuditCorrelationId =
+                    new AtomicReference<>();
+
+            when(dailyYieldService.processDailyYieldForDate(
+                    account.getAccountNumber(),
+                    account.getDigit(),
+                    TODAY
+            )).thenAnswer(invocation -> {
+                processingCorrelationId.set(
+                        MDC.get(CorrelationIdFilter.CORRELATION_ID_MDC_KEY)
+                );
+
+                return DailyYieldProcessingResult.APPLIED;
+            });
+
+            doAnswer(invocation -> {
+                runAuditCorrelationId.set(
+                        MDC.get(CorrelationIdFilter.CORRELATION_ID_MDC_KEY)
+                );
+
+                return null;
+            }).when(auditTrailRecorder).recordYieldRun(
+                    TODAY,
+                    AuditOutcome.SUCCESS,
+                    DailyYieldRunStatus.COMPLETED.name()
+            );
+
+            scheduler.processDailyYields();
+
+            String correlationId = processingCorrelationId.get();
+
+            assertNotNull(
+                    correlationId,
+                    "The scheduler should set a correlation ID before processing yields."
+            );
+
+            assertDoesNotThrow(
+                    () -> UUID.fromString(correlationId),
+                    "The correlation ID should be a valid UUID."
+            );
+
+            assertEquals(
+                    correlationId,
+                    runAuditCorrelationId.get(),
+                    "The run audit event should use the same correlation ID."
+            );
+
+            assertNull(
+                    MDC.get(CorrelationIdFilter.CORRELATION_ID_MDC_KEY),
+                    "The scheduler should clear the correlation ID after processing."
+            );
         }
     }
 

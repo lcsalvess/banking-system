@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -55,6 +56,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -68,6 +70,7 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -422,6 +425,174 @@ class TransactionConcurrencyTests {
             assertEquals(referenceDate, yieldTransaction.getYieldDate());
             assertNull(yieldTransaction.getPerformedBy());
             assertTrue(yieldTransaction.isPerformedBySystem());
+        }
+    }
+
+    @Nested
+    @DisplayName("Daily yield auditing")
+    class DailyYieldAuditing {
+
+        @Test
+        @DisplayName("Should persist the yield transaction and its audit event together")
+        void shouldPersistYieldTransactionAndAuditEventTogether() {
+            SavingsAccount account = createSavingsAccount("1000.00");
+            LocalDate referenceDate = LocalDate.now(clock);
+
+            transactionRepository.saveAndFlush(
+                    Transaction.create(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("1000.00"),
+                            atSaoPaulo(referenceDate.minusDays(1), 12, 0),
+                            account,
+                            findTestUser(),
+                            new BigDecimal("1000.00")
+                    )
+            );
+
+            DailyYieldProcessingResult result =
+                    dailyYieldService.processDailyYieldForDate(
+                            account.getAccountNumber(),
+                            account.getDigit(),
+                            referenceDate
+                    );
+
+            assertEquals(DailyYieldProcessingResult.APPLIED, result);
+            assertBalance("1000.17", account);
+
+            SavingsAccount persistedAccount = (SavingsAccount)
+                    accountRepository.findById(account.getId())
+                            .orElseThrow();
+
+            assertEquals(referenceDate, persistedAccount.getLastYieldDate());
+            assertEquals(
+                    referenceDate,
+                    persistedAccount.getLastYieldProcessedDate()
+            );
+
+            List<Transaction> yieldTransactions = transactionRepository.findAll(
+                    TransactionSpecifications.byAccountAndFilters(
+                            account.getId(),
+                            TransactionType.YIELD,
+                            null,
+                            null
+                    )
+            );
+
+            assertEquals(1, yieldTransactions.size());
+
+            Transaction yieldTransaction = yieldTransactions.getFirst();
+
+            assertEquals(TransactionType.YIELD, yieldTransaction.getType());
+            assertEquals(referenceDate, yieldTransaction.getYieldDate());
+            assertEquals(new BigDecimal("0.17"), yieldTransaction.getAmount());
+            assertEquals(
+                    new BigDecimal("1000.17"),
+                    yieldTransaction.getBalanceAfter()
+            );
+            assertNull(yieldTransaction.getPerformedBy());
+            assertTrue(yieldTransaction.isPerformedBySystem());
+
+            Map<String, Object> auditEvent = jdbcTemplate.queryForMap(
+                    """
+                    SELECT
+                        event_type,
+                        outcome,
+                        actor_type,
+                        actor_user_id,
+                        actor_username,
+                        entity_type,
+                        entity_id
+                    FROM audit_events
+                    WHERE event_type = 'YIELD'
+                      AND entity_type = 'TRANSACTION'
+                      AND entity_id = ?
+                    """,
+                    yieldTransaction.getTransactionCode().toString()
+            );
+
+            assertEquals("YIELD", auditEvent.get("event_type"));
+            assertEquals("SUCCESS", auditEvent.get("outcome"));
+            assertEquals("SYSTEM", auditEvent.get("actor_type"));
+            assertNull(auditEvent.get("actor_user_id"));
+            assertNull(auditEvent.get("actor_username"));
+            assertEquals("TRANSACTION", auditEvent.get("entity_type"));
+            assertEquals(
+                    yieldTransaction.getTransactionCode().toString(),
+                    auditEvent.get("entity_id")
+            );
+        }
+
+        @Test
+        @DisplayName("Should roll back the yield credit when its audit event cannot be persisted")
+        void shouldRollBackYieldCreditWhenAuditEventCannotBePersisted() {
+            SavingsAccount account = createSavingsAccount("1000.00");
+            LocalDate referenceDate = LocalDate.now(clock);
+
+            transactionRepository.saveAndFlush(
+                    Transaction.create(
+                            TransactionType.DEPOSIT,
+                            new BigDecimal("1000.00"),
+                            atSaoPaulo(referenceDate.minusDays(1), 12, 0),
+                            account,
+                            findTestUser(),
+                            new BigDecimal("1000.00")
+                    )
+            );
+
+            long auditEventsBefore = countYieldAuditEvents();
+
+            jdbcTemplate.execute(
+                    """
+                    ALTER TABLE audit_events
+                    ADD CONSTRAINT ck_test_reject_yield_audit
+                    CHECK (event_type <> 'YIELD') NOT VALID
+                    """
+            );
+
+            try {
+                assertThrows(
+                        DataIntegrityViolationException.class,
+                        () -> dailyYieldService.processDailyYieldForDate(
+                                account.getAccountNumber(),
+                                account.getDigit(),
+                                referenceDate
+                        )
+                );
+
+            } finally {
+                jdbcTemplate.execute(
+                        """
+                        ALTER TABLE audit_events
+                        DROP CONSTRAINT IF EXISTS ck_test_reject_yield_audit
+                        """
+                );
+            }
+
+            assertBalance("1000.00", account);
+
+            SavingsAccount persistedAccount = (SavingsAccount)
+                    accountRepository.findById(account.getId())
+                            .orElseThrow();
+
+            assertEquals(
+                    referenceDate.minusDays(1),
+                    persistedAccount.getLastYieldDate()
+            );
+
+            assertEquals(
+                    referenceDate.minusDays(1),
+                    persistedAccount.getLastYieldProcessedDate()
+            );
+
+            assertEquals(
+                    0,
+                    countTransactions(account, TransactionType.YIELD)
+            );
+
+            assertEquals(
+                    auditEventsBefore,
+                    countYieldAuditEvents()
+            );
         }
     }
 
@@ -1206,6 +1377,19 @@ class TransactionConcurrencyTests {
         return results.stream()
                 .filter(Boolean::booleanValue)
                 .count();
+    }
+
+    private long countYieldAuditEvents() {
+        Long count = jdbcTemplate.queryForObject(
+                """
+                SELECT count(*)
+                FROM audit_events
+                WHERE event_type = 'YIELD'
+                """,
+                Long.class
+        );
+
+        return count == null ? 0L : count;
     }
 
     // ---------------------------------------------------------------------

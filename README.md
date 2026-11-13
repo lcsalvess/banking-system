@@ -160,7 +160,7 @@ The [Development Guide](docs/DEVELOPMENT.md) explains how to configure the envir
 
 2. Create the `banking_system` and `banking_system_test` databases, then provision the PostgreSQL roles and schema permissions using [`scripts/db/bootstrap-roles.sql`](scripts/db/bootstrap-roles.sql) as a PostgreSQL administrator. Configure the required environment variables: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `DB_MIGRATOR_USERNAME`, `DB_MIGRATOR_PASSWORD`, and `JWT_SECRET`. The runtime datasource uses `banking_app`, while Flyway uses `banking_migrator` in the `local` and `prod` profiles. See the [Development Guide](docs/DEVELOPMENT.md#configuration) for database setup and profile-specific configuration.
 
-To create the initial administrator, also set `ADMIN_FULL_NAME`, ``ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`.
+To create the initial administrator, also set `ADMIN_FULL_NAME`, `ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`.
 
 3. Start the application using the `local` profile.
 

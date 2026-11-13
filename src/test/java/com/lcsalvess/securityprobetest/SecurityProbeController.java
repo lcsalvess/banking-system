@@ -20,6 +20,11 @@ public class SecurityProbeController {
         return authentication.getName();
     }
 
+    @GetMapping("/api/v1/accounts/probe/transactions")
+    public String accountTransactions(Authentication authentication) {
+        return authentication.getName();
+    }
+
     @PostMapping("/api/v1/transactions/deposits")
     public String create() {
         return "created";

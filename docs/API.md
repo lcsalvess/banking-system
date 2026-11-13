@@ -6,28 +6,28 @@ Full request and response schemas are available in Swagger UI
 when running with the `local` profile.
 
 | Method | Endpoint                                               | Description                                         | Access        |
-|--------|--------------------------------------------------------|-----------------------------------------------------|---------------|
+| ------ | ------------------------------------------------------ | --------------------------------------------------- | ------------- |
 | POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT                      | Public        |
 | PATCH  | `/api/v1/auth/password`                                | Change the password of the authenticated user       | Authenticated |
 | POST   | `/api/v1/users`                                        | Create a user                                       | `ADMIN`       |
 | GET    | `/api/v1/users`                                        | Retrieve a paginated list of users                  | `ADMIN`       |
-| PATCH  | `/api/v1/users/{employeeId}/deactivate`                    | Deactivate a user account                           | `ADMIN`       |
-| PATCH  | `/api/v1/users/{employeeId}/reactivate`                    | Reactivate a user account                           | `ADMIN`       |
-| PATCH  | `/api/v1/users/{employeeId}/role`                          | Change the role of a user                           | `ADMIN`       |
+| PATCH  | `/api/v1/users/{employeeId}/deactivate`                | Deactivate a user account                           | `ADMIN`       |
+| PATCH  | `/api/v1/users/{employeeId}/reactivate`                | Reactivate a user account                           | `ADMIN`       |
+| PATCH  | `/api/v1/users/{employeeId}/role`                      | Change the role of a user                           | `ADMIN`       |
 | POST   | `/api/v1/clients`                                      | Register a client                                   | `EMPLOYEE`    |
 | GET    | `/api/v1/clients`                                      | Retrieve a paginated list of clients                | `EMPLOYEE`    |
-| GET    | `/api/v1/clients/{clientId}`                                 | Get a client by ID                                  | `EMPLOYEE`    |
-| PATCH  | `/api/v1/clients/{clientId}`                                 | Partially update a client                           | `EMPLOYEE`    |
+| GET    | `/api/v1/clients/{clientId}`                           | Get a client by ID                                  | `EMPLOYEE`    |
+| PATCH  | `/api/v1/clients/{clientId}`                           | Partially update a client                           | `EMPLOYEE`    |
 | GET    | `/api/v1/clients/{clientId}/accounts`                  | List the accounts of a client (paginated)           | `EMPLOYEE`    |
 | POST   | `/api/v1/accounts`                                     | Create a checking or savings account                | `EMPLOYEE`    |
 | GET    | `/api/v1/accounts`                                     | Retrieve a paginated list of accounts               | `EMPLOYEE`    |
 | GET    | `/api/v1/accounts/{accountNumber}?digit=`              | Get an account                                      | `EMPLOYEE`    |
 | PATCH  | `/api/v1/accounts/{accountNumber}?digit=`              | Cancel an account                                   | `EMPLOYEE`    |
-| POST   | `/api/v1/transactions/deposits`                         | Deposit                                             | `EMPLOYEE`    |
-| POST   | `/api/v1/transactions/withdrawals`                        | Withdraw                                            | `EMPLOYEE`    |
-| POST   | `/api/v1/transactions/transfers`                        | Transfer between accounts                           | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/deposits`                        | Deposit                                             | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/withdrawals`                     | Withdraw                                            | `EMPLOYEE`    |
+| POST   | `/api/v1/transactions/transfers`                       | Transfer between accounts                           | `EMPLOYEE`    |
 | GET    | `/api/v1/accounts/{accountNumber}/transactions?digit=` | Transaction history of an account                   | `EMPLOYEE`    |
-| GET    | `/api/v1/transactions/{transactionCode}`          | Get a transaction by its public UUID                | `EMPLOYEE`    |
+| GET    | `/api/v1/transactions/{transactionCode}`               | Get a transaction by its public UUID                | `EMPLOYEE`    |
 | GET    | `/api/v1/audit-events`                                 | Search the audit trail using filters and pagination | `AUDITOR`     |
 
 `accountNumber` must have between 5 and 20 digits and `digit` exactly 1 digit, both in the path/query parameters and in request bodies.
@@ -59,14 +59,14 @@ List endpoints accept `page`, `size`, and `sort` (for example `sort=balance,desc
 
 To guarantee deterministic pagination, each endpoint uses a stable unique tie-breaker whenever it is not already part of the effective sort. The tie-breaker may differ between endpoints, as described in the table below.
 
-| Endpoint                                            | Filters                                                                                                  | Sortable fields                                                                                                                   | Default sort                                 | Default size |
-|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|--------------|
-| `GET /api/v1/users` | `search`, `role`, `active` | `employeeId`, `fullName`, `username`, `email`, `role`, `active` | `employeeId` ascending | 20 |
-| `GET /api/v1/clients`                               | `name`                                                                                                   | `id`, `name`                                                                                                                      | `id` ascending                               | 10           |
-| `GET /api/v1/accounts`                              | -                                                                                                        | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
-| `GET /api/v1/clients/{clientId}/accounts`           | `type`, `status`                                                                                         | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
+| Endpoint                                                   | Filters                                                                                                  | Sortable fields                                                                                                                   | Default sort                                 | Default size |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------ |
+| `GET /api/v1/users`                                        | `search`, `role`, `active`                                                                               | `employeeId`, `fullName`, `username`, `email`, `role`, `active`                                                                   | `employeeId` ascending                       | 20           |
+| `GET /api/v1/clients`                                      | `name`                                                                                                   | `id`, `name`                                                                                                                      | `id` ascending                               | 10           |
+| `GET /api/v1/accounts`                                     | -                                                                                                        | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
+| `GET /api/v1/clients/{clientId}/accounts`                  | `type`, `status`                                                                                         | `accountNumber`, `balance`, `status`, `type`                                                                                      | `accountNumber` ascending                    | 10           |
 | `GET /api/v1/accounts/{accountNumber}/transactions?digit=` | `type`, `startDate`, `endDate`                                                                           | `createdAt`, `id`, `type`, `amount`                                                                                               | `createdAt` descending, then `id` descending | 10           |
-| `GET /api/v1/audit-events`                          | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
+| `GET /api/v1/audit-events`                                 | `startDate`, `endDate`, `eventType`, `outcome`, `actorUserId`, `actorUsername`, `entityType`, `entityId` | `id`, `eventType`, `outcome`, `actorType`, `actorUserId`, `actorUsername`, `entityType`, `entityId`, `correlationId`, `createdAt` | `createdAt` descending, then `id` descending | 20           |
 
 When creating a HUMAN user, `fullName` is required and
 must not be blank. The `employeeId` is generated automatically

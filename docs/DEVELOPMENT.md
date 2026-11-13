@@ -61,17 +61,20 @@ Use the `local` profile for development.
 | Variable                 | Required              | Description                                                                               |
 |--------------------------|-----------------------|-------------------------------------------------------------------------------------------|
 | `SPRING_PROFILES_ACTIVE` | No                    | Active profile (`local`, `prod`, or `test`)                                               |
-| `DB_URL`                 | Yes, except in `test` | JDBC URL of the PostgreSQL database                                                       |
-| `DB_USERNAME`            | Yes                   | PostgreSQL username for the application datasource                                        |
-| `DB_PASSWORD`            | Yes                   | Password for the application datasource user                                              |
-| `DB_MIGRATOR_USERNAME`   | Yes, except in `test` | PostgreSQL username used by Flyway to apply database migrations                           |
-| `DB_MIGRATOR_PASSWORD`   | Yes, except in `test` | Password for the Flyway migration user                                                    |
-| `JWT_SECRET`             | Yes                   | Base64-encoded secret used to sign JWTs, with at least 256 bits of key material           |
-| `ADMIN_USERNAME`         | No                    | Username of the initial administrator                                                     |
-| `ADMIN_EMAIL`            | No                    | Email address of the initial administrator                                                |
-| `ADMIN_PASSWORD`         | No                    | Password of the initial administrator                                                     |
+| `DB_URL`                 | Yes, except in `test` | JDBC URL of the PostgreSQL database                                                      |
+| `DB_USERNAME`            | Yes                   | PostgreSQL username for the application datasource                                       |
+| `DB_PASSWORD`            | Yes                   | Password for the application datasource user                                             |
+| `DB_MIGRATOR_USERNAME`   | Yes, except in `test` | PostgreSQL username used by Flyway to apply database migrations                          |
+| `DB_MIGRATOR_PASSWORD`   | Yes, except in `test` | Password for the Flyway migration user                                                   |
+| `JWT_SECRET`             | Yes                   | Base64-encoded secret used to sign JWTs, with at least 256 bits of key material          |
+| `ADMIN_FULL_NAME`        | Conditional           | Full name of the initial administrator                                                    |
+| `ADMIN_USERNAME`         | Conditional           | Username of the initial administrator                                                     |
+| `ADMIN_EMAIL`            | Conditional           | Email address of the initial administrator                                                |
+| `ADMIN_PASSWORD`         | Conditional           | Password of the initial administrator                                                     |
 | `PROXY_IP_HEADER`        | No                    | Header with the original client IP behind a reverse proxy (for example `X-Forwarded-For`) |
 | `TRUSTED_PROXIES`        | No                    | Regular expression with the IPs of the trusted proxies; without it the header is ignored  |
+
+`Conditional` means these variables are required only when no `ADMIN` account exists and `app.admin.bootstrap.required=true`. When bootstrap is optional, they may be omitted.
 
 The application and Flyway use separate database credentials in the `local` and `prod` profiles.
 
@@ -99,9 +102,17 @@ Do not rely on the PostgreSQL server timezone or the JVM default timezone as an 
 
 Database passwords must be provided through environment variables or the run configuration and must not be committed to source control.
 
-The initial administrator is created only when no `ADMIN` user exists and all three `ADMIN_*` variables are configured. `ADMIN_PASSWORD` must satisfy the same password policy used for user creation, including complexity and size limits.
+#### Initial administrator bootstrap
 
-If no administrator exists and the required variables are missing, the application logs a warning and starts in `local` and `test`. In other profiles, including `prod` and when no profile is active, startup fails. This prevents the application from running without an administrator when the bootstrap requirement is enabled.
+The initial administrator bootstrap checks for an active `ADMIN` account before proceeding:
+
+- If at least one active administrator exists, bootstrap is skipped.
+- If administrator accounts exist but none are active, application startup fails in every profile. Administrator access must be restored using the documented recovery procedure. The application does not automatically create another administrator in this situation.
+- If no administrator account exists, the initial administrator is created when all four `ADMIN_FULL_NAME`, `ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` variables are configured. The supplied credentials are validated using the same rules applied to regular user creation.
+
+When no administrator account exists and the required credentials are missing or blank, the application logs a warning and continues starting in the `local` and `test` profiles, where bootstrap is optional. In other profiles, including `prod` and when no profile is active, startup fails because administrator bootstrap is required.
+
+`ADMIN_PASSWORD` must satisfy the same password policy used for user creation, including complexity and size limits.
 
 The initial administrator can manage users but cannot operate on clients, accounts, or transactions. Create an `EMPLOYEE` user to perform those operations. See the [API examples](API.md#examples).
 

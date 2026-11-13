@@ -38,6 +38,8 @@ public interface UserRepository extends
 
     boolean existsByRole(Role role);
 
+    boolean existsByRoleAndActiveTrue(Role role);
+
     boolean existsByEmployeeIdAndRole(String employeeId, Role role);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

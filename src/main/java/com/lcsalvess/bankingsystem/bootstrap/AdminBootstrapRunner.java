@@ -58,9 +58,18 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
     @Override
     public void run(String @NonNull ... args) {
-        if (userRepository.existsByRole(Role.ADMIN)) {
-            log.info("Administrator user already exists. Bootstrap skipped.");
+        if (userRepository.existsByRoleAndActiveTrue(Role.ADMIN)) {
+            log.info("An active administrator already exists. Bootstrap skipped.");
             return;
+        }
+
+        if (userRepository.existsByRole(Role.ADMIN)) {
+            throw new IllegalStateException(
+                    "Administrator bootstrap cannot proceed because administrator "
+                            + "accounts exist, but none are active. "
+                            + "Restore administrator access using the documented "
+                            + "recovery procedure before restarting the application."
+            );
         }
 
         if (!credentialsConfigured()) {

@@ -146,6 +146,8 @@ class SecurityConfigTests {
 
     private static final String PROTECTED_URL = "/api/v1/transactions/probe";
     private static final String POST_PROTECTED_URL = "/api/v1/transactions/deposits";
+    private static final String ACCOUNT_TRANSACTIONS_URL =
+            "/api/v1/accounts/probe/transactions";
     private static final String ADMIN_URL = "/api/v1/users/test-probe";
     private static final String LOGIN_URL = "/api/v1/auth/login";
     private static final String AUTH_PROBE_URL = "/api/v1/auth/probe";
@@ -509,6 +511,69 @@ class SecurityConfigTests {
                     .andExpect(status().isForbidden());
 
             verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Should allow EMPLOYEE on the account transaction history route")
+        void shouldAllowEmployeeOnAccountTransactionHistory() throws Exception {
+            User employee = createUser(Role.EMPLOYEE);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(employee);
+
+            mockMvc.perform(get(ACCOUNT_TRANSACTIONS_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(employee)
+                            ))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(USERNAME));
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Should deny account transaction history access to ADMIN")
+        void shouldForbidAdminFromAccountTransactionHistory() throws Exception {
+            User admin = createUser(Role.ADMIN);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(admin);
+
+            mockMvc.perform(get(ACCOUNT_TRANSACTIONS_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(admin)
+                            ))
+                    .andExpect(status().isForbidden());
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Should deny account transaction history access to AUDITOR")
+        void shouldForbidAuditorFromAccountTransactionHistory() throws Exception {
+            User auditor = createUser(Role.AUDITOR);
+
+            when(userDetailsService.loadUserByUsername(USERNAME))
+                    .thenReturn(auditor);
+
+            mockMvc.perform(get(ACCOUNT_TRANSACTIONS_URL)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    bearer(auditor)
+                            ))
+                    .andExpect(status().isForbidden());
+
+            verify(userDetailsService).loadUserByUsername(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Should return 401 on the account transaction history route without a token")
+        void shouldReturn401OnAccountTransactionHistoryWithoutToken() throws Exception {
+            expectUnauthorized(mockMvc.perform(get(ACCOUNT_TRANSACTIONS_URL)));
+
+            verifyNoInteractions(userDetailsService);
         }
 
         @Test

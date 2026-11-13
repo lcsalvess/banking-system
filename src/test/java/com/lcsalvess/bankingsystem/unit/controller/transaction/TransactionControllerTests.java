@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -585,12 +586,27 @@ public class TransactionControllerTests {
         }
 
         @Test
-        @DisplayName("Should return 400 when transaction UUID is invalid")
-        void shouldReturnBadRequestWhenTransactionCodeIsInvalid() throws Exception {
+        @DisplayName("Should return 404 when transaction UUID is invalid")
+        void shouldReturnNotFoundWhenTransactionCodeIsInvalid() throws Exception {
             performErrorResponse(
                     performGetByTransactionCode("invalid-uuid"),
-                    400,
-                    ApiErrorMessages.INVALID_REQUEST_PARAMETER
+                    404,
+                    ApiErrorMessages.RESOURCE_NOT_FOUND
+            );
+
+            verifyNoInteractions(transactionQueryService);
+        }
+
+        @ParameterizedTest(name = "GET /api/v1/transactions/{0}")
+        @ValueSource(strings = {"deposits", "withdrawals", "transfers"})
+        @DisplayName("Should return 405 for GET on POST-only operation routes")
+        void shouldReturnMethodNotAllowedForGetOnOperationRoutes(
+                String operation
+        ) throws Exception {
+            performErrorResponse(
+                    performGetByTransactionCode(operation),
+                    405,
+                    ApiErrorMessages.METHOD_NOT_ALLOWED
             );
 
             verifyNoInteractions(transactionQueryService);

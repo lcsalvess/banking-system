@@ -67,7 +67,7 @@ public class AuditTrailFilter extends OncePerRequestFilter {
     private static final Set<String> KNOWN_ACTIONS = Set.of(
             "login", "password",
             "deposits", "withdrawals", "transfers",
-            "code", "accounts", "transactions",
+            "accounts", "transactions",
             "deactivate", "reactivate", "role"
     );
 

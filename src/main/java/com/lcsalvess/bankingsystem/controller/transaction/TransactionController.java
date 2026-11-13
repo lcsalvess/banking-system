@@ -34,6 +34,13 @@ import java.util.UUID;
 @RequestMapping("/api/v1/transactions")
 public class TransactionController {
 
+    // Restricts the lookup path variable to the UUID format. Without it, the
+    // variable would also capture literal segments such as "deposits", so a
+    // GET on a POST-only route would answer 400 instead of 405.
+    private static final String UUID_PATH =
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
+                    + "-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+
     private final TransactionQueryService transactionQueryService;
     private final TransactionIdempotencyService transactionIdempotencyService;
 
@@ -52,16 +59,12 @@ public class TransactionController {
                     description = "Transaction retrieved successfully"
             ),
             @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid transaction UUID format"
-            ),
-            @ApiResponse(
                     responseCode = "404",
-                    description = "Transaction not found"
+                    description = "Transaction not found, or the identifier is not a valid UUID"
             )
     })
     @PreAuthorize("hasRole('EMPLOYEE')")
-    @GetMapping("/{transactionCode}")
+    @GetMapping("/{transactionCode:" + UUID_PATH + "}")
     public TransactionResponseDTO findByTransactionCode(
             @PathVariable UUID transactionCode
     ) {

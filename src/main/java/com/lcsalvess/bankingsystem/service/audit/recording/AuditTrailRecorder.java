@@ -23,6 +23,7 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -210,6 +211,31 @@ public class AuditTrailRecorder {
         if (!write(record)) {
             recentBlocks.asMap().remove(key, reservationToken);
         }
+    }
+
+    /**
+     * Records the outcome of one daily yield run. The run has no authenticated
+     * user, so the actor is SYSTEM. Best-effort like the other detached events:
+     * the run never depends on this write. Must be called outside a transaction.
+     */
+    public void recordYieldRun(
+            LocalDate referenceDate,
+            AuditOutcome outcome,
+            String reason
+    ) {
+        write(new DetachedAuditRecord(
+                AuditEventType.YIELD_RUN,
+                outcome,
+                AuditActorType.SYSTEM,
+                null,
+                null,
+                AuditEntityType.YIELD_RUN,
+                referenceDate.toString(),
+                reason,
+                null,
+                null,
+                null
+        ));
     }
 
     public void recordHttpRequestCompleted(

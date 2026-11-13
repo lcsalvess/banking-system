@@ -87,6 +87,36 @@ public class AuditService {
     }
 
     /**
+     * Records a successful system-generated operation (for example, the daily
+     * yield) in the SAME transaction as the audited change. There is no
+     * authenticated user in scheduled work, so the actor is always SYSTEM;
+     * consulting the current user here would record the event as ANONYMOUS.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordSystemSuccess(
+            AuditEventType eventType,
+            AuditEntityType entityType,
+            String entityId
+    ) {
+        auditEventRepository.save(
+                AuditEvent.create(
+                        eventType,
+                        AuditOutcome.SUCCESS,
+                        AuditActorType.SYSTEM,
+                        null,
+                        null,
+                        entityType,
+                        entityId,
+                        currentCorrelationId(),
+                        clock.instant(),
+                        null,
+                        null,
+                        null
+                )
+        );
+    }
+
+    /**
      * Records an event that must not depend on the operation's transaction:
      * failures (which trigger rollback), access denials, and login events.
      *

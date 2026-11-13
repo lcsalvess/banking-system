@@ -3,10 +3,13 @@ package com.lcsalvess.bankingsystem.service.transaction.yield;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
+import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.repository.AccountRepository;
+import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.data.domain.PageRequest;
@@ -17,6 +20,7 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class DailyYieldScheduler {
@@ -29,15 +33,18 @@ public class DailyYieldScheduler {
 
     private final AccountRepository accountRepository;
     private final DailyYieldService dailyYieldService;
+    private final AuditTrailRecorder auditTrailRecorder;
     private final Clock clock;
 
     public DailyYieldScheduler(
             AccountRepository accountRepository,
             DailyYieldService dailyYieldService,
+            AuditTrailRecorder auditTrailRecorder,
             Clock clock
     ) {
         this.accountRepository = accountRepository;
         this.dailyYieldService = dailyYieldService;
+        this.auditTrailRecorder = auditTrailRecorder;
         this.clock = clock;
     }
 
@@ -52,12 +59,20 @@ public class DailyYieldScheduler {
         YieldMetrics metrics = new YieldMetrics();
         boolean aborted = false;
 
-        log.info(
-                "Starting daily yield processing for {}",
-                referenceDate
+        String previousCorrelationId =
+                MDC.get(CorrelationIdFilter.CORRELATION_ID_MDC_KEY);
+
+        MDC.put(
+                CorrelationIdFilter.CORRELATION_ID_MDC_KEY,
+                UUID.randomUUID().toString()
         );
 
         try {
+            log.info(
+                    "Starting daily yield processing for {}",
+                    referenceDate
+            );
+
             while (true) {
                 List<SavingsAccount> batch =
                         accountRepository.findNextSavingsAccountsByStatus(
@@ -101,8 +116,52 @@ public class DailyYieldScheduler {
             );
 
         } finally {
-            logMetrics(referenceDate, aborted, metrics);
+            try {
+                logMetrics(referenceDate, aborted, metrics);
+                recordRun(referenceDate, runStatus(aborted, metrics), metrics);
+            } finally {
+                if (previousCorrelationId == null) {
+                    MDC.remove(CorrelationIdFilter.CORRELATION_ID_MDC_KEY);
+                } else {
+                    MDC.put(
+                            CorrelationIdFilter.CORRELATION_ID_MDC_KEY,
+                            previousCorrelationId
+                    );
+                }
+            }
         }
+    }
+
+    private static DailyYieldRunStatus runStatus(
+            boolean aborted,
+            YieldMetrics metrics
+    ) {
+        if (aborted) {
+            return DailyYieldRunStatus.ABORTED;
+        }
+
+        return metrics.getFailed() > 0
+                ? DailyYieldRunStatus.COMPLETED_WITH_FAILURES
+                : DailyYieldRunStatus.COMPLETED;
+    }
+
+    private void recordRun(
+            LocalDate referenceDate,
+            DailyYieldRunStatus status,
+            YieldMetrics metrics
+    ) {
+        // A startup recovery with nothing pending must not add a row per
+        // restart to an append-only table. An aborted run is always recorded.
+        if (metrics.getAttempted() == 0
+                && status != DailyYieldRunStatus.ABORTED) {
+            return;
+        }
+
+        auditTrailRecorder.recordYieldRun(
+                referenceDate,
+                status.outcome(),
+                status.name()
+        );
     }
 
     private void processAccountYields(
@@ -185,7 +244,7 @@ public class DailyYieldScheduler {
             }
         }
 
-        // Última tentativa: se falhar, a exceção será propagada.
+        // Final attempt: if it fails, the exception is propagated.
         return dailyYieldService.processDailyYieldForDate(
                 account.getAccountNumber(),
                 account.getDigit(),
@@ -213,7 +272,7 @@ public class DailyYieldScheduler {
     }
 
     /**
-     * Encapsula as métricas do processamento diário de rendimentos.
+     * Encapsulates the daily yield processing metrics.
      */
     private static class YieldMetrics {
 
@@ -236,6 +295,10 @@ public class DailyYieldScheduler {
 
         private void incrementFailed() {
             failed++;
+        }
+
+        private int getAttempted() {
+            return attempted;
         }
 
         private int getFailed() {

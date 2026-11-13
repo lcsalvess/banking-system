@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.function.Executable;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -36,7 +37,11 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DailyYieldServiceTests {
@@ -128,15 +133,7 @@ class DailyYieldServiceTests {
                     TODAY,
                     DAY_START
             );
-            verify(transactionRepository).save(any(Transaction.class));
-            verify(eventPublisher).publishEvent(
-                    new TransactionOperationEvent(
-                            TransactionType.YIELD,
-                            SAVINGS_NUMBER,
-                            new BigDecimal("0.17"),
-                            "SYSTEM"
-                    )
-            );
+            verifyYieldSavedAndPublished("0.17");
 
             verifyNoMoreInteractionsOnMocks();
         }
@@ -190,15 +187,7 @@ class DailyYieldServiceTests {
                     TODAY,
                     DAY_START
             );
-            verify(transactionRepository).save(any(Transaction.class));
-            verify(eventPublisher).publishEvent(
-                    new TransactionOperationEvent(
-                            TransactionType.YIELD,
-                            SAVINGS_NUMBER,
-                            new BigDecimal("0.01"),
-                            "SYSTEM"
-                    )
-            );
+            verifyYieldSavedAndPublished("0.01");
 
             verifyNoMoreInteractionsOnMocks();
         }
@@ -489,16 +478,8 @@ class DailyYieldServiceTests {
                     TODAY,
                     DAY_START
             );
-            verify(transactionRepository).save(any(Transaction.class));
             verifyAccountOperationLookup(account);
-            verify(eventPublisher).publishEvent(
-                    new TransactionOperationEvent(
-                            TransactionType.YIELD,
-                            SAVINGS_NUMBER,
-                            new BigDecimal("0.17"),
-                            "SYSTEM"
-                    )
-            );
+            verifyYieldSavedAndPublished("0.17");
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -521,6 +502,22 @@ class DailyYieldServiceTests {
     private void stubSaveReturningArgument() {
         when(transactionRepository.save(any(Transaction.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    private void verifyYieldSavedAndPublished(String amount) {
+        ArgumentCaptor<Transaction> saved =
+                ArgumentCaptor.forClass(Transaction.class);
+
+        verify(transactionRepository).save(saved.capture());
+        verify(eventPublisher).publishEvent(
+                new TransactionOperationEvent(
+                        TransactionType.YIELD,
+                        SAVINGS_NUMBER,
+                        new BigDecimal(amount),
+                        "SYSTEM",
+                        saved.getValue().getTransactionCode()
+                )
+        );
     }
 
     private void verifyNoInteractionsOnMocks() {

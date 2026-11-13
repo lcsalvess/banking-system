@@ -31,6 +31,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -203,6 +204,52 @@ class AuditServiceTests {
         }
     }
 
+    @Nested
+    @DisplayName("recordSystemSuccess(AuditEventType, AuditEntityType, String)")
+    class RecordSystemSuccess {
+
+        @Test
+        @DisplayName("Should record SYSTEM as the actor without consulting the current user")
+        void shouldRecordSystemActor() {
+            auditService.recordSystemSuccess(
+                    AuditEventType.YIELD,
+                    AuditEntityType.TRANSACTION,
+                    "5b1f6c0e-8a3d-4c2e-9f47-3d2a1b0c9e88"
+            );
+
+            AuditEvent saved = savedSystemEvent();
+
+            assertEquals(AuditEventType.YIELD, saved.getEventType());
+            assertEquals(AuditOutcome.SUCCESS, saved.getOutcome());
+            assertEquals(AuditActorType.SYSTEM, saved.getActorType());
+            assertNull(saved.getActorUserId());
+            assertNull(saved.getActorUsername());
+            assertEquals(AuditEntityType.TRANSACTION, saved.getEntityType());
+            assertEquals(
+                    "5b1f6c0e-8a3d-4c2e-9f47-3d2a1b0c9e88",
+                    saved.getEntityId()
+            );
+            assertEquals(NOW, saved.getCreatedAt());
+        }
+
+        @Test
+        @DisplayName("Should store the correlation ID of the current run")
+        void shouldStoreCorrelationId() {
+            MDC.put(CorrelationIdFilter.CORRELATION_ID_MDC_KEY, CORRELATION_ID);
+
+            auditService.recordSystemSuccess(
+                    AuditEventType.YIELD,
+                    AuditEntityType.TRANSACTION,
+                    "5b1f6c0e-8a3d-4c2e-9f47-3d2a1b0c9e88"
+            );
+
+            assertEquals(
+                    UUID.fromString(CORRELATION_ID),
+                    savedSystemEvent().getCorrelationId()
+            );
+        }
+    }
+
     private AuditEvent savedEvent() {
         ArgumentCaptor<AuditEvent> captor =
                 ArgumentCaptor.forClass(AuditEvent.class);
@@ -210,6 +257,17 @@ class AuditServiceTests {
         verify(currentUserService).findCurrentUser();
         verify(auditEventRepository).save(captor.capture());
         verifyNoMoreInteractions(auditEventRepository, currentUserService);
+
+        return captor.getValue();
+    }
+
+    private AuditEvent savedSystemEvent() {
+        ArgumentCaptor<AuditEvent> captor =
+                ArgumentCaptor.forClass(AuditEvent.class);
+
+        verify(auditEventRepository).save(captor.capture());
+        verifyNoInteractions(currentUserService);
+        verifyNoMoreInteractions(auditEventRepository);
 
         return captor.getValue();
     }

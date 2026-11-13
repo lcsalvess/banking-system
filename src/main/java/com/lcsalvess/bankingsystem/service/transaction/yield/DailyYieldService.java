@@ -116,10 +116,11 @@ public class DailyYieldService {
                 .atStartOfDay(AppTimeZone.ZONE)
                 .toInstant();
 
-        // Caminho rápido: lê o balance_after da última transação anterior ao
-        // dia. Se o histórico não estiver em ordem (rendimento retroativo
-        // gravado depois de movimentações mais novas), a consulta não retorna
-        // nada e o saldo é reconstruído somando o histórico.
+        // Fast path: retrieves the balance_after of the last transaction
+        // before the given day. If the transaction history is out of order
+        // (e.g., retroactive yield recorded after newer transactions), the
+        // query returns nothing and the balance is reconstructed by summing
+        // the transaction history.
         BigDecimal balanceAtStartOfDay =
                 transactionRepository.findBalanceAtStartOfDayFromSnapshot(
                                 savingsAccount.getId(),
@@ -153,7 +154,7 @@ public class DailyYieldService {
         savingsAccount.updateLastYieldDate(referenceDate);
         savingsAccount.markYieldDateProcessed(referenceDate);
 
-        registerSystemYieldTransaction(
+        Transaction yieldTransaction = registerSystemYieldTransaction(
                 yieldAmount,
                 referenceDate,
                 savingsAccount
@@ -164,7 +165,8 @@ public class DailyYieldService {
                         TransactionType.YIELD,
                         savingsAccount.getAccountNumber(),
                         yieldAmount,
-                        SystemActor.NAME
+                        SystemActor.NAME,
+                        yieldTransaction.getTransactionCode()
                 )
         );
 
@@ -184,7 +186,7 @@ public class DailyYieldService {
         return savingsAccount;
     }
 
-    private void registerSystemYieldTransaction(
+    private Transaction registerSystemYieldTransaction(
             BigDecimal amount,
             LocalDate referenceDate,
             SavingsAccount account
@@ -197,5 +199,6 @@ public class DailyYieldService {
                 account.getBalance()
         );
         transactionRepository.save(transaction);
+        return transaction;
     }
 }

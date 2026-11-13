@@ -12,17 +12,4 @@ public record TransactionOperationEvent(
         String username,
         UUID transactionCode
 ) {
-
-    /**
-     * Para eventos sem transação auditável, como o rendimento do sistema, que
-     * não carregam código.
-     */
-    public TransactionOperationEvent(
-            TransactionType type,
-            String accountNumber,
-            BigDecimal amount,
-            String username
-    ) {
-        this(type, accountNumber, amount, username, null);
-    }
 }

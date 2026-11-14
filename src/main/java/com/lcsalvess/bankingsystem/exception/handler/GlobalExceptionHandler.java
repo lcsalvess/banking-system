@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.exception.handler;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
-import com.lcsalvess.bankingsystem.exception.BusinessException;
+import com.lcsalvess.bankingsystem.exception.base.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;

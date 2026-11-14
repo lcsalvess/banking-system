@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.exception.client;
 
-import com.lcsalvess.bankingsystem.exception.BusinessException;
+import com.lcsalvess.bankingsystem.exception.base.BusinessException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import org.springframework.http.HttpStatus;
 

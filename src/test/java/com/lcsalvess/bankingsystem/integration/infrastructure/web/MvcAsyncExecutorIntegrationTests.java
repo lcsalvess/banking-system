@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.integration.config;
+package com.lcsalvess.bankingsystem.integration.infrastructure.web;
 
 import com.lcsalvess.bankingsystem.config.executor.TaskExecutorConfig;
 import org.junit.jupiter.api.DisplayName;

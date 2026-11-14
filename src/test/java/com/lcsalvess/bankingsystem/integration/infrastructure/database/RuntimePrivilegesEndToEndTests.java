@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.integration.security;
+package com.lcsalvess.bankingsystem.integration.infrastructure.database;
 
 import com.lcsalvess.bankingsystem.dto.request.client.ClientUpdateRequestDTO;
 import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDTO;

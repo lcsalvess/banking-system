@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.integration.security;
+package com.lcsalvess.bankingsystem.integration.infrastructure.database;
 
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.callback.Callback;

@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.integration.config;
+package com.lcsalvess.bankingsystem.integration.infrastructure.database;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;

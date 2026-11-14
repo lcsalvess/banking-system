@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.config;
 
 import com.lcsalvess.bankingsystem.config.time.ClockConfig;
-import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
+import com.lcsalvess.bankingsystem.security.handler.RestAuthenticationEntryPoint;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
 import com.lcsalvess.bankingsystem.service.security.JwtService;
 import org.mockito.Mockito;

@@ -1,9 +1,9 @@
 package com.lcsalvess.bankingsystem.config.security;
 
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
-import com.lcsalvess.bankingsystem.security.JwtAuthenticationFilter;
-import com.lcsalvess.bankingsystem.security.RestAccessDeniedHandler;
-import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
+import com.lcsalvess.bankingsystem.security.filter.JwtAuthenticationFilter;
+import com.lcsalvess.bankingsystem.security.handler.RestAccessDeniedHandler;
+import com.lcsalvess.bankingsystem.security.handler.RestAuthenticationEntryPoint;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

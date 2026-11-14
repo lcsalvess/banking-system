@@ -1,7 +1,7 @@
-package com.lcsalvess.bankingsystem.unit.security;
+package com.lcsalvess.bankingsystem.unit.audit.web;
 
-import com.lcsalvess.bankingsystem.security.AuditExceptionCaptureResolver;
-import com.lcsalvess.bankingsystem.security.AuditRequestAttributes;
+import com.lcsalvess.bankingsystem.audit.web.AuditExceptionCaptureResolver;
+import com.lcsalvess.bankingsystem.audit.web.AuditRequestAttributes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;

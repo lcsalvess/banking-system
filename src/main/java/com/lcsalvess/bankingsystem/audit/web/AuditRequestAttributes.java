@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.security;
+package com.lcsalvess.bankingsystem.audit.web;
 
 /**
  * Request attributes used to pass information from the security filter chain

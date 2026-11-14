@@ -1,11 +1,11 @@
-package com.lcsalvess.bankingsystem.unit.filter;
+package com.lcsalvess.bankingsystem.unit.audit.web;
 
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
-import com.lcsalvess.bankingsystem.filter.AuditTrailFilter;
+import com.lcsalvess.bankingsystem.audit.web.AuditTrailFilter;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
-import com.lcsalvess.bankingsystem.security.AuditRequestAttributes;
+import com.lcsalvess.bankingsystem.audit.web.AuditRequestAttributes;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import jakarta.servlet.FilterChain;

@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.security;
+package com.lcsalvess.bankingsystem.security.handler;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;

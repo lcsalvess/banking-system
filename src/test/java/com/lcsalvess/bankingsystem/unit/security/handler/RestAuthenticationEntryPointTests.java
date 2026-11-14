@@ -1,8 +1,8 @@
-package com.lcsalvess.bankingsystem.unit.security;
+package com.lcsalvess.bankingsystem.unit.security.handler;
 
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
-import com.lcsalvess.bankingsystem.security.RestAuthenticationEntryPoint;
+import com.lcsalvess.bankingsystem.security.handler.RestAuthenticationEntryPoint;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

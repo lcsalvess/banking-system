@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.security;
+package com.lcsalvess.bankingsystem.audit.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

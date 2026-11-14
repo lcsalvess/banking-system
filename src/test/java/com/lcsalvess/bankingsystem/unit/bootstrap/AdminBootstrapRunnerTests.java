@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.bootstrap;
 
 import com.lcsalvess.bankingsystem.bootstrap.AdminBootstrapRunner;
+import com.lcsalvess.bankingsystem.config.bootstrap.AdminBootstrapProperties;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.entity.user.UserType;
@@ -12,7 +13,6 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.stream.Stream;
 
@@ -85,16 +84,6 @@ class AdminBootstrapRunnerTests {
     @AfterAll
     static void closeValidator() {
         validatorFactory.close();
-    }
-
-    @BeforeEach
-    void setUp() {
-        runner = new AdminBootstrapRunner(
-                userRepository,
-                employeeIdGenerator,
-                passwordEncoder,
-                validator
-        );
     }
 
     @Nested
@@ -455,10 +444,20 @@ class AdminBootstrapRunnerTests {
             String password,
             boolean bootstrapRequired) {
 
-        ReflectionTestUtils.setField(runner, "adminFullName", fullName);
-        ReflectionTestUtils.setField(runner, "adminUsername", username);
-        ReflectionTestUtils.setField(runner, "adminEmail", email);
-        ReflectionTestUtils.setField(runner, "adminPassword", password);
-        ReflectionTestUtils.setField(runner, "bootstrapRequired", bootstrapRequired);
+        AdminBootstrapProperties properties = new AdminBootstrapProperties(
+                fullName,
+                username,
+                email,
+                password,
+                new AdminBootstrapProperties.Bootstrap(bootstrapRequired)
+        );
+
+        runner = new AdminBootstrapRunner(
+                userRepository,
+                employeeIdGenerator,
+                passwordEncoder,
+                validator,
+                properties
+        );
     }
 }

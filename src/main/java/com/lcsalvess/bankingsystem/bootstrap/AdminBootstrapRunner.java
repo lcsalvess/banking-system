@@ -15,6 +15,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -92,12 +93,22 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
         String employeeId = employeeIdGenerator.generate();
 
+        String rawPassword = Objects.requireNonNull(
+                adminPassword,
+                "Administrator password is required."
+        );
+
+        String encodedPassword = Objects.requireNonNull(
+                passwordEncoder.encode(rawPassword),
+                "Password encoder returned a null encoded password."
+        );
+
         User admin = User.createHuman(
                 employeeId,
                 adminFullName,
                 adminUsername,
                 adminEmail,
-                passwordEncoder.encode(adminPassword),
+                encodedPassword,
                 Role.ADMIN
         );
 

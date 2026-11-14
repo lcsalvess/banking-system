@@ -44,9 +44,10 @@ jobs:
 
     env:
       SPRING_PROFILES_ACTIVE: test
-      DB_URL: jdbc:postgresql://localhost:5432/banking_system_test
-      DB_USERNAME: banking_test
-      DB_PASSWORD: banking_test_password
+      # Non-sensitive JDBC URL for the ephemeral CI PostgreSQL service.
+      DB_TEST_URL: jdbc:postgresql://localhost:5432/banking_system_test # trufflehog:ignore
+      DB_TEST_USERNAME: banking_test
+      DB_TEST_PASSWORD: banking_test_password
       JWT_SECRET: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
 
     steps:

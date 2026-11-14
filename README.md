@@ -158,7 +158,22 @@ The [Development Guide](docs/DEVELOPMENT.md) explains how to configure the envir
    cd banking-system
    ```
 
-2. Create the `banking_system` and `banking_system_test` databases, then provision the PostgreSQL roles and schema permissions using [`scripts/db/bootstrap-roles.sql`](scripts/db/bootstrap-roles.sql) as a PostgreSQL administrator. Configure the required environment variables: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `DB_MIGRATOR_USERNAME`, `DB_MIGRATOR_PASSWORD`, and `JWT_SECRET`. The runtime datasource uses `banking_app`, while Flyway uses `banking_migrator` in the `local` and `prod` profiles. See the [Development Guide](docs/DEVELOPMENT.md#configuration) for database setup and profile-specific configuration.
+2. Create the `banking_system` and `banking_system_test` databases, then provision the PostgreSQL roles and schema permissions using [`scripts/db/bootstrap-roles.sql`](scripts/db/bootstrap-roles.sql) against the `banking_system` database as a PostgreSQL administrator.
+
+Configure the following environment variables for the `local` profile:
+
+- `DB_LOCAL_URL`
+- `DB_LOCAL_USERNAME`
+- `DB_LOCAL_PASSWORD`
+- `DB_LOCAL_MIGRATOR_USERNAME`
+- `DB_LOCAL_MIGRATOR_PASSWORD`
+- `JWT_SECRET`
+
+In the `local` profile, the runtime datasource uses `banking_app`, while Flyway uses the dedicated `banking_migrator` account to execute database migrations.
+
+For running tests, also configure `DB_TEST_URL`, `DB_TEST_USERNAME`, and `DB_TEST_PASSWORD`. The `test` profile uses `DB_TEST_USERNAME` and `DB_TEST_PASSWORD` for both the application datasource and Flyway migrations, and excludes the `db/callback` privilege callback.
+
+See the [Development Guide](docs/DEVELOPMENT.md#configuration) for database setup and profile-specific configuration.
 
 To create the initial administrator, also set `ADMIN_FULL_NAME`, `ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`.
 

@@ -3,7 +3,7 @@ package com.lcsalvess.bankingsystem.unit.exception.handler;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.lcsalvess.bankingsystem.exception.BusinessException;
+import com.lcsalvess.bankingsystem.exception.base.BusinessException;
 import com.lcsalvess.bankingsystem.exception.database.DatabaseConstraint;
 import com.lcsalvess.bankingsystem.exception.handler.GlobalExceptionHandler;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;

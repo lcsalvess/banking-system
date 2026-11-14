@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.exception;
+package com.lcsalvess.bankingsystem.exception.base;
 
 import org.springframework.http.HttpStatus;
 

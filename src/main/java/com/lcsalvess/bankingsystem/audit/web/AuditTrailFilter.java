@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.audit.web;
 
 import com.lcsalvess.bankingsystem.entity.user.User;
-import com.lcsalvess.bankingsystem.exception.BusinessException;
+import com.lcsalvess.bankingsystem.exception.base.BusinessException;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;

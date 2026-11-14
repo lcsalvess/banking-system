@@ -47,9 +47,10 @@ class PasswordChangeIntegrationTests {
 
     private static final String LOGIN_URL = "/api/v1/auth/login";
     private static final String PASSWORD_URL = "/api/v1/auth/password";
-    private static final String USERNAME = "test-user";
     private static final String CURRENT_PASSWORD = "Currentpassword123!";
     private static final String NEW_PASSWORD = "BrandNewPassword456!";
+
+    private String username;
 
     @Autowired
     private MockMvc mockMvc;
@@ -74,15 +75,13 @@ class PasswordChangeIntegrationTests {
         ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
 
-        userRepository.save(
-                UserTestFactory.aUser()
-                        .withEmployeeId("EMP-TEST-001")
-                        .withFullName("Test User")
-                        .withUsername(USERNAME)
-                        .withEmail("test-user@test.com")
-                        .withEncodedPassword(passwordEncoder.encode(CURRENT_PASSWORD))
+        User user = userRepository.save(
+                UserTestFactory.aUser("pwd")
+                        .withPassword(CURRENT_PASSWORD, passwordEncoder)
                         .build()
         );
+
+        username = user.getUsername();
     }
 
     @Test
@@ -93,7 +92,7 @@ class PasswordChangeIntegrationTests {
         changePassword(token, CURRENT_PASSWORD, NEW_PASSWORD)
                 .andExpect(status().isNoContent());
 
-        User user = userRepository.findByUsernameIgnoreCase(USERNAME).orElseThrow();
+        User user = userRepository.findByUsernameIgnoreCase(username).orElseThrow();
 
         assertTrue(passwordEncoder.matches(NEW_PASSWORD, user.getPassword()));
         assertEquals(1, user.getTokenVersion());
@@ -195,7 +194,7 @@ class PasswordChangeIntegrationTests {
 
         assertEquals(
                 0,
-                userRepository.findByUsernameIgnoreCase(USERNAME)
+                userRepository.findByUsernameIgnoreCase(username)
                         .orElseThrow()
                         .getTokenVersion()
         );
@@ -260,7 +259,7 @@ class PasswordChangeIntegrationTests {
     void shouldRejectDeactivatedUser() throws Exception {
         String token = loginAndGetToken(CURRENT_PASSWORD);
 
-        User user = userRepository.findByUsernameIgnoreCase(USERNAME).orElseThrow();
+        User user = userRepository.findByUsernameIgnoreCase(username).orElseThrow();
         user.deactivate();
         userRepository.save(user);
 
@@ -274,14 +273,14 @@ class PasswordChangeIntegrationTests {
         String oldToken = loginAndGetToken(CURRENT_PASSWORD);
 
         User user = userRepository
-                .findByUsernameIgnoreCase(USERNAME)
+                .findByUsernameIgnoreCase(username)
                 .orElseThrow();
 
         userService.deactivate(user.getEmployeeId());
         userService.reactivate(user.getEmployeeId());
 
         User reactivatedUser = userRepository
-                .findByUsernameIgnoreCase(USERNAME)
+                .findByUsernameIgnoreCase(username)
                 .orElseThrow();
 
         assertTrue(reactivatedUser.isActive());
@@ -317,23 +316,11 @@ class PasswordChangeIntegrationTests {
 
         try {
             Future<Integer> firstResult = executor.submit(
-                    () -> changePasswordAfterStart(
-                            token,
-                            CURRENT_PASSWORD,
-                            firstNewPassword,
-                            ready,
-                            start
-                    )
+                    () -> changePasswordAfterStart(token, firstNewPassword, ready, start)
             );
 
             Future<Integer> secondResult = executor.submit(
-                    () -> changePasswordAfterStart(
-                            token,
-                            CURRENT_PASSWORD,
-                            secondNewPassword,
-                            ready,
-                            start
-                    )
+                    () -> changePasswordAfterStart(token, secondNewPassword, ready, start)
             );
 
             // Ensure both tasks are ready before releasing them.
@@ -372,7 +359,7 @@ class PasswordChangeIntegrationTests {
             );
 
             User savedUser = userRepository
-                    .findByUsernameIgnoreCase(USERNAME)
+                    .findByUsernameIgnoreCase(username)
                     .orElseThrow();
 
             // The security version must not suffer a lost update.
@@ -435,7 +422,7 @@ class PasswordChangeIntegrationTests {
                             "username": "%s",
                             "password": "%s"
                         }
-                        """.formatted(USERNAME, password)));
+                        """.formatted(username, password)));
     }
 
     private String loginAndGetToken(String password) throws Exception {
@@ -459,7 +446,6 @@ class PasswordChangeIntegrationTests {
 
     private int changePasswordAfterStart(
             String token,
-            String currentPassword,
             String newPassword,
             CountDownLatch ready,
             CountDownLatch start
@@ -473,7 +459,7 @@ class PasswordChangeIntegrationTests {
             );
         }
 
-        return changePassword(token, currentPassword, newPassword)
+        return changePassword(token, CURRENT_PASSWORD, newPassword)
                 .andReturn()
                 .getResponse()
                 .getStatus();

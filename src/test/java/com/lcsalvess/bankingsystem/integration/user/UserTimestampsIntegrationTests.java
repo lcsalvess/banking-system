@@ -18,7 +18,6 @@ import org.springframework.test.context.ActiveProfiles;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,17 +48,8 @@ class UserTimestampsIntegrationTests {
     void setUp() {
         mutableClock.freezeAt(CREATED_AT);
 
-        String uniqueId = UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 8);
-
         userId = userRepository.saveAndFlush(
-                UserTestFactory.aUser()
-                        .withEmployeeId("EMP-CLOCK-" + uniqueId)
-                        .withUsername("clock-" + uniqueId)
-                        .withEmail("clock-" + uniqueId + "@test.com")
-                        .build()
+                UserTestFactory.aUser("clock").build()
         ).getId();
     }
 

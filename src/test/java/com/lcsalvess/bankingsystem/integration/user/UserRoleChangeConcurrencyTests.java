@@ -24,14 +24,13 @@ import org.springframework.test.context.ActiveProfiles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -149,10 +148,7 @@ class UserRoleChangeConcurrencyTests {
 
             User admin = createAdmins(1).getFirst();
 
-            User employee = createUser(
-                    "employee-role-change",
-                    Role.EMPLOYEE
-            );
+            User employee = createUser("emp-role", Role.EMPLOYEE);
 
             authenticateAs(admin);
 
@@ -185,10 +181,7 @@ class UserRoleChangeConcurrencyTests {
 
             User admin = createAdmins(1).getFirst();
 
-            User employee = createUser(
-                    "employee-role-change",
-                    Role.EMPLOYEE
-            );
+            User employee = createUser("emp-role", Role.EMPLOYEE);
 
             // The caller is demoted after authenticating the request.
             User stale = userRepository.findById(admin.getId()).orElseThrow();
@@ -312,30 +305,17 @@ class UserRoleChangeConcurrencyTests {
     // ---------------------------------------------------------------------
 
     private List<User> createAdmins(int quantity) {
-        return IntStream.rangeClosed(1, quantity)
-                .mapToObj(number ->
-                        createUser(
-                                "admin-role-" + number,
-                                Role.ADMIN
-                        )
-                )
+        return Stream.generate(() -> createUser("adm", Role.ADMIN))
+                .limit(quantity)
                 .toList();
     }
 
-    private User createUser(String username, Role role) {
-        String employeeId = "EMP-" + UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12);
-
-        User user = UserTestFactory.aUser()
-                .withEmployeeId(employeeId)
-                .withUsername(username)
-                .withEmail(username + "@test.com")
-                .withRole(role)
-                .build();
-
-        return userRepository.saveAndFlush(user);
+    private User createUser(String label, Role role) {
+        return userRepository.saveAndFlush(
+                UserTestFactory.aUser(label)
+                        .withRole(role)
+                        .build()
+        );
     }
 
     private Role roleOf(User user) {

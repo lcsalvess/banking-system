@@ -84,11 +84,7 @@ class TransactionConstraintIntegrationTests {
         clientSequence = 0;
 
         user = userRepository.saveAndFlush(
-                UserTestFactory.aUser()
-                        .withEmployeeId("EMP-TXC-" + testId)
-                        .withUsername("txc-" + testId)
-                        .withEmail("txc-" + testId + "@test.com")
-                        .build()
+                UserTestFactory.aUser("txc").build()
         );
 
         client = createClient();

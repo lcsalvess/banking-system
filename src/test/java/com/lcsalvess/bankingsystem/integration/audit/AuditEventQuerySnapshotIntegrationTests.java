@@ -438,28 +438,10 @@ class AuditEventQuerySnapshotIntegrationTests {
     }
 
     private User createAuditor() {
-        String username = "aud"
-                + UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12);
-
-        String email = username + "@example.test";
-
-        String employeeId = "EMP-"
-                + UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12);
-
         return transactionTemplate.execute(status ->
                 userRepository.save(
-                        UserTestFactory.aUser()
-                                .withEmployeeId(employeeId)
+                        UserTestFactory.aUser("aud")
                                 .withFullName("Snapshot Integration Auditor")
-                                .withUsername(username)
-                                .withEmail(email)
-                                .withEncodedPassword("test-password-hash")
                                 .withRole(Role.AUDITOR)
                                 .build()
                 )

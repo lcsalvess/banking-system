@@ -117,38 +117,46 @@ public class User implements UserDetails {
             String password,
             Role role
     ) {
+        validateEmployeeId(employeeId);
+
+        String normalizedFullName = FullNameNormalizer.normalize(fullName);
+        String normalizedUsername = UsernameNormalizer.normalize(username);
+        String normalizedEmail = EmailNormalizer.normalize(email);
+
+        String requiredPassword = Objects.requireNonNull(
+                password,
+                "Password is required."
+        );
+
+        Role requiredRole = Objects.requireNonNull(
+                role,
+                "Role is required."
+        );
+
         return new User(
                 employeeId,
-                fullName,
-                username,
-                email,
-                password,
-                role
+                normalizedFullName,
+                normalizedUsername,
+                normalizedEmail,
+                requiredPassword,
+                requiredRole
         );
     }
 
     private User(
             String employeeId,
-            String fullName,
-            String username,
-            String email,
+            String normalizedFullName,
+            String normalizedUsername,
+            String normalizedEmail,
             String password,
             Role role
     ) {
-        validateEmployeeId(employeeId);
-
         this.employeeId = employeeId;
-        this.fullName = FullNameNormalizer.normalize(fullName);
-        this.username = UsernameNormalizer.normalize(username);
-        this.email = EmailNormalizer.normalize(email);
-        this.password = Objects.requireNonNull(
-                password,
-                "Password is required."
-        );
-        this.role = Objects.requireNonNull(
-                role,
-                "Role is required."
-        );
+        this.fullName = normalizedFullName;
+        this.username = normalizedUsername;
+        this.email = normalizedEmail;
+        this.password = password;
+        this.role = role;
     }
 
     private static void validateEmployeeId(String employeeId) {

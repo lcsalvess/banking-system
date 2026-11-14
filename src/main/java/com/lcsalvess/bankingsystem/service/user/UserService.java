@@ -85,12 +85,22 @@ public class UserService {
         validateUsernameAvailability(username);
         validateEmailAvailability(email);
 
+        String rawPassword = Objects.requireNonNull(
+                dto.password(),
+                "Password is required."
+        );
+
+        String encodedPassword = Objects.requireNonNull(
+                passwordEncoder.encode(rawPassword),
+                "Password encoder returned a null encoded password."
+        );
+
         User user = User.createHuman(
                 employeeIdGenerator.generate(),
                 dto.fullName(),
                 username,
                 email,
-                passwordEncoder.encode(dto.password()),
+                encodedPassword,
                 dto.role()
         );
 

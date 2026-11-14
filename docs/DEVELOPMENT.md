@@ -46,42 +46,65 @@ Alternatively, connect to the existing application database as an administrator 
 
 Set the `SPRING_PROFILES_ACTIVE` environment variable to select the active profile.
 
-| Profile | Database                                               | Swagger UI / OpenAPI | Admin bootstrap required |
-|---------|--------------------------------------------------------|----------------------|--------------------------|
-| `local` | `DB_URL` is required                                   | Enabled              | No                       |
-| `prod`  | `DB_URL` is required                                   | Disabled             | Yes                      |
-| `test`  | `jdbc:postgresql://localhost:5432/banking_system_test` | Disabled             | No                       |
+| Profile | Database | Swagger UI / OpenAPI | Admin bootstrap required |
+|---------|----------|----------------------|--------------------------|
+| `local` | `DB_LOCAL_URL` | Enabled | No |
+| `prod` | `DB_PROD_URL` | Disabled | Yes |
+| `test` | `DB_TEST_URL` | Disabled | No |
 
-Without an active profile, `DB_URL` is required, API documentation is disabled, and the initial administrator is required at startup, as in the `prod` profile. The `app.admin.bootstrap.required` property defaults to `true`; only `local` and `test` disable this requirement.
+The `local` profile is intended for development, `prod` for production deployments, and `test` for automated tests.
+
+The base `application.properties` file contains shared configuration, while database connection details and credentials are provided by the profile-specific configuration files.
+
+The `app.admin.bootstrap.required` property defaults to `true`; only `local` and `test` disable this requirement.
 
 Use the `local` profile for development.
 
 ### 3. Configure environment variables
 
-| Variable                 | Required              | Description                                                                               |
-|--------------------------|-----------------------|-------------------------------------------------------------------------------------------|
-| `SPRING_PROFILES_ACTIVE` | No                    | Active profile (`local`, `prod`, or `test`)                                               |
-| `DB_URL`                 | Yes, except in `test` | JDBC URL of the PostgreSQL database                                                      |
-| `DB_USERNAME`            | Yes                   | PostgreSQL username for the application datasource                                       |
-| `DB_PASSWORD`            | Yes                   | Password for the application datasource user                                             |
-| `DB_MIGRATOR_USERNAME`   | Yes, except in `test` | PostgreSQL username used by Flyway to apply database migrations                          |
-| `DB_MIGRATOR_PASSWORD`   | Yes, except in `test` | Password for the Flyway migration user                                                   |
-| `JWT_SECRET`             | Yes                   | Base64-encoded secret used to sign JWTs, with at least 256 bits of key material          |
-| `ADMIN_FULL_NAME`        | Conditional           | Full name of the initial administrator                                                    |
-| `ADMIN_USERNAME`         | Conditional           | Username of the initial administrator                                                     |
-| `ADMIN_EMAIL`            | Conditional           | Email address of the initial administrator                                                |
-| `ADMIN_PASSWORD`         | Conditional           | Password of the initial administrator                                                     |
-| `PROXY_IP_HEADER`        | No                    | Header with the original client IP behind a reverse proxy (for example `X-Forwarded-For`) |
-| `TRUSTED_PROXIES`        | No                    | Regular expression with the IPs of the trusted proxies; without it the header is ignored  |
+The following table lists the environment variables required by each profile.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SPRING_PROFILES_ACTIVE` | No | Active profile (`local`, `prod`, or `test`) |
+| `DB_LOCAL_URL` | Local | JDBC URL of the local PostgreSQL database |
+| `DB_LOCAL_USERNAME` | Local | Local runtime datasource username (`banking_app`) |
+| `DB_LOCAL_PASSWORD` | Local | Local runtime datasource password |
+| `DB_LOCAL_MIGRATOR_USERNAME` | Local | Local Flyway migration username (`banking_migrator`) |
+| `DB_LOCAL_MIGRATOR_PASSWORD` | Local | Local Flyway migration password |
+| `DB_PROD_URL` | Production | JDBC URL of the production PostgreSQL database |
+| `DB_PROD_USERNAME` | Production | Production runtime datasource username (`banking_app`) |
+| `DB_PROD_PASSWORD` | Production | Production runtime datasource password |
+| `DB_PROD_MIGRATOR_USERNAME` | Production | Production Flyway migration username (`banking_migrator`) |
+| `DB_PROD_MIGRATOR_PASSWORD` | Production | Production Flyway migration password |
+| `DB_TEST_URL` | Test | JDBC URL of the PostgreSQL test database |
+| `DB_TEST_USERNAME` | Test | Test database username, used by both the application datasource and Flyway |
+| `DB_TEST_PASSWORD` | Test | Test database password, used by both the application datasource and Flyway |
+| `JWT_SECRET` | Yes | Base64-encoded secret used to sign JWTs, with at least 256 bits of key material |
+| `ADMIN_FULL_NAME` | Conditional | Full name of the initial administrator |
+| `ADMIN_USERNAME` | Conditional | Username of the initial administrator |
+| `ADMIN_EMAIL` | Conditional | Email address of the initial administrator |
+| `ADMIN_PASSWORD` | Conditional | Password of the initial administrator |
+| `PROXY_IP_HEADER` | No | Header with the original client IP behind a reverse proxy (for example, `X-Forwarded-For`) |
+| `TRUSTED_PROXIES` | No | Regular expression with the IPs of the trusted proxies; without it the header is ignored |
+
+`Local`, `Production`, and `Test` indicate that the corresponding variables are required when running with that profile.
 
 `Conditional` means these variables are required only when no `ADMIN` account exists and `app.admin.bootstrap.required=true`. When bootstrap is optional, they may be omitted.
 
 The application and Flyway use separate database credentials in the `local` and `prod` profiles.
 
-- `DB_USERNAME` and `DB_PASSWORD` identify the runtime database user (`banking_app`). This user performs application operations and should receive only the table and sequence privileges required by the application. It should not own database objects or have privileges to change the database schema.
-- `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD` identify the Flyway migration user (`banking_migrator`). This user applies schema migrations and owns the database objects managed by Flyway.
+- `DB_LOCAL_USERNAME` and `DB_LOCAL_PASSWORD`, or their `DB_PROD_*` equivalents, identify the runtime database user (`banking_app`). This user performs application operations and should receive only the table and sequence privileges required by the application. It should not own database objects or have privileges to change the database schema.
+- `DB_LOCAL_MIGRATOR_USERNAME` and `DB_LOCAL_MIGRATOR_PASSWORD`, or their `DB_PROD_MIGRATOR_*` equivalents, identify the Flyway migration user (`banking_migrator`). This user applies schema migrations and owns the database objects managed by Flyway.
+- In the `test` profile, `DB_TEST_USERNAME` and `DB_TEST_PASSWORD` are used by both the application datasource and Flyway. A separate migration user is not required.
 
-Before starting the application in `local` or `prod`, provision the roles and schema access with `scripts/db/bootstrap-roles.sql`, set both role passwords securely, and configure all four database environment variables. After each migration run, Flyway executes the callback `db/callback/afterMigrate__apply_runtime_privileges.sql` as `banking_migrator` to configure the runtime role's table, sequence, and default privileges. If Flyway connects as any other user, the callback fails the startup with an explicit error: verify `DB_MIGRATOR_USERNAME` and `DB_MIGRATOR_PASSWORD`. The `test` profile does not load this privilege callback.
+The shared `spring.flyway.url` property uses `${spring.datasource.url}`, so Flyway connects to the same database configured for the application datasource. Each profile supplies its own database credentials.
+
+Before starting the application in `local` or `prod`, provision the roles and schema access with `scripts/db/bootstrap-roles.sql`, set both role passwords securely, and configure all database environment variables required by the selected profile.
+
+After each migration run, Flyway executes the callback `db/callback/afterMigrate__apply_runtime_privileges.sql` as `banking_migrator` to configure the runtime role's table, sequence, and default privileges. If Flyway connects as any other user, the callback fails application startup with an explicit error. Verify the migration credentials for the active profile if this happens.
+
+The `test` profile does not load the `db/callback` privilege callback. It uses the test database credentials for both Flyway and the application datasource, keeping test fixture permissions separate from local and production privileges.
 
 #### Flyway session timezone
 
@@ -110,7 +133,7 @@ The initial administrator bootstrap checks for an active `ADMIN` account before 
 - If administrator accounts exist but none are active, application startup fails in every profile. Administrator access must be restored using the documented recovery procedure. The application does not automatically create another administrator in this situation.
 - If no administrator account exists, the initial administrator is created when all four `ADMIN_FULL_NAME`, `ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` variables are configured. The supplied credentials are validated using the same rules applied to regular user creation.
 
-When no administrator account exists and the required credentials are missing or blank, the application logs a warning and continues starting in the `local` and `test` profiles, where bootstrap is optional. In other profiles, including `prod` and when no profile is active, startup fails because administrator bootstrap is required.
+When no administrator account exists and the required credentials are missing or blank, the application logs a warning and continues starting in the `local` and `test` profiles, where bootstrap is optional. In other profiles, including `prod`, startup fails because administrator bootstrap is required.
 
 `ADMIN_PASSWORD` must satisfy the same password policy used for user creation, including complexity and size limits.
 
@@ -199,13 +222,33 @@ CREATE ROLE banking_test LOGIN PASSWORD 'replace-with-a-local-secret';
 ALTER DATABASE banking_system_test OWNER TO banking_test;
 ```
 
-Set `DB_USERNAME=banking_test` and `DB_PASSWORD` to the configured password when running tests. The `test` profile uses these credentials for both the application datasource and Flyway. The role must be able to apply migrations and clean up integration-test fixtures. Do not use the runtime `banking_app` credentials, whose production-style grants intentionally prohibit physical deletion from business tables and transaction history.
+Configure the test environment variables as follows, replacing the example password with the password configured for `banking_test`:
+
+**Windows (PowerShell):**
+
+```powershell
+$env:DB_TEST_URL = "jdbc:" + "postgresql://localhost:5432/banking_system_test"
+$env:DB_TEST_USERNAME = "banking_test"
+$env:DB_TEST_PASSWORD = "your-local-password"
+```
+
+**Linux / macOS:**
+
+```bash
+export DB_TEST_URL="jdbc:"'postgresql://localhost:5432/banking_system_test'
+export DB_TEST_USERNAME=banking_test
+export DB_TEST_PASSWORD=your-local-password
+```
+
+The `test` profile uses `DB_TEST_USERNAME` and `DB_TEST_PASSWORD` for both the application datasource and Flyway. The role must be able to apply migrations and clean up integration-test fixtures. Do not use the runtime `banking_app` credentials, whose production-style grants intentionally prohibit physical deletion from business tables and transaction history.
 
 The GitHub Actions workflow uses a dedicated `banking_test` user and a separate `banking_system_test` database. The `afterMigrate__apply_runtime_privileges.sql` privilege callback is not loaded in the `test` profile, keeping test fixture permissions separate from local and production privileges. The `afterConnect.sql` callback remains available through `classpath:db/migration`.
 
 The runtime role's least-privilege grants are verified by `LeastPrivilegeSmokeTests`, and the application flows are exercised under that role by `RuntimePrivilegesEndToEndTests`. Both run only when the `PRIVILEGE_TEST_*` environment variables are set. The `least-privilege` job in GitHub Actions configures them.
 
-`LeastPrivilegeSmokeTests` does not start the Spring application context. It creates Flyway instances programmatically to migrate the privilege-test database and verify the runtime role's permissions. These configurations include `classpath:db/migration` and do not define separate `callbackLocations`. Therefore, Flyway automatically discovers `afterConnect.sql` and initializes the migration connections with `America/Sao_Paulo`, following the same convention as the Spring Boot-managed migrations. `RuntimePrivilegesEndToEndTests` starts the full application with the datasource connected as `banking_app` and Flyway as `banking_migrator`.
+`LeastPrivilegeSmokeTests` does not start the Spring application context. It creates Flyway instances programmatically to migrate the privilege-test database and verify the runtime role's permissions. These configurations include `classpath:db/migration` and do not define separate `callbackLocations`. Therefore, Flyway automatically discovers `afterConnect.sql` and initializes the migration connections with `America/Sao_Paulo`, following the same convention as the Spring Boot-managed migrations.
+
+`RuntimePrivilegesEndToEndTests` starts the full application with the datasource connected as `banking_app` and Flyway as `banking_migrator`.
 
 For local execution, create an empty `banking_privilege_test` database. Run `scripts/db/bootstrap-roles.sql` as a PostgreSQL administrator against that database, then set the passwords for `banking_migrator` and `banking_app` to match the corresponding `PRIVILEGE_TEST_*` environment variables. The tests apply the database migrations themselves. `banking_app` has no `DELETE` privilege, so the end-to-end test leaves its fixtures in the database (with identifiers unique per run); use a throwaway database.
 
@@ -238,7 +281,7 @@ export PRIVILEGE_TEST_APP_PASSWORD=...
 .\mvnw.cmd verify
 ```
 
-Tests require a local PostgreSQL instance and the `DB_USERNAME`, `DB_PASSWORD`, and `JWT_SECRET` environment variables. In the `test` profile, `DB_URL` is defined by `application-test.properties`, so it is not required.
+Tests require a local PostgreSQL instance and the `DB_TEST_URL`, `DB_TEST_USERNAME`, `DB_TEST_PASSWORD`, and `JWT_SECRET` environment variables. The `test` profile obtains its database connection details from these environment variables through `application-test.properties`.
 
 ### Test coverage
 

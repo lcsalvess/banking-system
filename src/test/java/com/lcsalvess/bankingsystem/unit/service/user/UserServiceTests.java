@@ -163,6 +163,9 @@ class UserServiceTests {
             User savedUser = UserTestFactory.aUser()
                     .withId(1L)
                     .withEmployeeId(employeeId)
+                    .withFullName(dto.fullName())
+                    .withUsername(dto.username())
+                    .withEmail(dto.email())
                     .withEncodedPassword(ENCODED_PASSWORD)
                     .withRole(dto.role())
                     .build();

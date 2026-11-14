@@ -1,5 +1,6 @@
 package com.lcsalvess.bankingsystem.bootstrap;
 
+import com.lcsalvess.bankingsystem.config.bootstrap.AdminBootstrapProperties;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
@@ -10,7 +11,6 @@ import jakarta.validation.Validator;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -29,32 +29,20 @@ public class AdminBootstrapRunner implements CommandLineRunner {
     private final EmployeeIdGenerator employeeIdGenerator;
     private final PasswordEncoder passwordEncoder;
     private final Validator validator;
-
-    @Value("${app.admin.full-name:}")
-    private String adminFullName;
-
-    @Value("${app.admin.username:}")
-    private String adminUsername;
-
-    @Value("${app.admin.email:}")
-    private String adminEmail;
-
-    @Value("${app.admin.password:}")
-    private String adminPassword;
-
-    @Value("${app.admin.bootstrap.required:false}")
-    private boolean bootstrapRequired;
+    private final AdminBootstrapProperties adminBootstrapProperties;
 
     public AdminBootstrapRunner(
             UserRepository userRepository,
             EmployeeIdGenerator employeeIdGenerator,
             PasswordEncoder passwordEncoder,
-            Validator validator
+            Validator validator,
+            AdminBootstrapProperties adminBootstrapProperties
     ) {
         this.userRepository = userRepository;
         this.employeeIdGenerator = employeeIdGenerator;
         this.passwordEncoder = passwordEncoder;
         this.validator = validator;
+        this.adminBootstrapProperties = adminBootstrapProperties;
     }
 
     @Override
@@ -78,7 +66,7 @@ public class AdminBootstrapRunner implements CommandLineRunner {
                     "No administrator exists and the initial credentials "
                             + "have not been configured.";
 
-            if (bootstrapRequired) {
+            if (adminBootstrapProperties.bootstrap().required()) {
                 throw new IllegalStateException(
                         message + " Configure ADMIN_FULL_NAME, ADMIN_USERNAME, "
                                 + "ADMIN_EMAIL and ADMIN_PASSWORD before starting the application."
@@ -94,7 +82,7 @@ public class AdminBootstrapRunner implements CommandLineRunner {
         String employeeId = employeeIdGenerator.generate();
 
         String rawPassword = Objects.requireNonNull(
-                adminPassword,
+                adminBootstrapProperties.password(),
                 "Administrator password is required."
         );
 
@@ -105,9 +93,9 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
         User admin = User.createHuman(
                 employeeId,
-                adminFullName,
-                adminUsername,
-                adminEmail,
+                adminBootstrapProperties.fullName(),
+                adminBootstrapProperties.username(),
+                adminBootstrapProperties.email(),
                 encodedPassword,
                 Role.ADMIN
         );
@@ -119,10 +107,10 @@ public class AdminBootstrapRunner implements CommandLineRunner {
 
     private void validateCredentials() {
         UserRequestDTO candidate = new UserRequestDTO(
-                adminFullName,
-                adminUsername,
-                adminEmail,
-                adminPassword,
+                adminBootstrapProperties.fullName(),
+                adminBootstrapProperties.username(),
+                adminBootstrapProperties.email(),
+                adminBootstrapProperties.password(),
                 Role.ADMIN
         );
 
@@ -142,9 +130,13 @@ public class AdminBootstrapRunner implements CommandLineRunner {
     }
 
     private boolean credentialsConfigured() {
-        return adminFullName != null && !adminFullName.isBlank()
-                && adminUsername != null && !adminUsername.isBlank()
-                && adminEmail != null && !adminEmail.isBlank()
-                && adminPassword != null && !adminPassword.isBlank();
+        return adminBootstrapProperties.fullName() != null
+                && !adminBootstrapProperties.fullName().isBlank()
+                && adminBootstrapProperties.username() != null
+                && !adminBootstrapProperties.username().isBlank()
+                && adminBootstrapProperties.email() != null
+                && !adminBootstrapProperties.email().isBlank()
+                && adminBootstrapProperties.password() != null
+                && !adminBootstrapProperties.password().isBlank();
     }
 }

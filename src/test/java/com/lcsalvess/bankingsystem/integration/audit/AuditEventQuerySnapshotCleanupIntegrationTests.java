@@ -158,25 +158,10 @@ class AuditEventQuerySnapshotCleanupIntegrationTests {
     }
 
     private User createAuditor() {
-        String uniqueSuffix = UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12);
-
-        String username = "aud" + uniqueSuffix;
-
-        String email = username + "@example.test";
-
-        String employeeId = "EMP-" + uniqueSuffix;
-
         User savedUser = transactionTemplate.execute(status ->
                 userRepository.save(
-                        UserTestFactory.aUser()
-                                .withEmployeeId(employeeId)
+                        UserTestFactory.aUser("aud")
                                 .withFullName("Snapshot Cleanup Auditor")
-                                .withUsername(username)
-                                .withEmail(email)
-                                .withEncodedPassword("test-password-hash")
                                 .withRole(Role.AUDITOR)
                                 .build()
                 )

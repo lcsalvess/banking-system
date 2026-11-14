@@ -67,12 +67,11 @@ class AuthenticationControllerTests {
         ledgerTestCleaner.deleteAllTransactions();
         userRepository.deleteAll();
 
-        testUser = UserTestFactory.aUser()
-                .withEncodedPassword(passwordEncoder.encode(TEST_PASSWORD))
+        testUser = UserTestFactory.aUser("auth")
+                .withPassword(TEST_PASSWORD, passwordEncoder)
                 .build();
 
-        // Clear login attempts for the users used in the tests.
-        rateLimitProtectionService.clearFailures(testUser.getUsername());
+        // The fixed username is the only one that can carry state between tests.
         rateLimitProtectionService.clearFailures(NONEXISTENT_USERNAME);
 
         testUser = userRepository.save(testUser);

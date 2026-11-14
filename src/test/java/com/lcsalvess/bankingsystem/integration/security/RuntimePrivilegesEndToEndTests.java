@@ -365,16 +365,10 @@ class RuntimePrivilegesEndToEndTests {
     }
 
     private User createUser(Role role) {
-        String id = shortId();
-        String username = "e2e-" + id;
-
         return userRepository.saveAndFlush(
-                UserTestFactory.aUser()
+                UserTestFactory.aUser("e2e")
                         .withEmployeeId(employeeIdGenerator.generate())
-                        .withFullName("Test User")
-                        .withUsername(username)
-                        .withEmail("e2e-" + id + "@test.com")
-                        .withEncodedPassword(passwordEncoder.encode(PASSWORD))
+                        .withPassword(PASSWORD, passwordEncoder)
                         .withRole(role)
                         .build()
         );

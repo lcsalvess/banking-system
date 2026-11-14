@@ -13,8 +13,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ActiveProfiles("test")
@@ -37,17 +35,8 @@ class TransactionIdempotencyCleanupIntegrationTests {
     void setUp() {
         clearIdempotencyRequests();
 
-        String uniqueId = UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12);
-
         user = userRepository.saveAndFlush(
-                UserTestFactory.aUser()
-                        .withEmployeeId("EMP-" + uniqueId)
-                        .withUsername("idem-" + uniqueId)
-                        .withEmail("idem-cleanup-" + uniqueId + "@test.com")
-                        .build()
+                UserTestFactory.aUser("idem").build()
         );
     }
 

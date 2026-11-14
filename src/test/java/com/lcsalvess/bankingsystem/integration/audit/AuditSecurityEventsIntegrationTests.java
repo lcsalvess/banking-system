@@ -76,20 +76,9 @@ class AuditSecurityEventsIntegrationTests {
 
     @BeforeEach
     void setUp() {
-        String uniqueId = UUID.randomUUID()
-                .toString()
-                .replace("-", "");
-
-        String testUsername = "it" + uniqueId.substring(0, 8);
-        String employeeId = "EMP-" + uniqueId.substring(8, 20);
-
         User user = userRepository.save(
-                UserTestFactory.aUser()
-                        .withEmployeeId(employeeId)
-                        .withFullName("Integration Test Employee")
-                        .withUsername(testUsername)
-                        .withEmail(testUsername + "@test.com")
-                        .withEncodedPassword(passwordEncoder.encode(PASSWORD))
+                UserTestFactory.aUser("it")
+                        .withPassword(PASSWORD, passwordEncoder)
                         .build()
         );
 

@@ -228,24 +228,10 @@ class AuditEventSnapshotEndpointIntegrationTests {
     }
 
     private User createAuditor() {
-        String username = "e2e" + UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 10);
-
-        String employeeId = "EMP-"
-                + UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12);
-
         User auditor = userRepository.save(
-                UserTestFactory.aUser()
-                        .withEmployeeId(employeeId)
+                UserTestFactory.aUser("e2e")
                         .withFullName("End-to-End Test Auditor")
-                        .withUsername(username)
-                        .withEmail(username + "@test.com")
-                        .withEncodedPassword(passwordEncoder.encode(PASSWORD))
+                        .withPassword(PASSWORD, passwordEncoder)
                         .withRole(Role.AUDITOR)
                         .build()
         );

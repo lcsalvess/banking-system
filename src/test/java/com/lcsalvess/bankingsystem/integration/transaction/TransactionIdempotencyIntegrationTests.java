@@ -648,17 +648,8 @@ class TransactionIdempotencyIntegrationTests {
     }
 
     private User createUser() {
-        String uniqueId = UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12);
-
         return userRepository.saveAndFlush(
-                UserTestFactory.aUser()
-                        .withEmployeeId("EMP-" + uniqueId)
-                        .withUsername("idem-" + uniqueId)
-                        .withEmail("idem-" + uniqueId + "@test.com")
-                        .build()
+                UserTestFactory.aUser("idem").build()
         );
     }
 

@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.integration.audit;
+package com.lcsalvess.bankingsystem.integration.audit.snapshot;
 
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;

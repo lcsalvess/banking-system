@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.integration.config;
+package com.lcsalvess.bankingsystem.integration.infrastructure.database;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;

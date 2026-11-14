@@ -1,4 +1,4 @@
-package com.lcsalvess.bankingsystem.integration.audit;
+package com.lcsalvess.bankingsystem.integration.audit.snapshot;
 
 import com.jayway.jsonpath.JsonPath;
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;

@@ -24,13 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("OpenApiConfig")
 class OpenApiConfigTests {
 
+    private static final String APPLICATION_VERSION = "1.0.0";
+
     private final OpenApiConfig config = new OpenApiConfig();
 
     @Nested
     @DisplayName("bankingSystemOpenAPI")
     class BankingSystemOpenApiTests {
 
-        private final OpenAPI openApi = config.bankingSystemOpenAPI();
+        private final OpenAPI openApi = config.bankingSystemOpenAPI(APPLICATION_VERSION);
 
         @Test
         @DisplayName("Should describe the API")
@@ -39,10 +41,16 @@ class OpenApiConfigTests {
 
             assertNotNull(info);
             assertEquals("Banking System API", info.getTitle());
-            assertEquals("1.0.0", info.getVersion());
             assertTrue(info.getDescription().contains("RESTful banking API"));
             assertTrue(info.getDescription().contains("login endpoint"));
             assertTrue(info.getDescription().contains("Authorize"));
+        }
+
+        @Test
+        @DisplayName("Should use the application version provided by configuration")
+        void shouldUseTheProvidedApplicationVersion() {
+            assertEquals(APPLICATION_VERSION, openApi.getInfo().getVersion());
+            assertEquals("2.5.1", config.bankingSystemOpenAPI("2.5.1").getInfo().getVersion());
         }
 
         @Test

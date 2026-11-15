@@ -6,6 +6,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,11 +14,13 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI bankingSystemOpenAPI() {
+    public OpenAPI bankingSystemOpenAPI(
+            @Value("${info.app.version}") String applicationVersion
+    ) {
         return new OpenAPI()
                 .info(new Info()
                         .title("Banking System API")
-                        .version("1.0.0")
+                        .version(applicationVersion)
                         .description("""
                                 RESTful banking API built with Java 21, Spring Boot, and PostgreSQL.
                                 

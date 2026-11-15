@@ -4,8 +4,9 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditEvent;
 import org.springframework.data.repository.Repository;
 
 /**
- * Só expõe a gravação: a trilha é append-only, então não há busca nem remoção
- * por aqui (o banco também rejeita UPDATE, DELETE e TRUNCATE).
+ * Only exposes write operations: the audit trail is append-only, so no read
+ * or delete operations are provided here (the database also rejects UPDATE,
+ * DELETE, and TRUNCATE operations).
  */
 public interface AuditEventRepository extends Repository<AuditEvent, Long> {
 

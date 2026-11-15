@@ -40,8 +40,10 @@ public class TransactionIdempotencyRepository {
               AND transaction_code IS NULL
             """;
 
-    // created_at é um instante (TIMESTAMPTZ), portanto a retenção é
-    // calculada diretamente a partir do instante atual do banco.
+    /**
+     * The {@code created_at} column represents an instant ({@code TIMESTAMPTZ}),
+     * so retention is calculated directly using the database's current timestamp.
+     */
     private static final String DELETE_OLDER_THAN_SQL = """
             DELETE FROM transaction_idempotency_requests
             WHERE created_at < CURRENT_TIMESTAMP
@@ -55,8 +57,8 @@ public class TransactionIdempotencyRepository {
     }
 
     /**
-     * Tenta reservar a chave. Retorna true se a reserva foi criada
-     * e false se já existia uma reserva para (userId, idempotencyKey).
+     * Attempts to reserve the key. Returns true if the reservation was created
+     * and false if a reservation for (userId, idempotencyKey) already existed.
      */
     public boolean tryReserve(
             long userId,
@@ -64,7 +66,7 @@ public class TransactionIdempotencyRepository {
             String operationType,
             String requestHash
     ) {
-        // Tipos informados explicitamente para o driver PostgreSQL tratar UUIDs corretamente.
+        // Explicit types are provided to ensure the PostgreSQL driver handles UUIDs correctly.
         int insertedRows = jdbcTemplate.update(
                 INSERT_SQL,
                 ps -> {
@@ -113,14 +115,15 @@ public class TransactionIdempotencyRepository {
 
         if (updatedRows != 1) {
             throw new IllegalStateException(
-                    "Não foi possível concluir o registro de idempotência. O registro pode não existir ou já foi finalizado."
+                    "Failed to complete the idempotency record. The record may not exist or may have already been completed."
             );
         }
     }
 
     /**
-     * Remove os registros criados há mais de {@code retentionDays} dias.
-     * Retorna a quantidade de linhas removidas.
+     * Deletes records created more than {@code retentionDays} days ago.
+     *
+     * @return the number of deleted rows.
      */
     public int deleteOlderThanDays(int retentionDays) {
         return jdbcTemplate.update(DELETE_OLDER_THAN_SQL, retentionDays);

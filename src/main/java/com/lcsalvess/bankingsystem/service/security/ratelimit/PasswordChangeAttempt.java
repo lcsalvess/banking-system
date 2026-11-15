@@ -3,12 +3,14 @@ package com.lcsalvess.bankingsystem.service.security.ratelimit;
 import java.time.Instant;
 
 /**
- * Tentativa de troca de senha admitida pelo {@link RateLimitProtectionService}.
+ * Password change attempt accepted by {@link RateLimitProtectionService}.
  *
- * <p>A tentativa já está contabilizada quando este objeto é criado. Ele serve
- * para desfazer a contagem ({@code cancelPasswordChangeAttempt}) ou zerá-la
- * após a confirmação da senha atual ({@code recordSuccessfulCurrentPasswordVerification}).
- * O início da janela impede que o cancelamento altere uma sequência mais nova.
+ * <p>The attempt has already been counted when this object is created.
+ * It is used to reverse the count ({@code cancelPasswordChangeAttempt})
+ * or reset it after successful current password verification
+ * ({@code recordSuccessfulCurrentPasswordVerification}).
+ *
+ * <p>The window start prevents cancellation from affecting a newer sequence.
  */
 public record PasswordChangeAttempt(
         String key,

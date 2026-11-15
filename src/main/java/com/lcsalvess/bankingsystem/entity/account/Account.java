@@ -1,7 +1,21 @@
 package com.lcsalvess.bankingsystem.entity.account;
 
 import com.lcsalvess.bankingsystem.entity.client.Client;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import org.hibernate.annotations.DynamicUpdate;
 
 import java.math.BigDecimal;
@@ -19,28 +33,35 @@ import java.util.Objects;
 public abstract class Account {
 
     /**
-     * Saldo máximo por conta. Mantém o valor dentro de NUMERIC(19,2) e dentro
-     * dos 15 dígitos significativos que um double (clientes JS) representa
-     * sem perda. Espelha a constraint ck_accounts_balance_max.
+     * Maximum balance per account. Keeps the value within NUMERIC(19,2)
+     * and within the 15 significant digits that a double (JavaScript clients)
+     * can represent without precision loss. Mirrors the
+     * {@code ck_accounts_balance_max} constraint.
      */
     public static final BigDecimal MAX_BALANCE = new BigDecimal("9999999999999.99");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_accounts_client"))
     private Client client;
+
     @Column(name = "account_number", nullable = false, length = 20)
     private String accountNumber;
+
     @Column(name = "account_digit", nullable = false, length = 1)
     private String digit;
+
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal balance = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AccountStatus status = AccountStatus.ACTIVE;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "account_type", nullable = false, length = 20)
     private AccountType type;

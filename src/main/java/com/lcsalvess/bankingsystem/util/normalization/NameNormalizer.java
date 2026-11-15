@@ -1,4 +1,3 @@
-
 package com.lcsalvess.bankingsystem.util.normalization;
 
 public final class NameNormalizer {

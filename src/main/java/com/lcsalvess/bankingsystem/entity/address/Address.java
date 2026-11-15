@@ -1,36 +1,59 @@
 package com.lcsalvess.bankingsystem.entity.address;
 
 import com.lcsalvess.bankingsystem.util.normalization.OptionalTextNormalizer;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(name = "addresses")
 @DynamicUpdate
 public class Address {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "street_name", nullable = false, length = 150)
     private String streetName;
+
     @Column(name = "street_number", nullable = false, length = 10)
     private String streetNumber;
+
     @Column(length = 100)
     private String complement;
+
     @Column(nullable = false, length = 100)
     private String neighborhood;
+
     @Column(nullable = false, length = 100)
     private String city;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 2)
     private State state;
+
     @Column(name = "postal_code", nullable = false, length = 8)
     private String postalCode;
 
-    public Address() {
+    protected Address() {
     }
 
-    public Address(String streetName, String streetNumber, String complement, String neighborhood, String city, State state, String postalCode) {
+    public Address(
+            String streetName,
+            String streetNumber,
+            String complement,
+            String neighborhood,
+            String city,
+            State state,
+            String postalCode
+    ) {
         this.streetName = streetName;
         this.streetNumber = streetNumber;
         this.complement = OptionalTextNormalizer.normalize(complement);
@@ -47,7 +70,8 @@ public class Address {
             String neighborhood,
             String city,
             State state,
-            String postalCode) {
+            String postalCode
+    ) {
         this.streetName = streetName;
         this.streetNumber = streetNumber;
         this.complement = OptionalTextNormalizer.normalize(complement);

@@ -22,8 +22,8 @@ public class CurrentUserService {
     }
 
     /**
-     * Versão que não lança exceção: devolve vazio quando não há usuário
-     * autenticado.
+     * Non-throwing version: returns an empty {@link Optional} when no user
+     * is authenticated.
      */
     public Optional<User> findCurrentUser() {
         Authentication auth = SecurityContextHolder

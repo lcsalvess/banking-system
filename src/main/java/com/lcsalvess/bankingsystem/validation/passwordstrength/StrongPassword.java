@@ -1,4 +1,3 @@
-
 package com.lcsalvess.bankingsystem.validation.passwordstrength;
 
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;

@@ -3,7 +3,17 @@ package com.lcsalvess.bankingsystem.entity.client;
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.util.normalization.EmailNormalizer;
 import com.lcsalvess.bankingsystem.util.normalization.NameNormalizer;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
@@ -14,23 +24,29 @@ import org.hibernate.annotations.DynamicUpdate;
         })
 @DynamicUpdate
 public class Client {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(nullable = false, length = 125)
     private String name;
+
     @Column(nullable = false, length = 11)
     private String cpf;
+
     @Column(nullable = false)
     private String email;
+
     @Column(name = "phone_number", nullable = false, length = 11)
     private String phoneNumber;
+
     @OneToOne(cascade = CascadeType.ALL, optional = false)
     @JoinColumn(name = "address_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_clients_address"))
     private Address address;
 
-    public Client() {
+    protected Client() {
     }
 
     public Client(String name, String cpf, String email, String phoneNumber, Address address) {
@@ -42,11 +58,17 @@ public class Client {
     }
 
     public void update(String name, String email, String phoneNumber) {
-        if (name != null) {this.name = NameNormalizer.normalize(name);}
+        if (name != null) {
+            this.name = NameNormalizer.normalize(name);
+        }
 
-        if (email != null) {this.email = EmailNormalizer.normalize(email);}
+        if (email != null) {
+            this.email = EmailNormalizer.normalize(email);
+        }
 
-        if (phoneNumber != null) {this.phoneNumber = phoneNumber;}
+        if (phoneNumber != null) {
+            this.phoneNumber = phoneNumber;
+        }
     }
 
     public Long getId() {

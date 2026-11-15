@@ -21,8 +21,8 @@ import java.util.Date;
 public class JwtService {
 
     /**
-     * Claim personalizada do JWT que armazena a versão das credenciais do usuário.
-     * Utiliza "tv" como abreviação de "token version" para manter o token compacto.
+     * Custom JWT claim that stores the user's credential version.
+     * Uses "tv" as an abbreviation for "token version" to keep the token compact.
      */
     static final String TOKEN_VERSION_CLAIM = "tv";
 
@@ -33,7 +33,7 @@ public class JwtService {
     private final Clock clock;
 
     /**
-     * Cria o serviço após validar a chave de assinatura.
+     * Creates the service after validating the signing key.
      */
     public static JwtService create(JwtProperties jwtProperties, Clock clock) {
         SecretKey signingKey = createSigningKey(jwtProperties.secret());
@@ -47,7 +47,7 @@ public class JwtService {
     }
 
     /**
-     * Inicializa a configuração e constrói o parser JWT uma única vez.
+     * Initializes the configuration and builds the JWT parser only once.
      */
     private JwtService(
             SecretKey signingKey,
@@ -104,8 +104,8 @@ public class JwtService {
     }
 
     /**
-     * Valida assinatura, issuer, expiração e a claim obrigatória de versão do token.
-     * A claim "tv" deve conter um inteiro não negativo dentro do intervalo suportado.
+     * Validates the signature, issuer, expiration, and required token-version claim.
+     * The "tv" claim must contain a non-negative integer within the supported range.
      */
     public JwtClaims parse(String jwt) {
         Claims claims = jwtParser

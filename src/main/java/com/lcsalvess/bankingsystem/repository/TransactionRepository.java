@@ -80,19 +80,23 @@ public interface TransactionRepository extends
     );
 
     /**
-     * Saldo no início do dia lido do balance_after, sem somar o histórico.
+     * Retrieves the opening balance for the day from {@code balance_after},
+     * without summing the transaction history.
      *
-     * <p>Candidata: última transação (por id) que conta para o saldo do início
-     * do dia, isto é, não-rendimento criada antes do dia ou rendimento com
-     * data de referência anterior ao dia. O balance_after dela só vale se
-     * nenhuma transação que NÃO conta (efetiva a partir do dia) tiver id
-     * menor, porque então o saldo físico após a candidata inclui movimentos
-     * que o saldo do início do dia não deve incluir. Isso acontece quando um
-     * rendimento retroativo é gravado depois de movimentações mais novas.
-     * Nesse caso, ou sem histórico, a consulta não retorna linha e o chamador
-     * deve usar {@link #calculateBalanceAtStartOfDay}.
+     * <p>The candidate is the latest transaction (by ID) that contributes to
+     * the opening balance for the day, meaning a non-yield transaction created
+     * before the day or a yield transaction with a reference date before the day.
      *
-     * <p>Deve ser chamada com a linha da conta travada.
+     * <p>Its {@code balance_after} is valid only if no transaction that does
+     * NOT contribute to the opening balance (effective as of the day) has a
+     * lower ID. Otherwise, the physical balance after the candidate would
+     * include transactions that must not be included in the opening balance.
+     * This can happen when a retroactive yield is recorded after newer transactions.
+     *
+     * <p>In that case, or when no transaction history exists, the query returns
+     * no row, and the caller must use {@link #calculateBalanceAtStartOfDay}.
+     *
+     * <p>Must be called while the account row is locked.
      */
     @Query(value = """
         SELECT c.balance_after
@@ -131,9 +135,11 @@ public interface TransactionRepository extends
     );
 
     /**
-     * Contas cujo saldo difere do balance_after da última transação (ou de
-     * zero, se não houver transação). Uma única instrução, então enxerga um
-     * snapshot consistente de contas e transações.
+     * Identifies accounts whose balance differs from the {@code balance_after}
+     * value of their latest transaction (or from zero if no transaction exists).
+     *
+     * <p>Since this is a single statement, it sees a consistent snapshot of
+     * accounts and transactions.
      */
     @Query(value = """
         SELECT m."accountId" AS "accountId",
@@ -162,10 +168,10 @@ public interface TransactionRepository extends
     List<BalanceMismatch> findBalanceMismatches();
 
     /**
-     * Identifica a primeira quebra da cadeia de saldos históricos de cada conta.
+     * Identifies the first break in each account's historical balance chain.
      *
-     * <p>A primeira transação é validada contra o saldo inicial zero.
-     * As transações seguintes são validadas contra o saldo da transação anterior.
+     * <p>The first transaction is validated against the initial zero balance.
+     * Subsequent transactions are validated against the previous transaction's balance.
      */
     @Query(value = """
     WITH transaction_chain AS (

@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.security.filter;
 
-import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.audit.web.AuditRequestAttributes;
+import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.security.handler.RestAuthenticationEntryPoint;
 import com.lcsalvess.bankingsystem.service.security.CustomUserDetailsService;
 import com.lcsalvess.bankingsystem.service.security.JwtClaims;

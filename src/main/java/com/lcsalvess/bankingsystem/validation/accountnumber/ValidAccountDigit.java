@@ -4,23 +4,27 @@ import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Define uma anotação de validação personalizada para o dígito da conta.
+ * Defines a custom validation annotation for the account check digit.
  */
 @Documented
-// Faz a anotação aparecer na documentação gerada pelo Javadoc.
+// Makes the annotation appear in the generated Javadoc documentation.
 @Constraint(validatedBy = ValidAccountDigitValidator.class)
-// Informa ao Bean Validation que esta é uma constraint personalizada.
-// Quando @ValidAccountDigit for encontrada, ValidAccountDigitValidator será executado.
+// Informs Bean Validation that this is a custom constraint.
+// Whenever @ValidAccountDigit is encountered, ValidAccountDigitValidator will be executed.
 @Target({ElementType.FIELD, ElementType.PARAMETER})
-// Define onde @ValidAccountDigit pode ser utilizada.
-// FIELD = atributos/campos.
-// PARAMETER = parâmetros de métodos.
+// Defines where @ValidAccountDigit can be used.
+// FIELD = fields.
+// PARAMETER = method parameters.
 @Retention(RetentionPolicy.RUNTIME)
-// Mantém a anotação disponível durante a execução da aplicação.
-// Isso permite que o Bean Validation consiga encontrá-la em runtime.
+// Keeps the annotation available at runtime.
+// This allows Bean Validation to discover it during application execution.
 public @interface ValidAccountDigit {
 
     String message() default ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH;

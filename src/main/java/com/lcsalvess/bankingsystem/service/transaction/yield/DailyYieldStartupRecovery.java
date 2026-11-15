@@ -11,14 +11,16 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
 
 /**
- * Recupera os rendimentos pendentes após a inicialização.
+ * Recovers pending yields after application startup.
  *
- * <p>O processamento roda em outra thread: o Spring só marca a readiness como
- * {@code ACCEPTING_TRAFFIC} depois que todos os listeners de
- * {@link ApplicationReadyEvent} terminam, então um catch-up longo deixaria a
- * instância fora do ar para o orquestrador. O processamento é idempotente
- * (lock da conta + índice único {@code uk_transactions_daily_yield}),
- * portanto pode rodar em paralelo com o cron.
+ * <p>Processing runs on a separate thread: Spring only marks the application
+ * readiness state as {@code ACCEPTING_TRAFFIC} after all
+ * {@link ApplicationReadyEvent} listeners have finished. Therefore, a lengthy
+ * catch-up process would leave the instance unavailable to the orchestrator.
+ *
+ * <p>Processing is idempotent (account locking + the unique
+ * {@code uk_transactions_daily_yield} index), so it can run concurrently
+ * with the scheduled cron job.
  */
 @Component
 @Profile("!test")

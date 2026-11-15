@@ -49,8 +49,9 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
     }
 
     /**
-     * Responde 503 em JSON quando a autenticação não pôde ser concluída por falha de
-     * infraestrutura (por exemplo, banco indisponível), em vez de um 401 enganoso.
+     * Returns a JSON 503 response when authentication cannot be completed
+     * due to an infrastructure failure (e.g., database unavailability),
+     * instead of returning a misleading 401 response.
      */
     public void commenceServiceUnavailable(
             HttpServletResponse response

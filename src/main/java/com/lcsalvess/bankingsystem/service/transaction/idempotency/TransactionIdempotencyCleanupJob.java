@@ -14,7 +14,7 @@ public class TransactionIdempotencyCleanupJob {
     private final int retentionDays;
 
     /**
-     * Cria o job após validar o período de retenção.
+     * Creates the job after validating the retention period.
      */
     public static TransactionIdempotencyCleanupJob create(
             TransactionIdempotencyRepository idempotencyRepository,
@@ -22,7 +22,7 @@ public class TransactionIdempotencyCleanupJob {
     ) {
         if (retentionDays < 1) {
             throw new IllegalArgumentException(
-                    "banking.idempotency.retention-days deve ser maior ou igual a 1."
+                    "banking.idempotency.retention-days must be greater than or equal to 1."
             );
         }
 
@@ -33,7 +33,7 @@ public class TransactionIdempotencyCleanupJob {
     }
 
     /**
-     * Construtor privado que apenas atribui os valores recebidos.
+     * Private constructor that only assigns the provided values.
      */
     private TransactionIdempotencyCleanupJob(
             TransactionIdempotencyRepository idempotencyRepository,

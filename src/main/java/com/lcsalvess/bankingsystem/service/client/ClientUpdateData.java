@@ -5,9 +5,10 @@ import com.lcsalvess.bankingsystem.service.address.AddressData;
 import java.util.Objects;
 
 /**
- * Dados já resolvidos para atualizar um cliente.
- * O endereço é opcional e, quando presente, sempre contém o resultado
- * da consulta de CEP, além do número e complemento informados.
+ * Data already resolved for updating a client.
+ *
+ * <p>The address is optional and, when provided, always contains the result
+ * of the postal code lookup, along with the supplied street number and complement.
  */
 public record ClientUpdateData(
         String name,

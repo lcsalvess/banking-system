@@ -4,9 +4,8 @@ import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.integration.address.dto.AddressLookupResponse;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
 import jakarta.validation.ConstraintViolation;
-import org.springframework.stereotype.Component;
-
 import jakarta.validation.Validator;
+import org.springframework.stereotype.Component;
 
 import java.util.Set;
 import java.util.stream.Collectors;

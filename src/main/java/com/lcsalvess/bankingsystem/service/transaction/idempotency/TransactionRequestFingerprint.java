@@ -44,9 +44,9 @@ public final class TransactionRequestFingerprint {
     }
 
     /**
-     * Remove zeros à direita para que 10, 10.0 e 10.00 gerem o mesmo hash,
-     * sem lançar exceção para valores com escala maior que 2 (a validação
-     * de valor é responsabilidade da camada de negócio).
+     * Strips trailing zeros so that 10, 10.0, and 10.00 produce the same hash,
+     * without throwing an exception for values with a scale greater than 2
+     * (amount validation is the responsibility of the business layer).
      */
     private static String normalizeAmount(BigDecimal amount) {
         return amount
@@ -76,7 +76,7 @@ public final class TransactionRequestFingerprint {
 
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException(
-                    "O algoritmo SHA-256 não está disponível.",
+                    "The SHA-256 algorithm is not available.",
                     exception
             );
         }

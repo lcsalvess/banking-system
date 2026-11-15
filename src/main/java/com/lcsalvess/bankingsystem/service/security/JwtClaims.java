@@ -1,10 +1,10 @@
 package com.lcsalvess.bankingsystem.service.security;
 
 /**
- * Claims de um JWT já validado (assinatura, issuer e expiração).
+ * Claims from a JWT that has already been validated (signature, issuer, and expiration).
  *
- * @param username     subject do token
- * @param tokenVersion versão das credenciais do usuário na emissão do token
+ * @param username     the token's subject
+ * @param tokenVersion the user's credential version when the token was issued
  */
 public record JwtClaims(
         String username,

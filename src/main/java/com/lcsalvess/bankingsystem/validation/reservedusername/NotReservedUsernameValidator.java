@@ -17,7 +17,7 @@ public class NotReservedUsernameValidator
             return true;
         }
 
-        // Mesma normalização aplicada ao username antes de ser salvo.
+        // Applies the same normalization used for the username before it is persisted.
         return !RESERVED_USERNAME.equals(UsernameNormalizer.normalize(value));
     }
 }

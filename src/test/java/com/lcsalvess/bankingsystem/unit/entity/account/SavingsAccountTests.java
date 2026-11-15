@@ -60,7 +60,7 @@ class SavingsAccountTests {
         );
 
         assertEquals(
-                "A data inicial do rendimento é obrigatória.",
+                "The initial yield date is required.",
                 exception.getMessage()
         );
     }
@@ -106,7 +106,7 @@ class SavingsAccountTests {
         );
 
         assertEquals(
-                "A data do último rendimento não pode retroceder.",
+                "The last yield date cannot move backwards.",
                 exception.getMessage()
         );
 
@@ -140,7 +140,7 @@ class SavingsAccountTests {
         );
 
         assertEquals(
-                "A data de referência do rendimento é obrigatória.",
+                "The yield reference date is required.",
                 exception.getMessage()
         );
 
@@ -191,7 +191,7 @@ class SavingsAccountTests {
         );
 
         assertEquals(
-                "O saldo histórico deve ser válido e não negativo.",
+                "The historical balance must be valid and non-negative.",
                 exception.getMessage()
         );
     }
@@ -207,7 +207,7 @@ class SavingsAccountTests {
         );
 
         assertEquals(
-                "O saldo histórico deve ser válido e não negativo.",
+                "The historical balance must be valid and non-negative.",
                 exception.getMessage()
         );
     }
@@ -280,7 +280,7 @@ class SavingsAccountTests {
         );
 
         assertEquals(
-                "A data processada não pode retroceder.",
+                "The processed date cannot move backwards.",
                 exception.getMessage()
         );
 
@@ -323,7 +323,7 @@ class SavingsAccountTests {
         );
 
         assertEquals(
-                "A data de processamento do rendimento é obrigatória.",
+                "The yield processing date is required.",
                 exception.getMessage()
         );
 

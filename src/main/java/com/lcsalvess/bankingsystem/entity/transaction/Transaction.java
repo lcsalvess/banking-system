@@ -60,9 +60,9 @@ public class Transaction {
     private BigDecimal amount;
 
     /**
-     * Saldo da conta imediatamente após esta transação.
-     * É gravado na mesma transação de banco da alteração do saldo,
-     * com a linha da conta travada.
+     * Account balance immediately after this transaction.
+     * It is persisted in the same database transaction as the balance update,
+     * while the account row is locked.
      */
     @NotNull
     @Column(
@@ -103,15 +103,15 @@ public class Transaction {
     private boolean performedBySystem;
 
     /**
-     * Construtor exigido pelo JPA. Não é público para que nenhuma outra
-     * parte do código consiga criar uma transação sem passar pelas
-     * factories, que validam os dados.
+     * Constructor required by JPA. It is not public so that no other part
+     * of the code can create a transaction without going through the
+     * factories, which validate the data.
      */
     protected Transaction() {
     }
 
     /**
-     * Cria uma transação realizada por um usuário.
+     * Creates a transaction performed by a user.
      */
     public static Transaction create(
             TransactionType type,
@@ -144,7 +144,7 @@ public class Transaction {
     }
 
     /**
-     * Cria uma transação de transferência realizada por um usuário.
+     * Creates a transfer transaction performed by a user.
      */
     public static Transaction createTransfer(
             TransactionType type,
@@ -183,7 +183,7 @@ public class Transaction {
     }
 
     /**
-     * Cria uma transação de rendimento gerada pelo sistema.
+     * Creates a system-generated yield transaction.
      */
     public static Transaction createSystemYield(
             BigDecimal amount,
@@ -214,8 +214,8 @@ public class Transaction {
     }
 
     /**
-     * Construtor interno sem validações ou operações que lancem
-     * exceções durante a inicialização do objeto.
+     * Internal constructor without validations or operations that may throw
+     * exceptions during object initialization.
      */
     private Transaction(
             UUID transactionCode,

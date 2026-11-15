@@ -3,12 +3,14 @@ package com.lcsalvess.bankingsystem.service.security.ratelimit;
 import java.time.Instant;
 
 /**
- * Tentativa de login admitida pelo {@link RateLimitProtectionService}.
+ * Login attempt accepted by {@link RateLimitProtectionService}.
  *
- * <p>A tentativa já está contabilizada quando este objeto é criado. Ele serve
- * para desfazer a contagem ({@code cancelAttempt}) ou zerá-la após um login
- * bem-sucedido ({@code recordSuccessfulLogin}). O início da janela de cada
- * contador impede que o cancelamento altere uma sequência mais nova.
+ * <p>The attempt has already been counted when this object is created.
+ * It is used to reverse the count ({@code cancelAttempt}) or reset it
+ * after a successful login ({@code recordSuccessfulLogin}).
+ *
+ * <p>The start time of each counter window prevents cancellation from
+ * affecting a newer sequence.
  */
 public record LoginAttempt(
         String usernameAndIpKey,

@@ -9,8 +9,8 @@ import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRecord;
 import com.lcsalvess.bankingsystem.repository.idempotency.TransactionIdempotencyRepository;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
-import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
+import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -108,14 +108,14 @@ public class TransactionIdempotencyService {
 
         if (response.transactionCode() == null) {
             throw new IllegalStateException(
-                    "A operação financeira não retornou um código de transação."
+                    "The financial operation did not return a transaction code."
             );
         }
 
         /*
-         * Garante que a transação financeira seja enviada ao banco antes
-         * de registrar sua referência na tabela de idempotência.
-         * A FK para transaction_code precisa conseguir encontrar a transação.
+         * Ensures that the financial transaction is flushed to the database
+         * before recording its reference in the idempotency table.
+         * The foreign key for transaction_code must be able to reference the transaction.
          */
         transactionRepository.flush();
 
@@ -139,12 +139,12 @@ public class TransactionIdempotencyService {
                         userId,
                         idempotencyKey
                 ).orElseThrow(() -> new IllegalStateException(
-                        "A reserva de idempotência não foi encontrada após um conflito."
+                        "The idempotency reservation was not found after a conflict."
                 ));
 
         if (existing.transactionCode() == null) {
             throw new IllegalStateException(
-                    "Registro de idempotência confirmado sem uma transação financeira associada."
+                    "Idempotency record marked as completed without an associated financial transaction."
             );
         }
 

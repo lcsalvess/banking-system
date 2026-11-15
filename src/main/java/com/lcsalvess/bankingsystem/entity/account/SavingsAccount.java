@@ -1,7 +1,11 @@
 package com.lcsalvess.bankingsystem.entity.account;
 
 import com.lcsalvess.bankingsystem.entity.client.Client;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.PrimaryKeyJoinColumn;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import org.hibernate.annotations.DynamicUpdate;
 
@@ -19,12 +23,12 @@ import java.time.LocalDate;
 public class SavingsAccount extends Account {
 
     /**
-     * Taxa diária equivalente a 0,5% ao mês composto em 30 dias:
-     * (1 + 0,005)^(1/30) - 1.
-     * <p>
-     * É uma constante decimal, e não um cálculo com {@code Math.pow},
-     * para que o valor creditado não dependa da aritmética de ponto
-     * flutuante da JVM.
+     * Daily yield rate equivalent to 0.5% monthly interest compounded over 30 days:
+     * (1 + 0.005)^(1/30) - 1.
+     *
+     * <p>This is a decimal constant rather than a calculation using {@code Math.pow},
+     * ensuring that the credited amount does not depend on the JVM's floating-point
+     * arithmetic.
      */
     private static final BigDecimal DAILY_YIELD_RATE =
             new BigDecimal("0.000166265204228477063643");
@@ -40,13 +44,13 @@ public class SavingsAccount extends Account {
     private LocalDate lastYieldProcessedDate;
 
     /**
-     * Construtor exigido pelo JPA.
+     * Constructor required by JPA.
      */
     protected SavingsAccount() {
     }
 
     /**
-     * Cria uma conta poupança após validar a data inicial do rendimento.
+     * Creates a savings account after validating the initial yield date.
      */
     public static SavingsAccount create(
             Client client,
@@ -56,7 +60,7 @@ public class SavingsAccount extends Account {
     ) {
         validateDateNotNull(
                 initialYieldDate,
-                "A data inicial do rendimento é obrigatória."
+                "The initial yield date is required."
         );
 
         return new SavingsAccount(
@@ -68,7 +72,7 @@ public class SavingsAccount extends Account {
     }
 
     /**
-     * Construtor interno que recebe os argumentos previamente validados.
+     * Internal constructor that receives previously validated arguments.
      */
     private SavingsAccount(
             Client client,
@@ -91,18 +95,18 @@ public class SavingsAccount extends Account {
     }
 
     /**
-     * Atualiza a data do último rendimento registrado.
+     * Updates the date of the most recently recorded yield.
      */
     public void updateLastYieldDate(LocalDate referenceDate) {
         validateDateNotNull(
                 referenceDate,
-                "A data de referência do rendimento é obrigatória."
+                "The yield reference date is required."
         );
 
         if (lastYieldDate != null
                 && referenceDate.isBefore(lastYieldDate)) {
             throw new IllegalArgumentException(
-                    "A data do último rendimento não pode retroceder."
+                    "The last yield date cannot move backwards."
             );
         }
 
@@ -110,7 +114,7 @@ public class SavingsAccount extends Account {
     }
 
     /**
-     * Verifica se a conta está elegível para rendimento na data informada.
+     * Checks whether the account is eligible to earn yield on the specified date.
      */
     public boolean isEligibleForYield(LocalDate referenceDate) {
         return referenceDate != null
@@ -119,8 +123,8 @@ public class SavingsAccount extends Account {
     }
 
     /**
-     * Calcula o rendimento diário com base no saldo histórico informado.
-     * O valor monetário final é arredondado para duas casas decimais.
+     * Calculates the daily yield based on the supplied historical balance.
+     * The final monetary amount is rounded to two decimal places.
      */
     public BigDecimal calculateYield(
             BigDecimal balanceAtReferenceDate
@@ -128,7 +132,7 @@ public class SavingsAccount extends Account {
         if (balanceAtReferenceDate == null
                 || balanceAtReferenceDate.signum() < 0) {
             throw new IllegalArgumentException(
-                    "O saldo histórico deve ser válido e não negativo."
+                    "The historical balance must be valid and non-negative."
             );
         }
 
@@ -138,18 +142,18 @@ public class SavingsAccount extends Account {
     }
 
     /**
-     * Marca a data como processada sem alterar a data do último rendimento.
+     * Marks the date as processed without changing the last yield date.
      */
     public void markYieldDateProcessed(LocalDate referenceDate) {
         validateDateNotNull(
                 referenceDate,
-                "A data de processamento do rendimento é obrigatória."
+                "The yield processing date is required."
         );
 
         if (lastYieldProcessedDate != null
                 && referenceDate.isBefore(lastYieldProcessedDate)) {
             throw new IllegalArgumentException(
-                    "A data processada não pode retroceder."
+                    "The processed date cannot move backwards."
             );
         }
 

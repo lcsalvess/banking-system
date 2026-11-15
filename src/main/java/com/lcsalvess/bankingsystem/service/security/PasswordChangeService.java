@@ -43,9 +43,9 @@ public class PasswordChangeService {
     public void changePassword(ChangePasswordRequestDTO dto) {
         Long userId = currentUserService.getCurrentUser().getId();
 
-        // A tentativa é contabilizada antes de verificar a senha atual, para que
-        // requisições paralelas não ultrapassem o limite enquanto o BCrypt roda.
-        // O contador fica em memória: não é desfeito se a transação sofrer rollback.
+        // The attempt is counted before verifying the current password so that
+        // concurrent requests cannot exceed the limit while BCrypt is running.
+        // The counter is kept in memory and is not rolled back if the transaction is rolled back.
         PasswordChangeAttempt attempt =
                 rateLimitProtectionService.beginPasswordChangeAttempt(userId);
 
@@ -63,15 +63,15 @@ public class PasswordChangeService {
                 );
             }
         } catch (InvalidCurrentPasswordException exception) {
-            // Senha atual incorreta: a tentativa continua contabilizada.
+            // An incorrect current password: the attempt remains counted.
             throw exception;
         } catch (RuntimeException exception) {
-            // Falhas de infraestrutura ou inesperadas não são senha incorreta.
+            // Infrastructure or unexpected failures are not treated as incorrect passwords.
             rateLimitProtectionService.cancelPasswordChangeAttempt(attempt);
             throw exception;
         }
 
-        // Senha atual confirmada: o contador deixa de pesar contra o usuário.
+        // Current password verified: the attempt is no longer counted against the user.
         rateLimitProtectionService.recordSuccessfulCurrentPasswordVerification(attempt);
 
         if (passwordEncoder.matches(dto.newPassword(), user.getPassword())) {

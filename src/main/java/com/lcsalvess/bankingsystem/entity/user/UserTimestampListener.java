@@ -9,13 +9,14 @@ import java.time.Clock;
 import java.time.Instant;
 
 /**
- * Preenche created_at e updated_at do {@link User} com o {@link Clock}
- * da aplicação, o mesmo usado nas transações e na auditoria, o que torna
- * os timestamps determinísticos nos testes.
+ * Populates the {@code created_at} and {@code updated_at} fields of {@link User}
+ * using the application's {@link Clock}, the same one used for transactions
+ * and audit events, making timestamps deterministic in tests.
  *
- * <p>O Hibernate instancia este listener pelo contêiner do Spring, por isso
- * o Clock é injetado por construtor. O valor é truncado para microssegundos
- * para ser idêntico ao persistido em TIMESTAMP(6).
+ * <p>Hibernate instantiates this listener through the Spring container, which
+ * is why the {@code Clock} is injected through the constructor. The timestamp
+ * is truncated to microsecond precision to match the value persisted in
+ * {@code TIMESTAMP(6)}.
  */
 @Component
 public class UserTimestampListener {

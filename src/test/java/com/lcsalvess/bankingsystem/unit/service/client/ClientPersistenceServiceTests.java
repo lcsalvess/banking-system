@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.service.client;
 
 import com.lcsalvess.bankingsystem.entity.address.Address;
-import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.entity.address.State;
+import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.event.client.ClientOperationEvent;
 import com.lcsalvess.bankingsystem.event.client.ClientOperationType;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
@@ -36,8 +36,16 @@ import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ClientPersistenceService tests")
@@ -49,18 +57,22 @@ class ClientPersistenceServiceTests {
     private static final String PROVIDER =
             "com.lcsalvess.bankingsystem.unit.service.client.ClientPersistenceServiceTests#";
 
-    private static final String USERNAME = "usuario.teste";
+    private static final String USERNAME = "test.user";
 
     private static final Long CLIENT_ID = 1L;
-    private static final String NAME = "Cliente Teste";
-    private static final String CPF = "52998224725";
-    private static final String EMAIL = "teste@email.com";
-    private static final String PHONE = "11999999999";
     private static final String POSTAL_CODE = "01001000";
 
-    private static final String UPDATED_NAME = "Cliente Atualizado";
-    private static final String UPDATED_EMAIL = "atualizado@email.com";
+    private static final String UPDATED_NAME = "Jane Doe Update";
+    private static final String UPDATED_EMAIL = "jane.doe.update@example.com";
     private static final String UPDATED_PHONE = "11888888888";
+
+    private static final String NEW_STREET_NAME = "Rua Atualizada";
+    private static final String NEW_STREET_NUMBER = "456";
+    private static final String NEW_COMPLEMENT = "Apto 22";
+    private static final String NEW_NEIGHBORHOOD = "Centro";
+    private static final String NEW_CITY = "São Paulo";
+    private static final State NEW_STATE = State.SP;
+    private static final String NEW_POSTAL_CODE = "87654321";
 
     @Mock
     private ClientRepository clientRepository;
@@ -176,6 +188,7 @@ class ClientPersistenceServiceTests {
         void shouldUpdateClientSuccessfully() {
             Client client = client();
             Address originalAddress = client.getAddress();
+            AddressSnapshot originalSnapshot = AddressSnapshot.of(originalAddress);
 
             when(clientRepository.findById(CLIENT_ID))
                     .thenReturn(Optional.of(client));
@@ -192,7 +205,7 @@ class ClientPersistenceServiceTests {
             assertEquals(UPDATED_EMAIL, result.getEmail());
             assertEquals(UPDATED_PHONE, result.getPhoneNumber());
             assertSame(originalAddress, result.getAddress());
-            assertAddressUnchanged(result.getAddress());
+            assertAddressUnchanged(originalSnapshot, result.getAddress());
 
             verify(clientRepository).findById(CLIENT_ID);
             verify(clientRepository).save(client);
@@ -200,6 +213,7 @@ class ClientPersistenceServiceTests {
             verifyNoMoreInteractionsOnMocks();
         }
 
+        // A null expected value means the field must keep its original value.
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "partialUpdates")
         @DisplayName("Should update only the provided client fields")
@@ -211,6 +225,10 @@ class ClientPersistenceServiceTests {
                 String expectedPhone
         ) {
             Client client = client();
+            String originalName = client.getName();
+            String originalEmail = client.getEmail();
+            String originalPhone = client.getPhoneNumber();
+            AddressSnapshot originalAddress = AddressSnapshot.of(client.getAddress());
 
             when(clientRepository.findById(CLIENT_ID))
                     .thenReturn(Optional.of(client));
@@ -222,10 +240,10 @@ class ClientPersistenceServiceTests {
                     USERNAME
             );
 
-            assertEquals(expectedName, result.getName());
-            assertEquals(expectedEmail, result.getEmail());
-            assertEquals(expectedPhone, result.getPhoneNumber());
-            assertAddressUnchanged(result.getAddress());
+            assertEquals(expectedName != null ? expectedName : originalName, result.getName());
+            assertEquals(expectedEmail != null ? expectedEmail : originalEmail, result.getEmail());
+            assertEquals(expectedPhone != null ? expectedPhone : originalPhone, result.getPhoneNumber());
+            assertAddressUnchanged(originalAddress, result.getAddress());
 
             verify(clientRepository).findById(CLIENT_ID);
             verify(clientRepository).save(client);
@@ -241,7 +259,7 @@ class ClientPersistenceServiceTests {
                     UPDATED_NAME,
                     UPDATED_EMAIL,
                     UPDATED_PHONE,
-                    new AddressUpdateData(addressData(), "456", "Apto 22")
+                    new AddressUpdateData(addressData(), NEW_STREET_NUMBER, NEW_COMPLEMENT)
             );
 
             when(clientRepository.findById(CLIENT_ID))
@@ -256,13 +274,13 @@ class ClientPersistenceServiceTests {
 
             Address updatedAddress = result.getAddress();
 
-            assertEquals("Rua Atualizada", updatedAddress.getStreetName());
-            assertEquals("Centro", updatedAddress.getNeighborhood());
-            assertEquals("São Paulo", updatedAddress.getCity());
-            assertEquals(State.SP, updatedAddress.getState());
-            assertEquals("87654321", updatedAddress.getPostalCode());
-            assertEquals("456", updatedAddress.getStreetNumber());
-            assertEquals("Apto 22", updatedAddress.getComplement());
+            assertEquals(NEW_STREET_NAME, updatedAddress.getStreetName());
+            assertEquals(NEW_NEIGHBORHOOD, updatedAddress.getNeighborhood());
+            assertEquals(NEW_CITY, updatedAddress.getCity());
+            assertEquals(NEW_STATE, updatedAddress.getState());
+            assertEquals(NEW_POSTAL_CODE, updatedAddress.getPostalCode());
+            assertEquals(NEW_STREET_NUMBER, updatedAddress.getStreetNumber());
+            assertEquals(NEW_COMPLEMENT, updatedAddress.getComplement());
 
             verify(clientRepository).findById(CLIENT_ID);
             verify(clientRepository).save(client);
@@ -410,9 +428,9 @@ class ClientPersistenceServiceTests {
     @DisplayName("transaction boundaries")
     class TransactionBoundaries {
 
-        // Este serviço é o dono da transação de escrita. A anotação precisa ser
-        // a do Spring: o proxy é criado via @Transactional e o evento
-        // AFTER_COMMIT depende dessa transação existir no momento do publish.
+        // This service owns the write transaction. The annotation must be
+        // Spring's: the proxy is created via @Transactional and the
+        // AFTER_COMMIT event relies on that transaction existing at publish time.
         @Test
         @DisplayName("create and update should run inside a transaction")
         void createAndUpdateShouldBeTransactional() throws NoSuchMethodException {
@@ -433,62 +451,62 @@ class ClientPersistenceServiceTests {
         }
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> partialUpdates() {
         return Stream.of(
                 Arguments.of(
                         "only name is sent",
                         new ClientUpdateData(UPDATED_NAME, null, null, null),
                         UPDATED_NAME,
-                        EMAIL,
-                        PHONE
+                        null,
+                        null
                 ),
                 Arguments.of(
                         "only email is sent",
                         new ClientUpdateData(null, UPDATED_EMAIL, null, null),
-                        NAME,
+                        null,
                         UPDATED_EMAIL,
-                        PHONE
+                        null
                 ),
                 Arguments.of(
                         "only phone number is sent",
                         new ClientUpdateData(null, null, UPDATED_PHONE, null),
-                        NAME,
-                        EMAIL,
+                        null,
+                        null,
                         UPDATED_PHONE
                 ),
                 Arguments.of(
                         "nothing is sent",
                         new ClientUpdateData(null, null, null, null),
-                        NAME,
-                        EMAIL,
-                        PHONE
+                        null,
+                        null,
+                        null
                 )
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> addressUpdates() {
         return Stream.of(
                 Arguments.of(
                         "street number and complement are updated",
-                        "456",
-                        "Apto 22",
-                        "456",
-                        "Apto 22"
+                        NEW_STREET_NUMBER,
+                        NEW_COMPLEMENT,
+                        NEW_STREET_NUMBER,
+                        NEW_COMPLEMENT
                 ),
                 Arguments.of(
                         "complement is cleared when blank",
-                        "456",
+                        NEW_STREET_NUMBER,
                         "   ",
-                        "456",
+                        NEW_STREET_NUMBER,
                         null
                 ),
                 Arguments.of(
                         "complement is cleared when null",
-                        "456",
+                        NEW_STREET_NUMBER,
                         null,
-                        "456",
+                        NEW_STREET_NUMBER,
                         null
                 )
         );
@@ -516,17 +534,11 @@ class ClientPersistenceServiceTests {
         assertEquals(ApiErrorMessages.CLIENT_NOT_FOUND, exception.getMessage());
     }
 
-    private static void assertAddressUnchanged(Address address) {
-        assertEquals("Rua Teste", address.getStreetName());
-        assertEquals("123", address.getStreetNumber());
-        assertEquals("Apto 10", address.getComplement());
-        assertEquals("Centro", address.getNeighborhood());
-        assertEquals("São Paulo", address.getCity());
-        assertEquals(State.SP, address.getState());
-        assertEquals(POSTAL_CODE, address.getPostalCode());
+    private static void assertAddressUnchanged(AddressSnapshot expected, Address actual) {
+        assertEquals(expected, AddressSnapshot.of(actual));
     }
 
-    // Atualização sem endereço: nesse caso o ClientService repassa address = null.
+    // Update without address: in this case ClientService forwards address = null.
     private static ClientUpdateData clientOnlyUpdateData() {
         return new ClientUpdateData(
                 UPDATED_NAME,
@@ -536,26 +548,28 @@ class ClientPersistenceServiceTests {
         );
     }
 
-    // Atualização com endereço: o ClientService repassa o endereço consultado.
+    // Update with address: ClientService forwards the looked-up address.
     private static ClientUpdateData fullUpdateData() {
         return new ClientUpdateData(
                 UPDATED_NAME,
                 UPDATED_EMAIL,
                 UPDATED_PHONE,
-                new AddressUpdateData(addressData(), "456", "Apto 22")
+                new AddressUpdateData(addressData(), NEW_STREET_NUMBER, NEW_COMPLEMENT)
         );
     }
 
     private static AddressData addressData() {
         return new AddressData(
-                "Rua Atualizada",
-                "Centro",
-                "São Paulo",
-                State.SP,
-                "87654321"
+                NEW_STREET_NAME,
+                NEW_NEIGHBORHOOD,
+                NEW_CITY,
+                NEW_STATE,
+                NEW_POSTAL_CODE
         );
     }
 
+    // Has a non-null complement on purpose: the "complement is cleared"
+    // scenarios only prove something if the original complement is set.
     private static Address address() {
         return new Address(
                 "Rua Teste",
@@ -568,18 +582,45 @@ class ClientPersistenceServiceTests {
         );
     }
 
-    // Cliente ainda não persistido (sem id), como chega do ClientService na criação.
+    // Client not yet persisted (no id), as it arrives from ClientService on creation.
     private static Client unsavedClient() {
-        return new Client(NAME, CPF, EMAIL, PHONE, address());
+        return aClient("persistence-client").build();
     }
 
     private static Client client() {
-        Client client = unsavedClient();
-        setClientId(client);
-        return client;
+        return aClient("persistence-client")
+                .withId(CLIENT_ID)
+                .withAddress(address())
+                .build();
     }
 
+    // Simulates the id assignment done by the database on save.
     private static void setClientId(Client client) {
         ReflectionTestUtils.setField(client, "id", CLIENT_ID);
+    }
+
+    // Detached copy of the address fields, so "unchanged" assertions do not
+    // compare an object with itself when the entity is mutated in place.
+    private record AddressSnapshot(
+            String streetName,
+            String streetNumber,
+            String complement,
+            String neighborhood,
+            String city,
+            State state,
+            String postalCode
+    ) {
+
+        static AddressSnapshot of(Address address) {
+            return new AddressSnapshot(
+                    address.getStreetName(),
+                    address.getStreetNumber(),
+                    address.getComplement(),
+                    address.getNeighborhood(),
+                    address.getCity(),
+                    address.getState(),
+                    address.getPostalCode()
+            );
+        }
     }
 }

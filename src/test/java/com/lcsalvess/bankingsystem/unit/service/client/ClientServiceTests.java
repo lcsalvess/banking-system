@@ -25,6 +25,7 @@ import com.lcsalvess.bankingsystem.service.client.ClientUpdateData;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData.AddressUpdateData;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -45,7 +46,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -71,17 +72,13 @@ public class ClientServiceTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.service.client.ClientServiceTests#";
 
-    private static final String USERNAME = "usuario.teste";
+    private static final String USERNAME = "test.user";
 
     private static final Long CLIENT_ID = 1L;
-    private static final String NAME = "Cliente Teste";
-    private static final String CPF = "52998224725";
-    private static final String EMAIL = "teste@email.com";
-    private static final String PHONE = "11999999999";
     private static final String POSTAL_CODE = "01001000";
 
-    private static final String UPDATED_NAME = "Cliente Atualizado";
-    private static final String UPDATED_EMAIL = "atualizado@email.com";
+    private static final String UPDATED_NAME = "Jane Doe Update";
+    private static final String UPDATED_EMAIL = "jane.doe.update@example.com";
     private static final String UPDATED_PHONE = "11888888888";
 
     @Mock
@@ -99,6 +96,17 @@ public class ClientServiceTests {
     @InjectMocks
     private ClientService clientService;
 
+    private Client baseClient;
+    private String cpf;
+
+    @BeforeEach
+    void setUp() {
+        baseClient = aClient("base-client")
+                .withId(CLIENT_ID)
+                .build();
+        cpf = baseClient.getCpf();
+    }
+
     @Nested
     @DisplayName("findAll(String, Pageable)")
     class FindAll {
@@ -112,17 +120,13 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should return a page of clients when no name filter is provided")
         void shouldReturnPageOfClientsWithoutNameFilter() {
-            Client client1 = client();
-            Client client2 = client(
-                    2L,
-                    "Maria Silva",
-                    "91741354064",
-                    "maria@email.com",
-                    "11988888888"
-            );
+            Client secondClient = aClient("second-client")
+                    .withId(2L)
+                    .withName("Maria Silva")
+                    .build();
 
             Page<Client> clients = new PageImpl<>(
-                    List.of(client1, client2),
+                    List.of(baseClient, secondClient),
                     pageable,
                     2
             );
@@ -134,14 +138,8 @@ public class ClientServiceTests {
 
             assertEquals(
                     List.of(
-                            clientSummaryResponse(),
-                            new ClientSummaryResponseDTO(
-                                    2L,
-                                    "Maria Silva",
-                                    "***.***.***-64",
-                                    "maria@email.com",
-                                    "11988888888"
-                            )
+                            clientSummaryResponse(baseClient),
+                            clientSummaryResponse(secondClient)
                     ),
                     result.getContent()
             );
@@ -179,10 +177,13 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should filter clients by name ignoring case")
         void shouldFilterClientsByNameIgnoringCase() {
-            Client client = client();
+            Client matchingClient = aClient("matching-client")
+                    .withId(CLIENT_ID)
+                    .withName("Emily Johnson")
+                    .build();
 
             Page<Client> clients = new PageImpl<>(
-                    List.of(client),
+                    List.of(matchingClient),
                     pageable,
                     1
             );
@@ -196,7 +197,7 @@ public class ClientServiceTests {
                     clientService.findAll("  emily  ", pageable);
 
             assertEquals(
-                    List.of(clientSummaryResponse()),
+                    List.of(clientSummaryResponse(matchingClient)),
                     result.getContent()
             );
             assertEquals(1, result.getTotalElements());
@@ -213,7 +214,7 @@ public class ClientServiceTests {
         @DisplayName("Should list all clients when name filter is blank")
         void shouldListAllClientsWhenNameIsBlank() {
             Page<Client> clients = new PageImpl<>(
-                    List.of(client()),
+                    List.of(baseClient),
                     pageable,
                     1
             );
@@ -237,13 +238,11 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should return the client entity when ID exists")
         void shouldReturnClientEntityWhenIdExists() {
-            Client client = client();
-
-            stubClientLookup(client);
+            stubClientLookup(baseClient);
 
             Client result = clientService.findEntityById(CLIENT_ID);
 
-            assertSame(client, result);
+            assertSame(baseClient, result);
 
             verify(clientRepository).findById(CLIENT_ID);
             verifyNoMoreInteractionsOnMocks();
@@ -272,11 +271,11 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should return the client response when ID exists")
         void shouldReturnClientResponseWhenIdExists() {
-            stubClientLookup(client());
+            stubClientLookup(baseClient);
 
             ClientResponseDTO result = clientService.findById(CLIENT_ID);
 
-            assertEquals(clientResponse(), result);
+            assertEquals(clientResponse(baseClient), result);
 
             verify(clientRepository).findById(CLIENT_ID);
             verifyNoMoreInteractionsOnMocks();
@@ -306,21 +305,20 @@ public class ClientServiceTests {
         @DisplayName("Should look up the address before calling the persistence service")
         void shouldCreateClientSuccessfully() {
             ClientRequestDTO request = clientRequest();
-            Address address = address();
-            Client savedClient = client();
+            Address address = baseClient.getAddress();
 
-            when(clientRepository.existsByCpf(CPF)).thenReturn(false);
+            when(clientRepository.existsByCpf(cpf)).thenReturn(false);
             when(addressService.createFromPostalCode(request.address())).thenReturn(address);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.create(any(Client.class), eq(USERNAME)))
-                    .thenReturn(savedClient);
+                    .thenReturn(baseClient);
 
             ClientResponseDTO result = clientService.create(request);
 
             ArgumentCaptor<Client> clientCaptor = ArgumentCaptor.forClass(Client.class);
 
             assertNotNull(result);
-            assertEquals(savedClient.getId(), result.id());
+            assertEquals(baseClient.getId(), result.id());
 
             InOrder inOrder = inOrder(
                     clientRepository,
@@ -328,17 +326,17 @@ public class ClientServiceTests {
                     currentUserService,
                     clientPersistenceService
             );
-            inOrder.verify(clientRepository).existsByCpf(CPF);
+            inOrder.verify(clientRepository).existsByCpf(cpf);
             inOrder.verify(addressService).createFromPostalCode(request.address());
             inOrder.verify(currentUserService).getUsername();
             inOrder.verify(clientPersistenceService).create(clientCaptor.capture(), eq(USERNAME));
 
             Client capturedClient = clientCaptor.getValue();
 
-            assertEquals(NAME, capturedClient.getName());
-            assertEquals(CPF, capturedClient.getCpf());
-            assertEquals(EMAIL, capturedClient.getEmail());
-            assertEquals(PHONE, capturedClient.getPhoneNumber());
+            assertEquals(baseClient.getName(), capturedClient.getName());
+            assertEquals(cpf, capturedClient.getCpf());
+            assertEquals(baseClient.getEmail(), capturedClient.getEmail());
+            assertEquals(baseClient.getPhoneNumber(), capturedClient.getPhoneNumber());
             assertSame(address, capturedClient.getAddress());
 
             verifyNoMoreInteractionsOnMocks();
@@ -349,7 +347,7 @@ public class ClientServiceTests {
         void shouldThrowWhenCpfAlreadyExists() {
             ClientRequestDTO request = clientRequest();
 
-            when(clientRepository.existsByCpf(CPF)).thenReturn(true);
+            when(clientRepository.existsByCpf(cpf)).thenReturn(true);
 
             assertThrowsWithMessage(
                     ClientCpfAlreadyExistsException.class,
@@ -357,7 +355,7 @@ public class ClientServiceTests {
                     () -> clientService.create(request)
             );
 
-            verify(clientRepository).existsByCpf(CPF);
+            verify(clientRepository).existsByCpf(cpf);
             verifyNoMoreInteractionsOnMocks();
         }
 
@@ -365,7 +363,7 @@ public class ClientServiceTests {
         @DisplayName("Should translate the integrity violation when the email already exists")
         void shouldTranslateViolationWhenEmailAlreadyExists() {
             ClientRequestDTO request = clientRequest();
-            Address address = address();
+            Address address = baseClient.getAddress();
 
             ConstraintViolationException cause =
                     new ConstraintViolationException(
@@ -380,7 +378,7 @@ public class ClientServiceTests {
                             cause
                     );
 
-            when(clientRepository.existsByCpf(CPF)).thenReturn(false);
+            when(clientRepository.existsByCpf(cpf)).thenReturn(false);
             when(addressService.createFromPostalCode(request.address())).thenReturn(address);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.create(any(Client.class), eq(USERNAME)))
@@ -394,7 +392,7 @@ public class ClientServiceTests {
             assertEquals(ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS, thrown.getMessage());
             assertSame(exception, thrown.getCause());
 
-            verify(clientRepository).existsByCpf(CPF);
+            verify(clientRepository).existsByCpf(cpf);
             verify(addressService).createFromPostalCode(request.address());
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).create(any(Client.class), eq(USERNAME));
@@ -410,7 +408,7 @@ public class ClientServiceTests {
         ) {
             ClientRequestDTO request = clientRequest();
 
-            when(clientRepository.existsByCpf(CPF)).thenReturn(false);
+            when(clientRepository.existsByCpf(cpf)).thenReturn(false);
             when(addressService.createFromPostalCode(request.address()))
                     .thenThrow(exception);
 
@@ -421,7 +419,7 @@ public class ClientServiceTests {
 
             assertSame(exception, thrown);
 
-            verify(clientRepository).existsByCpf(CPF);
+            verify(clientRepository).existsByCpf(cpf);
             verify(addressService).createFromPostalCode(request.address());
             verifyNoMoreInteractionsOnMocks();
         }
@@ -430,11 +428,11 @@ public class ClientServiceTests {
         @DisplayName("Should rethrow the failure when persistence fails and the CPF does not exist")
         void shouldRethrowWhenPersistenceFailsForOtherReasons() {
             ClientRequestDTO request = clientRequest();
-            Address address = address();
+            Address address = baseClient.getAddress();
             DataIntegrityViolationException exception =
                     new DataIntegrityViolationException("fk_client_address");
 
-            when(clientRepository.existsByCpf(CPF)).thenReturn(false);
+            when(clientRepository.existsByCpf(cpf)).thenReturn(false);
             when(addressService.createFromPostalCode(request.address())).thenReturn(address);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.create(any(Client.class), eq(USERNAME)))
@@ -447,19 +445,20 @@ public class ClientServiceTests {
 
             assertSame(exception, thrown);
 
-            verify(clientRepository).existsByCpf(CPF);
+            verify(clientRepository).existsByCpf(cpf);
             verify(addressService).createFromPostalCode(request.address());
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).create(any(Client.class), eq(USERNAME));
             verifyNoMoreInteractionsOnMocks();
         }
 
-        // Corrida: o existsByCpf inicial passou, mas outra requisição gravou o mesmo CPF antes do commit.
+        // Race: the initial existsByCpf check passed, but another request
+        // persisted the same CPF before the commit.
         @Test
         @DisplayName("Should translate the integrity violation when the CPF was taken concurrently")
         void shouldTranslateViolationWhenCpfWasTakenConcurrently() {
             ClientRequestDTO request = clientRequest();
-            Address address = address();
+            Address address = baseClient.getAddress();
 
             ConstraintViolationException cause =
                     new ConstraintViolationException(
@@ -474,7 +473,7 @@ public class ClientServiceTests {
                             cause
                     );
 
-            when(clientRepository.existsByCpf(CPF)).thenReturn(false, true);
+            when(clientRepository.existsByCpf(cpf)).thenReturn(false, true);
             when(addressService.createFromPostalCode(request.address())).thenReturn(address);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.create(any(Client.class), eq(USERNAME)))
@@ -486,7 +485,7 @@ public class ClientServiceTests {
                     () -> clientService.create(request)
             );
 
-            verify(clientRepository).existsByCpf(CPF);
+            verify(clientRepository).existsByCpf(cpf);
             verify(addressService).createFromPostalCode(request.address());
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).create(any(Client.class), eq(USERNAME));
@@ -501,7 +500,6 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should look up the address before calling the persistence service")
         void shouldUpdateClientAndAddressSuccessfully() {
-            Client client = client();
             ClientUpdateRequestDTO request = fullUpdateRequest();
             AddressData addressData = addressData();
 
@@ -517,12 +515,12 @@ public class ClientServiceTests {
             )).thenReturn(addressData);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.update(CLIENT_ID, expectedData, USERNAME))
-                    .thenReturn(client);
+                    .thenReturn(baseClient);
 
             ClientResponseDTO result = clientService.update(CLIENT_ID, request);
 
             assertNotNull(result);
-            assertEquals(client.getId(), result.id());
+            assertEquals(baseClient.getId(), result.id());
 
             InOrder inOrder = inOrder(
                     addressService,
@@ -543,8 +541,8 @@ public class ClientServiceTests {
             verifyNoMoreInteractionsOnMocks();
         }
 
-        // Todos os cenários têm address = null:
-        // o serviço não deve consultar o endereço e deve repassar address = null.
+        // Every scenario has address = null: the service must not look up
+        // the address and must forward address = null.
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "partialUpdates")
         @DisplayName("Should forward updates without address and without looking it up")
@@ -553,16 +551,14 @@ public class ClientServiceTests {
                 ClientUpdateRequestDTO request,
                 ClientUpdateData expectedData
         ) {
-            Client client = client();
-
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.update(CLIENT_ID, expectedData, USERNAME))
-                    .thenReturn(client);
+                    .thenReturn(baseClient);
 
             ClientResponseDTO result = clientService.update(CLIENT_ID, request);
 
             assertNotNull(result);
-            assertEquals(client.getId(), result.id());
+            assertEquals(baseClient.getId(), result.id());
 
             verify(currentUserService).getUsername();
             verify(clientPersistenceService).update(
@@ -574,8 +570,8 @@ public class ClientServiceTests {
             verifyNoMoreInteractionsOnMocks();
         }
 
-        // O serviço só repassa streetNumber/complement; a normalização
-        // (complemento em branco vira null) é responsabilidade da entidade.
+        // The service only forwards streetNumber/complement; normalization
+        // (blank complement becomes null) is the entity's responsibility.
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "addressForwarding")
         @DisplayName("Should forward street number and complement from the address request")
@@ -585,7 +581,6 @@ public class ClientServiceTests {
                 String expectedStreetNumber,
                 String expectedComplement
         ) {
-            Client client = client();
             AddressData addressData = addressData();
 
             ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(
@@ -610,12 +605,12 @@ public class ClientServiceTests {
                     .thenReturn(addressData);
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.update(CLIENT_ID, expectedData, USERNAME))
-                    .thenReturn(client);
+                    .thenReturn(baseClient);
 
             ClientResponseDTO result = clientService.update(CLIENT_ID, request);
 
             assertNotNull(result);
-            assertEquals(client.getId(), result.id());
+            assertEquals(baseClient.getId(), result.id());
 
             verify(addressService).findAddressByPostalCode(addressRequest.postalCode());
             verify(currentUserService).getUsername();
@@ -708,9 +703,9 @@ public class ClientServiceTests {
     @DisplayName("transaction boundaries")
     class TransactionBoundaries {
 
-        // A transação de escrita pertence ao ClientPersistenceService.
-        // Se create/update (ou a classe) voltarem a ser @Transactional aqui,
-        // a conexão passa a ficar aberta durante a consulta de CEP.
+        // The write transaction belongs to ClientPersistenceService.
+        // If create/update (or the class) become @Transactional here again,
+        // the connection would stay open during the postal code lookup.
         @Test
         @DisplayName("create and update should not run inside a transaction")
         void createAndUpdateShouldNotBeTransactional() throws NoSuchMethodException {
@@ -727,7 +722,7 @@ public class ClientServiceTests {
         }
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> addressLookupFailures() {
         return Stream.of(
                 Arguments.of(
@@ -745,7 +740,7 @@ public class ClientServiceTests {
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> partialUpdates() {
         return Stream.of(
                 Arguments.of(
@@ -771,7 +766,7 @@ public class ClientServiceTests {
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> addressForwarding() {
         return Stream.of(
                 Arguments.of(
@@ -817,13 +812,19 @@ public class ClientServiceTests {
         assertEquals(message, exception.getMessage());
     }
 
-    private static ClientRequestDTO clientRequest() {
+    private ClientRequestDTO clientRequest() {
+        Address address = baseClient.getAddress();
+
         return new ClientRequestDTO(
-                NAME,
-                CPF,
-                EMAIL,
-                PHONE,
-                new AddressRequestDTO("123", null, POSTAL_CODE)
+                baseClient.getName(),
+                baseClient.getCpf(),
+                baseClient.getEmail(),
+                baseClient.getPhoneNumber(),
+                new AddressRequestDTO(
+                        address.getStreetNumber(),
+                        address.getComplement(),
+                        address.getPostalCode()
+                )
         );
     }
 
@@ -850,52 +851,28 @@ public class ClientServiceTests {
         );
     }
 
-    private static Address address() {
-        return new Address(
-                "Rua Teste",
-                "123",
-                null,
-                "Centro",
-                "São Paulo",
-                State.SP,
-                POSTAL_CODE
-        );
+    private static String maskedCpf(String cpf) {
+        return "***.***.***-" + cpf.substring(9);
     }
 
-    private static Client client() {
-        return client(CLIENT_ID, NAME, CPF, EMAIL, PHONE);
-    }
-
-    private static Client client(
-            Long id,
-            String name,
-            String cpf,
-            String email,
-            String phoneNumber
-    ) {
-        Client client = new Client(name, cpf, email, phoneNumber, address());
-        ReflectionTestUtils.setField(client, "id", id);
-        return client;
-    }
-
-    private static ClientSummaryResponseDTO clientSummaryResponse() {
+    private static ClientSummaryResponseDTO clientSummaryResponse(Client client) {
         return new ClientSummaryResponseDTO(
-                CLIENT_ID,
-                NAME,
-                "***.***.***-25",
-                EMAIL,
-                PHONE
+                client.getId(),
+                client.getName(),
+                maskedCpf(client.getCpf()),
+                client.getEmail(),
+                client.getPhoneNumber()
         );
     }
 
-    private static ClientResponseDTO clientResponse() {
+    private static ClientResponseDTO clientResponse(Client client) {
         return new ClientResponseDTO(
-                CLIENT_ID,
-                NAME,
-                "***.***.***-25",
-                EMAIL,
-                PHONE,
-                AddressResponseDTO.fromEntity(address())
+                client.getId(),
+                client.getName(),
+                maskedCpf(client.getCpf()),
+                client.getEmail(),
+                client.getPhoneNumber(),
+                AddressResponseDTO.fromEntity(client.getAddress())
         );
     }
 }

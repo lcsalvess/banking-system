@@ -7,8 +7,6 @@ import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
-import com.lcsalvess.bankingsystem.entity.address.Address;
-import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationEvent;
 import com.lcsalvess.bankingsystem.event.account.AccountOperationType;
@@ -60,6 +58,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -79,9 +78,8 @@ public class AccountServiceTests {
 
     private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.service.account.AccountServiceTests#";
 
-    private static final String USERNAME = "usuario.teste";
+    private static final String USERNAME = "test.user";
     private static final Long CLIENT_ID = 1L;
-    private static final String CLIENT_NAME = "Cliente Teste";
     private static final Long SAVED_ACCOUNT_ID = 10L;
 
     private static final String CHECKING_NUMBER = "00001";
@@ -92,7 +90,7 @@ public class AccountServiceTests {
     private static final String NON_EXISTENT_NUMBER = "99999";
     private static final String NON_EXISTENT_DIGIT = "7";
 
-    // 2026-01-01 23:30 em São Paulo = 2026-01-02T02:30Z. Se alguém usar UTC, a data muda.
+    // 2026-01-01 23:30 in São Paulo = 2026-01-02T02:30Z. If someone uses UTC, the date changes.
     private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-01-02T02:30:00Z"), ZONE);
     private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
@@ -139,8 +137,11 @@ public class AccountServiceTests {
                     Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
             );
 
+            CheckingAccount checking = checkingAccount();
+            SavingsAccount savings = savingsAccount();
+
             stubAccountPage(
-                    List.of(checkingAccount(), savingsAccount()),
+                    List.of(checking, savings),
                     pageable
             );
 
@@ -149,11 +150,13 @@ public class AccountServiceTests {
             assertEquals(
                     List.of(
                             accountResponse(
+                                    checking.getClient().getName(),
                                     CHECKING_NUMBER,
                                     CHECKING_DIGIT,
                                     AccountType.CHECKING
                             ),
                             accountResponse(
+                                    savings.getClient().getName(),
                                     SAVINGS_NUMBER,
                                     SAVINGS_DIGIT,
                                     AccountType.SAVINGS
@@ -274,13 +277,23 @@ public class AccountServiceTests {
         @Test
         @DisplayName("Should return the account response when account number exists")
         void shouldReturnAccountResponseWhenAccountNumberExists() {
+            SavingsAccount account = savingsAccount();
+
             when(accountNumberGenerator.isValid(SAVINGS_NUMBER, SAVINGS_DIGIT)).thenReturn(true);
             when(accountRepository.findByAccountNumberWithClient(SAVINGS_NUMBER))
-                    .thenReturn(Optional.of(savingsAccount()));
+                    .thenReturn(Optional.of(account));
 
             AccountResponseDTO result = accountService.findByAccountNumber(SAVINGS_NUMBER, SAVINGS_DIGIT);
 
-            assertEquals(accountResponse(SAVINGS_NUMBER, SAVINGS_DIGIT, AccountType.SAVINGS), result);
+            assertEquals(
+                    accountResponse(
+                            account.getClient().getName(),
+                            SAVINGS_NUMBER,
+                            SAVINGS_DIGIT,
+                            AccountType.SAVINGS
+                    ),
+                    result
+            );
 
             verify(accountNumberGenerator).isValid(SAVINGS_NUMBER, SAVINGS_DIGIT);
             verify(accountRepository).findByAccountNumberWithClient(SAVINGS_NUMBER);
@@ -395,7 +408,7 @@ public class AccountServiceTests {
 
             AccountResponseDTO result = accountService.create(request);
 
-            assertEquals(accountResponse(number, digit, type), result);
+            assertEquals(accountResponse(client.getName(), number, digit, type), result);
 
             ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
 
@@ -553,8 +566,8 @@ public class AccountServiceTests {
             verifyNoMoreInteractionsOnMocks();
         }
 
-        // A validação de conta ativa vem antes da de saldo: conta cancelada com saldo
-        // deve falhar por "não está ativa".
+        // The active-account check runs before the balance check: a cancelled
+        // account with a balance must fail with "not active".
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "cancelledAccountBalances")
         @DisplayName("Should throw when account is not active")
@@ -611,7 +624,7 @@ public class AccountServiceTests {
     @DisplayName("transaction boundaries")
     class TransactionBoundaries {
 
-        // Consultas devem ser read-only; create e cancel precisam de transação de escrita.
+        // Queries must be read-only; create and cancel need a write transaction.
         @ParameterizedTest(name = "{0}")
         @MethodSource(PROVIDER + "transactionModes")
         @DisplayName("Should declare the expected transaction mode")
@@ -631,7 +644,7 @@ public class AccountServiceTests {
         }
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> accountTypes() {
         return Stream.of(
                 Arguments.of("checking account", AccountType.CHECKING, CheckingAccount.class,
@@ -641,7 +654,7 @@ public class AccountServiceTests {
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> databaseDuplicateScenarios() {
         return Stream.of(
                 Arguments.of("database rejects duplicate checking account", AccountType.CHECKING,
@@ -651,7 +664,7 @@ public class AccountServiceTests {
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> unrelatedDataIntegrityViolations() {
         return Stream.of(
                 Arguments.of("another constraint is violated",
@@ -668,7 +681,7 @@ public class AccountServiceTests {
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> transactionModes() {
         return Stream.of(
                 Arguments.of("findAll is read-only", "findAll",
@@ -685,8 +698,9 @@ public class AccountServiceTests {
         );
     }
 
-    // "0.00" usa escala diferente de BigDecimal.ZERO: o serviço compara com compareTo, não equals.
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    // "0.00" has a different BigDecimal scale than BigDecimal.ZERO: the service
+    // compares with compareTo, not equals.
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> cancellableAccounts() {
         return Stream.of(
                 Arguments.of("checking account", checkingAccount()),
@@ -695,7 +709,7 @@ public class AccountServiceTests {
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> accountsWithBalance() {
         return Stream.of(
                 Arguments.of("positive balance", new BigDecimal("10.00")),
@@ -704,7 +718,7 @@ public class AccountServiceTests {
         );
     }
 
-    @SuppressWarnings("unused") // usado via @MethodSource (referência por String)
+    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
     static Stream<Arguments> cancelledAccountBalances() {
         return Stream.of(
                 Arguments.of("cancelled account without balance", BigDecimal.ZERO),
@@ -806,12 +820,9 @@ public class AccountServiceTests {
     }
 
     private static Client client() {
-        Address address = new Address(
-                "Rua Teste", "123", null, "Centro", "Mogi das Cruzes", State.SP, "08710000"
-        );
-        Client client = new Client(CLIENT_NAME, "52998224725", "teste@email.com", "11999999999", address);
-        ReflectionTestUtils.setField(client, "id", CLIENT_ID);
-        return client;
+        return aClient("account-client")
+                .withId(CLIENT_ID)
+                .build();
     }
 
     private static CheckingAccount checkingAccount() {
@@ -833,9 +844,14 @@ public class AccountServiceTests {
         return account;
     }
 
-    private static AccountResponseDTO accountResponse(String number, String digit, AccountType type) {
+    private static AccountResponseDTO accountResponse(
+            String clientName,
+            String number,
+            String digit,
+            AccountType type
+    ) {
         return new AccountResponseDTO(
-                number, digit, CLIENT_NAME, BigDecimal.ZERO, type, AccountStatus.ACTIVE
+                number, digit, clientName, BigDecimal.ZERO, type, AccountStatus.ACTIVE
         );
     }
 }

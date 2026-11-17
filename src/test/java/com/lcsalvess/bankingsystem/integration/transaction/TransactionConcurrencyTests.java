@@ -7,8 +7,6 @@ import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
-import com.lcsalvess.bankingsystem.entity.address.Address;
-import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
@@ -67,6 +65,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -133,7 +132,6 @@ class TransactionConcurrencyTests {
     @MockitoBean
     private CurrentUserService currentUserService;
 
-    private int clientSequence;
     private User testUser;
 
     @BeforeEach
@@ -143,8 +141,6 @@ class TransactionConcurrencyTests {
         clientRepository.deleteAll();
         addressRepository.deleteAll();
         userRepository.deleteAll();
-
-        clientSequence = 0;
 
         testUser = userRepository.saveAndFlush(
                 UserTestFactory.aUser().build()
@@ -1491,27 +1487,9 @@ class TransactionConcurrencyTests {
     }
 
     private Client createClient() {
-        int n = ++clientSequence;
-
-        Address address = new Address(
-                "Rua Teste",
-                String.valueOf(n),
-                null,
-                "Centro",
-                "Mogi das Cruzes",
-                State.SP,
-                "08700000"
+        return clientRepository.saveAndFlush(
+                aClient("concurrency-client").build()
         );
-
-        Client client = new Client(
-                "Cliente Concorrencia " + n,
-                String.format("%011d", n),
-                "concurrency" + n + "@test.com",
-                "11999999999",
-                address
-        );
-
-        return clientRepository.saveAndFlush(client);
     }
 
     private void assertBalance(String expected, Account account) {

@@ -71,12 +71,12 @@ public class ClientControllerTests {
     private static final String CLIENTS_URL = "/api/v1/clients";
     private static final String CLIENT_URL = "/api/v1/clients/{clientId}";
 
-    private static final String VALID_NAME = "Cliente Teste";
+    private static final String VALID_NAME = "Test Client";
     private static final String VALID_CPF = "52998224725";
-    private static final String VALID_EMAIL = "teste@email.com";
+    private static final String VALID_EMAIL = "test.client@email.com";
     private static final String VALID_PHONE = "11999999999";
-    private static final String UPDATED_NAME = "Cliente Atualizado";
-    private static final String UPDATED_EMAIL = "atualizado@email.com";
+    private static final String UPDATED_NAME = "Updated Client";
+    private static final String UPDATED_EMAIL = "updated.client@email.com";
     private static final String VALID_STREET_NUMBER = "123";
     private static final String VALID_CREATION_POSTAL_CODE = "01001000";
     private static final String VALID_UPDATE_POSTAL_CODE = "08710000";
@@ -110,19 +110,12 @@ public class ClientControllerTests {
         @Test
         @DisplayName("Should return a page of clients successfully")
         void shouldReturnPageOfClientsSuccessfully() throws Exception {
-            ClientSummaryResponseDTO client1 = new ClientSummaryResponseDTO(
-                    1L, "Lucas Alves", "62934118037",
-                    "lucas@email.com", "11999999999"
-            );
-            ClientSummaryResponseDTO client2 = new ClientSummaryResponseDTO(
-                    2L, "Maria Silva", "91741354064",
-                    "maria@email.com", "11988888888"
-            );
+            List<ClientSummaryResponseDTO> clientSummaries = clientSummaries();
 
             Page<ClientSummaryResponseDTO> clients = new PageImpl<>(
-                    List.of(client1, client2),
+                    clientSummaries,
                     defaultPageable,
-                    2
+                    clientSummaries.size()
             );
 
             when(clientService.findAll(null, defaultPageable)).thenReturn(clients);
@@ -778,6 +771,19 @@ public class ClientControllerTests {
                 email,
                 VALID_PHONE,
                 AddressResponseDTO.fromEntity(address())
+        );
+    }
+
+    private static List<ClientSummaryResponseDTO> clientSummaries() {
+        return List.of(
+                new ClientSummaryResponseDTO(
+                        1L, "Joe Michael Doe", "62934118037",
+                        "joe.doe@email.com", "11999999999"
+                ),
+                new ClientSummaryResponseDTO(
+                        2L, "Jane Michele Doe", "91741354064",
+                        "jane.doe@email.com", "11988888888"
+                )
         );
     }
 }

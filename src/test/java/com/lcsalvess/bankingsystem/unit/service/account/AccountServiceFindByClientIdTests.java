@@ -6,8 +6,6 @@ import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
-import com.lcsalvess.bankingsystem.entity.address.Address;
-import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
@@ -46,6 +44,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -61,7 +60,6 @@ import static org.mockito.Mockito.when;
 public class AccountServiceFindByClientIdTests {
 
     private static final Long CLIENT_ID = 1L;
-    private static final String CLIENT_NAME = "Cliente Teste";
 
     private static final String CHECKING_NUMBER = "00001";
     private static final String CHECKING_DIGIT = "9";
@@ -115,9 +113,13 @@ public class AccountServiceFindByClientIdTests {
             );
             Specification<Account> specification = (root, query, cb) -> null;
 
+            Client client = client();
+            CheckingAccount checking = checkingAccount(client);
+            SavingsAccount savings = savingsAccount(client);
+
             when(accountRepository.findAll(specification, pageable))
                     .thenReturn(new PageImpl<>(
-                            List.of(checkingAccount(), savingsAccount()),
+                            List.of(checking, savings),
                             pageable,
                             2
                     ));
@@ -134,8 +136,8 @@ public class AccountServiceFindByClientIdTests {
 
                 assertEquals(
                         List.of(
-                                response(CHECKING_NUMBER, CHECKING_DIGIT, AccountType.CHECKING),
-                                response(SAVINGS_NUMBER, SAVINGS_DIGIT, AccountType.SAVINGS)
+                                response(checking.getClient().getName(), CHECKING_NUMBER, CHECKING_DIGIT, AccountType.CHECKING),
+                                response(savings.getClient().getName(), SAVINGS_NUMBER, SAVINGS_DIGIT, AccountType.SAVINGS)
                         ),
                         result.getContent()
                 );
@@ -163,8 +165,10 @@ public class AccountServiceFindByClientIdTests {
             );
             Specification<Account> specification = (root, query, cb) -> null;
 
+            SavingsAccount savings = savingsAccount(client());
+
             when(accountRepository.findAll(specification, pageable))
-                    .thenReturn(new PageImpl<>(List.of(savingsAccount()), pageable, 1));
+                    .thenReturn(new PageImpl<>(List.of(savings), pageable, 1));
 
             try (MockedStatic<AccountSpecifications> specifications =
                          mockStatic(AccountSpecifications.class)) {
@@ -185,7 +189,12 @@ public class AccountServiceFindByClientIdTests {
                 );
 
                 assertEquals(
-                        List.of(response(SAVINGS_NUMBER, SAVINGS_DIGIT, AccountType.SAVINGS)),
+                        List.of(response(
+                                savings.getClient().getName(),
+                                SAVINGS_NUMBER,
+                                SAVINGS_DIGIT,
+                                AccountType.SAVINGS
+                        )),
                         result.getContent()
                 );
 
@@ -325,29 +334,31 @@ public class AccountServiceFindByClientIdTests {
     }
 
     private static Client client() {
-        Address address = new Address(
-                "Rua Teste", "123", null, "Centro", "Mogi das Cruzes", State.SP, "08710000"
-        );
-        Client client = new Client(CLIENT_NAME, "52998224725", "teste@email.com", "11999999999", address);
-        ReflectionTestUtils.setField(client, "id", CLIENT_ID);
-        return client;
+        return aClient("account-client")
+                .withId(CLIENT_ID)
+                .build();
     }
 
-    private static CheckingAccount checkingAccount() {
-        CheckingAccount account = new CheckingAccount(client(), CHECKING_NUMBER, CHECKING_DIGIT);
+    private static CheckingAccount checkingAccount(Client client) {
+        CheckingAccount account = new CheckingAccount(client, CHECKING_NUMBER, CHECKING_DIGIT);
         ReflectionTestUtils.setField(account, "id", 1L);
         return account;
     }
 
-    private static SavingsAccount savingsAccount() {
-        SavingsAccount account = SavingsAccount.create(client(), SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
+    private static SavingsAccount savingsAccount(Client client) {
+        SavingsAccount account = SavingsAccount.create(client, SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
         ReflectionTestUtils.setField(account, "id", 2L);
         return account;
     }
 
-    private static AccountResponseDTO response(String number, String digit, AccountType type) {
+    private static AccountResponseDTO response(
+            String clientName,
+            String number,
+            String digit,
+            AccountType type
+    ) {
         return new AccountResponseDTO(
-                number, digit, CLIENT_NAME, BigDecimal.ZERO, type, AccountStatus.ACTIVE
+                number, digit, clientName, BigDecimal.ZERO, type, AccountStatus.ACTIVE
         );
     }
 }

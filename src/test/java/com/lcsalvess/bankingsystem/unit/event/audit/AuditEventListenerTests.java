@@ -35,7 +35,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 @ExtendWith(MockitoExtension.class)
 class AuditEventListenerTests {
 
-    private static final String USERNAME = "lucas";
+    private static final String USERNAME = "joe.doe";
     private static final String ACCOUNT_NUMBER = "123456";
     private static final BigDecimal AMOUNT = new BigDecimal("10.00");
 

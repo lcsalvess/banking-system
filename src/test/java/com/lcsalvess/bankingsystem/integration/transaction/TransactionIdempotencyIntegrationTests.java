@@ -5,8 +5,6 @@ import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
-import com.lcsalvess.bankingsystem.entity.address.Address;
-import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.entity.user.User;
@@ -50,6 +48,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -100,7 +99,6 @@ class TransactionIdempotencyIntegrationTests {
     @MockitoBean
     private CurrentUserService currentUserService;
 
-    private int clientSequence;
     private User testUser;
 
     @BeforeEach
@@ -112,8 +110,6 @@ class TransactionIdempotencyIntegrationTests {
         clientRepository.deleteAll();
         addressRepository.deleteAll();
         userRepository.deleteAll();
-
-        clientSequence = 0;
 
         testUser = createUser();
 
@@ -624,27 +620,9 @@ class TransactionIdempotencyIntegrationTests {
     }
 
     private Client createClient() {
-        int number = ++clientSequence;
-
-        Address address = new Address(
-                "Rua Teste",
-                String.valueOf(number),
-                null,
-                "Centro",
-                "Mogi das Cruzes",
-                State.SP,
-                "08700000"
+        return clientRepository.saveAndFlush(
+                aClient("idempotency-client").build()
         );
-
-        Client client = new Client(
-                "Cliente Idempotencia " + number,
-                String.format("%011d", number),
-                "idempotency" + number + "@test.com",
-                "11999999999",
-                address
-        );
-
-        return clientRepository.saveAndFlush(client);
     }
 
     private User createUser() {

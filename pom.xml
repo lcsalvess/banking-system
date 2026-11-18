@@ -326,7 +326,7 @@
                     <consoleOutput>true</consoleOutput>
                     <logViolationsToConsole>true</logViolationsToConsole>
                     <failOnViolation>true</failOnViolation>
-                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
                     <linkXRef>false</linkXRef>
                 </configuration>
 

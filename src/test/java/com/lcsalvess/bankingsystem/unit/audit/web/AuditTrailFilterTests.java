@@ -1,15 +1,25 @@
 package com.lcsalvess.bankingsystem.unit.audit.web;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
+import com.lcsalvess.bankingsystem.audit.web.AuditRequestAttributes;
+import com.lcsalvess.bankingsystem.audit.web.AuditTrailFilter;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.transaction.InsufficientBalanceException;
-import com.lcsalvess.bankingsystem.audit.web.AuditTrailFilter;
 import com.lcsalvess.bankingsystem.filter.CorrelationIdFilter;
 import com.lcsalvess.bankingsystem.integration.address.exception.AddressProviderUnavailableException;
-import com.lcsalvess.bankingsystem.audit.web.AuditRequestAttributes;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditTrailRecorder;
 import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,649 +38,638 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.servlet.HandlerMapping;
 
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuditTrailFilter")
 class AuditTrailFilterTests {
 
-    private static final String PATH =
-            "/api/v1/transactions/withdrawals";
+  private static final String PATH =
+      "/api/v1/transactions/withdrawals";
 
-    private static final String IP = "192.0.2.10";
+  private static final String IP = "192.0.2.10";
 
-    private static final String LOGIN_PATH =
-            "/api/v1/auth/login";
+  private static final String LOGIN_PATH =
+      "/api/v1/auth/login";
 
-    @Mock
-    private AuditTrailRecorder recorder;
+  @Mock
+  private AuditTrailRecorder recorder;
 
-    private AuditTrailFilter filter;
-    private User actor;
+  private AuditTrailFilter filter;
+  private User actor;
 
-    @BeforeEach
-    void setUp() {
-        filter = new AuditTrailFilter(recorder);
+  @BeforeEach
+  void setUp() {
+    filter = new AuditTrailFilter(recorder);
 
-        actor = UserTestFactory.aUser()
-                .withId(7L)
-                .build();
+    actor = UserTestFactory.userBuilder()
+        .withId(7L)
+        .build();
+  }
+
+  private MockHttpServletRequest request(
+      String method,
+      boolean authenticated
+  ) {
+    return request(method, PATH, authenticated);
+  }
+
+  private MockHttpServletRequest request(
+      String method,
+      String path,
+      boolean authenticated
+  ) {
+    MockHttpServletRequest request =
+        new MockHttpServletRequest(method, path);
+
+    request.setRemoteAddr(IP);
+
+    if (authenticated) {
+      request.setAttribute(
+          AuditRequestAttributes.AUTHENTICATED_USER,
+          actor
+      );
     }
 
-    private MockHttpServletRequest request(
-            String method,
-            boolean authenticated
-    ) {
-        return request(method, PATH, authenticated);
-    }
+    return request;
+  }
 
-    private MockHttpServletRequest request(
-            String method,
-            String path,
-            boolean authenticated
-    ) {
-        MockHttpServletRequest request =
-                new MockHttpServletRequest(method, path);
+  private MockHttpServletResponse run(
+      MockHttpServletRequest request,
+      int status,
+      Exception failure
+  ) throws Exception {
+    MockHttpServletResponse response =
+        new MockHttpServletResponse();
 
-        request.setRemoteAddr(IP);
+    FilterChain chain = (req, res) -> {
+      ((HttpServletResponse) res).setStatus(status);
 
-        if (authenticated) {
-            request.setAttribute(
-                    AuditRequestAttributes.AUTHENTICATED_USER,
-                    actor
-            );
-        }
-
-        return request;
-    }
-
-    private MockHttpServletResponse run(
-            MockHttpServletRequest request,
-            int status,
-            Exception failure
-    ) throws Exception {
-        MockHttpServletResponse response =
-                new MockHttpServletResponse();
-
-        FilterChain chain = (req, res) -> {
-            ((HttpServletResponse) res).setStatus(status);
-
-            if (failure != null) {
-                req.setAttribute(
-                        AuditRequestAttributes.FAILURE_EXCEPTION,
-                        failure
-                );
-            }
-        };
-
-        filter.doFilter(request, response, chain);
-
-        return response;
-    }
-
-    @Test
-    @DisplayName("Should record an access denied as an HTTP outcome")
-    void shouldRecordAccessDenied() throws Exception {
-        run(request("GET", true), 403, null);
-
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("GET"),
-                eq(PATH),
-                eq(IP),
-                eq(403),
-                eq("FORBIDDEN"),
-                isNull()
+      if (failure != null) {
+        req.setAttribute(
+            AuditRequestAttributes.FAILURE_EXCEPTION,
+            failure
         );
+      }
+    };
 
-        verifyNoMoreInteractions(recorder);
-    }
+    filter.doFilter(request, response, chain);
 
-    @Test
-    @DisplayName("Should take the correlation id from the response header")
-    void shouldUseCorrelationIdFromResponseHeader() throws Exception {
-        UUID correlationId = UUID.randomUUID();
+    return response;
+  }
 
-        MockHttpServletRequest request = request("GET", true);
+  @Test
+  @DisplayName("Should record an access denied as an HTTP outcome")
+  void shouldRecordAccessDenied() throws Exception {
+    run(request("GET", true), 403, null);
 
-        MockHttpServletResponse response =
-                new MockHttpServletResponse();
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("GET"),
+        eq(PATH),
+        eq(IP),
+        eq(403),
+        eq("FORBIDDEN"),
+        isNull()
+    );
 
-        FilterChain chain = (req, res) -> {
-            ((HttpServletResponse) res).setHeader(
-                    CorrelationIdFilter.CORRELATION_ID_HEADER,
-                    correlationId.toString()
-            );
+    verifyNoMoreInteractions(recorder);
+  }
 
-            ((HttpServletResponse) res).setStatus(403);
-        };
+  @Test
+  @DisplayName("Should take the correlation id from the response header")
+  void shouldUseCorrelationIdFromResponseHeader() throws Exception {
+    UUID correlationId = UUID.randomUUID();
 
-        filter.doFilter(request, response, chain);
+    MockHttpServletRequest request = request("GET", true);
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("GET"),
-                eq(PATH),
-                eq(IP),
-                eq(403),
-                eq("FORBIDDEN"),
-                eq(correlationId)
-        );
+    MockHttpServletResponse response =
+        new MockHttpServletResponse();
 
-        verifyNoMoreInteractions(recorder);
-    }
+    FilterChain chain = (req, res) -> {
+      ((HttpServletResponse) res).setHeader(
+          CorrelationIdFilter.CORRELATION_ID_HEADER,
+          correlationId.toString()
+      );
 
-    @Test
-    @DisplayName("Should ignore a correlation id header that is not a UUID")
-    void shouldIgnoreMalformedCorrelationId() throws Exception {
-        MockHttpServletRequest request = request("GET", true);
+      ((HttpServletResponse) res).setStatus(403);
+    };
 
-        MockHttpServletResponse response =
-                new MockHttpServletResponse();
+    filter.doFilter(request, response, chain);
 
-        FilterChain chain = (req, res) -> {
-            ((HttpServletResponse) res).setHeader(
-                    CorrelationIdFilter.CORRELATION_ID_HEADER,
-                    "not-a-uuid"
-            );
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("GET"),
+        eq(PATH),
+        eq(IP),
+        eq(403),
+        eq("FORBIDDEN"),
+        eq(correlationId)
+    );
 
-            ((HttpServletResponse) res).setStatus(403);
-        };
+    verifyNoMoreInteractions(recorder);
+  }
 
-        filter.doFilter(request, response, chain);
+  @Test
+  @DisplayName("Should ignore a correlation id header that is not a UUID")
+  void shouldIgnoreMalformedCorrelationId() throws Exception {
+    MockHttpServletRequest request = request("GET", true);
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("GET"),
-                eq(PATH),
-                eq(IP),
-                eq(403),
-                eq("FORBIDDEN"),
-                isNull()
-        );
+    MockHttpServletResponse response =
+        new MockHttpServletResponse();
 
-        verifyNoMoreInteractions(recorder);
-    }
+    FilterChain chain = (req, res) -> {
+      ((HttpServletResponse) res).setHeader(
+          CorrelationIdFilter.CORRELATION_ID_HEADER,
+          "not-a-uuid"
+      );
 
-    @Test
-    @DisplayName("Should record a business failure with its specific reason")
-    void shouldRecordBusinessFailure() throws Exception {
-        run(
-                request("POST", true),
-                409,
-                new InsufficientBalanceException("insufficient")
-        );
+      ((HttpServletResponse) res).setStatus(403);
+    };
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(409),
-                eq("INSUFFICIENT_BALANCE"),
-                isNull()
-        );
+    filter.doFilter(request, response, chain);
 
-        verifyNoMoreInteractions(recorder);
-    }
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("GET"),
+        eq(PATH),
+        eq(IP),
+        eq(403),
+        eq("FORBIDDEN"),
+        isNull()
+    );
 
-    @Test
-    @DisplayName("Should record a failure on a read-only request")
-    void shouldRecordBusinessFailureOnRead() throws Exception {
-        run(
-                request("GET", true),
-                409,
-                new InsufficientBalanceException("insufficient")
-        );
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("GET"),
-                eq(PATH),
-                eq(IP),
-                eq(409),
-                eq("INSUFFICIENT_BALANCE"),
-                isNull()
-        );
+  @Test
+  @DisplayName("Should record a business failure with its specific reason")
+  void shouldRecordBusinessFailure() throws Exception {
+    run(
+        request("POST", true),
+        409,
+        new InsufficientBalanceException("insufficient")
+    );
 
-        verifyNoMoreInteractions(recorder);
-    }
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(409),
+        eq("INSUFFICIENT_BALANCE"),
+        isNull()
+    );
 
-    @Test
-    @DisplayName("Should record a server error with a fixed internal code")
-    void shouldRecordUnexpectedServerError() throws Exception {
-        run(
-                request("POST", true),
-                500,
-                new IllegalStateException("secret detail")
-        );
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(500),
-                eq("INTERNAL_ERROR"),
-                isNull()
-        );
+  @Test
+  @DisplayName("Should record a failure on a read-only request")
+  void shouldRecordBusinessFailureOnRead() throws Exception {
+    run(
+        request("GET", true),
+        409,
+        new InsufficientBalanceException("insufficient")
+    );
 
-        verifyNoMoreInteractions(recorder);
-    }
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("GET"),
+        eq(PATH),
+        eq(IP),
+        eq(409),
+        eq("INSUFFICIENT_BALANCE"),
+        isNull()
+    );
 
-    @Test
-    @DisplayName("Should record a lock failure with its specific reason")
-    void shouldRecordLockFailureOnRead() throws Exception {
-        run(
-                request("GET", true),
-                503,
-                new PessimisticLockingFailureException("lock")
-        );
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("GET"),
-                eq(PATH),
-                eq(IP),
-                eq(503),
-                eq("DATABASE_LOCK_FAILURE"),
-                isNull()
-        );
+  @Test
+  @DisplayName("Should record a server error with a fixed internal code")
+  void shouldRecordUnexpectedServerError() throws Exception {
+    run(
+        request("POST", true),
+        500,
+        new IllegalStateException("secret detail")
+    );
 
-        verifyNoMoreInteractions(recorder);
-    }
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(500),
+        eq("INTERNAL_ERROR"),
+        isNull()
+    );
 
-    @ParameterizedTest(name = "Should classify {0} as {1}")
-    @MethodSource("databaseFailureCases")
-    @DisplayName("Should distinguish database timeouts from database unavailability")
-    void shouldClassifyDatabaseFailuresPrecisely(
-            Exception failure,
-            String expectedReason
-    ) throws Exception {
-        run(
-                request("POST", true),
-                503,
-                failure
-        );
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(503),
-                eq(expectedReason),
-                isNull()
-        );
+  @Test
+  @DisplayName("Should record a lock failure with its specific reason")
+  void shouldRecordLockFailureOnRead() throws Exception {
+    run(
+        request("GET", true),
+        503,
+        new PessimisticLockingFailureException("lock")
+    );
 
-        verifyNoMoreInteractions(recorder);
-    }
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("GET"),
+        eq(PATH),
+        eq(IP),
+        eq(503),
+        eq("DATABASE_LOCK_FAILURE"),
+        isNull()
+    );
 
-    private static Stream<Arguments> databaseFailureCases() {
-        return Stream.of(
-                Arguments.of(
-                        new QueryTimeoutException("query timeout"),
-                        "DATABASE_QUERY_TIMEOUT"
-                ),
-                Arguments.of(
-                        new DataAccessResourceFailureException(
-                                "resource unavailable"
-                        ),
-                        "DATABASE_UNAVAILABLE"
-                ),
-                Arguments.of(
-                        new CannotCreateTransactionException(
-                                "transaction unavailable"
-                        ),
-                        "DATABASE_UNAVAILABLE"
-                )
-        );
-    }
+    verifyNoMoreInteractions(recorder);
+  }
 
-    @Test
-    @DisplayName("Should map data integrity and provider failures to stable codes")
-    void shouldMapInfrastructureFailures() throws Exception {
-        run(
-                request("POST", true),
-                500,
-                new DataIntegrityViolationException("x")
-        );
+  @ParameterizedTest(name = "Should classify {0} as {1}")
+  @MethodSource("databaseFailureCases")
+  @DisplayName("Should distinguish database timeouts from database unavailability")
+  void shouldClassifyDatabaseFailuresPrecisely(
+      Exception failure,
+      String expectedReason
+  ) throws Exception {
+    run(
+        request("POST", true),
+        503,
+        failure
+    );
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(500),
-                eq("DATA_INTEGRITY_VIOLATION"),
-                isNull()
-        );
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(503),
+        eq(expectedReason),
+        isNull()
+    );
 
-        run(
-                request("POST", true),
-                503,
-                new AddressProviderUnavailableException("down")
-        );
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(503),
-                eq("EXTERNAL_PROVIDER_UNAVAILABLE"),
-                isNull()
-        );
+  private static Stream<Arguments> databaseFailureCases() {
+    return Stream.of(
+        Arguments.of(
+            new QueryTimeoutException("query timeout"),
+            "DATABASE_QUERY_TIMEOUT"
+        ),
+        Arguments.of(
+            new DataAccessResourceFailureException(
+                "resource unavailable"
+            ),
+            "DATABASE_UNAVAILABLE"
+        ),
+        Arguments.of(
+            new CannotCreateTransactionException(
+                "transaction unavailable"
+            ),
+            "DATABASE_UNAVAILABLE"
+        )
+    );
+  }
 
-        verifyNoMoreInteractions(recorder);
-    }
+  @Test
+  @DisplayName("Should map data integrity and provider failures to stable codes")
+  void shouldMapInfrastructureFailures() throws Exception {
+    run(
+        request("POST", true),
+        500,
+        new DataIntegrityViolationException("x")
+    );
 
-    @Test
-    @DisplayName("Should use a generic server error reason when no exception was captured")
-    void shouldUseGenericServerErrorWithoutException() throws Exception {
-        run(request("POST", true), 500, null);
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(500),
+        eq("DATA_INTEGRITY_VIOLATION"),
+        isNull()
+    );
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(500),
-                isNull(),
-                isNull()
-        );
+    run(
+        request("POST", true),
+        503,
+        new AddressProviderUnavailableException("down")
+    );
 
-        verifyNoMoreInteractions(recorder);
-    }
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(503),
+        eq("EXTERNAL_PROVIDER_UNAVAILABLE"),
+        isNull()
+    );
 
-    @Test
-    @DisplayName("Should use a generic client error reason for validation failures")
-    void shouldRecordValidationErrors() throws Exception {
-        run(
-                request("POST", true),
-                400,
-                new IllegalArgumentException("bad")
-        );
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(400),
-                isNull(),
-                isNull()
-        );
+  @Test
+  @DisplayName("Should use a generic server error reason when no exception was captured")
+  void shouldUseGenericServerErrorWithoutException() throws Exception {
+    run(request("POST", true), 500, null);
 
-        verifyNoMoreInteractions(recorder);
-    }
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(500),
+        isNull(),
+        isNull()
+    );
 
-    @Test
-    @DisplayName("Should ignore anonymous requests outside the login endpoint")
-    void shouldIgnoreAnonymousRequests() throws Exception {
-        run(request("POST", false), 401, null);
-        run(request("POST", false), 403, null);
-        run(request("POST", false), 500, null);
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verifyNoInteractions(recorder);
-    }
+  @Test
+  @DisplayName("Should use a generic client error reason for validation failures")
+  void shouldRecordValidationErrors() throws Exception {
+    run(
+        request("POST", true),
+        400,
+        new IllegalArgumentException("bad")
+    );
 
-    @Test
-    @DisplayName("Should record a successful state-changing request")
-    void shouldRecordSuccessfulStateChangingRequest() throws Exception {
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(400),
+        isNull(),
+        isNull()
+    );
+
+    verifyNoMoreInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should ignore anonymous requests outside the login endpoint")
+  void shouldIgnoreAnonymousRequests() throws Exception {
+    run(request("POST", false), 401, null);
+    run(request("POST", false), 403, null);
+    run(request("POST", false), 500, null);
+
+    verifyNoInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should record a successful state-changing request")
+  void shouldRecordSuccessfulStateChangingRequest() throws Exception {
+    run(request("POST", true), 201, null);
+
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(201),
+        isNull(),
+        isNull()
+    );
+
+    verifyNoMoreInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should ignore successful read-only requests")
+  void shouldIgnoreSuccessfulReadOnlyRequest() throws Exception {
+    run(request("GET", true), 200, null);
+
+    verifyNoInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should record a successful anonymous login response")
+  void shouldRecordSuccessfulLogin() throws Exception {
+    run(
+        request("POST", LOGIN_PATH, false),
+        200,
+        null
+    );
+
+    verify(recorder).recordHttpRequestCompleted(
+        isNull(),
+        eq("POST"),
+        eq(LOGIN_PATH),
+        eq(IP),
+        eq(200),
+        isNull(),
+        isNull()
+    );
+
+    verifyNoMoreInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should record a failed anonymous login response")
+  void shouldRecordFailedLogin() throws Exception {
+    run(
+        request("POST", LOGIN_PATH, false),
+        401,
+        null
+    );
+
+    verify(recorder).recordHttpRequestCompleted(
+        isNull(),
+        eq("POST"),
+        eq(LOGIN_PATH),
+        eq(IP),
+        eq(401),
+        eq("UNAUTHORIZED"),
+        isNull()
+    );
+
+    verifyNoMoreInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should not duplicate rate-limited login audit events")
+  void shouldNotRecordRateLimitedLogin() throws Exception {
+    run(
+        request("POST", LOGIN_PATH, false),
+        429,
+        null
+    );
+
+    verifyNoInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should use the MVC route pattern when available")
+  void shouldUseMvcRoutePattern() throws Exception {
+    MockHttpServletRequest request = request(
+        "GET",
+        "/api/v1/clients/12345",
+        true
+    );
+
+    request.setAttribute(
+        HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE,
+        "/api/v1/clients/{id}"
+    );
+
+    run(request, 404, null);
+
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("GET"),
+        eq("/api/v1/clients/{id}"),
+        eq(IP),
+        eq(404),
+        isNull(),
+        isNull()
+    );
+
+    verifyNoMoreInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should mask numeric identifiers when the MVC route pattern is unavailable")
+  void shouldMaskNumericPathSegments() throws Exception {
+    MockHttpServletRequest request = request(
+        "GET",
+        "/api/v1/clients/12345",
+        true
+    );
+
+    run(request, 404, null);
+
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("GET"),
+        eq("/api/v1/clients/{id}"),
+        eq(IP),
+        eq(404),
+        isNull(),
+        isNull()
+    );
+
+    verifyNoMoreInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should ignore requests outside the API")
+  void shouldIgnoreRequestsOutsideApi() throws Exception {
+    run(
+        request("POST", "/actuator/health", true),
+        500,
+        null
+    );
+
+    verifyNoInteractions(recorder);
+  }
+
+  @Test
+  @DisplayName("Should still hand the request to the rest of the chain")
+  void shouldContinueTheChain() throws Exception {
+    MockHttpServletResponse response =
         run(request("POST", true), 201, null);
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(201),
-                isNull(),
-                isNull()
-        );
+    assertEquals(201, response.getStatus());
 
-        verifyNoMoreInteractions(recorder);
-    }
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(201),
+        isNull(),
+        isNull()
+    );
 
-    @Test
-    @DisplayName("Should ignore successful read-only requests")
-    void shouldIgnoreSuccessfulReadOnlyRequest() throws Exception {
-        run(request("GET", true), 200, null);
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verifyNoInteractions(recorder);
-    }
+  @Test
+  @DisplayName("Should not store client-chosen text from unmatched API paths")
+  void shouldMaskUnmatchedApiPaths() throws Exception {
+    run(request("GET", "/api/v1/" + "x".repeat(200), true), 403, null);
 
-    @Test
-    @DisplayName("Should record a successful anonymous login response")
-    void shouldRecordSuccessfulLogin() throws Exception {
-        run(
-                request("POST", LOGIN_PATH, false),
-                200,
-                null
-        );
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("GET"),
+        eq("/api/v1/{unmatched}"),
+        eq(IP),
+        eq(403),
+        eq("FORBIDDEN"),
+        isNull()
+    );
 
-        verify(recorder).recordHttpRequestCompleted(
-                isNull(),
-                eq("POST"),
-                eq(LOGIN_PATH),
-                eq(IP),
-                eq(200),
-                isNull(),
-                isNull()
-        );
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verifyNoMoreInteractions(recorder);
-    }
+  @Test
+  @DisplayName("Should mask unknown segments of known resources")
+  void shouldMaskUnknownSegmentsOfKnownResources() throws Exception {
+    run(request("PATCH", "/api/v1/users/john.doe/deactivate", true),
+        403, null);
 
-    @Test
-    @DisplayName("Should record a failed anonymous login response")
-    void shouldRecordFailedLogin() throws Exception {
-        run(
-                request("POST", LOGIN_PATH, false),
-                401,
-                null
-        );
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("PATCH"),
+        eq("/api/v1/users/{id}/deactivate"),
+        eq(IP),
+        eq(403),
+        eq("FORBIDDEN"),
+        isNull()
+    );
 
-        verify(recorder).recordHttpRequestCompleted(
-                isNull(),
-                eq("POST"),
-                eq(LOGIN_PATH),
-                eq(IP),
-                eq(401),
-                eq("UNAUTHORIZED"),
-                isNull()
-        );
+    verifyNoMoreInteractions(recorder);
+  }
 
-        verifyNoMoreInteractions(recorder);
-    }
+  @Test
+  @DisplayName("Should collapse unknown HTTP methods")
+  void shouldCollapseUnknownMethods() throws Exception {
+    run(request("FOO", true), 403, null);
 
-    @Test
-    @DisplayName("Should not duplicate rate-limited login audit events")
-    void shouldNotRecordRateLimitedLogin() throws Exception {
-        run(
-                request("POST", LOGIN_PATH, false),
-                429,
-                null
-        );
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("OTHER"),
+        eq(PATH),
+        eq(IP),
+        eq(403),
+        eq("FORBIDDEN"),
+        isNull()
+    );
 
-        verifyNoInteractions(recorder);
-    }
+    verifyNoMoreInteractions(recorder);
+  }
 
-    @Test
-    @DisplayName("Should use the MVC route pattern when available")
-    void shouldUseMvcRoutePattern() throws Exception {
-        MockHttpServletRequest request = request(
-                "GET",
-                "/api/v1/clients/12345",
-                true
-        );
+  @Test
+  @DisplayName("Should record the outcome when the chain throws")
+  void shouldRecordOutcomeWhenChainThrows() {
+    MockHttpServletResponse response = new MockHttpServletResponse();
 
-        request.setAttribute(
-                HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE,
-                "/api/v1/clients/{id}"
-        );
+    FilterChain chain = (req, res) -> {
+      throw new IllegalStateException("boom");
+    };
 
-        run(request, 404, null);
+    assertThrows(
+        IllegalStateException.class,
+        () -> filter.doFilter(request("POST", true), response, chain)
+    );
 
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("GET"),
-                eq("/api/v1/clients/{id}"),
-                eq(IP),
-                eq(404),
-                isNull(),
-                isNull()
-        );
+    verify(recorder).recordHttpRequestCompleted(
+        eq(actor),
+        eq("POST"),
+        eq(PATH),
+        eq(IP),
+        eq(500),
+        eq("INTERNAL_ERROR"),
+        isNull()
+    );
 
-        verifyNoMoreInteractions(recorder);
-    }
-
-    @Test
-    @DisplayName("Should mask numeric identifiers when the MVC route pattern is unavailable")
-    void shouldMaskNumericPathSegments() throws Exception {
-        MockHttpServletRequest request = request(
-                "GET",
-                "/api/v1/clients/12345",
-                true
-        );
-
-        run(request, 404, null);
-
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("GET"),
-                eq("/api/v1/clients/{id}"),
-                eq(IP),
-                eq(404),
-                isNull(),
-                isNull()
-        );
-
-        verifyNoMoreInteractions(recorder);
-    }
-
-    @Test
-    @DisplayName("Should ignore requests outside the API")
-    void shouldIgnoreRequestsOutsideApi() throws Exception {
-        run(
-                request("POST", "/actuator/health", true),
-                500,
-                null
-        );
-
-        verifyNoInteractions(recorder);
-    }
-
-    @Test
-    @DisplayName("Should still hand the request to the rest of the chain")
-    void shouldContinueTheChain() throws Exception {
-        MockHttpServletResponse response =
-                run(request("POST", true), 201, null);
-
-        assertEquals(201, response.getStatus());
-
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(201),
-                isNull(),
-                isNull()
-        );
-
-        verifyNoMoreInteractions(recorder);
-    }
-
-    @Test
-    @DisplayName("Should not store client-chosen text from unmatched API paths")
-    void shouldMaskUnmatchedApiPaths() throws Exception {
-        run(request("GET", "/api/v1/" + "x".repeat(200), true), 403, null);
-
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("GET"),
-                eq("/api/v1/{unmatched}"),
-                eq(IP),
-                eq(403),
-                eq("FORBIDDEN"),
-                isNull()
-        );
-
-        verifyNoMoreInteractions(recorder);
-    }
-
-    @Test
-    @DisplayName("Should mask unknown segments of known resources")
-    void shouldMaskUnknownSegmentsOfKnownResources() throws Exception {
-        run(request("PATCH", "/api/v1/users/john.doe/deactivate", true),
-                403, null);
-
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("PATCH"),
-                eq("/api/v1/users/{id}/deactivate"),
-                eq(IP),
-                eq(403),
-                eq("FORBIDDEN"),
-                isNull()
-        );
-
-        verifyNoMoreInteractions(recorder);
-    }
-
-    @Test
-    @DisplayName("Should collapse unknown HTTP methods")
-    void shouldCollapseUnknownMethods() throws Exception {
-        run(request("FOO", true), 403, null);
-
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("OTHER"),
-                eq(PATH),
-                eq(IP),
-                eq(403),
-                eq("FORBIDDEN"),
-                isNull()
-        );
-
-        verifyNoMoreInteractions(recorder);
-    }
-
-    @Test
-    @DisplayName("Should record the outcome when the chain throws")
-    void shouldRecordOutcomeWhenChainThrows() {
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        FilterChain chain = (req, res) -> {
-            throw new IllegalStateException("boom");
-        };
-
-        assertThrows(
-                IllegalStateException.class,
-                () -> filter.doFilter(request("POST", true), response, chain)
-        );
-
-        verify(recorder).recordHttpRequestCompleted(
-                eq(actor),
-                eq("POST"),
-                eq(PATH),
-                eq(IP),
-                eq(500),
-                eq("INTERNAL_ERROR"),
-                isNull()
-        );
-
-        verifyNoMoreInteractions(recorder);
-    }
+    verifyNoMoreInteractions(recorder);
+  }
 }

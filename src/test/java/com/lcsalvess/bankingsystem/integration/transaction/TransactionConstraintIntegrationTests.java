@@ -1,5 +1,10 @@
 package com.lcsalvess.bankingsystem.integration.transaction;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.account.SavingsAccount;
@@ -15,6 +20,11 @@ import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenera
 import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
 import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,488 +36,477 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 @ActiveProfiles("test")
 @SpringBootTest
 @DisplayName("Transaction constraints integration")
 class TransactionConstraintIntegrationTests {
 
-    private static final String APPEND_ONLY_MESSAGE =
-            "transactions is append-only";
+  private static final String APPEND_ONLY_MESSAGE =
+      "transactions is append-only";
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private LedgerTestCleaner ledgerTestCleaner;
+  @Autowired
+  private LedgerTestCleaner ledgerTestCleaner;
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired
+  private UserRepository userRepository;
 
-    @Autowired
-    private ClientRepository clientRepository;
+  @Autowired
+  private ClientRepository clientRepository;
 
-    @Autowired
-    private AccountRepository accountRepository;
+  @Autowired
+  private AccountRepository accountRepository;
 
-    @Autowired
-    private AccountNumberGenerator accountNumberGenerator;
+  @Autowired
+  private AccountNumberGenerator accountNumberGenerator;
 
-    private User user;
-    private Client client;
-    private CheckingAccount checkingAccount;
-    private SavingsAccount savingsAccount;
+  private User user;
+  private Client client;
+  private CheckingAccount checkingAccount;
+  private SavingsAccount savingsAccount;
 
-    private static final ZoneId BUSINESS_ZONE =
-            ZoneId.of("America/Sao_Paulo");
+  private static final ZoneId BUSINESS_ZONE =
+      ZoneId.of("America/Sao_Paulo");
 
-    private String testId;
-    private int clientSequence;
+  private String testId;
+  private int clientSequence;
 
-    @BeforeEach
-    void setUp() {
-        testId = UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 8);
+  @BeforeEach
+  void setUp() {
+    testId = UUID.randomUUID()
+        .toString()
+        .replace("-", "")
+        .substring(0, 8);
 
-        clientSequence = 0;
+    clientSequence = 0;
 
-        user = userRepository.saveAndFlush(
-                UserTestFactory.aUser("txc").build()
-        );
+    user = userRepository.saveAndFlush(
+        UserTestFactory.userBuilder("txc").build()
+    );
 
-        client = createClient();
+    client = createClient();
 
-        GeneratedAccountNumber checkingNumber =
-                accountNumberGenerator.generate();
+    GeneratedAccountNumber checkingNumber =
+        accountNumberGenerator.generate();
 
-        checkingAccount = accountRepository.saveAndFlush(
-                new CheckingAccount(
-                        client,
-                        checkingNumber.number(),
-                        checkingNumber.digit()
-                )
-        );
+    checkingAccount = accountRepository.saveAndFlush(
+        new CheckingAccount(
+            client,
+            checkingNumber.number(),
+            checkingNumber.digit()
+        )
+    );
 
-        GeneratedAccountNumber savingsNumber =
-                accountNumberGenerator.generate();
+    GeneratedAccountNumber savingsNumber =
+        accountNumberGenerator.generate();
 
-        savingsAccount = accountRepository.saveAndFlush(
-                SavingsAccount.create(
-                        client,
-                        savingsNumber.number(),
-                        savingsNumber.digit(),
-                        LocalDate.now(BUSINESS_ZONE)
-                )
-        );
+    savingsAccount = accountRepository.saveAndFlush(
+        SavingsAccount.create(
+            client,
+            savingsNumber.number(),
+            savingsNumber.digit(),
+            LocalDate.now(BUSINESS_ZONE)
+        )
+    );
+  }
+
+  @AfterEach
+  void tearDown() {
+    if (checkingAccount != null) {
+      ledgerTestCleaner.deleteTransactionsOfAccount(checkingAccount.getId());
+
+      accountRepository.delete(checkingAccount);
     }
 
-    @AfterEach
-    void tearDown() {
-        if (checkingAccount != null) {
-            ledgerTestCleaner.deleteTransactionsOfAccount(checkingAccount.getId());
+    if (savingsAccount != null) {
+      ledgerTestCleaner.deleteTransactionsOfAccount(savingsAccount.getId());
 
-            accountRepository.delete(checkingAccount);
-        }
-
-        if (savingsAccount != null) {
-            ledgerTestCleaner.deleteTransactionsOfAccount(savingsAccount.getId());
-
-            accountRepository.delete(savingsAccount);
-        }
-
-        if (client != null) {
-            clientRepository.delete(client);
-        }
-
-        if (user != null) {
-            userRepository.delete(user);
-        }
+      accountRepository.delete(savingsAccount);
     }
 
-    @Test
-    @DisplayName("Should reject transaction amounts above the maximum")
-    void shouldRejectAmountAboveMaximum() {
-        assertThrows(
-                DataIntegrityViolationException.class,
-                () -> insertTransaction(
-                        TransactionType.DEPOSIT,
-                        new BigDecimal("10000000000000.00"),
-                        checkingAccount,
-                        null,
-                        user,
-                        false,
-                        null
-                )
-        );
+    if (client != null) {
+      clientRepository.delete(client);
     }
 
-    @Test
-    @DisplayName("Should allow transaction amounts at the maximum")
-    void shouldAllowAmountAtMaximum() {
-        assertDoesNotThrow(
-                () -> insertTransaction(
-                        TransactionType.DEPOSIT,
-                        new BigDecimal("9999999999999.99"),
-                        checkingAccount,
-                        null,
-                        user,
-                        false,
-                        null
-                )
-        );
+    if (user != null) {
+      userRepository.delete(user);
     }
+  }
 
-    @Test
-    @DisplayName("Should require a transfer code for transfer transactions")
-    void shouldRequireTransferCodeForTransfers() {
-        assertThrows(
-                DataIntegrityViolationException.class,
-                () -> insertTransaction(
-                        TransactionType.TRANSFER_SENT,
-                        new BigDecimal("50.00"),
-                        checkingAccount,
-                        null,
-                        user,
-                        false,
-                        null
-                )
-        );
-    }
+  @Test
+  @DisplayName("Should reject transaction amounts above the maximum")
+  void shouldRejectAmountAboveMaximum() {
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () -> insertTransaction(
+            TransactionType.DEPOSIT,
+            new BigDecimal("10000000000000.00"),
+            checkingAccount,
+            null,
+            user,
+            false,
+            null
+        )
+    );
+  }
 
-    @Test
-    @DisplayName("Should reject transfer codes for non-transfer transactions")
-    void shouldRejectTransferCodeForNonTransferTransactions() {
-        assertThrows(
-                DataIntegrityViolationException.class,
-                () -> insertTransaction(
-                        TransactionType.DEPOSIT,
-                        new BigDecimal("50.00"),
-                        checkingAccount,
-                        UUID.randomUUID(),
-                        user,
-                        false,
-                        null
-                )
-        );
-    }
+  @Test
+  @DisplayName("Should allow transaction amounts at the maximum")
+  void shouldAllowAmountAtMaximum() {
+    assertDoesNotThrow(
+        () -> insertTransaction(
+            TransactionType.DEPOSIT,
+            new BigDecimal("9999999999999.99"),
+            checkingAccount,
+            null,
+            user,
+            false,
+            null
+        )
+    );
+  }
 
-    @Test
-    @DisplayName("Should allow one transaction for each transfer direction")
-    void shouldAllowOneTransactionPerTransferDirection() {
-        UUID transferCode = UUID.randomUUID();
-        BigDecimal amount = new BigDecimal("50.00");
+  @Test
+  @DisplayName("Should require a transfer code for transfer transactions")
+  void shouldRequireTransferCodeForTransfers() {
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () -> insertTransaction(
+            TransactionType.TRANSFER_SENT,
+            new BigDecimal("50.00"),
+            checkingAccount,
+            null,
+            user,
+            false,
+            null
+        )
+    );
+  }
 
-        assertDoesNotThrow(() -> {
-            insertTransaction(
-                    TransactionType.TRANSFER_SENT,
-                    amount,
-                    checkingAccount,
-                    transferCode,
-                    user,
-                    false,
-                    null
-            );
+  @Test
+  @DisplayName("Should reject transfer codes for non-transfer transactions")
+  void shouldRejectTransferCodeForNonTransferTransactions() {
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () -> insertTransaction(
+            TransactionType.DEPOSIT,
+            new BigDecimal("50.00"),
+            checkingAccount,
+            UUID.randomUUID(),
+            user,
+            false,
+            null
+        )
+    );
+  }
 
-            insertTransaction(
-                    TransactionType.TRANSFER_RECEIVED,
-                    amount,
-                    savingsAccount,
-                    transferCode,
-                    user,
-                    false,
-                    null
-            );
-        });
-    }
+  @Test
+  @DisplayName("Should allow one transaction for each transfer direction")
+  void shouldAllowOneTransactionPerTransferDirection() {
+    UUID transferCode = UUID.randomUUID();
+    BigDecimal amount = new BigDecimal("50.00");
 
-    @Test
-    @DisplayName("Should reject duplicate transfer directions")
-    void shouldRejectDuplicateTransferDirection() {
-        UUID transferCode = UUID.randomUUID();
-        BigDecimal amount = new BigDecimal("50.00");
+    assertDoesNotThrow(() -> {
+      insertTransaction(
+          TransactionType.TRANSFER_SENT,
+          amount,
+          checkingAccount,
+          transferCode,
+          user,
+          false,
+          null
+      );
 
-        insertTransaction(
-                TransactionType.TRANSFER_SENT,
+      insertTransaction(
+          TransactionType.TRANSFER_RECEIVED,
+          amount,
+          savingsAccount,
+          transferCode,
+          user,
+          false,
+          null
+      );
+    });
+  }
+
+  @Test
+  @DisplayName("Should reject duplicate transfer directions")
+  void shouldRejectDuplicateTransferDirection() {
+    UUID transferCode = UUID.randomUUID();
+    BigDecimal amount = new BigDecimal("50.00");
+
+    insertTransaction(
+        TransactionType.TRANSFER_SENT,
+        amount,
+        checkingAccount,
+        transferCode,
+        user,
+        false,
+        null
+    );
+
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () -> insertTransaction(
+            TransactionType.TRANSFER_SENT,
+            amount,
+            savingsAccount,
+            transferCode,
+            user,
+            false,
+            null
+        )
+    );
+  }
+
+  @Test
+  @DisplayName("Should require a human actor for ordinary transactions")
+  void shouldRequireHumanActorForOrdinaryTransactions() {
+    assertDoesNotThrow(
+        () -> insertTransaction(
+            TransactionType.DEPOSIT,
+            new BigDecimal("50.00"),
+            checkingAccount,
+            null,
+            user,
+            false,
+            null
+        )
+    );
+
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () -> insertTransaction(
+            TransactionType.DEPOSIT,
+            new BigDecimal("50.00"),
+            checkingAccount,
+            null,
+            null,
+            true,
+            null
+        )
+    );
+  }
+
+  @Test
+  @DisplayName("Should require a system actor for yield transactions")
+  void shouldRequireSystemActorForYieldTransactions() {
+    assertDoesNotThrow(
+        () -> insertTransaction(
+            TransactionType.YIELD,
+            new BigDecimal("10.00"),
+            savingsAccount,
+            null,
+            null,
+            true,
+            LocalDate.now(BUSINESS_ZONE)
+        )
+    );
+
+    assertThrows(
+        DataIntegrityViolationException.class,
+        () -> insertTransaction(
+            TransactionType.YIELD,
+            new BigDecimal("10.00"),
+            savingsAccount,
+            null,
+            user,
+            false,
+            LocalDate.now(BUSINESS_ZONE).plusDays(1)
+        )
+    );
+  }
+
+  @Test
+  @DisplayName("Should reject UPDATE on transactions, even for the table owner")
+  void shouldRejectUpdate() {
+    insertTransaction(
+        TransactionType.DEPOSIT,
+        new BigDecimal("10.00"),
+        checkingAccount,
+        null,
+        user,
+        false,
+        null
+    );
+
+    DataAccessException exception = assertThrows(
+        DataAccessException.class,
+        () -> jdbcTemplate.update(
+            "UPDATE transactions SET amount = amount WHERE account_id = ?",
+            checkingAccount.getId()
+        )
+    );
+
+    assertAppendOnly(exception);
+    assertEquals(1, countTransactions(checkingAccount));
+  }
+
+  @Test
+  @DisplayName("Should reject DELETE on transactions, even for the table owner")
+  void shouldRejectDelete() {
+    insertTransaction(
+        TransactionType.DEPOSIT,
+        new BigDecimal("10.00"),
+        checkingAccount,
+        null,
+        user,
+        false,
+        null
+    );
+
+    DataAccessException exception = assertThrows(
+        DataAccessException.class,
+        () -> jdbcTemplate.update(
+            "DELETE FROM transactions WHERE account_id = ?",
+            checkingAccount.getId()
+        )
+    );
+
+    assertAppendOnly(exception);
+    assertEquals(1, countTransactions(checkingAccount));
+  }
+
+  @Test
+  @DisplayName("Should reject TRUNCATE on transactions, even for the table owner")
+  void shouldRejectTruncate() {
+    insertTransaction(
+        TransactionType.DEPOSIT,
+        new BigDecimal("10.00"),
+        checkingAccount,
+        null,
+        user,
+        false,
+        null
+    );
+
+    // transaction_idempotency_requests references transactions, so both
+    // tables must be named for PostgreSQL to reach the trigger.
+    DataAccessException exception = assertThrows(
+        DataAccessException.class,
+        () -> jdbcTemplate.execute(
+            "TRUNCATE TABLE transactions, transaction_idempotency_requests"
+        )
+    );
+
+    assertAppendOnly(exception);
+    assertEquals(1, countTransactions(checkingAccount));
+  }
+
+  @Test
+  @DisplayName("Should validate transaction integrity constraints")
+  void shouldValidateTransactionIntegrityConstraints() {
+    Integer validatedConstraints = jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM pg_constraint
+            WHERE conrelid = 'public.transactions'::regclass
+              AND contype = 'c'
+              AND conname IN (
+                  'ck_transactions_amount_max',
+                  'ck_transactions_transfer_code'
+              )
+              AND convalidated = TRUE
+            """,
+        Integer.class
+    );
+
+    assertEquals(2, validatedConstraints);
+  }
+
+  private int countTransactions(Account account) {
+    Integer total = jdbcTemplate.queryForObject(
+        "SELECT count(*) FROM transactions WHERE account_id = ?",
+        Integer.class,
+        account.getId()
+    );
+
+    return total == null ? 0 : total;
+  }
+
+  private void assertAppendOnly(DataAccessException exception) {
+    assertTrue(
+        exception.getMessage().contains(APPEND_ONLY_MESSAGE),
+        "The statement failed for another reason: "
+            + exception.getMessage()
+    );
+  }
+
+  private void insertTransaction(
+      TransactionType type,
+      BigDecimal amount,
+      Account account,
+      UUID transferCode,
+      User performedBy,
+      boolean performedBySystem,
+      LocalDate yieldDate
+  ) {
+    jdbcTemplate.update(
+            """
+            INSERT INTO transactions (
                 amount,
-                checkingAccount,
-                transferCode,
-                user,
-                false,
-                null
-        );
+                created_at,
+                transaction_type,
+                account_id,
+                transaction_code,
+                transfer_code,
+                performed_by_user_id,
+                performed_by_system,
+                balance_after,
+                yield_date
+            )
+            VALUES (
+                ?,
+                CURRENT_TIMESTAMP,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?
+            )
+            """,
+        amount,
+        type.name(),
+        account.getId(),
+        UUID.randomUUID(),
+        transferCode,
+        performedBy != null ? performedBy.getId() : null,
+        performedBySystem,
+        new BigDecimal("0.00"),
+        yieldDate
+    );
+  }
 
-        assertThrows(
-                DataIntegrityViolationException.class,
-                () -> insertTransaction(
-                        TransactionType.TRANSFER_SENT,
-                        amount,
-                        savingsAccount,
-                        transferCode,
-                        user,
-                        false,
-                        null
-                )
-        );
-    }
+  private Client createClient() {
+    int number = ++clientSequence;
 
-    @Test
-    @DisplayName("Should require a human actor for ordinary transactions")
-    void shouldRequireHumanActorForOrdinaryTransactions() {
-        assertDoesNotThrow(
-                () -> insertTransaction(
-                        TransactionType.DEPOSIT,
-                        new BigDecimal("50.00"),
-                        checkingAccount,
-                        null,
-                        user,
-                        false,
-                        null
-                )
-        );
+    Address address = new Address(
+        "Rua Teste",
+        String.valueOf(number),
+        null,
+        "Centro",
+        "Mogi das Cruzes",
+        State.SP,
+        "08700000"
+    );
 
-        assertThrows(
-                DataIntegrityViolationException.class,
-                () -> insertTransaction(
-                        TransactionType.DEPOSIT,
-                        new BigDecimal("50.00"),
-                        checkingAccount,
-                        null,
-                        null,
-                        true,
-                        null
-                )
-        );
-    }
+    Client newClient = new Client(
+        "Cliente Constraints " + number,
+        String.format(
+            "%011d",
+            ThreadLocalRandom.current()
+                .nextLong(100_000_000_000L)
+        ),
+        "constraints-" + testId + "@test.com",
+        "11999999999",
+        address
+    );
 
-    @Test
-    @DisplayName("Should require a system actor for yield transactions")
-    void shouldRequireSystemActorForYieldTransactions() {
-        assertDoesNotThrow(
-                () -> insertTransaction(
-                        TransactionType.YIELD,
-                        new BigDecimal("10.00"),
-                        savingsAccount,
-                        null,
-                        null,
-                        true,
-                        LocalDate.now(BUSINESS_ZONE)
-                )
-        );
-
-        assertThrows(
-                DataIntegrityViolationException.class,
-                () -> insertTransaction(
-                        TransactionType.YIELD,
-                        new BigDecimal("10.00"),
-                        savingsAccount,
-                        null,
-                        user,
-                        false,
-                        LocalDate.now(BUSINESS_ZONE).plusDays(1)
-                )
-        );
-    }
-
-    @Test
-    @DisplayName("Should reject UPDATE on transactions, even for the table owner")
-    void shouldRejectUpdate() {
-        insertTransaction(
-                TransactionType.DEPOSIT,
-                new BigDecimal("10.00"),
-                checkingAccount,
-                null,
-                user,
-                false,
-                null
-        );
-
-        DataAccessException exception = assertThrows(
-                DataAccessException.class,
-                () -> jdbcTemplate.update(
-                        "UPDATE transactions SET amount = amount WHERE account_id = ?",
-                        checkingAccount.getId()
-                )
-        );
-
-        assertAppendOnly(exception);
-        assertEquals(1, countTransactions(checkingAccount));
-    }
-
-    @Test
-    @DisplayName("Should reject DELETE on transactions, even for the table owner")
-    void shouldRejectDelete() {
-        insertTransaction(
-                TransactionType.DEPOSIT,
-                new BigDecimal("10.00"),
-                checkingAccount,
-                null,
-                user,
-                false,
-                null
-        );
-
-        DataAccessException exception = assertThrows(
-                DataAccessException.class,
-                () -> jdbcTemplate.update(
-                        "DELETE FROM transactions WHERE account_id = ?",
-                        checkingAccount.getId()
-                )
-        );
-
-        assertAppendOnly(exception);
-        assertEquals(1, countTransactions(checkingAccount));
-    }
-
-    @Test
-    @DisplayName("Should reject TRUNCATE on transactions, even for the table owner")
-    void shouldRejectTruncate() {
-        insertTransaction(
-                TransactionType.DEPOSIT,
-                new BigDecimal("10.00"),
-                checkingAccount,
-                null,
-                user,
-                false,
-                null
-        );
-
-        // transaction_idempotency_requests references transactions, so both
-        // tables must be named for PostgreSQL to reach the trigger.
-        DataAccessException exception = assertThrows(
-                DataAccessException.class,
-                () -> jdbcTemplate.execute(
-                        "TRUNCATE TABLE transactions, transaction_idempotency_requests"
-                )
-        );
-
-        assertAppendOnly(exception);
-        assertEquals(1, countTransactions(checkingAccount));
-    }
-
-    @Test
-    @DisplayName("Should validate transaction integrity constraints")
-    void shouldValidateTransactionIntegrityConstraints() {
-        Integer validatedConstraints = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM pg_constraint
-                WHERE conrelid = 'public.transactions'::regclass
-                  AND contype = 'c'
-                  AND conname IN (
-                      'ck_transactions_amount_max',
-                      'ck_transactions_transfer_code'
-                  )
-                  AND convalidated = TRUE
-                """,
-                Integer.class
-        );
-
-        assertEquals(2, validatedConstraints);
-    }
-
-    private int countTransactions(Account account) {
-        Integer total = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM transactions WHERE account_id = ?",
-                Integer.class,
-                account.getId()
-        );
-
-        return total == null ? 0 : total;
-    }
-
-    private void assertAppendOnly(DataAccessException exception) {
-        assertTrue(
-                exception.getMessage().contains(APPEND_ONLY_MESSAGE),
-                "The statement failed for another reason: "
-                        + exception.getMessage()
-        );
-    }
-
-    private void insertTransaction(
-            TransactionType type,
-            BigDecimal amount,
-            Account account,
-            UUID transferCode,
-            User performedBy,
-            boolean performedBySystem,
-            LocalDate yieldDate
-    ) {
-        jdbcTemplate.update(
-                """
-                INSERT INTO transactions (
-                    amount,
-                    created_at,
-                    transaction_type,
-                    account_id,
-                    transaction_code,
-                    transfer_code,
-                    performed_by_user_id,
-                    performed_by_system,
-                    balance_after,
-                    yield_date
-                )
-                VALUES (
-                    ?,
-                    CURRENT_TIMESTAMP,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?
-                )
-                """,
-                amount,
-                type.name(),
-                account.getId(),
-                UUID.randomUUID(),
-                transferCode,
-                performedBy != null ? performedBy.getId() : null,
-                performedBySystem,
-                new BigDecimal("0.00"),
-                yieldDate
-        );
-    }
-
-    private Client createClient() {
-        int number = ++clientSequence;
-
-        Address address = new Address(
-                "Rua Teste",
-                String.valueOf(number),
-                null,
-                "Centro",
-                "Mogi das Cruzes",
-                State.SP,
-                "08700000"
-        );
-
-        Client newClient = new Client(
-                "Cliente Constraints " + number,
-                String.format(
-                        "%011d",
-                        ThreadLocalRandom.current()
-                                .nextLong(100_000_000_000L)
-                ),
-                "constraints-" + testId + "@test.com",
-                "11999999999",
-                address
-        );
-
-        return clientRepository.saveAndFlush(newClient);
-    }
+    return clientRepository.saveAndFlush(newClient);
+  }
 }

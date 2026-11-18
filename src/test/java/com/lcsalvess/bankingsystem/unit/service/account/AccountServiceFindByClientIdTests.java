@@ -1,5 +1,17 @@
 package com.lcsalvess.bankingsystem.unit.service.account;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.clientBuilder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+
 import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
@@ -15,6 +27,14 @@ import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenerator;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.testsupport.ClientTestFactory;
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -36,329 +56,319 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Method;
-import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
-
-import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 public class AccountServiceFindByClientIdTests {
 
-    private static final Long CLIENT_ID = 1L;
+  private static final Long CLIENT_ID = 1L;
 
-    private static final String CHECKING_NUMBER = "00001";
-    private static final String CHECKING_DIGIT = "9";
-    private static final String SAVINGS_NUMBER = "00002";
-    private static final String SAVINGS_DIGIT = "7";
+  private static final String CHECKING_NUMBER = "00001";
+  private static final String CHECKING_DIGIT = "9";
+  private static final String SAVINGS_NUMBER = "00002";
+  private static final String SAVINGS_DIGIT = "7";
 
-    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
-    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-01-02T02:30:00Z"), ZONE);
-    private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
+  private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
+  private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-01-02T02:30:00Z"), ZONE);
+  private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
 
-    @Mock
-    private AccountRepository accountRepository;
+  @Mock
+  private AccountRepository accountRepository;
 
-    @Mock
-    private ClientService clientService;
+  @Mock
+  private ClientService clientService;
 
-    @Mock
-    private AccountNumberGenerator accountNumberGenerator;
+  @Mock
+  private AccountNumberGenerator accountNumberGenerator;
 
-    @Mock
-    private CurrentUserService currentUserService;
+  @Mock
+  private CurrentUserService currentUserService;
 
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
+  @Mock
+  private ApplicationEventPublisher eventPublisher;
 
-    private AccountService accountService;
+  private AccountService accountService;
 
-    @BeforeEach
-    void setUp() {
-        accountService = new AccountService(
-                accountRepository,
-                accountNumberGenerator,
-                clientService,
-                currentUserService,
-                eventPublisher,
-                CLOCK
+  @BeforeEach
+  void setUp() {
+    accountService = new AccountService(
+        accountRepository,
+        accountNumberGenerator,
+        clientService,
+        currentUserService,
+        eventPublisher,
+        CLOCK
+    );
+  }
+
+  @Nested
+  @DisplayName("findByClientId(Long, AccountType, AccountStatus, Pageable)")
+  class FindByClientId {
+
+    @Test
+    @DisplayName("Should return the client's accounts as a page of DTOs")
+    void shouldReturnPageOfClientAccounts() {
+      Pageable pageable = PageRequest.of(
+          0,
+          10,
+          Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
+      );
+      Specification<Account> specification = (root, query, cb) -> null;
+
+      Client client = client();
+      CheckingAccount checking = checkingAccount(client);
+      SavingsAccount savings = savingsAccount(client);
+
+      when(accountRepository.findAll(specification, pageable))
+          .thenReturn(new PageImpl<>(
+              List.of(checking, savings),
+              pageable,
+              2
+          ));
+
+      try (MockedStatic<AccountSpecifications> specifications =
+               mockStatic(AccountSpecifications.class)) {
+
+        specifications.when(() ->
+            AccountSpecifications.byClientAndFilters(CLIENT_ID, null, null)
+        ).thenReturn(specification);
+
+        Page<AccountResponseDto> result =
+            accountService.findByClientId(CLIENT_ID, null, null, pageable);
+
+        assertEquals(
+            List.of(
+                response(
+                    checking.getClient().getName(),
+                    CHECKING_NUMBER,
+                    CHECKING_DIGIT,
+                    AccountType.CHECKING
+                ),
+                response(
+                    savings.getClient().getName(),
+                    SAVINGS_NUMBER,
+                    SAVINGS_DIGIT,
+                    AccountType.SAVINGS
+                )
+            ),
+            result.getContent()
         );
-    }
+        assertEquals(2, result.getTotalElements());
+        assertEquals(1, result.getTotalPages());
 
-    @Nested
-    @DisplayName("findByClientId(Long, AccountType, AccountStatus, Pageable)")
-    class FindByClientId {
-
-        @Test
-        @DisplayName("Should return the client's accounts as a page of DTOs")
-        void shouldReturnPageOfClientAccounts() {
-            Pageable pageable = PageRequest.of(
-                    0,
-                    10,
-                    Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
-            );
-            Specification<Account> specification = (root, query, cb) -> null;
-
-            Client client = client();
-            CheckingAccount checking = checkingAccount(client);
-            SavingsAccount savings = savingsAccount(client);
-
-            when(accountRepository.findAll(specification, pageable))
-                    .thenReturn(new PageImpl<>(
-                            List.of(checking, savings),
-                            pageable,
-                            2
-                    ));
-
-            try (MockedStatic<AccountSpecifications> specifications =
-                         mockStatic(AccountSpecifications.class)) {
-
-                specifications.when(() ->
-                        AccountSpecifications.byClientAndFilters(CLIENT_ID, null, null)
-                ).thenReturn(specification);
-
-                Page<AccountResponseDto> result =
-                        accountService.findByClientId(CLIENT_ID, null, null, pageable);
-
-                assertEquals(
-                        List.of(
-                                response(checking.getClient().getName(), CHECKING_NUMBER, CHECKING_DIGIT, AccountType.CHECKING),
-                                response(savings.getClient().getName(), SAVINGS_NUMBER, SAVINGS_DIGIT, AccountType.SAVINGS)
-                        ),
-                        result.getContent()
-                );
-                assertEquals(2, result.getTotalElements());
-                assertEquals(1, result.getTotalPages());
-
-                specifications.verify(() ->
-                                AccountSpecifications.byClientAndFilters(CLIENT_ID, null, null),
-                        times(1)
-                );
-            }
-
-            verify(clientService).findEntityById(CLIENT_ID);
-            verify(accountRepository).findAll(specification, pageable);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should build the specification with the type and status filters")
-        void shouldBuildSpecificationWithFilters() {
-            Pageable pageable = PageRequest.of(
-                    0,
-                    10,
-                    Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
-            );
-            Specification<Account> specification = (root, query, cb) -> null;
-
-            SavingsAccount savings = savingsAccount(client());
-
-            when(accountRepository.findAll(specification, pageable))
-                    .thenReturn(new PageImpl<>(List.of(savings), pageable, 1));
-
-            try (MockedStatic<AccountSpecifications> specifications =
-                         mockStatic(AccountSpecifications.class)) {
-
-                specifications.when(() ->
-                        AccountSpecifications.byClientAndFilters(
-                                CLIENT_ID,
-                                AccountType.SAVINGS,
-                                AccountStatus.ACTIVE
-                        )
-                ).thenReturn(specification);
-
-                Page<AccountResponseDto> result = accountService.findByClientId(
-                        CLIENT_ID,
-                        AccountType.SAVINGS,
-                        AccountStatus.ACTIVE,
-                        pageable
-                );
-
-                assertEquals(
-                        List.of(response(
-                                savings.getClient().getName(),
-                                SAVINGS_NUMBER,
-                                SAVINGS_DIGIT,
-                                AccountType.SAVINGS
-                        )),
-                        result.getContent()
-                );
-
-                specifications.verify(() ->
-                                AccountSpecifications.byClientAndFilters(
-                                        CLIENT_ID,
-                                        AccountType.SAVINGS,
-                                        AccountStatus.ACTIVE
-                                ),
-                        times(1)
-                );
-            }
-
-            verify(clientService).findEntityById(CLIENT_ID);
-            verify(accountRepository).findAll(specification, pageable);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should return an empty page when the client has no accounts")
-        void shouldReturnEmptyPageWhenClientHasNoAccounts() {
-            Pageable pageable = PageRequest.of(0, 10, Sort.by("id").ascending());
-
-            when(accountRepository.findAll(
-                    ArgumentMatchers.<Specification<Account>>any(),
-                    ArgumentMatchers.any(Pageable.class)
-            )).thenReturn(new PageImpl<>(List.of(), pageable, 0));
-
-            Page<AccountResponseDto> result =
-                    accountService.findByClientId(CLIENT_ID, null, null, pageable);
-
-            assertTrue(result.isEmpty());
-            assertEquals(0, result.getTotalElements());
-            assertEquals(0, result.getTotalPages());
-
-            verify(clientService).findEntityById(CLIENT_ID);
-        }
-
-        @Test
-        @DisplayName("Should append the id tie-breaker when the sort has no id")
-        void shouldAppendIdTieBreakerWhenSortHasNoId() {
-            Pageable requested = PageRequest.of(0, 10, Sort.by("balance").descending());
-
-            when(accountRepository.findAll(
-                    ArgumentMatchers.<Specification<Account>>any(),
-                    ArgumentMatchers.any(Pageable.class)
-            )).thenReturn(new PageImpl<>(List.of(), requested, 0));
-
-            accountService.findByClientId(CLIENT_ID, null, null, requested);
-
-            ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-
-            verify(accountRepository).findAll(
-                    ArgumentMatchers.<Specification<Account>>any(),
-                    captor.capture()
-            );
-
-            assertEquals(
-                    Sort.by(Sort.Order.desc("balance"), Sort.Order.asc("id")),
-                    captor.getValue().getSort()
-            );
-            assertEquals(0, captor.getValue().getPageNumber());
-            assertEquals(10, captor.getValue().getPageSize());
-        }
-
-        @Test
-        @DisplayName("Should not duplicate the id tie-breaker when the sort already has id")
-        void shouldKeepSortWhenItAlreadyHasId() {
-            Pageable requested = PageRequest.of(1, 5, Sort.by("id").descending());
-
-            when(accountRepository.findAll(
-                    ArgumentMatchers.<Specification<Account>>any(),
-                    ArgumentMatchers.any(Pageable.class)
-            )).thenReturn(new PageImpl<>(List.of(), requested, 0));
-
-            accountService.findByClientId(CLIENT_ID, null, null, requested);
-
-            ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-
-            verify(accountRepository).findAll(
-                    ArgumentMatchers.<Specification<Account>>any(),
-                    captor.capture()
-            );
-
-            assertEquals(Sort.by(Sort.Order.desc("id")), captor.getValue().getSort());
-            assertEquals(1, captor.getValue().getPageNumber());
-            assertEquals(5, captor.getValue().getPageSize());
-        }
-
-        @Test
-        @DisplayName("Should throw ClientNotFoundException without querying accounts")
-        void shouldThrowWhenClientDoesNotExist() {
-            Pageable pageable = PageRequest.of(0, 10, Sort.by("id").ascending());
-
-            when(clientService.findEntityById(CLIENT_ID))
-                    .thenThrow(new ClientNotFoundException());
-
-            ClientNotFoundException exception = assertThrows(
-                    ClientNotFoundException.class,
-                    () -> accountService.findByClientId(CLIENT_ID, null, null, pageable)
-            );
-
-            assertEquals(ApiErrorMessages.CLIENT_NOT_FOUND, exception.getMessage());
-
-            verify(clientService).findEntityById(CLIENT_ID);
-            verifyNoInteractions(accountRepository);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should run in a read-only transaction")
-        void shouldRunInReadOnlyTransaction() throws NoSuchMethodException {
-            Method method = AccountService.class.getMethod(
-                    "findByClientId",
-                    Long.class,
-                    AccountType.class,
-                    AccountStatus.class,
-                    Pageable.class
-            );
-
-            Transactional transactional =
-                    AnnotatedElementUtils.findMergedAnnotation(method, Transactional.class);
-
-            assertNotNull(transactional);
-            assertTrue(transactional.readOnly());
-        }
-    }
-
-    private void verifyNoMoreInteractionsOnMocks() {
-        verifyNoMoreInteractions(
-                accountRepository,
-                clientService,
-                accountNumberGenerator,
-                currentUserService,
-                eventPublisher
+        specifications.verify(() ->
+                AccountSpecifications.byClientAndFilters(CLIENT_ID, null, null),
+            times(1)
         );
+      }
+
+      verify(clientService).findEntityById(CLIENT_ID);
+      verify(accountRepository).findAll(specification, pageable);
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    private static Client client() {
-        return aClient("account-client")
-                .withId(CLIENT_ID)
-                .build();
-    }
+    @Test
+    @DisplayName("Should build the specification with the type and status filters")
+    void shouldBuildSpecificationWithFilters() {
+      Pageable pageable = PageRequest.of(
+          0,
+          10,
+          Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
+      );
+      Specification<Account> specification = (root, query, cb) -> null;
 
-    private static CheckingAccount checkingAccount(Client client) {
-        CheckingAccount account = new CheckingAccount(client, CHECKING_NUMBER, CHECKING_DIGIT);
-        ReflectionTestUtils.setField(account, "id", 1L);
-        return account;
-    }
+      SavingsAccount savings = savingsAccount(client());
 
-    private static SavingsAccount savingsAccount(Client client) {
-        SavingsAccount account = SavingsAccount.create(client, SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
-        ReflectionTestUtils.setField(account, "id", 2L);
-        return account;
-    }
+      when(accountRepository.findAll(specification, pageable))
+          .thenReturn(new PageImpl<>(List.of(savings), pageable, 1));
 
-    private static AccountResponseDto response(
-            String clientName,
-            String number,
-            String digit,
-            AccountType type
-    ) {
-        return new AccountResponseDto(
-                number, digit, clientName, BigDecimal.ZERO, type, AccountStatus.ACTIVE
+      try (MockedStatic<AccountSpecifications> specifications =
+               mockStatic(AccountSpecifications.class)) {
+
+        specifications.when(() ->
+            AccountSpecifications.byClientAndFilters(
+                CLIENT_ID,
+                AccountType.SAVINGS,
+                AccountStatus.ACTIVE
+            )
+        ).thenReturn(specification);
+
+        Page<AccountResponseDto> result = accountService.findByClientId(
+            CLIENT_ID,
+            AccountType.SAVINGS,
+            AccountStatus.ACTIVE,
+            pageable
         );
+
+        assertEquals(
+            List.of(response(
+                savings.getClient().getName(),
+                SAVINGS_NUMBER,
+                SAVINGS_DIGIT,
+                AccountType.SAVINGS
+            )),
+            result.getContent()
+        );
+
+        specifications.verify(() ->
+                AccountSpecifications.byClientAndFilters(
+                    CLIENT_ID,
+                    AccountType.SAVINGS,
+                    AccountStatus.ACTIVE
+                ),
+            times(1)
+        );
+      }
+
+      verify(clientService).findEntityById(CLIENT_ID);
+      verify(accountRepository).findAll(specification, pageable);
+      verifyNoMoreInteractionsOnMocks();
     }
+
+    @Test
+    @DisplayName("Should return an empty page when the client has no accounts")
+    void shouldReturnEmptyPageWhenClientHasNoAccounts() {
+      Pageable pageable = PageRequest.of(0, 10, Sort.by("id").ascending());
+
+      when(accountRepository.findAll(
+          ArgumentMatchers.<Specification<Account>>any(),
+          ArgumentMatchers.any(Pageable.class)
+      )).thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+      Page<AccountResponseDto> result =
+          accountService.findByClientId(CLIENT_ID, null, null, pageable);
+
+      assertTrue(result.isEmpty());
+      assertEquals(0, result.getTotalElements());
+      assertEquals(0, result.getTotalPages());
+
+      verify(clientService).findEntityById(CLIENT_ID);
+    }
+
+    @Test
+    @DisplayName("Should append the id tie-breaker when the sort has no id")
+    void shouldAppendIdTieBreakerWhenSortHasNoId() {
+      Pageable requested = PageRequest.of(0, 10, Sort.by("balance").descending());
+
+      when(accountRepository.findAll(
+          ArgumentMatchers.<Specification<Account>>any(),
+          ArgumentMatchers.any(Pageable.class)
+      )).thenReturn(new PageImpl<>(List.of(), requested, 0));
+
+      accountService.findByClientId(CLIENT_ID, null, null, requested);
+
+      ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+
+      verify(accountRepository).findAll(
+          ArgumentMatchers.<Specification<Account>>any(),
+          captor.capture()
+      );
+
+      assertEquals(
+          Sort.by(Sort.Order.desc("balance"), Sort.Order.asc("id")),
+          captor.getValue().getSort()
+      );
+      assertEquals(0, captor.getValue().getPageNumber());
+      assertEquals(10, captor.getValue().getPageSize());
+    }
+
+    @Test
+    @DisplayName("Should not duplicate the id tie-breaker when the sort already has id")
+    void shouldKeepSortWhenItAlreadyHasId() {
+      Pageable requested = PageRequest.of(1, 5, Sort.by("id").descending());
+
+      when(accountRepository.findAll(
+          ArgumentMatchers.<Specification<Account>>any(),
+          ArgumentMatchers.any(Pageable.class)
+      )).thenReturn(new PageImpl<>(List.of(), requested, 0));
+
+      accountService.findByClientId(CLIENT_ID, null, null, requested);
+
+      ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+
+      verify(accountRepository).findAll(
+          ArgumentMatchers.<Specification<Account>>any(),
+          captor.capture()
+      );
+
+      assertEquals(Sort.by(Sort.Order.desc("id")), captor.getValue().getSort());
+      assertEquals(1, captor.getValue().getPageNumber());
+      assertEquals(5, captor.getValue().getPageSize());
+    }
+
+    @Test
+    @DisplayName("Should throw ClientNotFoundException without querying accounts")
+    void shouldThrowWhenClientDoesNotExist() {
+      Pageable pageable = PageRequest.of(0, 10, Sort.by("id").ascending());
+
+      when(clientService.findEntityById(CLIENT_ID))
+          .thenThrow(new ClientNotFoundException());
+
+      ClientNotFoundException exception = assertThrows(
+          ClientNotFoundException.class,
+          () -> accountService.findByClientId(CLIENT_ID, null, null, pageable)
+      );
+
+      assertEquals(ApiErrorMessages.CLIENT_NOT_FOUND, exception.getMessage());
+
+      verify(clientService).findEntityById(CLIENT_ID);
+      verifyNoInteractions(accountRepository);
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @Test
+    @DisplayName("Should run in a read-only transaction")
+    void shouldRunInReadOnlyTransaction() throws NoSuchMethodException {
+      Method method = AccountService.class.getMethod(
+          "findByClientId",
+          Long.class,
+          AccountType.class,
+          AccountStatus.class,
+          Pageable.class
+      );
+
+      Transactional transactional =
+          AnnotatedElementUtils.findMergedAnnotation(method, Transactional.class);
+
+      assertNotNull(transactional);
+      assertTrue(transactional.readOnly());
+    }
+  }
+
+  private void verifyNoMoreInteractionsOnMocks() {
+    verifyNoMoreInteractions(
+        accountRepository,
+        clientService,
+        accountNumberGenerator,
+        currentUserService,
+        eventPublisher
+    );
+  }
+
+  private static Client client() {
+    return ClientTestFactory.clientBuilder("account-client")
+        .withId(CLIENT_ID)
+        .build();
+  }
+
+  private static CheckingAccount checkingAccount(Client client) {
+    CheckingAccount account = new CheckingAccount(client, CHECKING_NUMBER, CHECKING_DIGIT);
+    ReflectionTestUtils.setField(account, "id", 1L);
+    return account;
+  }
+
+  private static SavingsAccount savingsAccount(Client client) {
+    SavingsAccount account = SavingsAccount.create(client, SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
+    ReflectionTestUtils.setField(account, "id", 2L);
+    return account;
+  }
+
+  private static AccountResponseDto response(
+      String clientName,
+      String number,
+      String digit,
+      AccountType type
+  ) {
+    return new AccountResponseDto(
+        number, digit, clientName, BigDecimal.ZERO, type, AccountStatus.ACTIVE
+    );
+  }
 }

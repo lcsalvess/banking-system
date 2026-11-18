@@ -1,9 +1,19 @@
 package com.lcsalvess.bankingsystem.unit.security.handler;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.security.handler.RestAuthenticationEntryPoint;
 import jakarta.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,269 +30,258 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.security.core.AuthenticationException;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.stream.Stream;
-
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 class RestAuthenticationEntryPointTests {
 
-    private static final int UNAUTHORIZED_STATUS =
-            HttpServletResponse.SC_UNAUTHORIZED;
+  private static final int UNAUTHORIZED_STATUS =
+      HttpServletResponse.SC_UNAUTHORIZED;
 
-    private static final Instant FIXED_INSTANT =
-            Instant.parse("2026-01-01T12:00:00Z");
+  private static final Instant FIXED_INSTANT =
+      Instant.parse("2026-01-01T12:00:00Z");
 
-    private static final Clock FIXED_CLOCK =
-            Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
+  private static final Clock FIXED_CLOCK =
+      Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC);
 
-    private JsonMapper jsonMapper;
-    private RestAuthenticationEntryPoint authenticationEntryPoint;
-    private MockHttpServletRequest request;
-    private MockHttpServletResponse response;
+  private JsonMapper jsonMapper;
+  private RestAuthenticationEntryPoint authenticationEntryPoint;
+  private MockHttpServletRequest request;
+  private MockHttpServletResponse response;
 
-    @BeforeEach
-    void setUp() {
-        jsonMapper = JsonMapper.builder().build();
-        authenticationEntryPoint = new RestAuthenticationEntryPoint(jsonMapper, FIXED_CLOCK);
+  @BeforeEach
+  void setUp() {
+    jsonMapper = JsonMapper.builder().build();
+    authenticationEntryPoint = new RestAuthenticationEntryPoint(jsonMapper, FIXED_CLOCK);
 
-        request = new MockHttpServletRequest();
-        request.setRequestURI("/api/v1/accounts");
+    request = new MockHttpServletRequest();
+    request.setRequestURI("/api/v1/accounts");
 
-        response = new MockHttpServletResponse();
+    response = new MockHttpServletResponse();
+  }
+
+  @Nested
+  @DisplayName("Authentication failure response")
+  class AuthenticationFailureResponse {
+
+    @Test
+    @DisplayName("Should return a JSON 401 response with the expected error")
+    void shouldReturnJsonUnauthorizedResponseWithExpectedError()
+        throws Exception {
+
+      authenticationEntryPoint.commence(
+          request,
+          response,
+          new BadCredentialsException("Invalid credentials")
+      );
+
+      ApiErrorResponse errorResponse = readErrorResponse();
+
+      assertUnauthorizedResponse(errorResponse);
     }
 
-    @Nested
-    @DisplayName("Authentication failure response")
-    class AuthenticationFailureResponse {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("authenticationExceptions")
+    @DisplayName("Should return the same response for authentication exception types")
+    void shouldReturnSameResponseForAuthenticationExceptionTypes(
+        String scenario,
+        AuthenticationException exception
+    ) throws Exception {
 
-        @Test
-        @DisplayName("Should return a JSON 401 response with the expected error")
-        void shouldReturnJsonUnauthorizedResponseWithExpectedError()
-                throws Exception {
+      authenticationEntryPoint.commence(
+          request,
+          response,
+          exception
+      );
 
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new BadCredentialsException("Invalid credentials")
-            );
+      ApiErrorResponse errorResponse = readErrorResponse();
 
-            ApiErrorResponse errorResponse = readErrorResponse();
-
-            assertUnauthorizedResponse(errorResponse);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource("authenticationExceptions")
-        @DisplayName("Should return the same response for authentication exception types")
-        void shouldReturnSameResponseForAuthenticationExceptionTypes(
-                String scenario,
-                AuthenticationException exception
-        ) throws Exception {
-
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    exception
-            );
-
-            ApiErrorResponse errorResponse = readErrorResponse();
-
-            assertUnauthorizedResponse(errorResponse);
-        }
-
-        static Stream<Arguments> authenticationExceptions() {
-            return Stream.of(
-                    Arguments.of(
-                            "bad credentials",
-                            new BadCredentialsException(
-                                    "Invalid username or password"
-                            )
-                    ),
-                    Arguments.of(
-                            "credentials not found",
-                            new AuthenticationCredentialsNotFoundException(
-                                    "Authentication required"
-                            )
-                    ),
-                    Arguments.of(
-                            "insufficient authentication",
-                            new InsufficientAuthenticationException(
-                                    "Insufficient authentication"
-                            )
-                    )
-            );
-        }
+      assertUnauthorizedResponse(errorResponse);
     }
 
-    @Nested
-    @DisplayName("UTF-8 encoding")
-    class Utf8Encoding {
-
-        @Test
-        @DisplayName("Should preserve accented characters when response is decoded as UTF-8")
-        void shouldPreserveAccentedCharactersWhenDecodedAsUtf8()
-                throws Exception {
-
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new BadCredentialsException("Invalid credentials")
-            );
-
-            byte[] responseBytes = response.getContentAsByteArray();
-
-            String body = new String(
-                    responseBytes,
-                    StandardCharsets.UTF_8
-            );
-
-            assertAll(
-                    () -> assertEquals(
-                            StandardCharsets.UTF_8.name(),
-                            response.getCharacterEncoding()
-                    ),
-                    () -> assertTrue(
-                            body.contains(ApiErrorMessages.AUTHENTICATION_FAILED)
-                    ),
-                    () -> assertFalse(
-                            body.contains("NÃ£o")
-                    ),
-                    () -> assertFalse(
-                            body.contains("usuÃ¡rio")
-                    )
-            );
-        }
+    static Stream<Arguments> authenticationExceptions() {
+      return Stream.of(
+          Arguments.of(
+              "bad credentials",
+              new BadCredentialsException(
+                  "Invalid username or password"
+              )
+          ),
+          Arguments.of(
+              "credentials not found",
+              new AuthenticationCredentialsNotFoundException(
+                  "Authentication required"
+              )
+          ),
+          Arguments.of(
+              "insufficient authentication",
+              new InsufficientAuthenticationException(
+                  "Insufficient authentication"
+              )
+          )
+      );
     }
+  }
 
-    @Nested
-    @DisplayName("Response body")
-    class ResponseBody {
+  @Nested
+  @DisplayName("UTF-8 encoding")
+  class Utf8Encoding {
 
-        @Test
-        @DisplayName("Should not expose authentication exception details")
-        void shouldNotExposeAuthenticationExceptionDetails()
-                throws Exception {
+    @Test
+    @DisplayName("Should preserve accented characters when response is decoded as UTF-8")
+    void shouldPreserveAccentedCharactersWhenDecodedAsUtf8()
+        throws Exception {
 
-            AuthenticationException exception =
-                    new BadCredentialsException(
-                            "Sensitive authentication failure details"
-                    );
+      authenticationEntryPoint.commence(
+          request,
+          response,
+          new BadCredentialsException("Invalid credentials")
+      );
 
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    exception
-            );
+      byte[] responseBytes = response.getContentAsByteArray();
 
-            String body = response.getContentAsString(
-                    StandardCharsets.UTF_8
-            );
+      String body = new String(
+          responseBytes,
+          StandardCharsets.UTF_8
+      );
 
-            assertAll(
-                    () -> assertFalse(
-                            body.contains(
-                                    exception.getClass().getSimpleName()
-                            )
-                    ),
-                    () -> assertFalse(
-                            body.contains(exception.getMessage())
-                    ),
-                    () -> assertEquals(
-                            ApiErrorMessages.AUTHENTICATION_FAILED,
-                            readErrorResponse().message()
-                    )
-            );
-        }
+      assertAll(
+          () -> assertEquals(
+              StandardCharsets.UTF_8.name(),
+              response.getCharacterEncoding()
+          ),
+          () -> assertTrue(
+              body.contains(ApiErrorMessages.AUTHENTICATION_FAILED)
+          ),
+          () -> assertFalse(
+              body.contains("NÃ£o")
+          ),
+          () -> assertFalse(
+              body.contains("usuÃ¡rio")
+          )
+      );
     }
+  }
 
-    @Nested
-    @DisplayName("Service unavailable response")
-    class ServiceUnavailableResponse {
+  @Nested
+  @DisplayName("Response body")
+  class ResponseBody {
 
-        @Test
-        @DisplayName("Should return a JSON 503 response with the expected error")
-        void shouldReturnJsonServiceUnavailableResponse() throws Exception {
-            authenticationEntryPoint.commenceServiceUnavailable(response);
+    @Test
+    @DisplayName("Should not expose authentication exception details")
+    void shouldNotExposeAuthenticationExceptionDetails()
+        throws Exception {
 
-            ApiErrorResponse errorResponse = readErrorResponse();
+      AuthenticationException exception =
+          new BadCredentialsException(
+              "Sensitive authentication failure details"
+          );
 
-            MediaType contentType = MediaType.parseMediaType(
-                    response.getContentType()
-            );
+      authenticationEntryPoint.commence(
+          request,
+          response,
+          exception
+      );
 
-            assertAll(
-                    () -> assertEquals(
-                            HttpServletResponse.SC_SERVICE_UNAVAILABLE,
-                            response.getStatus()
-                    ),
-                    () -> assertTrue(
-                            MediaType.APPLICATION_JSON.isCompatibleWith(contentType)
-                    ),
-                    () -> assertEquals(
-                            StandardCharsets.UTF_8.name(),
-                            response.getCharacterEncoding()
-                    ),
-                    () -> assertEquals(
-                            HttpServletResponse.SC_SERVICE_UNAVAILABLE,
-                            errorResponse.status()
-                    ),
-                    () -> assertEquals(
-                            "O serviço está temporariamente indisponível. Tente novamente.",
-                            errorResponse.message()
-                    ),
-                    () -> assertEquals(
-                            FIXED_INSTANT,
-                            errorResponse.timestamp()
-                    )
-            );
-        }
+      String body = response.getContentAsString(
+          StandardCharsets.UTF_8
+      );
+
+      assertAll(
+          () -> assertFalse(
+              body.contains(
+                  exception.getClass().getSimpleName()
+              )
+          ),
+          () -> assertFalse(
+              body.contains(exception.getMessage())
+          ),
+          () -> assertEquals(
+              ApiErrorMessages.AUTHENTICATION_FAILED,
+              readErrorResponse().message()
+          )
+      );
     }
+  }
 
-    private void assertUnauthorizedResponse(ApiErrorResponse errorResponse) {
-        MediaType contentType = MediaType.parseMediaType(
-                response.getContentType()
-        );
+  @Nested
+  @DisplayName("Service unavailable response")
+  class ServiceUnavailableResponse {
 
-        assertAll(
-                () -> assertEquals(
-                        UNAUTHORIZED_STATUS,
-                        response.getStatus()
-                ),
-                () -> assertTrue(
-                        contentType.isCompatibleWith(
-                                MediaType.APPLICATION_JSON
-                        )
-                ),
-                () -> assertEquals(
-                        StandardCharsets.UTF_8.name(),
-                        response.getCharacterEncoding()
-                ),
-                () -> assertEquals(
-                        UNAUTHORIZED_STATUS,
-                        errorResponse.status()
-                ),
-                () -> assertEquals(
-                        ApiErrorMessages.AUTHENTICATION_FAILED,
-                        errorResponse.message()
-                ),
-                () -> assertEquals(
-                        FIXED_INSTANT,
-                        errorResponse.timestamp()
-                )
-        );
+    @Test
+    @DisplayName("Should return a JSON 503 response with the expected error")
+    void shouldReturnJsonServiceUnavailableResponse() throws Exception {
+      authenticationEntryPoint.commenceServiceUnavailable(response);
+
+      ApiErrorResponse errorResponse = readErrorResponse();
+
+      MediaType contentType = MediaType.parseMediaType(
+          response.getContentType()
+      );
+
+      assertAll(
+          () -> assertEquals(
+              HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+              response.getStatus()
+          ),
+          () -> assertTrue(
+              MediaType.APPLICATION_JSON.isCompatibleWith(contentType)
+          ),
+          () -> assertEquals(
+              StandardCharsets.UTF_8.name(),
+              response.getCharacterEncoding()
+          ),
+          () -> assertEquals(
+              HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+              errorResponse.status()
+          ),
+          () -> assertEquals(
+              "O serviço está temporariamente indisponível. Tente novamente.",
+              errorResponse.message()
+          ),
+          () -> assertEquals(
+              FIXED_INSTANT,
+              errorResponse.timestamp()
+          )
+      );
     }
+  }
 
-    private ApiErrorResponse readErrorResponse() throws Exception {
-        return jsonMapper.readValue(
-                response.getContentAsString(StandardCharsets.UTF_8),
-                ApiErrorResponse.class
-        );
-    }
+  private void assertUnauthorizedResponse(ApiErrorResponse errorResponse) {
+    MediaType contentType = MediaType.parseMediaType(
+        response.getContentType()
+    );
+
+    assertAll(
+        () -> assertEquals(
+            UNAUTHORIZED_STATUS,
+            response.getStatus()
+        ),
+        () -> assertTrue(
+            contentType.isCompatibleWith(
+                MediaType.APPLICATION_JSON
+            )
+        ),
+        () -> assertEquals(
+            StandardCharsets.UTF_8.name(),
+            response.getCharacterEncoding()
+        ),
+        () -> assertEquals(
+            UNAUTHORIZED_STATUS,
+            errorResponse.status()
+        ),
+        () -> assertEquals(
+            ApiErrorMessages.AUTHENTICATION_FAILED,
+            errorResponse.message()
+        ),
+        () -> assertEquals(
+            FIXED_INSTANT,
+            errorResponse.timestamp()
+        )
+    );
+  }
+
+  private ApiErrorResponse readErrorResponse() throws Exception {
+    return jsonMapper.readValue(
+        response.getContentAsString(StandardCharsets.UTF_8),
+        ApiErrorResponse.class
+    );
+  }
 }

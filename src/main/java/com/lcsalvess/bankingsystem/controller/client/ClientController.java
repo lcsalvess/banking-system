@@ -125,7 +125,7 @@ public class ClientController {
   })
   @GetMapping
   public Page<ClientSummaryResponseDto> findAll(
-      @Parameter(description = "Filter clients by name", example = "Lucas")
+      @Parameter(description = "Filter clients by name", example = "Pietro")
       @RequestParam(required = false) String name,
       @ParameterObject
       @PageableDefault(sort = "id") Pageable pageable

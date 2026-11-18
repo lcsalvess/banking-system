@@ -1,5 +1,16 @@
 package com.lcsalvess.bankingsystem.unit.service.client;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.clientBuilder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
@@ -12,8 +23,12 @@ import com.lcsalvess.bankingsystem.service.address.AddressData;
 import com.lcsalvess.bankingsystem.service.client.ClientPersistenceService;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData;
 import com.lcsalvess.bankingsystem.service.client.ClientUpdateData.AddressUpdateData;
+import com.lcsalvess.bankingsystem.testsupport.ClientTestFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.lang.reflect.Method;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -32,595 +47,580 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Method;
-import java.util.Optional;
-import java.util.stream.Stream;
-
-import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ClientPersistenceService tests")
 class ClientPersistenceServiceTests {
 
-    private static final String CREATE_TIMER_NAME = "client.persistence.create";
-    private static final String UPDATE_TIMER_NAME = "client.persistence.update";
+  private static final String CREATE_TIMER_NAME = "client.persistence.create";
+  private static final String UPDATE_TIMER_NAME = "client.persistence.update";
 
-    private static final String PROVIDER =
-            "com.lcsalvess.bankingsystem.unit.service.client.ClientPersistenceServiceTests#";
+  private static final String PROVIDER =
+      "com.lcsalvess.bankingsystem.unit.service.client.ClientPersistenceServiceTests#";
 
-    private static final String USERNAME = "test.user";
+  private static final String USERNAME = "test.user";
 
-    private static final Long CLIENT_ID = 1L;
-    private static final String POSTAL_CODE = "01001000";
+  private static final Long CLIENT_ID = 1L;
+  private static final String POSTAL_CODE = "01001000";
 
-    private static final String UPDATED_NAME = "Jane Doe Update";
-    private static final String UPDATED_EMAIL = "jane.doe.update@example.com";
-    private static final String UPDATED_PHONE = "11888888888";
+  private static final String UPDATED_NAME = "Jane Doe Update";
+  private static final String UPDATED_EMAIL = "jane.doe.update@example.com";
+  private static final String UPDATED_PHONE = "11888888888";
 
-    private static final String NEW_STREET_NAME = "Rua Atualizada";
-    private static final String NEW_STREET_NUMBER = "456";
-    private static final String NEW_COMPLEMENT = "Apto 22";
-    private static final String NEW_NEIGHBORHOOD = "Centro";
-    private static final String NEW_CITY = "São Paulo";
-    private static final State NEW_STATE = State.SP;
-    private static final String NEW_POSTAL_CODE = "87654321";
+  private static final String NEW_STREET_NAME = "Rua Atualizada";
+  private static final String NEW_STREET_NUMBER = "456";
+  private static final String NEW_COMPLEMENT = "Apto 22";
+  private static final String NEW_NEIGHBORHOOD = "Centro";
+  private static final String NEW_CITY = "São Paulo";
+  private static final State NEW_STATE = State.SP;
+  private static final String NEW_POSTAL_CODE = "87654321";
 
-    @Mock
-    private ClientRepository clientRepository;
+  @Mock
+  private ClientRepository clientRepository;
 
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
+  @Mock
+  private ApplicationEventPublisher eventPublisher;
 
-    private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
-    private ClientPersistenceService clientPersistenceService;
+  private ClientPersistenceService clientPersistenceService;
 
-    @BeforeEach
-    void setUp() {
-        clientPersistenceService = new ClientPersistenceService(
-                clientRepository,
-                eventPublisher,
-                meterRegistry
-        );
+  @BeforeEach
+  void setUp() {
+    clientPersistenceService = new ClientPersistenceService(
+        clientRepository,
+        eventPublisher,
+        meterRegistry
+    );
+  }
+
+  @Nested
+  @DisplayName("create(Client, String)")
+  class Create {
+
+    @Test
+    @DisplayName("Should save the received client and return the saved entity")
+    void shouldCreateClientSuccessfully() {
+      Client client = unsavedClient();
+
+      when(clientRepository.save(client)).thenAnswer(invocation -> {
+        Client toSave = invocation.getArgument(0);
+        setClientId(toSave);
+        return toSave;
+      });
+
+      Client result = clientPersistenceService.create(client, USERNAME);
+
+      assertSame(client, result);
+      assertEquals(CLIENT_ID, result.getId());
+
+      verify(clientRepository).save(client);
+      verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @Nested
-    @DisplayName("create(Client, String)")
-    class Create {
+    @Test
+    @DisplayName("Should publish client created event")
+    void shouldPublishClientCreatedEvent() {
+      Client client = unsavedClient();
 
-        @Test
-        @DisplayName("Should save the received client and return the saved entity")
-        void shouldCreateClientSuccessfully() {
-            Client client = unsavedClient();
+      when(clientRepository.save(client)).thenAnswer(invocation -> {
+        Client toSave = invocation.getArgument(0);
+        setClientId(toSave);
+        return toSave;
+      });
 
-            when(clientRepository.save(client)).thenAnswer(invocation -> {
-                Client toSave = invocation.getArgument(0);
-                setClientId(toSave);
-                return toSave;
-            });
+      clientPersistenceService.create(client, USERNAME);
 
-            Client result = clientPersistenceService.create(client, USERNAME);
+      ClientOperationEvent event = capturePublishedEvent();
 
-            assertSame(client, result);
-            assertEquals(CLIENT_ID, result.getId());
+      assertEquals(CLIENT_ID, event.clientId());
+      assertEquals(ClientOperationType.CREATED, event.type());
+      assertEquals(USERNAME, event.username());
 
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should publish client created event")
-        void shouldPublishClientCreatedEvent() {
-            Client client = unsavedClient();
-
-            when(clientRepository.save(client)).thenAnswer(invocation -> {
-                Client toSave = invocation.getArgument(0);
-                setClientId(toSave);
-                return toSave;
-            });
-
-            clientPersistenceService.create(client, USERNAME);
-
-            ClientOperationEvent event = capturePublishedEvent();
-
-            assertEquals(CLIENT_ID, event.clientId());
-            assertEquals(ClientOperationType.CREATED, event.type());
-            assertEquals(USERNAME, event.username());
-
-            verify(clientRepository).save(client);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should record the persistence timer")
-        void shouldRecordPersistenceTimer() {
-            Client client = unsavedClient();
-
-            when(clientRepository.save(client)).thenReturn(client);
-
-            clientPersistenceService.create(client, USERNAME);
-
-            assertEquals(1, meterRegistry.get(CREATE_TIMER_NAME).timer().count());
-
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should propagate the failure and not publish the event when save fails")
-        void shouldNotPublishEventWhenSaveFails() {
-            Client client = unsavedClient();
-            DataIntegrityViolationException exception =
-                    new DataIntegrityViolationException("uk_client_cpf");
-
-            when(clientRepository.save(client)).thenThrow(exception);
-
-            DataIntegrityViolationException thrown = assertThrows(
-                    DataIntegrityViolationException.class,
-                    () -> clientPersistenceService.create(client, USERNAME)
-            );
-
-            assertSame(exception, thrown);
-
-            verify(clientRepository).save(client);
-            verifyNoInteractions(eventPublisher);
-            verifyNoMoreInteractions(clientRepository);
-        }
+      verify(clientRepository).save(client);
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @Nested
-    @DisplayName("update(Long, ClientUpdateData, String)")
-    class Update {
+    @Test
+    @DisplayName("Should record the persistence timer")
+    void shouldRecordPersistenceTimer() {
+      Client client = unsavedClient();
 
-        @Test
-        @DisplayName("Should update client fields and keep the address when none is sent")
-        void shouldUpdateClientSuccessfully() {
-            Client client = client();
-            Address originalAddress = client.getAddress();
-            AddressSnapshot originalSnapshot = AddressSnapshot.of(originalAddress);
+      when(clientRepository.save(client)).thenReturn(client);
 
-            when(clientRepository.findById(CLIENT_ID))
-                    .thenReturn(Optional.of(client));
-            when(clientRepository.save(client)).thenReturn(client);
+      clientPersistenceService.create(client, USERNAME);
 
-            Client result = clientPersistenceService.update(
-                    CLIENT_ID,
-                    clientOnlyUpdateData(),
-                    USERNAME
-            );
+      assertEquals(1, meterRegistry.get(CREATE_TIMER_NAME).timer().count());
 
-            assertSame(client, result);
-            assertEquals(UPDATED_NAME, result.getName());
-            assertEquals(UPDATED_EMAIL, result.getEmail());
-            assertEquals(UPDATED_PHONE, result.getPhoneNumber());
-            assertSame(originalAddress, result.getAddress());
-            assertAddressUnchanged(originalSnapshot, result.getAddress());
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        // A null expected value means the field must keep its original value.
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "partialUpdates")
-        @DisplayName("Should update only the provided client fields")
-        void shouldUpdateOnlyTheProvidedFields(
-                String scenario,
-                ClientUpdateData data,
-                String expectedName,
-                String expectedEmail,
-                String expectedPhone
-        ) {
-            Client client = client();
-            String originalName = client.getName();
-            String originalEmail = client.getEmail();
-            String originalPhone = client.getPhoneNumber();
-            AddressSnapshot originalAddress = AddressSnapshot.of(client.getAddress());
-
-            when(clientRepository.findById(CLIENT_ID))
-                    .thenReturn(Optional.of(client));
-            when(clientRepository.save(client)).thenReturn(client);
-
-            Client result = clientPersistenceService.update(
-                    CLIENT_ID,
-                    data,
-                    USERNAME
-            );
-
-            assertEquals(expectedName != null ? expectedName : originalName, result.getName());
-            assertEquals(expectedEmail != null ? expectedEmail : originalEmail, result.getEmail());
-            assertEquals(expectedPhone != null ? expectedPhone : originalPhone, result.getPhoneNumber());
-            assertAddressUnchanged(originalAddress, result.getAddress());
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should update client address successfully")
-        void shouldUpdateClientAddressSuccessfully() {
-            Client client = client();
-            ClientUpdateData data = new ClientUpdateData(
-                    UPDATED_NAME,
-                    UPDATED_EMAIL,
-                    UPDATED_PHONE,
-                    new AddressUpdateData(addressData(), NEW_STREET_NUMBER, NEW_COMPLEMENT)
-            );
-
-            when(clientRepository.findById(CLIENT_ID))
-                    .thenReturn(Optional.of(client));
-            when(clientRepository.save(client)).thenReturn(client);
-
-            Client result = clientPersistenceService.update(
-                    CLIENT_ID,
-                    data,
-                    USERNAME
-            );
-
-            Address updatedAddress = result.getAddress();
-
-            assertEquals(NEW_STREET_NAME, updatedAddress.getStreetName());
-            assertEquals(NEW_NEIGHBORHOOD, updatedAddress.getNeighborhood());
-            assertEquals(NEW_CITY, updatedAddress.getCity());
-            assertEquals(NEW_STATE, updatedAddress.getState());
-            assertEquals(NEW_POSTAL_CODE, updatedAddress.getPostalCode());
-            assertEquals(NEW_STREET_NUMBER, updatedAddress.getStreetNumber());
-            assertEquals(NEW_COMPLEMENT, updatedAddress.getComplement());
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "addressUpdates")
-        @DisplayName("Should update address fields according to the update data")
-        void shouldUpdateAddressFields(
-                String scenario,
-                String streetNumber,
-                String complement,
-                String expectedStreetNumber,
-                String expectedComplement
-        ) {
-            Client client = client();
-            ClientUpdateData data = new ClientUpdateData(
-                    null,
-                    null,
-                    null,
-                    new AddressUpdateData(addressData(), streetNumber, complement)
-            );
-
-            when(clientRepository.findById(CLIENT_ID))
-                    .thenReturn(Optional.of(client));
-            when(clientRepository.save(client)).thenReturn(client);
-
-            Client result = clientPersistenceService.update(
-                    CLIENT_ID,
-                    data,
-                    USERNAME
-            );
-
-            Address updatedAddress = result.getAddress();
-
-            assertEquals(expectedStreetNumber, updatedAddress.getStreetNumber());
-            assertEquals(expectedComplement, updatedAddress.getComplement());
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when client does not exist")
-        void shouldThrowWhenClientDoesNotExist() {
-            when(clientRepository.findById(CLIENT_ID))
-                    .thenReturn(Optional.empty());
-
-            assertClientNotFound(
-                    () -> clientPersistenceService.update(
-                            CLIENT_ID,
-                            fullUpdateData(),
-                            USERNAME
-                    )
-            );
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verifyNoInteractions(eventPublisher);
-            verifyNoMoreInteractions(clientRepository);
-        }
-
-        @Test
-        @DisplayName("Should propagate the failure and not publish the event when save fails")
-        void shouldNotPublishEventWhenSaveFails() {
-            Client client = client();
-            DataIntegrityViolationException exception =
-                    new DataIntegrityViolationException("update failed");
-
-            when(clientRepository.findById(CLIENT_ID))
-                    .thenReturn(Optional.of(client));
-            when(clientRepository.save(client)).thenThrow(exception);
-
-            DataIntegrityViolationException thrown = assertThrows(
-                    DataIntegrityViolationException.class,
-                    () -> clientPersistenceService.update(
-                            CLIENT_ID,
-                            clientOnlyUpdateData(),
-                            USERNAME
-                    )
-            );
-
-            assertSame(exception, thrown);
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verify(clientRepository).save(client);
-            verifyNoInteractions(eventPublisher);
-            verifyNoMoreInteractions(clientRepository);
-        }
-
-        @Test
-        @DisplayName("Should record the update timer")
-        void shouldRecordUpdateTimer() {
-            Client client = client();
-
-            when(clientRepository.findById(CLIENT_ID))
-                    .thenReturn(Optional.of(client));
-            when(clientRepository.save(client)).thenReturn(client);
-
-            clientPersistenceService.update(
-                    CLIENT_ID,
-                    clientOnlyUpdateData(),
-                    USERNAME
-            );
-
-            assertEquals(1, meterRegistry.get(UPDATE_TIMER_NAME).timer().count());
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verify(clientRepository).save(client);
-            verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should publish client updated event")
-        void shouldPublishClientUpdatedEvent() {
-            Client client = client();
-
-            when(clientRepository.findById(CLIENT_ID))
-                    .thenReturn(Optional.of(client));
-            when(clientRepository.save(client)).thenReturn(client);
-
-            clientPersistenceService.update(
-                    CLIENT_ID,
-                    clientOnlyUpdateData(),
-                    USERNAME
-            );
-
-            ClientOperationEvent event = capturePublishedEvent();
-
-            assertEquals(CLIENT_ID, event.clientId());
-            assertEquals(ClientOperationType.UPDATED, event.type());
-            assertEquals(USERNAME, event.username());
-
-            verify(clientRepository).findById(CLIENT_ID);
-            verify(clientRepository).save(client);
-            verifyNoMoreInteractionsOnMocks();
-        }
+      verify(clientRepository).save(client);
+      verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @Nested
-    @DisplayName("transaction boundaries")
-    class TransactionBoundaries {
+    @Test
+    @DisplayName("Should propagate the failure and not publish the event when save fails")
+    void shouldNotPublishEventWhenSaveFails() {
+      Client client = unsavedClient();
+      DataIntegrityViolationException exception =
+          new DataIntegrityViolationException("uk_client_cpf");
 
-        // This service owns the write transaction. The annotation must be
-        // Spring's: the proxy is created via @Transactional and the
-        // AFTER_COMMIT event relies on that transaction existing at publish time.
-        @Test
-        @DisplayName("create and update should run inside a transaction")
-        void createAndUpdateShouldBeTransactional() throws NoSuchMethodException {
-            Method create = ClientPersistenceService.class.getMethod(
-                    "create",
-                    Client.class,
-                    String.class
-            );
-            Method update = ClientPersistenceService.class.getMethod(
-                    "update",
-                    Long.class,
-                    ClientUpdateData.class,
-                    String.class
-            );
+      when(clientRepository.save(client)).thenThrow(exception);
 
-            assertTrue(AnnotatedElementUtils.hasAnnotation(create, Transactional.class));
-            assertTrue(AnnotatedElementUtils.hasAnnotation(update, Transactional.class));
-        }
+      DataIntegrityViolationException thrown = assertThrows(
+          DataIntegrityViolationException.class,
+          () -> clientPersistenceService.create(client, USERNAME)
+      );
+
+      assertSame(exception, thrown);
+
+      verify(clientRepository).save(client);
+      verifyNoInteractions(eventPublisher);
+      verifyNoMoreInteractions(clientRepository);
+    }
+  }
+
+  @Nested
+  @DisplayName("update(Long, ClientUpdateData, String)")
+  class Update {
+
+    @Test
+    @DisplayName("Should update client fields and keep the address when none is sent")
+    void shouldUpdateClientSuccessfully() {
+      Client client = client();
+      Address originalAddress = client.getAddress();
+      final AddressSnapshot originalSnapshot = AddressSnapshot.of(originalAddress);
+
+      when(clientRepository.findById(CLIENT_ID))
+          .thenReturn(Optional.of(client));
+      when(clientRepository.save(client)).thenReturn(client);
+
+      Client result = clientPersistenceService.update(
+          CLIENT_ID,
+          clientOnlyUpdateData(),
+          USERNAME
+      );
+
+      assertSame(client, result);
+      assertEquals(UPDATED_NAME, result.getName());
+      assertEquals(UPDATED_EMAIL, result.getEmail());
+      assertEquals(UPDATED_PHONE, result.getPhoneNumber());
+      assertSame(originalAddress, result.getAddress());
+      assertAddressUnchanged(originalSnapshot, result.getAddress());
+
+      verify(clientRepository).findById(CLIENT_ID);
+      verify(clientRepository).save(client);
+      verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> partialUpdates() {
-        return Stream.of(
-                Arguments.of(
-                        "only name is sent",
-                        new ClientUpdateData(UPDATED_NAME, null, null, null),
-                        UPDATED_NAME,
-                        null,
-                        null
-                ),
-                Arguments.of(
-                        "only email is sent",
-                        new ClientUpdateData(null, UPDATED_EMAIL, null, null),
-                        null,
-                        UPDATED_EMAIL,
-                        null
-                ),
-                Arguments.of(
-                        "only phone number is sent",
-                        new ClientUpdateData(null, null, UPDATED_PHONE, null),
-                        null,
-                        null,
-                        UPDATED_PHONE
-                ),
-                Arguments.of(
-                        "nothing is sent",
-                        new ClientUpdateData(null, null, null, null),
-                        null,
-                        null,
-                        null
-                )
-        );
-    }
-
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> addressUpdates() {
-        return Stream.of(
-                Arguments.of(
-                        "street number and complement are updated",
-                        NEW_STREET_NUMBER,
-                        NEW_COMPLEMENT,
-                        NEW_STREET_NUMBER,
-                        NEW_COMPLEMENT
-                ),
-                Arguments.of(
-                        "complement is cleared when blank",
-                        NEW_STREET_NUMBER,
-                        "   ",
-                        NEW_STREET_NUMBER,
-                        null
-                ),
-                Arguments.of(
-                        "complement is cleared when null",
-                        NEW_STREET_NUMBER,
-                        null,
-                        NEW_STREET_NUMBER,
-                        null
-                )
-        );
-    }
-
-    private ClientOperationEvent capturePublishedEvent() {
-        ArgumentCaptor<ClientOperationEvent> eventCaptor =
-                ArgumentCaptor.forClass(ClientOperationEvent.class);
-
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
-
-        return eventCaptor.getValue();
-    }
-
-    private void verifyNoMoreInteractionsOnMocks() {
-        verifyNoMoreInteractions(clientRepository, eventPublisher);
-    }
-
-    private static void assertClientNotFound(Executable executable) {
-        ClientNotFoundException exception = assertThrows(
-                ClientNotFoundException.class,
-                executable
-        );
-
-        assertEquals(ApiErrorMessages.CLIENT_NOT_FOUND, exception.getMessage());
-    }
-
-    private static void assertAddressUnchanged(AddressSnapshot expected, Address actual) {
-        assertEquals(expected, AddressSnapshot.of(actual));
-    }
-
-    // Update without address: in this case ClientService forwards address = null.
-    private static ClientUpdateData clientOnlyUpdateData() {
-        return new ClientUpdateData(
-                UPDATED_NAME,
-                UPDATED_EMAIL,
-                UPDATED_PHONE,
-                null
-        );
-    }
-
-    // Update with address: ClientService forwards the looked-up address.
-    private static ClientUpdateData fullUpdateData() {
-        return new ClientUpdateData(
-                UPDATED_NAME,
-                UPDATED_EMAIL,
-                UPDATED_PHONE,
-                new AddressUpdateData(addressData(), NEW_STREET_NUMBER, NEW_COMPLEMENT)
-        );
-    }
-
-    private static AddressData addressData() {
-        return new AddressData(
-                NEW_STREET_NAME,
-                NEW_NEIGHBORHOOD,
-                NEW_CITY,
-                NEW_STATE,
-                NEW_POSTAL_CODE
-        );
-    }
-
-    // Has a non-null complement on purpose: the "complement is cleared"
-    // scenarios only prove something if the original complement is set.
-    private static Address address() {
-        return new Address(
-                "Rua Teste",
-                "123",
-                "Apto 10",
-                "Centro",
-                "São Paulo",
-                State.SP,
-                POSTAL_CODE
-        );
-    }
-
-    // Client not yet persisted (no id), as it arrives from ClientService on creation.
-    private static Client unsavedClient() {
-        return aClient("persistence-client").build();
-    }
-
-    private static Client client() {
-        return aClient("persistence-client")
-                .withId(CLIENT_ID)
-                .withAddress(address())
-                .build();
-    }
-
-    // Simulates the id assignment done by the database on save.
-    private static void setClientId(Client client) {
-        ReflectionTestUtils.setField(client, "id", CLIENT_ID);
-    }
-
-    // Detached copy of the address fields, so "unchanged" assertions do not
-    // compare an object with itself when the entity is mutated in place.
-    private record AddressSnapshot(
-            String streetName,
-            String streetNumber,
-            String complement,
-            String neighborhood,
-            String city,
-            State state,
-            String postalCode
+    // A null expected value means the field must keep its original value.
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "partialUpdates")
+    @DisplayName("Should update only the provided client fields")
+    void shouldUpdateOnlyTheProvidedFields(
+        String scenario,
+        ClientUpdateData data,
+        String expectedName,
+        String expectedEmail,
+        String expectedPhone
     ) {
+      Client client = client();
+      String originalName = client.getName();
+      final String originalEmail = client.getEmail();
+      final String originalPhone = client.getPhoneNumber();
+      final AddressSnapshot originalAddress = AddressSnapshot.of(client.getAddress());
 
-        static AddressSnapshot of(Address address) {
-            return new AddressSnapshot(
-                    address.getStreetName(),
-                    address.getStreetNumber(),
-                    address.getComplement(),
-                    address.getNeighborhood(),
-                    address.getCity(),
-                    address.getState(),
-                    address.getPostalCode()
-            );
-        }
+      when(clientRepository.findById(CLIENT_ID))
+          .thenReturn(Optional.of(client));
+      when(clientRepository.save(client)).thenReturn(client);
+
+      Client result = clientPersistenceService.update(
+          CLIENT_ID,
+          data,
+          USERNAME
+      );
+
+      assertEquals(expectedName != null ? expectedName : originalName, result.getName());
+      assertEquals(expectedEmail != null ? expectedEmail : originalEmail, result.getEmail());
+      assertEquals(expectedPhone != null ? expectedPhone : originalPhone, result.getPhoneNumber());
+      assertAddressUnchanged(originalAddress, result.getAddress());
+
+      verify(clientRepository).findById(CLIENT_ID);
+      verify(clientRepository).save(client);
+      verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
+      verifyNoMoreInteractionsOnMocks();
     }
+
+    @Test
+    @DisplayName("Should update client address successfully")
+    void shouldUpdateClientAddressSuccessfully() {
+      Client client = client();
+      ClientUpdateData data = new ClientUpdateData(
+          UPDATED_NAME,
+          UPDATED_EMAIL,
+          UPDATED_PHONE,
+          new AddressUpdateData(addressData(), NEW_STREET_NUMBER, NEW_COMPLEMENT)
+      );
+
+      when(clientRepository.findById(CLIENT_ID))
+          .thenReturn(Optional.of(client));
+      when(clientRepository.save(client)).thenReturn(client);
+
+      Client result = clientPersistenceService.update(
+          CLIENT_ID,
+          data,
+          USERNAME
+      );
+
+      Address updatedAddress = result.getAddress();
+
+      assertEquals(NEW_STREET_NAME, updatedAddress.getStreetName());
+      assertEquals(NEW_NEIGHBORHOOD, updatedAddress.getNeighborhood());
+      assertEquals(NEW_CITY, updatedAddress.getCity());
+      assertEquals(NEW_STATE, updatedAddress.getState());
+      assertEquals(NEW_POSTAL_CODE, updatedAddress.getPostalCode());
+      assertEquals(NEW_STREET_NUMBER, updatedAddress.getStreetNumber());
+      assertEquals(NEW_COMPLEMENT, updatedAddress.getComplement());
+
+      verify(clientRepository).findById(CLIENT_ID);
+      verify(clientRepository).save(client);
+      verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "addressUpdates")
+    @DisplayName("Should update address fields according to the update data")
+    void shouldUpdateAddressFields(
+        String scenario,
+        String streetNumber,
+        String complement,
+        String expectedStreetNumber,
+        String expectedComplement
+    ) {
+      Client client = client();
+      ClientUpdateData data = new ClientUpdateData(
+          null,
+          null,
+          null,
+          new AddressUpdateData(addressData(), streetNumber, complement)
+      );
+
+      when(clientRepository.findById(CLIENT_ID))
+          .thenReturn(Optional.of(client));
+      when(clientRepository.save(client)).thenReturn(client);
+
+      Client result = clientPersistenceService.update(
+          CLIENT_ID,
+          data,
+          USERNAME
+      );
+
+      Address updatedAddress = result.getAddress();
+
+      assertEquals(expectedStreetNumber, updatedAddress.getStreetNumber());
+      assertEquals(expectedComplement, updatedAddress.getComplement());
+
+      verify(clientRepository).findById(CLIENT_ID);
+      verify(clientRepository).save(client);
+      verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @Test
+    @DisplayName("Should throw when client does not exist")
+    void shouldThrowWhenClientDoesNotExist() {
+      when(clientRepository.findById(CLIENT_ID))
+          .thenReturn(Optional.empty());
+
+      assertClientNotFound(
+          () -> clientPersistenceService.update(
+              CLIENT_ID,
+              fullUpdateData(),
+              USERNAME
+          )
+      );
+
+      verify(clientRepository).findById(CLIENT_ID);
+      verifyNoInteractions(eventPublisher);
+      verifyNoMoreInteractions(clientRepository);
+    }
+
+    @Test
+    @DisplayName("Should propagate the failure and not publish the event when save fails")
+    void shouldNotPublishEventWhenSaveFails() {
+      Client client = client();
+      DataIntegrityViolationException exception =
+          new DataIntegrityViolationException("update failed");
+
+      when(clientRepository.findById(CLIENT_ID))
+          .thenReturn(Optional.of(client));
+      when(clientRepository.save(client)).thenThrow(exception);
+
+      DataIntegrityViolationException thrown = assertThrows(
+          DataIntegrityViolationException.class,
+          () -> clientPersistenceService.update(
+              CLIENT_ID,
+              clientOnlyUpdateData(),
+              USERNAME
+          )
+      );
+
+      assertSame(exception, thrown);
+
+      verify(clientRepository).findById(CLIENT_ID);
+      verify(clientRepository).save(client);
+      verifyNoInteractions(eventPublisher);
+      verifyNoMoreInteractions(clientRepository);
+    }
+
+    @Test
+    @DisplayName("Should record the update timer")
+    void shouldRecordUpdateTimer() {
+      Client client = client();
+
+      when(clientRepository.findById(CLIENT_ID))
+          .thenReturn(Optional.of(client));
+      when(clientRepository.save(client)).thenReturn(client);
+
+      clientPersistenceService.update(
+          CLIENT_ID,
+          clientOnlyUpdateData(),
+          USERNAME
+      );
+
+      assertEquals(1, meterRegistry.get(UPDATE_TIMER_NAME).timer().count());
+
+      verify(clientRepository).findById(CLIENT_ID);
+      verify(clientRepository).save(client);
+      verify(eventPublisher).publishEvent(any(ClientOperationEvent.class));
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @Test
+    @DisplayName("Should publish client updated event")
+    void shouldPublishClientUpdatedEvent() {
+      Client client = client();
+
+      when(clientRepository.findById(CLIENT_ID))
+          .thenReturn(Optional.of(client));
+      when(clientRepository.save(client)).thenReturn(client);
+
+      clientPersistenceService.update(
+          CLIENT_ID,
+          clientOnlyUpdateData(),
+          USERNAME
+      );
+
+      ClientOperationEvent event = capturePublishedEvent();
+
+      assertEquals(CLIENT_ID, event.clientId());
+      assertEquals(ClientOperationType.UPDATED, event.type());
+      assertEquals(USERNAME, event.username());
+
+      verify(clientRepository).findById(CLIENT_ID);
+      verify(clientRepository).save(client);
+      verifyNoMoreInteractionsOnMocks();
+    }
+  }
+
+  @Nested
+  @DisplayName("transaction boundaries")
+  class TransactionBoundaries {
+
+    // This service owns the write transaction. The annotation must be
+    // Spring's: the proxy is created via @Transactional and the
+    // AFTER_COMMIT event relies on that transaction existing at publish time.
+    @Test
+    @DisplayName("create and update should run inside a transaction")
+    void createAndUpdateShouldBeTransactional() throws NoSuchMethodException {
+      Method create = ClientPersistenceService.class.getMethod(
+          "create",
+          Client.class,
+          String.class
+      );
+      Method update = ClientPersistenceService.class.getMethod(
+          "update",
+          Long.class,
+          ClientUpdateData.class,
+          String.class
+      );
+
+      assertTrue(AnnotatedElementUtils.hasAnnotation(create, Transactional.class));
+      assertTrue(AnnotatedElementUtils.hasAnnotation(update, Transactional.class));
+    }
+  }
+
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> partialUpdates() {
+    return Stream.of(
+        Arguments.of(
+            "only name is sent",
+            new ClientUpdateData(UPDATED_NAME, null, null, null),
+            UPDATED_NAME,
+            null,
+            null
+        ),
+        Arguments.of(
+            "only email is sent",
+            new ClientUpdateData(null, UPDATED_EMAIL, null, null),
+            null,
+            UPDATED_EMAIL,
+            null
+        ),
+        Arguments.of(
+            "only phone number is sent",
+            new ClientUpdateData(null, null, UPDATED_PHONE, null),
+            null,
+            null,
+            UPDATED_PHONE
+        ),
+        Arguments.of(
+            "nothing is sent",
+            new ClientUpdateData(null, null, null, null),
+            null,
+            null,
+            null
+        )
+    );
+  }
+
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> addressUpdates() {
+    return Stream.of(
+        Arguments.of(
+            "street number and complement are updated",
+            NEW_STREET_NUMBER,
+            NEW_COMPLEMENT,
+            NEW_STREET_NUMBER,
+            NEW_COMPLEMENT
+        ),
+        Arguments.of(
+            "complement is cleared when blank",
+            NEW_STREET_NUMBER,
+            "   ",
+            NEW_STREET_NUMBER,
+            null
+        ),
+        Arguments.of(
+            "complement is cleared when null",
+            NEW_STREET_NUMBER,
+            null,
+            NEW_STREET_NUMBER,
+            null
+        )
+    );
+  }
+
+  private ClientOperationEvent capturePublishedEvent() {
+    ArgumentCaptor<ClientOperationEvent> eventCaptor =
+        ArgumentCaptor.forClass(ClientOperationEvent.class);
+
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+    return eventCaptor.getValue();
+  }
+
+  private void verifyNoMoreInteractionsOnMocks() {
+    verifyNoMoreInteractions(clientRepository, eventPublisher);
+  }
+
+  private static void assertClientNotFound(Executable executable) {
+    ClientNotFoundException exception = assertThrows(
+        ClientNotFoundException.class,
+        executable
+    );
+
+    assertEquals(ApiErrorMessages.CLIENT_NOT_FOUND, exception.getMessage());
+  }
+
+  private static void assertAddressUnchanged(AddressSnapshot expected, Address actual) {
+    assertEquals(expected, AddressSnapshot.of(actual));
+  }
+
+  // Update without address: in this case ClientService forwards address = null.
+  private static ClientUpdateData clientOnlyUpdateData() {
+    return new ClientUpdateData(
+        UPDATED_NAME,
+        UPDATED_EMAIL,
+        UPDATED_PHONE,
+        null
+    );
+  }
+
+  // Update with address: ClientService forwards the looked-up address.
+  private static ClientUpdateData fullUpdateData() {
+    return new ClientUpdateData(
+        UPDATED_NAME,
+        UPDATED_EMAIL,
+        UPDATED_PHONE,
+        new AddressUpdateData(addressData(), NEW_STREET_NUMBER, NEW_COMPLEMENT)
+    );
+  }
+
+  private static AddressData addressData() {
+    return new AddressData(
+        NEW_STREET_NAME,
+        NEW_NEIGHBORHOOD,
+        NEW_CITY,
+        NEW_STATE,
+        NEW_POSTAL_CODE
+    );
+  }
+
+  // Has a non-null complement on purpose: the "complement is cleared"
+  // scenarios only prove something if the original complement is set.
+  private static Address address() {
+    return new Address(
+        "Rua Teste",
+        "123",
+        "Apto 10",
+        "Centro",
+        "São Paulo",
+        State.SP,
+        POSTAL_CODE
+    );
+  }
+
+  // Client not yet persisted (no id), as it arrives from ClientService on creation.
+  private static Client unsavedClient() {
+    return ClientTestFactory.clientBuilder("persistence-client").build();
+  }
+
+  private static Client client() {
+    return ClientTestFactory.clientBuilder("persistence-client")
+        .withId(CLIENT_ID)
+        .withAddress(address())
+        .build();
+  }
+
+  // Simulates the id assignment done by the database on save.
+  private static void setClientId(Client client) {
+    ReflectionTestUtils.setField(client, "id", CLIENT_ID);
+  }
+
+  // Detached copy of the address fields, so "unchanged" assertions do not
+  // compare an object with itself when the entity is mutated in place.
+  private record AddressSnapshot(
+      String streetName,
+      String streetNumber,
+      String complement,
+      String neighborhood,
+      String city,
+      State state,
+      String postalCode
+  ) {
+
+    static AddressSnapshot of(Address address) {
+      return new AddressSnapshot(
+          address.getStreetName(),
+          address.getStreetNumber(),
+          address.getComplement(),
+          address.getNeighborhood(),
+          address.getCity(),
+          address.getState(),
+          address.getPostalCode()
+      );
+    }
+  }
 }

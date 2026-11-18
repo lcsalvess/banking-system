@@ -1,5 +1,13 @@
 package com.lcsalvess.bankingsystem.integration.transaction;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.clientBuilder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
+
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
 import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDto;
 import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
@@ -20,8 +28,20 @@ import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNum
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
 import com.lcsalvess.bankingsystem.service.transaction.TransactionService;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
+import com.lcsalvess.bankingsystem.testsupport.ClientTestFactory;
 import com.lcsalvess.bankingsystem.testsupport.LedgerTestCleaner;
 import com.lcsalvess.bankingsystem.testsupport.UserTestFactory;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,685 +56,667 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.when;
-
 @ActiveProfiles("test")
 @SpringBootTest
 @DisplayName("Transaction idempotency integration")
 class TransactionIdempotencyIntegrationTests {
 
-    private static final int TIMEOUT_SECONDS = 30;
+  private static final int TIMEOUT_SECONDS = 30;
 
-    @Autowired
-    private TransactionIdempotencyService transactionIdempotencyService;
+  @Autowired
+  private TransactionIdempotencyService transactionIdempotencyService;
 
-    @Autowired
-    private TransactionIdempotencyRepository idempotencyRepository;
+  @Autowired
+  private TransactionIdempotencyRepository idempotencyRepository;
 
-    @Autowired
-    private TransactionService transactionService;
+  @Autowired
+  private TransactionService transactionService;
 
-    @Autowired
-    private LedgerTestCleaner ledgerTestCleaner;
+  @Autowired
+  private LedgerTestCleaner ledgerTestCleaner;
 
-    @Autowired
-    private AccountRepository accountRepository;
+  @Autowired
+  private AccountRepository accountRepository;
 
-    @Autowired
-    private AddressRepository addressRepository;
+  @Autowired
+  private AddressRepository addressRepository;
 
-    @Autowired
-    private ClientRepository clientRepository;
+  @Autowired
+  private ClientRepository clientRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired
+  private UserRepository userRepository;
 
-    @Autowired
-    private AccountNumberGenerator accountNumberGenerator;
+  @Autowired
+  private AccountNumberGenerator accountNumberGenerator;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private PlatformTransactionManager transactionManager;
+  @Autowired
+  private PlatformTransactionManager transactionManager;
 
-    @MockitoBean
-    private CurrentUserService currentUserService;
+  @MockitoBean
+  private CurrentUserService currentUserService;
 
-    private User testUser;
+  private User testUser;
 
-    @BeforeEach
-    void setUp() {
-        clearIdempotencyRequests();
+  @BeforeEach
+  void setUp() {
+    clearIdempotencyRequests();
 
-        ledgerTestCleaner.deleteAllTransactions();
-        accountRepository.deleteAll();
-        clientRepository.deleteAll();
-        addressRepository.deleteAll();
-        userRepository.deleteAll();
+    ledgerTestCleaner.deleteAllTransactions();
+    accountRepository.deleteAll();
+    clientRepository.deleteAll();
+    addressRepository.deleteAll();
+    userRepository.deleteAll();
 
-        testUser = createUser();
+    testUser = createUser();
 
-        when(currentUserService.getCurrentUser()).thenReturn(testUser);
-        when(currentUserService.getUsername()).thenReturn(testUser.getUsername());
+    when(currentUserService.getCurrentUser()).thenReturn(testUser);
+    when(currentUserService.getUsername()).thenReturn(testUser.getUsername());
+  }
+
+  @AfterEach
+  void cleanUpIdempotencyRequests() {
+    clearIdempotencyRequests();
+  }
+
+  @Nested
+  @DisplayName("Repeated requests")
+  class RepeatedRequests {
+
+    @Test
+    @DisplayName("Should return the original result without executing a second deposit")
+    void shouldReturnOriginalResultWhenDepositIsRepeated() {
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      AccountOperationRequestDto firstRequest =
+          operation(account, "100.00");
+
+      AccountOperationRequestDto retryRequest =
+          operation(account, "100.00");
+
+      TransactionResponseDto firstResponse =
+          transactionIdempotencyService.deposit(
+              idempotencyKey,
+              firstRequest
+          );
+
+      TransactionResponseDto retryResponse =
+          transactionIdempotencyService.deposit(
+              idempotencyKey,
+              retryRequest
+          );
+
+      assertSameTransaction(firstResponse, retryResponse);
+
+      assertEquals(
+          firstResponse.transactionCode(),
+          idempotencyRepository
+              .findByUserIdAndKey(testUser.getId(), idempotencyKey)
+              .orElseThrow()
+              .transactionCode()
+      );
+
+      assertBalance("100.00", account);
+      assertEquals(1L, countTransactions(account));
+      assertEquals(1L, countIdempotencyRequests());
     }
 
-    @AfterEach
-    void cleanUpIdempotencyRequests() {
-        clearIdempotencyRequests();
+    @Test
+    @DisplayName("Should treat equivalent amount scales as the same request")
+    void shouldReplayWhenAmountScaleDiffers() {
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      TransactionResponseDto firstResponse =
+          transactionIdempotencyService.deposit(
+              idempotencyKey,
+              operation(account, "100")
+          );
+
+      TransactionResponseDto retryResponse =
+          transactionIdempotencyService.deposit(
+              idempotencyKey,
+              operation(account, "100.00")
+          );
+
+      assertSameTransaction(firstResponse, retryResponse);
+      assertBalance("100.00", account);
+      assertEquals(1L, countTransactions(account));
+      assertEquals(1L, countIdempotencyRequests());
     }
 
-    @Nested
-    @DisplayName("Repeated requests")
-    class RepeatedRequests {
+    @Test
+    @DisplayName("Should return the original result without executing a second transfer")
+    void shouldReturnOriginalResultWhenTransferIsRepeated() {
+      CheckingAccount source = createCheckingAccount("500.00");
+      CheckingAccount destination = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
 
-        @Test
-        @DisplayName("Should return the original result without executing a second deposit")
-        void shouldReturnOriginalResultWhenDepositIsRepeated() {
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
+      TransferRequestDto firstRequest =
+          transfer(source, destination, "100.00");
 
-            AccountOperationRequestDto firstRequest =
-                    operation(account, "100.00");
+      TransferRequestDto retryRequest =
+          transfer(source, destination, "100.00");
 
-            AccountOperationRequestDto retryRequest =
-                    operation(account, "100.00");
+      TransactionResponseDto firstResponse =
+          transactionIdempotencyService.transfer(
+              idempotencyKey,
+              firstRequest
+          );
 
-            TransactionResponseDto firstResponse =
-                    transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            firstRequest
-                    );
+      TransactionResponseDto retryResponse =
+          transactionIdempotencyService.transfer(
+              idempotencyKey,
+              retryRequest
+          );
 
-            TransactionResponseDto retryResponse =
-                    transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            retryRequest
-                    );
+      assertSameTransaction(firstResponse, retryResponse);
 
-            assertSameTransaction(firstResponse, retryResponse);
+      assertNotNull(firstResponse.transferCode());
 
-            assertEquals(
-                    firstResponse.transactionCode(),
-                    idempotencyRepository
-                            .findByUserIdAndKey(testUser.getId(), idempotencyKey)
-                            .orElseThrow()
-                            .transactionCode()
-            );
+      assertBalance("400.00", source);
+      assertBalance("100.00", destination);
 
-            assertBalance("100.00", account);
-            assertEquals(1L, countTransactions(account));
-            assertEquals(1L, countIdempotencyRequests());
-        }
-
-        @Test
-        @DisplayName("Should treat equivalent amount scales as the same request")
-        void shouldReplayWhenAmountScaleDiffers() {
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
-
-            TransactionResponseDto firstResponse =
-                    transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            operation(account, "100")
-                    );
-
-            TransactionResponseDto retryResponse =
-                    transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            operation(account, "100.00")
-                    );
-
-            assertSameTransaction(firstResponse, retryResponse);
-            assertBalance("100.00", account);
-            assertEquals(1L, countTransactions(account));
-            assertEquals(1L, countIdempotencyRequests());
-        }
-
-        @Test
-        @DisplayName("Should return the original result without executing a second transfer")
-        void shouldReturnOriginalResultWhenTransferIsRepeated() {
-            CheckingAccount source = createCheckingAccount("500.00");
-            CheckingAccount destination = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
-
-            TransferRequestDto firstRequest =
-                    transfer(source, destination, "100.00");
-
-            TransferRequestDto retryRequest =
-                    transfer(source, destination, "100.00");
-
-            TransactionResponseDto firstResponse =
-                    transactionIdempotencyService.transfer(
-                            idempotencyKey,
-                            firstRequest
-                    );
-
-            TransactionResponseDto retryResponse =
-                    transactionIdempotencyService.transfer(
-                            idempotencyKey,
-                            retryRequest
-                    );
-
-            assertSameTransaction(firstResponse, retryResponse);
-
-            assertNotNull(firstResponse.transferCode());
-
-            assertBalance("400.00", source);
-            assertBalance("100.00", destination);
-
-            assertEquals(1L, countTransactions(source));
-            assertEquals(1L, countTransactions(destination));
-            assertEquals(1L, countIdempotencyRequests());
-        }
-
-        @Test
-        @DisplayName("Should scope idempotency keys per user")
-        void shouldScopeIdempotencyKeysPerUser() {
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
-
-            User otherUser = createUser();
-
-            TransactionResponseDto firstResponse =
-                    transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            operation(account, "100.00")
-                    );
-
-            when(currentUserService.getCurrentUser()).thenReturn(otherUser);
-            when(currentUserService.getUsername()).thenReturn(otherUser.getUsername());
-
-            TransactionResponseDto secondResponse =
-                    transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            operation(account, "100.00")
-                    );
-
-            assertNotEquals(
-                    firstResponse.transactionCode(),
-                    secondResponse.transactionCode()
-            );
-
-            assertBalance("200.00", account);
-            assertEquals(2L, countTransactions(account));
-            assertEquals(2L, countIdempotencyRequests());
-        }
+      assertEquals(1L, countTransactions(source));
+      assertEquals(1L, countTransactions(destination));
+      assertEquals(1L, countIdempotencyRequests());
     }
 
-    @Nested
-    @DisplayName("Idempotency key conflicts")
-    class IdempotencyKeyConflicts {
+    @Test
+    @DisplayName("Should scope idempotency keys per user")
+    void shouldScopeIdempotencyKeysPerUser() {
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
 
-        @Test
-        @DisplayName("Should reject the same key when the deposit amount is different")
-        void shouldRejectDifferentPayloadForExistingKey() {
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
+      User otherUser = createUser();
 
+      TransactionResponseDto firstResponse =
+          transactionIdempotencyService.deposit(
+              idempotencyKey,
+              operation(account, "100.00")
+          );
+
+      when(currentUserService.getCurrentUser()).thenReturn(otherUser);
+      when(currentUserService.getUsername()).thenReturn(otherUser.getUsername());
+
+      TransactionResponseDto secondResponse =
+          transactionIdempotencyService.deposit(
+              idempotencyKey,
+              operation(account, "100.00")
+          );
+
+      assertNotEquals(
+          firstResponse.transactionCode(),
+          secondResponse.transactionCode()
+      );
+
+      assertBalance("200.00", account);
+      assertEquals(2L, countTransactions(account));
+      assertEquals(2L, countIdempotencyRequests());
+    }
+  }
+
+  @Nested
+  @DisplayName("Idempotency key conflicts")
+  class IdempotencyKeyConflicts {
+
+    @Test
+    @DisplayName("Should reject the same key when the deposit amount is different")
+    void shouldRejectDifferentPayloadForExistingKey() {
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      transactionIdempotencyService.deposit(
+          idempotencyKey,
+          operation(account, "100.00")
+      );
+
+      assertThrows(
+          IdempotencyKeyConflictException.class,
+          () -> transactionIdempotencyService.deposit(
+              idempotencyKey,
+              operation(account, "200.00")
+          )
+      );
+
+      assertBalance("100.00", account);
+      assertEquals(1L, countTransactions(account));
+      assertEquals(1L, countIdempotencyRequests());
+    }
+
+    @Test
+    @DisplayName("Should reject the same key when the target account is different")
+    void shouldRejectDifferentAccountForExistingKey() {
+      CheckingAccount firstAccount = createCheckingAccount("0.00");
+      CheckingAccount secondAccount = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      transactionIdempotencyService.deposit(
+          idempotencyKey,
+          operation(firstAccount, "100.00")
+      );
+
+      assertThrows(
+          IdempotencyKeyConflictException.class,
+          () -> transactionIdempotencyService.deposit(
+              idempotencyKey,
+              operation(secondAccount, "100.00")
+          )
+      );
+
+      assertBalance("100.00", firstAccount);
+      assertBalance("0.00", secondAccount);
+      assertEquals(0L, countTransactions(secondAccount));
+      assertEquals(1L, countIdempotencyRequests());
+    }
+
+    @Test
+    @DisplayName("Should reject the same key when the operation type is different")
+    void shouldRejectDifferentOperationForExistingKey() {
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      transactionIdempotencyService.deposit(
+          idempotencyKey,
+          operation(account, "100.00")
+      );
+
+      assertThrows(
+          IdempotencyKeyConflictException.class,
+          () -> transactionIdempotencyService.withdraw(
+              idempotencyKey,
+              operation(account, "100.00")
+          )
+      );
+
+      assertBalance("100.00", account);
+      assertEquals(1L, countTransactions(account));
+      assertEquals(1L, countIdempotencyRequests());
+    }
+  }
+
+  @Nested
+  @DisplayName("Failed operations")
+  class FailedOperations {
+
+    @Test
+    @DisplayName("Should release the idempotency key when the financial operation rolls back")
+    void shouldAllowRetryAfterFailedOperation() {
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      AccountOperationRequestDto withdrawalRequest =
+          operation(account, "100.00");
+
+      assertThrows(
+          InsufficientBalanceException.class,
+          () -> transactionIdempotencyService.withdraw(
+              idempotencyKey,
+              withdrawalRequest
+          )
+      );
+
+      assertEquals(
+          0L,
+          countIdempotencyRequests(),
+          "The failed transaction must not leave a reserved key."
+      );
+
+      transactionService.deposit(
+          operation(account, "200.00")
+      );
+
+      TransactionResponseDto response =
+          transactionIdempotencyService.withdraw(
+              idempotencyKey,
+              withdrawalRequest
+          );
+
+      assertEquals(TransactionType.WITHDRAWAL, response.type());
+      assertMoneyEquals(new BigDecimal("100.00"), response.balanceAfter());
+
+      assertBalance("100.00", account);
+      assertEquals(2L, countTransactions(account));
+      assertEquals(1L, countIdempotencyRequests());
+    }
+  }
+
+  @Nested
+  @DisplayName("Concurrent requests")
+  class ConcurrentRequests {
+
+    @Test
+    @DisplayName("Should block while the key is reserved by an uncommitted transaction")
+    void shouldBlockUntilReservingTransactionEnds() throws Exception {
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+      Future<TransactionResponseDto> blockedCall;
+
+      TransactionStatus reservingTransaction =
+          transactionManager.getTransaction(
+              new DefaultTransactionDefinition()
+          );
+
+      try {
+        assertTrue(
+            idempotencyRepository.tryReserve(
+                testUser.getId(),
+                idempotencyKey,
+                "DEPOSIT",
+                "0".repeat(64)
+            )
+        );
+
+        blockedCall = executor.submit(
+            () -> transactionIdempotencyService.deposit(
+                idempotencyKey,
+                operation(account, "100.00")
+            )
+        );
+
+        assertThrows(
+            TimeoutException.class,
+            () -> blockedCall.get(500, TimeUnit.MILLISECONDS),
+            "The call must wait while the key is reserved."
+        );
+      } finally {
+        transactionManager.rollback(reservingTransaction);
+      }
+
+      try {
+        TransactionResponseDto response =
+            blockedCall.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        assertNotNull(response.transactionCode());
+      } finally {
+        executor.shutdownNow();
+      }
+
+      assertBalance("100.00", account);
+      assertEquals(1L, countTransactions(account));
+      assertEquals(1L, countIdempotencyRequests());
+    }
+
+    @Test
+    @DisplayName("Should execute a financial operation only once for concurrent identical requests")
+    void shouldExecuteOnlyOnceForConcurrentIdenticalRequests()
+        throws Exception {
+
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      AccountOperationRequestDto firstRequest =
+          operation(account, "100.00");
+
+      AccountOperationRequestDto secondRequest =
+          operation(account, "100.00");
+
+      List<Callable<TransactionResponseDto>> tasks = List.of(
+          () -> transactionIdempotencyService.deposit(
+              idempotencyKey,
+              firstRequest
+          ),
+          () -> transactionIdempotencyService.deposit(
+              idempotencyKey,
+              secondRequest
+          )
+      );
+
+      List<TransactionResponseDto> results = runConcurrently(tasks);
+
+      assertEquals(2, results.size());
+
+      assertSameTransaction(results.get(0), results.get(1));
+
+      assertBalance("100.00", account);
+      assertEquals(1L, countTransactions(account));
+      assertEquals(1L, countIdempotencyRequests());
+    }
+
+    @Test
+    @DisplayName(
+        "Should allow only one payload when concurrent requests use the same key differently"
+    )
+    void shouldAllowOnlyOnePayloadForConcurrentConflictingRequests()
+        throws Exception {
+
+      CheckingAccount account = createCheckingAccount("0.00");
+      UUID idempotencyKey = UUID.randomUUID();
+
+      AccountOperationRequestDto firstRequest =
+          operation(account, "100.00");
+
+      AccountOperationRequestDto secondRequest =
+          operation(account, "200.00");
+
+      List<Callable<DepositOutcome>> tasks = List.of(
+          depositOutcome(idempotencyKey, firstRequest),
+          depositOutcome(idempotencyKey, secondRequest)
+      );
+
+      List<DepositOutcome> results = runConcurrently(tasks);
+
+      long successfulOperations = results.stream()
+          .filter(result -> !result.conflict())
+          .count();
+
+      long conflicts = results.stream()
+          .filter(DepositOutcome::conflict)
+          .count();
+
+      assertEquals(1L, successfulOperations);
+      assertEquals(1L, conflicts);
+
+      DepositOutcome successfulResult = results.stream()
+          .filter(result -> !result.conflict())
+          .findFirst()
+          .orElseThrow();
+
+      assertNotNull(successfulResult.response());
+
+      assertMoneyEquals(
+          successfulResult.response().balanceAfter(),
+          persistedBalance(account)
+      );
+
+      assertEquals(1L, countTransactions(account));
+      assertEquals(1L, countIdempotencyRequests());
+    }
+  }
+
+  private Callable<DepositOutcome> depositOutcome(
+      UUID idempotencyKey,
+      AccountOperationRequestDto request
+  ) {
+    return () -> {
+      try {
+        TransactionResponseDto response =
             transactionIdempotencyService.deposit(
-                    idempotencyKey,
-                    operation(account, "100.00")
+                idempotencyKey,
+                request
             );
 
-            assertThrows(
-                    IdempotencyKeyConflictException.class,
-                    () -> transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            operation(account, "200.00")
-                    )
-            );
+        return new DepositOutcome(response, false);
 
-            assertBalance("100.00", account);
-            assertEquals(1L, countTransactions(account));
-            assertEquals(1L, countIdempotencyRequests());
-        }
+      } catch (IdempotencyKeyConflictException exception) {
+        return new DepositOutcome(null, true);
+      }
+    };
+  }
 
-        @Test
-        @DisplayName("Should reject the same key when the target account is different")
-        void shouldRejectDifferentAccountForExistingKey() {
-            CheckingAccount firstAccount = createCheckingAccount("0.00");
-            CheckingAccount secondAccount = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
+  private <T> List<T> runConcurrently(List<Callable<T>> tasks)
+      throws Exception {
 
-            transactionIdempotencyService.deposit(
-                    idempotencyKey,
-                    operation(firstAccount, "100.00")
-            );
+    ExecutorService executor =
+        Executors.newFixedThreadPool(tasks.size());
 
-            assertThrows(
-                    IdempotencyKeyConflictException.class,
-                    () -> transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            operation(secondAccount, "100.00")
-                    )
-            );
+    CountDownLatch ready = new CountDownLatch(tasks.size());
+    CountDownLatch start = new CountDownLatch(1);
 
-            assertBalance("100.00", firstAccount);
-            assertBalance("0.00", secondAccount);
-            assertEquals(0L, countTransactions(secondAccount));
-            assertEquals(1L, countIdempotencyRequests());
-        }
+    try {
+      List<Future<T>> futures = tasks.stream()
+          .map(task -> executor.submit(() -> {
+            ready.countDown();
 
-        @Test
-        @DisplayName("Should reject the same key when the operation type is different")
-        void shouldRejectDifferentOperationForExistingKey() {
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
-
-            transactionIdempotencyService.deposit(
-                    idempotencyKey,
-                    operation(account, "100.00")
-            );
-
-            assertThrows(
-                    IdempotencyKeyConflictException.class,
-                    () -> transactionIdempotencyService.withdraw(
-                            idempotencyKey,
-                            operation(account, "100.00")
-                    )
-            );
-
-            assertBalance("100.00", account);
-            assertEquals(1L, countTransactions(account));
-            assertEquals(1L, countIdempotencyRequests());
-        }
-    }
-
-    @Nested
-    @DisplayName("Failed operations")
-    class FailedOperations {
-
-        @Test
-        @DisplayName("Should release the idempotency key when the financial operation rolls back")
-        void shouldAllowRetryAfterFailedOperation() {
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
-
-            AccountOperationRequestDto withdrawalRequest =
-                    operation(account, "100.00");
-
-            assertThrows(
-                    InsufficientBalanceException.class,
-                    () -> transactionIdempotencyService.withdraw(
-                            idempotencyKey,
-                            withdrawalRequest
-                    )
-            );
-
-            assertEquals(
-                    0L,
-                    countIdempotencyRequests(),
-                    "The failed transaction must not leave a reserved key."
-            );
-
-            transactionService.deposit(
-                    operation(account, "200.00")
-            );
-
-            TransactionResponseDto response =
-                    transactionIdempotencyService.withdraw(
-                            idempotencyKey,
-                            withdrawalRequest
-                    );
-
-            assertEquals(TransactionType.WITHDRAWAL, response.type());
-            assertMoneyEquals(new BigDecimal("100.00"), response.balanceAfter());
-
-            assertBalance("100.00", account);
-            assertEquals(2L, countTransactions(account));
-            assertEquals(1L, countIdempotencyRequests());
-        }
-    }
-
-    @Nested
-    @DisplayName("Concurrent requests")
-    class ConcurrentRequests {
-
-        @Test
-        @DisplayName("Should block while the key is reserved by an uncommitted transaction")
-        void shouldBlockUntilReservingTransactionEnds() throws Exception {
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
-
-            ExecutorService executor = Executors.newSingleThreadExecutor();
-            Future<TransactionResponseDto> blockedCall;
-
-            TransactionStatus reservingTransaction =
-                    transactionManager.getTransaction(
-                            new DefaultTransactionDefinition()
-                    );
-
-            try {
-                assertTrue(
-                        idempotencyRepository.tryReserve(
-                                testUser.getId(),
-                                idempotencyKey,
-                                "DEPOSIT",
-                                "0".repeat(64)
-                        )
-                );
-
-                blockedCall = executor.submit(
-                        () -> transactionIdempotencyService.deposit(
-                                idempotencyKey,
-                                operation(account, "100.00")
-                        )
-                );
-
-                assertThrows(
-                        TimeoutException.class,
-                        () -> blockedCall.get(500, TimeUnit.MILLISECONDS),
-                        "The call must wait while the key is reserved."
-                );
-            } finally {
-                transactionManager.rollback(reservingTransaction);
+            if (!start.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+              throw new IllegalStateException(
+                  "Timed out waiting for the start signal."
+              );
             }
 
-            try {
-                TransactionResponseDto response =
-                        blockedCall.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return task.call();
+          }))
+          .toList();
 
-                assertNotNull(response.transactionCode());
-            } finally {
-                executor.shutdownNow();
-            }
+      assertTrue(
+          ready.await(TIMEOUT_SECONDS, TimeUnit.SECONDS),
+          "Threads did not become ready in time."
+      );
 
-            assertBalance("100.00", account);
-            assertEquals(1L, countTransactions(account));
-            assertEquals(1L, countIdempotencyRequests());
-        }
+      start.countDown();
 
-        @Test
-        @DisplayName("Should execute a financial operation only once for concurrent identical requests")
-        void shouldExecuteOnlyOnceForConcurrentIdenticalRequests()
-                throws Exception {
+      List<T> results = new ArrayList<>();
 
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
-
-            AccountOperationRequestDto firstRequest =
-                    operation(account, "100.00");
-
-            AccountOperationRequestDto secondRequest =
-                    operation(account, "100.00");
-
-            List<Callable<TransactionResponseDto>> tasks = List.of(
-                    () -> transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            firstRequest
-                    ),
-                    () -> transactionIdempotencyService.deposit(
-                            idempotencyKey,
-                            secondRequest
-                    )
-            );
-
-            List<TransactionResponseDto> results = runConcurrently(tasks);
-
-            assertEquals(2, results.size());
-
-            assertSameTransaction(results.get(0), results.get(1));
-
-            assertBalance("100.00", account);
-            assertEquals(1L, countTransactions(account));
-            assertEquals(1L, countIdempotencyRequests());
-        }
-
-        @Test
-        @DisplayName("Should allow only one payload when concurrent requests use the same key differently")
-        void shouldAllowOnlyOnePayloadForConcurrentConflictingRequests()
-                throws Exception {
-
-            CheckingAccount account = createCheckingAccount("0.00");
-            UUID idempotencyKey = UUID.randomUUID();
-
-            AccountOperationRequestDto firstRequest =
-                    operation(account, "100.00");
-
-            AccountOperationRequestDto secondRequest =
-                    operation(account, "200.00");
-
-            List<Callable<DepositOutcome>> tasks = List.of(
-                    depositOutcome(idempotencyKey, firstRequest),
-                    depositOutcome(idempotencyKey, secondRequest)
-            );
-
-            List<DepositOutcome> results = runConcurrently(tasks);
-
-            long successfulOperations = results.stream()
-                    .filter(result -> !result.conflict())
-                    .count();
-
-            long conflicts = results.stream()
-                    .filter(DepositOutcome::conflict)
-                    .count();
-
-            assertEquals(1L, successfulOperations);
-            assertEquals(1L, conflicts);
-
-            DepositOutcome successfulResult = results.stream()
-                    .filter(result -> !result.conflict())
-                    .findFirst()
-                    .orElseThrow();
-
-            assertNotNull(successfulResult.response());
-
-            assertMoneyEquals(
-                    successfulResult.response().balanceAfter(),
-                    persistedBalance(account)
-            );
-
-            assertEquals(1L, countTransactions(account));
-            assertEquals(1L, countIdempotencyRequests());
-        }
-    }
-
-    private Callable<DepositOutcome> depositOutcome(
-            UUID idempotencyKey,
-            AccountOperationRequestDto request
-    ) {
-        return () -> {
-            try {
-                TransactionResponseDto response =
-                        transactionIdempotencyService.deposit(
-                                idempotencyKey,
-                                request
-                        );
-
-                return new DepositOutcome(response, false);
-
-            } catch (IdempotencyKeyConflictException exception) {
-                return new DepositOutcome(null, true);
-            }
-        };
-    }
-
-    private <T> List<T> runConcurrently(List<Callable<T>> tasks)
-            throws Exception {
-
-        ExecutorService executor =
-                Executors.newFixedThreadPool(tasks.size());
-
-        CountDownLatch ready = new CountDownLatch(tasks.size());
-        CountDownLatch start = new CountDownLatch(1);
-
-        try {
-            List<Future<T>> futures = tasks.stream()
-                    .map(task -> executor.submit(() -> {
-                        ready.countDown();
-
-                        if (!start.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                            throw new IllegalStateException(
-                                    "Timed out waiting for the start signal."
-                            );
-                        }
-
-                        return task.call();
-                    }))
-                    .toList();
-
-            assertTrue(
-                    ready.await(TIMEOUT_SECONDS, TimeUnit.SECONDS),
-                    "Threads did not become ready in time."
-            );
-
-            start.countDown();
-
-            List<T> results = new ArrayList<>();
-
-            for (Future<T> future : futures) {
-                results.add(
-                        future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                );
-            }
-
-            return results;
-
-        } finally {
-            start.countDown();
-            executor.shutdownNow();
-        }
-    }
-
-    private CheckingAccount createCheckingAccount(String initialBalance) {
-        Client client = createClient();
-
-        GeneratedAccountNumber generated =
-                accountNumberGenerator.generate();
-
-        CheckingAccount account = new CheckingAccount(
-                client,
-                generated.number(),
-                generated.digit()
+      for (Future<T> future : futures) {
+        results.add(
+            future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
         );
+      }
 
-        BigDecimal balance = new BigDecimal(initialBalance);
-        if (balance.signum() > 0) {
-            account.credit(balance);
-        } else if (balance.signum() < 0) {
-            throw new IllegalArgumentException(
-                    "An initial account balance cannot be negative."
-            );
-        }
+      return results;
 
-        return accountRepository.saveAndFlush(account);
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  private CheckingAccount createCheckingAccount(String initialBalance) {
+    Client client = createClient();
+
+    GeneratedAccountNumber generated =
+        accountNumberGenerator.generate();
+
+    CheckingAccount account = new CheckingAccount(
+        client,
+        generated.number(),
+        generated.digit()
+    );
+
+    BigDecimal balance = new BigDecimal(initialBalance);
+    if (balance.signum() > 0) {
+      account.credit(balance);
+    } else if (balance.signum() < 0) {
+      throw new IllegalArgumentException(
+          "An initial account balance cannot be negative."
+      );
     }
 
-    private Client createClient() {
-        return clientRepository.saveAndFlush(
-                aClient("idempotency-client").build()
-        );
-    }
+    return accountRepository.saveAndFlush(account);
+  }
 
-    private User createUser() {
-        return userRepository.saveAndFlush(
-                UserTestFactory.aUser("idem").build()
-        );
-    }
+  private Client createClient() {
+    return clientRepository.saveAndFlush(
+        ClientTestFactory.clientBuilder("idempotency-client").build()
+    );
+  }
 
-    private AccountOperationRequestDto operation(
-            Account account,
-            String amount
-    ) {
-        return new AccountOperationRequestDto(
-                account.getAccountNumber(),
-                account.getDigit(),
-                new BigDecimal(amount)
-        );
-    }
+  private User createUser() {
+    return userRepository.saveAndFlush(
+        UserTestFactory.userBuilder("idem").build()
+    );
+  }
 
-    private TransferRequestDto transfer(
-            Account source,
-            Account destination,
-            String amount
-    ) {
-        return new TransferRequestDto(
-                source.getAccountNumber(),
-                source.getDigit(),
-                destination.getAccountNumber(),
-                destination.getDigit(),
-                new BigDecimal(amount)
-        );
-    }
+  private AccountOperationRequestDto operation(
+      Account account,
+      String amount
+  ) {
+    return new AccountOperationRequestDto(
+        account.getAccountNumber(),
+        account.getDigit(),
+        new BigDecimal(amount)
+    );
+  }
 
-    private void assertSameTransaction(
-            TransactionResponseDto expected,
-            TransactionResponseDto actual
-    ) {
-        assertEquals(expected.transactionCode(), actual.transactionCode());
-        assertEquals(expected.transferCode(), actual.transferCode());
-        assertEquals(expected.type(), actual.type());
-        assertMoneyEquals(expected.amount(), actual.amount());
-        assertEquals(expected.createdAt(), actual.createdAt());
-        assertEquals(expected.yieldDate(), actual.yieldDate());
-        assertMoneyEquals(expected.balanceAfter(), actual.balanceAfter());
-    }
+  private TransferRequestDto transfer(
+      Account source,
+      Account destination,
+      String amount
+  ) {
+    return new TransferRequestDto(
+        source.getAccountNumber(),
+        source.getDigit(),
+        destination.getAccountNumber(),
+        destination.getDigit(),
+        new BigDecimal(amount)
+    );
+  }
 
-    private void assertBalance(String expected, Account account) {
-        assertMoneyEquals(
-                new BigDecimal(expected),
-                persistedBalance(account)
-        );
-    }
+  private void assertSameTransaction(
+      TransactionResponseDto expected,
+      TransactionResponseDto actual
+  ) {
+    assertEquals(expected.transactionCode(), actual.transactionCode());
+    assertEquals(expected.transferCode(), actual.transferCode());
+    assertEquals(expected.type(), actual.type());
+    assertMoneyEquals(expected.amount(), actual.amount());
+    assertEquals(expected.createdAt(), actual.createdAt());
+    assertEquals(expected.yieldDate(), actual.yieldDate());
+    assertMoneyEquals(expected.balanceAfter(), actual.balanceAfter());
+  }
 
-    private BigDecimal persistedBalance(Account account) {
-        return accountRepository.findById(account.getId())
-                .orElseThrow()
-                .getBalance();
-    }
+  private void assertBalance(String expected, Account account) {
+    assertMoneyEquals(
+        new BigDecimal(expected),
+        persistedBalance(account)
+    );
+  }
 
-    private void assertMoneyEquals(
-            BigDecimal expected,
-            BigDecimal actual
-    ) {
-        assertEquals(
-                0,
-                expected.compareTo(actual),
-                "Expected " + expected + " but was " + actual
-        );
-    }
+  private BigDecimal persistedBalance(Account account) {
+    return accountRepository.findById(account.getId())
+        .orElseThrow()
+        .getBalance();
+  }
 
-    private long countTransactions(Account account) {
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM transactions WHERE account_id = ?",
-                Long.class,
-                account.getId()
-        );
-    }
+  private void assertMoneyEquals(
+      BigDecimal expected,
+      BigDecimal actual
+  ) {
+    assertEquals(
+        0,
+        expected.compareTo(actual),
+        "Expected " + expected + " but was " + actual
+    );
+  }
 
-    private long countIdempotencyRequests() {
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM transaction_idempotency_requests",
-                Long.class
-        );
-    }
+  private long countTransactions(Account account) {
+    return jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM transactions WHERE account_id = ?",
+        Long.class,
+        account.getId()
+    );
+  }
 
-    private void clearIdempotencyRequests() {
-        jdbcTemplate.update("DELETE FROM transaction_idempotency_requests");
-    }
+  private long countIdempotencyRequests() {
+    return jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM transaction_idempotency_requests",
+        Long.class
+    );
+  }
 
-    private record DepositOutcome(
-            TransactionResponseDto response,
-            boolean conflict
-    ) {
-    }
+  private void clearIdempotencyRequests() {
+    jdbcTemplate.update("DELETE FROM transaction_idempotency_requests");
+  }
+
+  private record DepositOutcome(
+      TransactionResponseDto response,
+      boolean conflict
+  ) {
+  }
 }

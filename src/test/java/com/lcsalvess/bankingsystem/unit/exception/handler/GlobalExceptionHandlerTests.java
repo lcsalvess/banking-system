@@ -1,5 +1,16 @@
 package com.lcsalvess.bankingsystem.unit.exception.handler;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -24,6 +35,11 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,1012 +83,996 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.sql.SQLException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Stream;
-
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @WebMvcTest(controllers = GlobalExceptionHandlerTests.TestController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import({
-        WebMvcTestSecurityConfig.class,
-        GlobalExceptionHandler.class,
-        GlobalExceptionHandlerTests.TestController.class
+    WebMvcTestSecurityConfig.class,
+    GlobalExceptionHandler.class,
+    GlobalExceptionHandlerTests.TestController.class
 })
 class GlobalExceptionHandlerTests {
 
-    private static final String THROW_URL = "/__test/throw";
+  private static final String THROW_URL = "/__test/throw";
 
-    private static final ValidatorFactory VALIDATOR_FACTORY =
-            Validation.buildDefaultValidatorFactory();
+  private static final ValidatorFactory VALIDATOR_FACTORY =
+      Validation.buildDefaultValidatorFactory();
 
-    private static final Validator VALIDATOR =
-            VALIDATOR_FACTORY.getValidator();
+  private static final Validator VALIDATOR =
+      VALIDATOR_FACTORY.getValidator();
 
-    @Autowired
-    private MockMvc mockMvc;
+  @Autowired
+  private MockMvc mockMvc;
 
-    @Autowired
-    private TestController testController;
+  @Autowired
+  private TestController testController;
 
-    @BeforeEach
-    void clearConfiguredException() {
-        testController.clearThrowable();
-    }
+  @BeforeEach
+  void clearConfiguredException() {
+    testController.clearThrowable();
+  }
 
-    @AfterAll
-    static void closeValidatorFactory() {
-        VALIDATOR_FACTORY.close();
-    }
+  @AfterAll
+  static void closeValidatorFactory() {
+    VALIDATOR_FACTORY.close();
+  }
 
-    // -------------------------------------------------------------------------
-    // AUTENTICAÇÃO
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // AUTENTICAÇÃO
+  // -------------------------------------------------------------------------
 
-    @Test
-    void shouldReturnUnauthorizedWhenCredentialsAreInvalid()
-            throws Exception {
+  @Test
+  void shouldReturnUnauthorizedWhenCredentialsAreInvalid()
+      throws Exception {
 
-        performThrowing(new BadCredentialsException("Sensitive detail"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.INVALID_CREDENTIALS))
-                .andExpect(content().string(
-                        not(containsString("Sensitive detail"))
-                ));
-    }
+    performThrowing(new BadCredentialsException("Sensitive detail"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.INVALID_CREDENTIALS))
+        .andExpect(content().string(
+            not(containsString("Sensitive detail"))
+        ));
+  }
 
-    @Test
-    void shouldReturnUnauthorizedWhenAuthenticationFails()
-            throws Exception {
+  @Test
+  void shouldReturnUnauthorizedWhenAuthenticationFails()
+      throws Exception {
 
-        performThrowing(
-                new InsufficientAuthenticationException("Internal auth detail")
-        )
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.AUTHENTICATION_FAILED))
-                .andExpect(content().string(
-                        not(containsString("Internal auth detail"))
-                ));
-    }
-
-    @Test
-    void shouldReturnServiceUnavailableWhenAuthenticationFailsBecauseOfDatabase()
-            throws Exception {
-
-        performThrowing(
-                new InternalAuthenticationServiceException(
-                        "Sensitive connection detail",
-                        new DataAccessResourceFailureException(
-                                "Sensitive connection detail"
-                        )
-                )
-        )
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.status").value(503))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
-                .andExpect(content().string(
-                        not(containsString("Sensitive connection detail"))
-                ));
-    }
-
-    @Test
-    void shouldReturnServiceUnavailableWhenAuthenticationFailsBecauseOfTransaction()
-            throws Exception {
-
-        performThrowing(
-                new AuthenticationServiceException(
-                        "Sensitive transaction detail",
-                        new CannotCreateTransactionException(
-                                "Sensitive transaction detail"
-                        )
-                )
-        )
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.status").value(503))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
-                .andExpect(content().string(
-                        not(containsString("Sensitive transaction detail"))
-                ));
-    }
-
-    @Test
-    void shouldReturnInternalServerErrorWhenAuthenticationFailsForUnknownReason()
-            throws Exception {
-
-        performThrowing(
-                new AuthenticationServiceException("Internal auth detail")
-        )
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.INTERNAL_SERVER_ERROR))
-                .andExpect(content().string(
-                        not(containsString("Internal auth detail"))
-                ));
-    }
-
-    @ParameterizedTest
-    @EnumSource(
-            value = RateLimitScope.class,
-            mode = EnumSource.Mode.EXCLUDE,
-            names = "USER_ID"
+    performThrowing(
+        new InsufficientAuthenticationException("Internal auth detail")
     )
-    void shouldReturnTooManyRequestsWithRetryAfterWhenLoginRateLimitIsExceeded(
-            RateLimitScope scope
-    ) throws Exception {
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.AUTHENTICATION_FAILED))
+        .andExpect(content().string(
+            not(containsString("Internal auth detail"))
+        ));
+  }
 
-        performThrowing(
-                new RateLimitExceededException(
-                        42L,
-                        RateLimitOperation.LOGIN,
-                        scope
-                )
+  @Test
+  void shouldReturnServiceUnavailableWhenAuthenticationFailsBecauseOfDatabase()
+      throws Exception {
+
+    performThrowing(
+        new InternalAuthenticationServiceException(
+            "Sensitive connection detail",
+            new DataAccessResourceFailureException(
+                "Sensitive connection detail"
+            )
         )
-                .andExpect(status().isTooManyRequests())
-                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "42"))
-                .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.LOGIN_RATE_LIMIT_EXCEEDED))
-                .andExpect(content().string(
-                        not(containsString(scope.name()))
-                ));
-    }
+    )
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.status").value(503))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
+        .andExpect(content().string(
+            not(containsString("Sensitive connection detail"))
+        ));
+  }
 
-    @Test
-    void shouldReturnPasswordChangeMessageWhenPasswordChangeRateLimitIsExceeded()
-            throws Exception {
+  @Test
+  void shouldReturnServiceUnavailableWhenAuthenticationFailsBecauseOfTransaction()
+      throws Exception {
 
-        performThrowing(
-                new RateLimitExceededException(
-                        42L,
-                        RateLimitOperation.PASSWORD_CHANGE,
-                        RateLimitScope.USER_ID
-                )
+    performThrowing(
+        new AuthenticationServiceException(
+            "Sensitive transaction detail",
+            new CannotCreateTransactionException(
+                "Sensitive transaction detail"
+            )
         )
-                .andExpect(status().isTooManyRequests())
-                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "42"))
-                .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.PASSWORD_CHANGE_RATE_LIMIT_EXCEEDED))
-                .andExpect(content().string(
-                        not(containsString(RateLimitOperation.PASSWORD_CHANGE.name()))
-                ));
-    }
+    )
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.status").value(503))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
+        .andExpect(content().string(
+            not(containsString("Sensitive transaction detail"))
+        ));
+  }
 
-    @Test
-    void shouldReturnAtLeastOneSecondInRetryAfterWhenWaitIsNotPositive()
-            throws Exception {
+  @Test
+  void shouldReturnInternalServerErrorWhenAuthenticationFailsForUnknownReason()
+      throws Exception {
 
-        performThrowing(
-                new RateLimitExceededException(
-                        0L,
-                        RateLimitOperation.LOGIN,
-                        RateLimitScope.CLIENT_IP
-                )
+    performThrowing(
+        new AuthenticationServiceException("Internal auth detail")
+    )
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.status").value(500))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.INTERNAL_SERVER_ERROR))
+        .andExpect(content().string(
+            not(containsString("Internal auth detail"))
+        ));
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = RateLimitScope.class,
+      mode = EnumSource.Mode.EXCLUDE,
+      names = "USER_ID"
+  )
+  void shouldReturnTooManyRequestsWithRetryAfterWhenLoginRateLimitIsExceeded(
+      RateLimitScope scope
+  ) throws Exception {
+
+    performThrowing(
+        new RateLimitExceededException(
+            42L,
+            RateLimitOperation.LOGIN,
+            scope
         )
-                .andExpect(status().isTooManyRequests())
-                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"));
-    }
+    )
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "42"))
+        .andExpect(jsonPath("$.status").value(429))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.LOGIN_RATE_LIMIT_EXCEEDED))
+        .andExpect(content().string(
+            not(containsString(scope.name()))
+        ));
+  }
 
-    // -------------------------------------------------------------------------
-    // AUTORIZAÇÃO
-    // -------------------------------------------------------------------------
+  @Test
+  void shouldReturnPasswordChangeMessageWhenPasswordChangeRateLimitIsExceeded()
+      throws Exception {
 
-    @Test
-    void shouldReturnForbiddenWhenAccessIsDenied()
-            throws Exception {
-
-        performThrowing(
-                new AccessDeniedException("Sensitive authorization detail")
+    performThrowing(
+        new RateLimitExceededException(
+            42L,
+            RateLimitOperation.PASSWORD_CHANGE,
+            RateLimitScope.USER_ID
         )
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.status").value(403))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.ACCESS_DENIED_RESOURCE))
-                .andExpect(content().string(
-                        not(containsString("Sensitive authorization detail"))
-                ));
-    }
+    )
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "42"))
+        .andExpect(jsonPath("$.status").value(429))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.PASSWORD_CHANGE_RATE_LIMIT_EXCEEDED))
+        .andExpect(content().string(
+            not(containsString(RateLimitOperation.PASSWORD_CHANGE.name()))
+        ));
+  }
 
-    // -------------------------------------------------------------------------
-    // REGRAS DE NEGÓCIO
-    // -------------------------------------------------------------------------
+  @Test
+  void shouldReturnAtLeastOneSecondInRetryAfterWhenWaitIsNotPositive()
+      throws Exception {
 
-    @Test
-    void shouldReturnStatusAndMessageDefinedByBusinessException()
-            throws Exception {
-
-        performThrowing(
-                new TestBusinessException(
-                        "Operação de negócio inválida.",
-                        HttpStatus.UNPROCESSABLE_CONTENT
-                )
+    performThrowing(
+        new RateLimitExceededException(
+            0L,
+            RateLimitOperation.LOGIN,
+            RateLimitScope.CLIENT_IP
         )
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.message")
-                        .value("Operação de negócio inválida."));
-    }
+    )
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"));
+  }
 
-    // -------------------------------------------------------------------------
-    // INTEGRIDADE DE DADOS
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // AUTORIZAÇÃO
+  // -------------------------------------------------------------------------
 
-    @ParameterizedTest
-    @MethodSource("knownConstraintCases")
-    void shouldReturnConflictWhenKnownConstraintIsViolated(
-            DatabaseConstraint constraint,
-            String expectedMessage
-    ) throws Exception {
+  @Test
+  void shouldReturnForbiddenWhenAccessIsDenied()
+      throws Exception {
 
-        var cause = new org.hibernate.exception.ConstraintViolationException(
-                "Duplicate key",
-                null,
-                constraint.getConstraintName()
+    performThrowing(
+        new AccessDeniedException("Sensitive authorization detail")
+    )
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.status").value(403))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.ACCESS_DENIED_RESOURCE))
+        .andExpect(content().string(
+            not(containsString("Sensitive authorization detail"))
+        ));
+  }
+
+  // -------------------------------------------------------------------------
+  // REGRAS DE NEGÓCIO
+  // -------------------------------------------------------------------------
+
+  @Test
+  void shouldReturnStatusAndMessageDefinedByBusinessException()
+      throws Exception {
+
+    performThrowing(
+        new TestBusinessException(
+            "Operação de negócio inválida.",
+            HttpStatus.UNPROCESSABLE_CONTENT
+        )
+    )
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.status").value(422))
+        .andExpect(jsonPath("$.message")
+            .value("Operação de negócio inválida."));
+  }
+
+  // -------------------------------------------------------------------------
+  // INTEGRIDADE DE DADOS
+  // -------------------------------------------------------------------------
+
+  @ParameterizedTest
+  @MethodSource("knownConstraintCases")
+  void shouldReturnConflictWhenKnownConstraintIsViolated(
+      DatabaseConstraint constraint,
+      String expectedMessage
+  ) throws Exception {
+
+    var cause = new org.hibernate.exception.ConstraintViolationException(
+        "Duplicate key",
+        null,
+        constraint.getConstraintName()
+    );
+
+    DataIntegrityViolationException exception =
+        new DataIntegrityViolationException(
+            "Database detail",
+            cause
         );
 
-        DataIntegrityViolationException exception =
-                new DataIntegrityViolationException(
-                        "Database detail",
-                        cause
-                );
+    performThrowing(exception)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.status").value(409))
+        .andExpect(jsonPath("$.message").value(expectedMessage));
+  }
 
-        performThrowing(exception)
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.message").value(expectedMessage));
-    }
+  static Stream<Arguments> knownConstraintCases() {
+    return Stream.of(
+        Arguments.of(
+            DatabaseConstraint.CLIENT_EMAIL_UNIQUE,
+            ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS
+        ),
+        Arguments.of(
+            DatabaseConstraint.CLIENT_CPF_UNIQUE,
+            ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS
+        ),
+        Arguments.of(
+            DatabaseConstraint.USER_USERNAME_UNIQUE,
+            ApiErrorMessages.USERNAME_ALREADY_EXISTS
+        ),
+        Arguments.of(
+            DatabaseConstraint.USER_EMAIL_UNIQUE,
+            ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
+        ),
+        Arguments.of(
+            DatabaseConstraint.SYSTEM_MIGRATION_USER_INACTIVE,
+            ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
+        ),
+        Arguments.of(
+            DatabaseConstraint.USER_USERNAME_RESERVED,
+            ApiErrorMessages.RESERVED_USERNAME
+        ),
+        Arguments.of(
+            DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE,
+            ApiErrorMessages.ACTIVE_ACCOUNT_ALREADY_EXISTS
+        ),
+        Arguments.of(
+            DatabaseConstraint.ACCOUNT_BALANCE_MAX,
+            ApiErrorMessages.BALANCE_LIMIT_EXCEEDED
+        )
+    );
+  }
 
-    static Stream<Arguments> knownConstraintCases() {
-        return Stream.of(
-                Arguments.of(
-                        DatabaseConstraint.CLIENT_EMAIL_UNIQUE,
-                        ApiErrorMessages.CLIENT_EMAIL_ALREADY_EXISTS
-                ),
-                Arguments.of(
-                        DatabaseConstraint.CLIENT_CPF_UNIQUE,
-                        ApiErrorMessages.CLIENT_CPF_ALREADY_EXISTS
-                ),
-                Arguments.of(
-                        DatabaseConstraint.USER_USERNAME_UNIQUE,
-                        ApiErrorMessages.USERNAME_ALREADY_EXISTS
-                ),
-                Arguments.of(
-                        DatabaseConstraint.USER_EMAIL_UNIQUE,
-                        ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
-                ),
-                Arguments.of(
-                        DatabaseConstraint.SYSTEM_MIGRATION_USER_INACTIVE,
-                        ApiErrorMessages.SYSTEM_USER_CANNOT_BE_REACTIVATED
-                ),
-                Arguments.of(
-                        DatabaseConstraint.USER_USERNAME_RESERVED,
-                        ApiErrorMessages.RESERVED_USERNAME
-                ),
-                Arguments.of(
-                        DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE,
-                        ApiErrorMessages.ACTIVE_ACCOUNT_ALREADY_EXISTS
-                ),
-                Arguments.of(
-                        DatabaseConstraint.ACCOUNT_BALANCE_MAX,
-                        ApiErrorMessages.BALANCE_LIMIT_EXCEEDED
-                )
-        );
-    }
+  @Test
+  void shouldReturnInternalServerErrorWhenConstraintIsUnknown()
+      throws Exception {
 
-    @Test
-    void shouldReturnInternalServerErrorWhenConstraintIsUnknown()
-            throws Exception {
+    var cause = new org.hibernate.exception.ConstraintViolationException(
+        "Unknown constraint",
+        null,
+        "uk_unknown_constraint"
+    );
 
-        var cause = new org.hibernate.exception.ConstraintViolationException(
+    performThrowing(
+        new DataIntegrityViolationException(
+            "Sensitive database detail",
+            cause
+        )
+    )
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.status").value(500))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.DATABASE_INTEGRITY_ERROR))
+        .andExpect(content().string(
+            not(containsString("Sensitive database detail"))
+        ));
+  }
+
+  @ParameterizedTest(name = "[{index}] {0}")
+  @MethodSource("unknownConstraintLogCases")
+  void shouldLogOnlySqlStateAndConstraintWhenConstraintIsUnknown(
+      String description,
+      Throwable cause,
+      String expectedLogMessage
+  ) throws Exception {
+
+    List<ILoggingEvent> events = captureHandlerLogs(() ->
+        performThrowing(
+            new DataIntegrityViolationException(
+                "Sensitive database detail",
+                cause
+            )
+        )
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.message")
+                .value(ApiErrorMessages.DATABASE_INTEGRITY_ERROR))
+            .andExpect(content().string(
+                not(containsString("Sensitive database detail"))
+            ))
+    );
+
+    ILoggingEvent event = events.stream()
+        .filter(e -> e.getFormattedMessage()
+            .startsWith("Data integrity violation"))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError(
+            "Expected a data integrity warning to be logged."
+        ));
+
+    assertEquals(expectedLogMessage, event.getFormattedMessage());
+
+    // The exception itself is never logged: its detail carries row values.
+    assertNull(event.getThrowableProxy());
+  }
+
+  static Stream<Arguments> unknownConstraintLogCases() {
+    return Stream.of(
+        Arguments.of(
+            "Hibernate violation with SQLState and constraint",
+            new org.hibernate.exception.ConstraintViolationException(
                 "Unknown constraint",
-                null,
+                new SQLException("reason", "23505"),
                 "uk_unknown_constraint"
-        );
-
-        performThrowing(
-                new DataIntegrityViolationException(
-                        "Sensitive database detail",
-                        cause
-                )
+            ),
+            "Data integrity violation: sqlState=23505, "
+                + "constraint=uk_unknown_constraint"
+        ),
+        Arguments.of(
+            "Hibernate violation whose SQLException has no SQLState",
+            new org.hibernate.exception.ConstraintViolationException(
+                "Unknown constraint",
+                new SQLException("reason"),
+                "uk_unknown_constraint"
+            ),
+            "Data integrity violation: sqlState=unknown, "
+                + "constraint=uk_unknown_constraint"
+        ),
+        Arguments.of(
+            "Hibernate violation without name wrapping a PostgreSQL error",
+            new org.hibernate.exception.ConstraintViolationException(
+                "Unknown constraint",
+                postgresViolation("uk_from_postgres"),
+                null
+            ),
+            "Data integrity violation: sqlState=23505, "
+                + "constraint=uk_from_postgres"
+        ),
+        Arguments.of(
+            "PostgreSQL error with constraint",
+            postgresViolation("uk_from_postgres"),
+            "Data integrity violation: sqlState=23505, "
+                + "constraint=uk_from_postgres"
+        ),
+        Arguments.of(
+            "PostgreSQL error without constraint field",
+            postgresViolation(null),
+            "Data integrity violation: sqlState=23505, "
+                + "constraint=unknown"
+        ),
+        Arguments.of(
+            "PostgreSQL error without server error message",
+            new PSQLException(
+                "No server message",
+                PSQLState.UNEXPECTED_ERROR
+            ),
+            "Data integrity violation: sqlState="
+                + PSQLState.UNEXPECTED_ERROR.getState()
+                + ", constraint=unknown"
+        ),
+        Arguments.of(
+            "Plain SQLException without SQLState",
+            new SQLException("no state"),
+            "Data integrity violation: sqlState=unknown, "
+                + "constraint=unknown"
         )
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.DATABASE_INTEGRITY_ERROR))
-                .andExpect(content().string(
-                        not(containsString("Sensitive database detail"))
-                ));
-    }
+    );
+  }
 
-    @ParameterizedTest(name = "[{index}] {0}")
-    @MethodSource("unknownConstraintLogCases")
-    void shouldLogOnlySqlStateAndConstraintWhenConstraintIsUnknown(
-            String description,
-            Throwable cause,
-            String expectedLogMessage
-    ) throws Exception {
+  // -------------------------------------------------------------------------
+  // VALIDAÇÃO DO CORPO DA REQUISIÇÃO
+  // -------------------------------------------------------------------------
 
-        List<ILoggingEvent> events = captureHandlerLogs(() ->
-                performThrowing(
-                        new DataIntegrityViolationException(
-                                "Sensitive database detail",
-                                cause
-                        )
-                )
-                        .andExpect(status().isInternalServerError())
-                        .andExpect(jsonPath("$.message")
-                                .value(ApiErrorMessages.DATABASE_INTEGRITY_ERROR))
-                        .andExpect(content().string(
-                                not(containsString("Sensitive database detail"))
-                        ))
-        );
+  @Test
+  void shouldReturnBadRequestWhenRequestBodyIsInvalid()
+      throws Exception {
 
-        ILoggingEvent event = events.stream()
-                .filter(e -> e.getFormattedMessage()
-                        .startsWith("Data integrity violation"))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError(
-                        "Expected a data integrity warning to be logged."
-                ));
+    mockMvc.perform(post("/__test/validated")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(
+                """
+                {
+                  "name": "",
+                  "age": 12
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.VALIDATION_ERROR))
+        .andExpect(jsonPath("$.errors").exists())
+        .andExpect(jsonPath("$.errors.name").exists())
+        .andExpect(jsonPath("$.errors.age").exists());
+  }
 
-        assertEquals(expectedLogMessage, event.getFormattedMessage());
+  @Test
+  void shouldReturnBadRequestWhenRequestBodyIsMalformed()
+      throws Exception {
 
-        // The exception itself is never logged: its detail carries row values.
-        assertNull(event.getThrowableProxy());
-    }
+    mockMvc.perform(post("/__test/validated")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.INVALID_REQUEST_DATA));
+  }
 
-    static Stream<Arguments> unknownConstraintLogCases() {
-        return Stream.of(
-                Arguments.of(
-                        "Hibernate violation with SQLState and constraint",
-                        new org.hibernate.exception.ConstraintViolationException(
-                                "Unknown constraint",
-                                new SQLException("reason", "23505"),
-                                "uk_unknown_constraint"
-                        ),
-                        "Data integrity violation: sqlState=23505, "
-                                + "constraint=uk_unknown_constraint"
-                ),
-                Arguments.of(
-                        "Hibernate violation whose SQLException has no SQLState",
-                        new org.hibernate.exception.ConstraintViolationException(
-                                "Unknown constraint",
-                                new SQLException("reason"),
-                                "uk_unknown_constraint"
-                        ),
-                        "Data integrity violation: sqlState=unknown, "
-                                + "constraint=uk_unknown_constraint"
-                ),
-                Arguments.of(
-                        "Hibernate violation without name wrapping a PostgreSQL error",
-                        new org.hibernate.exception.ConstraintViolationException(
-                                "Unknown constraint",
-                                postgresViolation("uk_from_postgres"),
-                                null
-                        ),
-                        "Data integrity violation: sqlState=23505, "
-                                + "constraint=uk_from_postgres"
-                ),
-                Arguments.of(
-                        "PostgreSQL error with constraint",
-                        postgresViolation("uk_from_postgres"),
-                        "Data integrity violation: sqlState=23505, "
-                                + "constraint=uk_from_postgres"
-                ),
-                Arguments.of(
-                        "PostgreSQL error without constraint field",
-                        postgresViolation(null),
-                        "Data integrity violation: sqlState=23505, "
-                                + "constraint=unknown"
-                ),
-                Arguments.of(
-                        "PostgreSQL error without server error message",
-                        new PSQLException(
-                                "No server message",
-                                PSQLState.UNEXPECTED_ERROR
-                        ),
-                        "Data integrity violation: sqlState="
-                                + PSQLState.UNEXPECTED_ERROR.getState()
-                                + ", constraint=unknown"
-                ),
-                Arguments.of(
-                        "Plain SQLException without SQLState",
-                        new SQLException("no state"),
-                        "Data integrity violation: sqlState=unknown, "
-                                + "constraint=unknown"
-                )
-        );
-    }
+  @ParameterizedTest(name = "[{index}] {0}")
+  @MethodSource("fieldErrorCases")
+  void shouldResolveFieldErrorsDeterministically(
+      String description,
+      List<FieldError> fieldErrors,
+      String expectedMessage
+  ) throws Exception {
 
-    // -------------------------------------------------------------------------
-    // VALIDAÇÃO DO CORPO DA REQUISIÇÃO
-    // -------------------------------------------------------------------------
+    BindingResult bindingResult = bindingResult();
+    fieldErrors.forEach(bindingResult::addError);
 
-    @Test
-    void shouldReturnBadRequestWhenRequestBodyIsInvalid()
-            throws Exception {
+    performInvalidArgument(bindingResult)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.VALIDATION_ERROR))
+        .andExpect(jsonPath("$.errors.name").value(expectedMessage));
+  }
 
-        mockMvc.perform(post("/__test/validated")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "name": "",
-                                  "age": 12
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.VALIDATION_ERROR))
-                .andExpect(jsonPath("$.errors").exists())
-                .andExpect(jsonPath("$.errors.name").exists())
-                .andExpect(jsonPath("$.errors.age").exists());
-    }
-
-    @Test
-    void shouldReturnBadRequestWhenRequestBodyIsMalformed()
-            throws Exception {
-
-        mockMvc.perform(post("/__test/validated")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.INVALID_REQUEST_DATA));
-    }
-
-    @ParameterizedTest(name = "[{index}] {0}")
-    @MethodSource("fieldErrorCases")
-    void shouldResolveFieldErrorsDeterministically(
-            String description,
-            List<FieldError> fieldErrors,
-            String expectedMessage
-    ) throws Exception {
-
-        BindingResult bindingResult = bindingResult();
-        fieldErrors.forEach(bindingResult::addError);
-
-        performInvalidArgument(bindingResult)
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.VALIDATION_ERROR))
-                .andExpect(jsonPath("$.errors.name").value(expectedMessage));
-    }
-
-    static Stream<Arguments> fieldErrorCases() {
-        return Stream.of(
-                Arguments.of(
-                        "required error first: later errors are ignored",
-                        List.of(
-                                nameError("NotBlank", "must not be blank"),
-                                nameError("Pattern", "must match the pattern")
-                        ),
-                        "must not be blank"
-                ),
-                Arguments.of(
-                        "required error last: it replaces earlier errors",
-                        List.of(
-                                nameError("Pattern", "must match the pattern"),
-                                nameError("NotBlank", "must not be blank")
-                        ),
-                        "must not be blank"
-                ),
-                Arguments.of(
-                        "non-required errors are joined",
-                        List.of(
-                                nameError("Pattern", "must match the pattern"),
-                                nameError("Size", "size must be at most 5")
-                        ),
-                        "must match the pattern; size must be at most 5"
-                ),
-                Arguments.of(
-                        "missing default message uses the fallback",
-                        List.of(nameError("Pattern", null)),
-                        "Valor inválido"
-                )
-        );
-    }
-
-    @ParameterizedTest(name = "[{index}] {0}")
-    @MethodSource("globalErrorCases")
-    void shouldReportGlobalErrorsUnderTheObjectName(
-            String description,
-            String defaultMessage,
-            String expectedMessage
-    ) throws Exception {
-
-        BindingResult bindingResult = bindingResult();
-        bindingResult.reject("PasswordsMatch", defaultMessage);
-
-        performInvalidArgument(bindingResult)
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.VALIDATION_ERROR))
-                .andExpect(jsonPath("$.errors.testRequest")
-                        .value(expectedMessage));
-    }
-
-    static Stream<Arguments> globalErrorCases() {
-        return Stream.of(
-                Arguments.of(
-                        "with default message",
-                        "Passwords do not match",
-                        "Passwords do not match"
-                ),
-                Arguments.of(
-                        "without default message",
-                        null,
-                        "Objeto inválido"
-                )
-        );
-    }
-
-    // -------------------------------------------------------------------------
-    // VIOLAÇÕES DE CONSTRAINTS
-    // -------------------------------------------------------------------------
-
-    @Test
-    void shouldReturnBadRequestWhenNestedConstraintsAreViolated()
-            throws Exception {
-
-        Set<ConstraintViolation<?>> violations = new HashSet<>(
-                VALIDATOR.validate(
-                        new TestOuter(
-                                new TestInner(""),
-                                null
-                        )
-                )
-        );
-
-        jakarta.validation.ConstraintViolationException exception =
-                new jakarta.validation.ConstraintViolationException(
-                        "Validation failed",
-                        violations
-                );
-
-        performThrowing(exception)
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.VALIDATION_ERROR))
-                .andExpect(jsonPath("$.errors").exists())
-                .andExpect(jsonPath("$.errors.value").exists())
-                .andExpect(jsonPath("$.errors.code").exists());
-    }
-
-    // -------------------------------------------------------------------------
-    // ERROS DE PARÂMETROS E ROTEAMENTO
-    // -------------------------------------------------------------------------
-
-    @Test
-    void shouldReturnBadRequestWhenRequiredParameterIsMissing()
-            throws Exception {
-
-        mockMvc.perform(get("/__test/required-parameter"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
-    }
-
-    @Test
-    void shouldReturnBadRequestWhenRequiredHeaderIsMissing()
-            throws Exception {
-
-        mockMvc.perform(get("/__test/required-header"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
-    }
-
-    @Test
-    void shouldReturnInvalidParameterMessageForOtherBindingExceptions()
-            throws Exception {
-
-        performThrowing(new ServletRequestBindingException("Binding failed"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.INVALID_REQUEST_PARAMETER));
-    }
-
-    @Test
-    void shouldReturnBadRequestWhenParameterHasInvalidType()
-            throws Exception {
-
-        mockMvc.perform(get("/__test/type-mismatch")
-                        .param("id", "not-a-number"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.INVALID_REQUEST_PARAMETER));
-    }
-
-    @Test
-    void shouldReturnNotFoundWhenResourceDoesNotExist()
-            throws Exception {
-
-        mockMvc.perform(get("/__test/does-not-exist"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.RESOURCE_NOT_FOUND));
-    }
-
-    @Test
-    void shouldReturnMethodNotAllowedWhenHttpMethodIsUnsupported()
-            throws Exception {
-
-        mockMvc.perform(get("/__test/post-only"))
-                .andExpect(status().isMethodNotAllowed())
-                .andExpect(jsonPath("$.status").value(405))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.METHOD_NOT_ALLOWED));
-    }
-
-    @Test
-    void shouldReturnUnsupportedMediaTypeWhenContentTypeIsUnsupported()
-            throws Exception {
-
-        mockMvc.perform(post("/__test/validated")
-                        .contentType(MediaType.TEXT_PLAIN)
-                        .content("invalid content type"))
-                .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.status").value(415))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.UNSUPPORTED_MEDIA_TYPE));
-    }
-
-    // -------------------------------------------------------------------------
-    // INFRAESTRUTURA
-    // -------------------------------------------------------------------------
-
-    @Test
-    void shouldReturnServiceUnavailableWhenAddressProviderIsUnavailable()
-            throws Exception {
-
-        performThrowing(
-                new AddressProviderUnavailableException(
-                        "Sensitive provider detail"
-                )
+  static Stream<Arguments> fieldErrorCases() {
+    return Stream.of(
+        Arguments.of(
+            "required error first: later errors are ignored",
+            List.of(
+                nameError("NotBlank", "must not be blank"),
+                nameError("Pattern", "must match the pattern")
+            ),
+            "must not be blank"
+        ),
+        Arguments.of(
+            "required error last: it replaces earlier errors",
+            List.of(
+                nameError("Pattern", "must match the pattern"),
+                nameError("NotBlank", "must not be blank")
+            ),
+            "must not be blank"
+        ),
+        Arguments.of(
+            "non-required errors are joined",
+            List.of(
+                nameError("Pattern", "must match the pattern"),
+                nameError("Size", "size must be at most 5")
+            ),
+            "must match the pattern; size must be at most 5"
+        ),
+        Arguments.of(
+            "missing default message uses the fallback",
+            List.of(nameError("Pattern", null)),
+            "Valor inválido"
         )
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.status").value(503))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE))
-                .andExpect(content().string(
-                        not(containsString("Sensitive provider detail"))
-                ));
-    }
+    );
+  }
 
-    @ParameterizedTest
-    @MethodSource("databaseUnavailableExceptions")
-    void shouldReturnServiceUnavailableWhenDatabaseIsUnavailable(
-            Throwable exception
-    ) throws Exception {
+  @ParameterizedTest(name = "[{index}] {0}")
+  @MethodSource("globalErrorCases")
+  void shouldReportGlobalErrorsUnderTheObjectName(
+      String description,
+      String defaultMessage,
+      String expectedMessage
+  ) throws Exception {
 
-        performThrowing(exception)
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.status").value(503))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
-                .andExpect(content().string(
-                        not(containsString("Sensitive database detail"))
-                ));
-    }
+    BindingResult bindingResult = bindingResult();
+    bindingResult.reject("PasswordsMatch", defaultMessage);
 
-    @SuppressWarnings("unused") // usado via @MethodSource
-    static Stream<Throwable> databaseUnavailableExceptions() {
-        return Stream.of(
-                new DataAccessResourceFailureException("Sensitive database detail"),
-                new QueryTimeoutException("Sensitive database detail"),
-                new CannotCreateTransactionException("Sensitive database detail")
-        );
-    }
+    performInvalidArgument(bindingResult)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.VALIDATION_ERROR))
+        .andExpect(jsonPath("$.errors.testRequest")
+            .value(expectedMessage));
+  }
 
-    @Test
-    void shouldReturnServiceUnavailableWhenDatabaseLockCannotBeAcquired()
-            throws Exception {
-
-        performThrowing(
-                new CannotAcquireLockException(
-                        "Sensitive database lock detail"
-                )
+  static Stream<Arguments> globalErrorCases() {
+    return Stream.of(
+        Arguments.of(
+            "with default message",
+            "Passwords do not match",
+            "Passwords do not match"
+        ),
+        Arguments.of(
+            "without default message",
+            null,
+            "Objeto inválido"
         )
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.status").value(503))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
-                .andExpect(content().string(
-                        not(containsString("Sensitive database lock detail"))
-                ));
-    }
+    );
+  }
 
-    // -------------------------------------------------------------------------
-    // TROCA DE SENHA
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // VIOLAÇÕES DE CONSTRAINTS
+  // -------------------------------------------------------------------------
 
-    @ParameterizedTest
-    @MethodSource("passwordChangeExceptions")
-    void shouldReturnBadRequestWhenPasswordChangeIsRejected(
-            BusinessException exception,
-            String expectedMessage
-    ) throws Exception {
+  @Test
+  void shouldReturnBadRequestWhenNestedConstraintsAreViolated()
+      throws Exception {
 
-        performThrowing(exception)
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(expectedMessage));
-    }
-
-    @SuppressWarnings("unused") // usado via @MethodSource
-    static Stream<Arguments> passwordChangeExceptions() {
-        return Stream.of(
-                Arguments.of(
-                        new InvalidCurrentPasswordException(
-                                ApiErrorMessages.INVALID_CURRENT_PASSWORD
-                        ),
-                        ApiErrorMessages.INVALID_CURRENT_PASSWORD
-                ),
-                Arguments.of(
-                        new PasswordUnchangedException(
-                                ApiErrorMessages.PASSWORD_UNCHANGED
-                        ),
-                        ApiErrorMessages.PASSWORD_UNCHANGED
-                )
-        );
-    }
-
-    // -------------------------------------------------------------------------
-    // EXCEÇÕES INESPERADAS
-    // -------------------------------------------------------------------------
-
-    @Test
-    void shouldReturnInternalServerErrorForUnexpectedException()
-            throws Exception {
-
-        performThrowing(
-                new IllegalStateException("Sensitive internal detail")
+    Set<ConstraintViolation<?>> violations = new HashSet<>(
+        VALIDATOR.validate(
+            new TestOuter(
+                new TestInner(""),
+                null
+            )
         )
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.message")
-                        .value(ApiErrorMessages.INTERNAL_SERVER_ERROR))
-                .andExpect(content().string(
-                        not(containsString("Sensitive internal detail"))
-                ));
-    }
+    );
 
-    // -------------------------------------------------------------------------
-    // MÉTODOS AUXILIARES
-    // -------------------------------------------------------------------------
-
-    private ResultActions performThrowing(Throwable throwable)
-            throws Exception {
-
-        testController.setThrowable(throwable);
-
-        try {
-            return mockMvc.perform(get(THROW_URL));
-        } finally {
-            testController.clearThrowable();
-        }
-    }
-
-    private ResultActions performInvalidArgument(BindingResult bindingResult)
-            throws Exception {
-
-        MethodParameter parameter = new MethodParameter(
-                TestController.class.getDeclaredMethod(
-                        "validated",
-                        TestRequest.class
-                ),
-                0
+    jakarta.validation.ConstraintViolationException exception =
+        new jakarta.validation.ConstraintViolationException(
+            "Validation failed",
+            violations
         );
 
-        return performThrowing(
-                new MethodArgumentNotValidException(parameter, bindingResult)
-        );
-    }
+    performThrowing(exception)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.VALIDATION_ERROR))
+        .andExpect(jsonPath("$.errors").exists())
+        .andExpect(jsonPath("$.errors.value").exists())
+        .andExpect(jsonPath("$.errors.code").exists());
+  }
 
-    private static BindingResult bindingResult() {
-        return new BeanPropertyBindingResult(
-                new TestRequest(null, null),
-                "testRequest"
-        );
-    }
+  // -------------------------------------------------------------------------
+  // ERROS DE PARÂMETROS E ROTEAMENTO
+  // -------------------------------------------------------------------------
 
-    private static FieldError nameError(String code, String message) {
-        return new FieldError(
-                "testRequest",
-                "name",
-                null,
-                false,
-                new String[]{code},
-                null,
-                message
-        );
-    }
+  @Test
+  void shouldReturnBadRequestWhenRequiredParameterIsMissing()
+      throws Exception {
 
-    /**
-     * Creates a PostgreSQL exception with SQLState 23505 and an optional
-     * constraint name, using the driver's own error representation.
-     */
-    private static PSQLException postgresViolation(String constraintName) {
-        StringBuilder serverError = new StringBuilder()
-                .append('S').append("ERROR").append('\0')
-                .append('C').append("23505").append('\0')
-                .append('M').append("duplicate key value").append('\0');
+    mockMvc.perform(get("/__test/required-parameter"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
+  }
 
-        if (constraintName != null) {
-            serverError.append('n').append(constraintName).append('\0');
-        }
+  @Test
+  void shouldReturnBadRequestWhenRequiredHeaderIsMissing()
+      throws Exception {
 
-        // Terminates the PostgreSQL ErrorResponse fields.
-        serverError.append('\0');
+    mockMvc.perform(get("/__test/required-header"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.MISSING_REQUIRED_PARAMETER));
+  }
 
-        return new PSQLException(new ServerErrorMessage(serverError.toString()));
-    }
+  @Test
+  void shouldReturnInvalidParameterMessageForOtherBindingExceptions()
+      throws Exception {
 
-    private static List<ILoggingEvent> captureHandlerLogs(ThrowingAction action)
-            throws Exception {
+    performThrowing(new ServletRequestBindingException("Binding failed"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.INVALID_REQUEST_PARAMETER));
+  }
 
-        Logger handlerLogger =
-                (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+  @Test
+  void shouldReturnBadRequestWhenParameterHasInvalidType()
+      throws Exception {
 
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        handlerLogger.addAppender(appender);
+    mockMvc.perform(get("/__test/type-mismatch")
+            .param("id", "not-a-number"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.INVALID_REQUEST_PARAMETER));
+  }
 
-        try {
-            action.run();
-            return List.copyOf(appender.list);
-        } finally {
-            handlerLogger.detachAppender(appender);
-            appender.stop();
-        }
-    }
+  @Test
+  void shouldReturnNotFoundWhenResourceDoesNotExist()
+      throws Exception {
 
-    @FunctionalInterface
-    private interface ThrowingAction {
-        void run() throws Exception;
-    }
+    mockMvc.perform(get("/__test/does-not-exist"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.RESOURCE_NOT_FOUND));
+  }
 
-    @SuppressWarnings("unchecked")
-    private static <T extends Throwable> void sneakyThrow(
-            Throwable throwable
-    ) throws T {
-        throw (T) throwable;
-    }
+  @Test
+  void shouldReturnMethodNotAllowedWhenHttpMethodIsUnsupported()
+      throws Exception {
 
-    private static class TestBusinessException extends BusinessException {
+    mockMvc.perform(get("/__test/post-only"))
+        .andExpect(status().isMethodNotAllowed())
+        .andExpect(jsonPath("$.status").value(405))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.METHOD_NOT_ALLOWED));
+  }
 
-        TestBusinessException(String message, HttpStatus status) {
-            super(message, status);
-        }
-    }
+  @Test
+  void shouldReturnUnsupportedMediaTypeWhenContentTypeIsUnsupported()
+      throws Exception {
 
-    // -------------------------------------------------------------------------
-    // CONTROLLER UTILIZADO EXCLUSIVAMENTE NOS TESTES
-    // -------------------------------------------------------------------------
+    mockMvc.perform(post("/__test/validated")
+            .contentType(MediaType.TEXT_PLAIN)
+            .content("invalid content type"))
+        .andExpect(status().isUnsupportedMediaType())
+        .andExpect(jsonPath("$.status").value(415))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.UNSUPPORTED_MEDIA_TYPE));
+  }
 
-    @RestController
-    static class TestController {
+  // -------------------------------------------------------------------------
+  // INFRAESTRUTURA
+  // -------------------------------------------------------------------------
 
-        private volatile Throwable configuredThrowable;
+  @Test
+  void shouldReturnServiceUnavailableWhenAddressProviderIsUnavailable()
+      throws Exception {
 
-        void setThrowable(Throwable throwable) {
-            this.configuredThrowable = java.util.Objects.requireNonNull(
-                    throwable
-            );
-        }
-
-        void clearThrowable() {
-            this.configuredThrowable = null;
-        }
-
-        @GetMapping("/__test/throw")
-        String throwConfigured() {
-            Throwable throwable = configuredThrowable;
-
-            if (throwable == null) {
-                throw new IllegalStateException(
-                        "Nenhuma exceção foi configurada para o teste."
-                );
-            }
-
-            sneakyThrow(throwable);
-
-            return "unreachable";
-        }
-
-        @SuppressWarnings("unused")
-        @PostMapping(
-                value = "/__test/validated",
-                consumes = MediaType.APPLICATION_JSON_VALUE
+    performThrowing(
+        new AddressProviderUnavailableException(
+            "Sensitive provider detail"
         )
-        String validated(@Valid @RequestBody TestRequest request) {
-            return "valid";
-        }
+    )
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.status").value(503))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE))
+        .andExpect(content().string(
+            not(containsString("Sensitive provider detail"))
+        ));
+  }
 
-        @GetMapping("/__test/required-parameter")
-        String requiredParameter(
-                @RequestParam("name") String name
-        ) {
-            return name;
-        }
+  @ParameterizedTest
+  @MethodSource("databaseUnavailableExceptions")
+  void shouldReturnServiceUnavailableWhenDatabaseIsUnavailable(
+      Throwable exception
+  ) throws Exception {
 
-        @GetMapping("/__test/type-mismatch")
-        String typeMismatch(
-                @RequestParam("id") Integer id
-        ) {
-            return id.toString();
-        }
+    performThrowing(exception)
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.status").value(503))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
+        .andExpect(content().string(
+            not(containsString("Sensitive database detail"))
+        ));
+  }
 
-        @GetMapping("/__test/required-header")
-        String requiredHeader(
-                @RequestHeader("Idempotency-Key") String key
-        ) {
-            return key;
-        }
+  @SuppressWarnings("unused") // usado via @MethodSource
+  static Stream<Throwable> databaseUnavailableExceptions() {
+    return Stream.of(
+        new DataAccessResourceFailureException("Sensitive database detail"),
+        new QueryTimeoutException("Sensitive database detail"),
+        new CannotCreateTransactionException("Sensitive database detail")
+    );
+  }
 
-        @PostMapping("/__test/post-only")
-        String postOnly() {
-            return "ok";
-        }
+  @Test
+  void shouldReturnServiceUnavailableWhenDatabaseLockCannotBeAcquired()
+      throws Exception {
+
+    performThrowing(
+        new CannotAcquireLockException(
+            "Sensitive database lock detail"
+        )
+    )
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.status").value(503))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.DATABASE_TEMPORARILY_UNAVAILABLE))
+        .andExpect(content().string(
+            not(containsString("Sensitive database lock detail"))
+        ));
+  }
+
+  // -------------------------------------------------------------------------
+  // TROCA DE SENHA
+  // -------------------------------------------------------------------------
+
+  @ParameterizedTest
+  @MethodSource("passwordChangeExceptions")
+  void shouldReturnBadRequestWhenPasswordChangeIsRejected(
+      BusinessException exception,
+      String expectedMessage
+  ) throws Exception {
+
+    performThrowing(exception)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message").value(expectedMessage));
+  }
+
+  @SuppressWarnings("unused") // usado via @MethodSource
+  static Stream<Arguments> passwordChangeExceptions() {
+    return Stream.of(
+        Arguments.of(
+            new InvalidCurrentPasswordException(
+                ApiErrorMessages.INVALID_CURRENT_PASSWORD
+            ),
+            ApiErrorMessages.INVALID_CURRENT_PASSWORD
+        ),
+        Arguments.of(
+            new PasswordUnchangedException(
+                ApiErrorMessages.PASSWORD_UNCHANGED
+            ),
+            ApiErrorMessages.PASSWORD_UNCHANGED
+        )
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // EXCEÇÕES INESPERADAS
+  // -------------------------------------------------------------------------
+
+  @Test
+  void shouldReturnInternalServerErrorForUnexpectedException()
+      throws Exception {
+
+    performThrowing(
+        new IllegalStateException("Sensitive internal detail")
+    )
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.status").value(500))
+        .andExpect(jsonPath("$.message")
+            .value(ApiErrorMessages.INTERNAL_SERVER_ERROR))
+        .andExpect(content().string(
+            not(containsString("Sensitive internal detail"))
+        ));
+  }
+
+  // -------------------------------------------------------------------------
+  // MÉTODOS AUXILIARES
+  // -------------------------------------------------------------------------
+
+  private ResultActions performThrowing(Throwable throwable)
+      throws Exception {
+
+    testController.setThrowable(throwable);
+
+    try {
+      return mockMvc.perform(get(THROW_URL));
+    } finally {
+      testController.clearThrowable();
+    }
+  }
+
+  private ResultActions performInvalidArgument(BindingResult bindingResult)
+      throws Exception {
+
+    MethodParameter parameter = new MethodParameter(
+        TestController.class.getDeclaredMethod(
+            "validated",
+            TestRequest.class
+        ),
+        0
+    );
+
+    return performThrowing(
+        new MethodArgumentNotValidException(parameter, bindingResult)
+    );
+  }
+
+  private static BindingResult bindingResult() {
+    return new BeanPropertyBindingResult(
+        new TestRequest(null, null),
+        "testRequest"
+    );
+  }
+
+  private static FieldError nameError(String code, String message) {
+    return new FieldError(
+        "testRequest",
+        "name",
+        null,
+        false,
+        new String[] {code},
+        null,
+        message
+    );
+  }
+
+  /**
+   * Creates a PostgreSQL exception with SQLState 23505 and an optional
+   * constraint name, using the driver's own error representation.
+   */
+  private static PSQLException postgresViolation(String constraintName) {
+    StringBuilder serverError = new StringBuilder()
+        .append('S').append("ERROR").append('\0')
+        .append('C').append("23505").append('\0')
+        .append('M').append("duplicate key value").append('\0');
+
+    if (constraintName != null) {
+      serverError.append('n').append(constraintName).append('\0');
     }
 
-    // -------------------------------------------------------------------------
-    // OBJETOS DE TESTE PARA VALIDAÇÃO
-    // -------------------------------------------------------------------------
+    // Terminates the PostgreSQL ErrorResponse fields.
+    serverError.append('\0');
 
-    record TestRequest(
-            @NotBlank
-            @Size(max = 5)
-            @Pattern(regexp = "[a-z]+")
-            String name,
+    return new PSQLException(new ServerErrorMessage(serverError.toString()));
+  }
 
-            @NotNull
-            @Min(18)
-            Integer age
+  private static List<ILoggingEvent> captureHandlerLogs(ThrowingAction action)
+      throws Exception {
+
+    Logger handlerLogger =
+        (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    handlerLogger.addAppender(appender);
+
+    try {
+      action.run();
+      return List.copyOf(appender.list);
+    } finally {
+      handlerLogger.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingAction {
+    void run() throws Exception;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends Throwable> void sneakyThrow(
+      Throwable throwable
+  ) throws T {
+    throw (T) throwable;
+  }
+
+  private static class TestBusinessException extends BusinessException {
+
+    TestBusinessException(String message, HttpStatus status) {
+      super(message, status);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // CONTROLLER UTILIZADO EXCLUSIVAMENTE NOS TESTES
+  // -------------------------------------------------------------------------
+
+  @RestController
+  static class TestController {
+
+    private volatile Throwable configuredThrowable;
+
+    void setThrowable(Throwable throwable) {
+      this.configuredThrowable = java.util.Objects.requireNonNull(
+          throwable
+      );
+    }
+
+    void clearThrowable() {
+      this.configuredThrowable = null;
+    }
+
+    @GetMapping("/__test/throw")
+    String throwConfigured() {
+      Throwable throwable = configuredThrowable;
+
+      if (throwable == null) {
+        throw new IllegalStateException(
+            "Nenhuma exceção foi configurada para o teste."
+        );
+      }
+
+      sneakyThrow(throwable);
+
+      return "unreachable";
+    }
+
+    @SuppressWarnings("unused")
+    @PostMapping(
+        value = "/__test/validated",
+        consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    String validated(@Valid @RequestBody TestRequest request) {
+      return "valid";
+    }
+
+    @GetMapping("/__test/required-parameter")
+    String requiredParameter(
+        @RequestParam("name") String name
     ) {
+      return name;
     }
 
-    private record TestInner(
-            @NotBlank
-            @Size(min = 3)
-            @Pattern(regexp = "\\d+")
-            String value
+    @GetMapping("/__test/type-mismatch")
+    String typeMismatch(
+        @RequestParam("id") Integer id
     ) {
+      return id.toString();
     }
 
-    private record TestOuter(
-            @Valid TestInner inner,
-
-            @NotBlank String code
+    @GetMapping("/__test/required-header")
+    String requiredHeader(
+        @RequestHeader("Idempotency-Key") String key
     ) {
+      return key;
     }
+
+    @PostMapping("/__test/post-only")
+    String postOnly() {
+      return "ok";
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // OBJETOS DE TESTE PARA VALIDAÇÃO
+  // -------------------------------------------------------------------------
+
+  record TestRequest(
+      @NotBlank
+      @Size(max = 5)
+      @Pattern(regexp = "[a-z]+")
+      String name,
+
+      @NotNull
+      @Min(18)
+      Integer age
+  ) {
+  }
+
+  private record TestInner(
+      @NotBlank
+      @Size(min = 3)
+      @Pattern(regexp = "\\d+")
+      String value
+  ) {
+  }
+
+  private record TestOuter(
+      @Valid TestInner inner,
+
+      @NotBlank String code
+  ) {
+  }
 }

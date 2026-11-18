@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.controller.account;
 
-import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Set;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,70 +23,84 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Set;
-
+/**
+ * REST controller responsible for retrieving bank accounts associated with clients.
+ */
 @Tag(
-        name = "Accounts",
-        description = "Bank account management and retrieval, including accounts associated with a client."
+    name = "Accounts",
+    description =
+        "Bank account management and retrieval, including accounts "
+            + "associated with a client."
 )
 @PreAuthorize("hasRole('EMPLOYEE')")
 @RestController
 @RequestMapping("/api/v1/clients/{clientId}/accounts")
 public class ClientAccountController {
 
-    private static final String SORTABLE = "accountNumber,balance,status,type";
+  private static final String SORTABLE = "accountNumber,balance,status,type";
 
-    private static final Set<String> SORTABLE_PROPERTIES =
-            Set.of(SORTABLE.split(","));
+  private static final Set<String> SORTABLE_PROPERTIES =
+      Set.of(SORTABLE.split(","));
 
-    private final AccountService accountService;
+  private final AccountService accountService;
 
-    public ClientAccountController(AccountService accountService) {
-        this.accountService = accountService;
-    }
+  public ClientAccountController(AccountService accountService) {
+    this.accountService = accountService;
+  }
 
-    @Operation(
-            summary = "Get accounts of a client",
-            description = """
-                    Retrieves the accounts of a client using pagination and
-                    sorting, with optional filters by account type and status.
-                    Cancelled accounts are included unless filtered out.
-                    The default page size is 10, and the default sort order
-                    is ascending by account number. The maximum page size is 100.
-                    """
-    )
-    @SortableBy(
-            value = SORTABLE,
-            defaultSort = "accountNumber,ASC"
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Accounts retrieved successfully"
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid client ID or request parameters"
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Client not found"
-            )
-    })
-    @GetMapping
-    public Page<AccountResponseDTO> findByClientId(
-            @Parameter(description = "Client unique identifier", example = "1")
-            @PathVariable Long clientId,
-            @Parameter(description = "Filter accounts by type", example = "SAVINGS")
-            @RequestParam(required = false) AccountType type,
-            @Parameter(description = "Filter accounts by status", example = "ACTIVE")
-            @RequestParam(required = false) AccountStatus status,
-            @ParameterObject
-            @PageableDefault(size = 10, sort = "accountNumber")
-            Pageable pageable
-    ) {
-        SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
+  /**
+   * Retrieves a client's accounts with optional filters, pagination, and sorting.
+   * Canceled accounts are included unless explicitly excluded by the status filter.
+   *
+   * @param clientId the client's unique identifier
+   * @param type the optional account type filter
+   * @param status the optional account status filter
+   * @param pageable pagination and sorting parameters
+   * @return a page of account response DTOs
+   */
+  @Operation(
+      summary = "Get accounts of a client",
+      description =
+          """
+          Retrieves the accounts of a client using pagination and
+          sorting, with optional filters by account type and status.
+          Cancelled accounts are included unless filtered out.
+          The default page size is 10, and the default sort order
+          is ascending by account number. The maximum page size is 100.
+          """
+  )
+  @SortableBy(
+      value = SORTABLE,
+      defaultSort = "accountNumber,ASC"
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Accounts retrieved successfully"
+      ),
+      @ApiResponse(
+          responseCode = "400",
+          description = "Invalid client ID or request parameters"
+      ),
+      @ApiResponse(
+          responseCode = "404",
+          description = "Client not found"
+      )
+  })
+  @GetMapping
+  public Page<AccountResponseDto> findByClientId(
+      @Parameter(description = "Client unique identifier", example = "1")
+      @PathVariable Long clientId,
+      @Parameter(description = "Filter accounts by type", example = "SAVINGS")
+      @RequestParam(required = false) AccountType type,
+      @Parameter(description = "Filter accounts by status", example = "ACTIVE")
+      @RequestParam(required = false) AccountStatus status,
+      @ParameterObject
+      @PageableDefault(sort = "accountNumber")
+      Pageable pageable
+  ) {
+    SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
 
-        return accountService.findByClientId(clientId, type, status, pageable);
-    }
+    return accountService.findByClientId(clientId, type, status, pageable);
+  }
 }

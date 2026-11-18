@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.controller.transaction;
 
-import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.service.transaction.query.TransactionPageResult;
 import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
@@ -15,6 +15,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDate;
+import java.util.Set;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,127 +33,143 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
-import java.util.Set;
-
+/**
+ * REST controller responsible for retrieving paginated transaction history
+ * associated with bank accounts.
+ */
 @Tag(
-        name = "Transactions",
-        description = "Deposits, withdrawals, transfers and transaction history."
+    name = "Transactions",
+    description = "Deposits, withdrawals, transfers and transaction history."
 )
 @Validated
 @RestController
 @RequestMapping("/api/v1/accounts/{accountNumber}/transactions")
 public class AccountTransactionController {
 
-    private static final String SNAPSHOT_HEADER = "X-Transaction-Snapshot";
+  private static final String SNAPSHOT_HEADER = "X-Transaction-Snapshot";
 
-    private static final String SORTABLE = "createdAt,id,type,amount";
+  private static final String SORTABLE = "createdAt,id,type,amount";
 
-    private static final Set<String> SORTABLE_PROPERTIES =
-            Set.of(SORTABLE.split(","));
+  private static final Set<String> SORTABLE_PROPERTIES =
+      Set.of(SORTABLE.split(","));
 
-    private final TransactionQueryService transactionQueryService;
+  private final TransactionQueryService transactionQueryService;
 
-    public AccountTransactionController(
-            TransactionQueryService transactionQueryService
-    ) {
-        this.transactionQueryService = transactionQueryService;
-    }
-    @Operation(
-            summary = "Retrieve transactions by account",
-            description = "Retrieves transactions for the specified account, with pagination and optional filters."
-    )
-    @SortableBy(
-            value = SORTABLE,
-            defaultSort = "createdAt,DESC;id,DESC"
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Transactions retrieved successfully",
-                    headers = @Header(
-                            name = SNAPSHOT_HEADER,
-                            description = "Snapshot token to reuse when navigating transaction pages.",
-                            schema = @Schema(type = "string")
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid request parameters or account identifiers"
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Account not found"
-            )
-    })
-    @PreAuthorize("hasRole('EMPLOYEE')")
-    @GetMapping
-    public ResponseEntity<Page<TransactionResponseDTO>> findByAccountNumber(
-            @Parameter(
-                    description = "Account number",
-                    example = "12345",
-                    required = true
-            )
-            @ValidAccountNumber
-            @PathVariable String accountNumber,
+  public AccountTransactionController(
+      TransactionQueryService transactionQueryService
+  ) {
+    this.transactionQueryService = transactionQueryService;
+  }
 
-            @Parameter(
-                    description = "Account check digit",
-                    example = "1",
-                    required = true
-            )
-            @ValidAccountDigit
-            @RequestParam String digit,
+  /**
+   * Retrieves paginated transactions for an account with optional filters
+   * and snapshot-based pagination consistency.
+   *
+   * @param accountNumber the account number
+   * @param digit the account verification digit
+   * @param type the optional transaction type filter
+   * @param startDate the optional inclusive start date
+   * @param endDate the optional inclusive end date
+   * @param pageable pagination and sorting parameters
+   * @param snapshotToken the optional token used to preserve the original result set
+   * @return a response containing the transaction page and snapshot token
+   */
+  @Operation(
+      summary = "Retrieve transactions by account",
+      description =
+          "Retrieves transactions for the specified account, "
+              + "with pagination and optional filters."
+  )
+  @SortableBy(
+      value = SORTABLE,
+      defaultSort = "createdAt,DESC;id,DESC"
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Transactions retrieved successfully",
+          headers = @Header(
+              name = SNAPSHOT_HEADER,
+              description = "Snapshot token to reuse when navigating transaction pages.",
+              schema = @Schema(type = "string")
+          )
+      ),
+      @ApiResponse(
+          responseCode = "400",
+          description = "Invalid request parameters or account identifiers"
+      ),
+      @ApiResponse(
+          responseCode = "404",
+          description = "Account not found"
+      )
+  })
+  @PreAuthorize("hasRole('EMPLOYEE')")
+  @GetMapping
+  public ResponseEntity<Page<TransactionResponseDto>> findByAccountNumber(
+      @Parameter(
+          description = "Account number",
+          example = "12345",
+          required = true
+      )
+      @ValidAccountNumber
+      @PathVariable String accountNumber,
 
-            @Parameter(description = "Filter by transaction type")
-            @RequestParam(required = false)
-            TransactionType type,
+      @Parameter(
+          description = "Account check digit",
+          example = "1",
+          required = true
+      )
+      @ValidAccountDigit
+      @RequestParam String digit,
 
-            @Parameter(
-                    description = "Start date (inclusive)",
-                    example = "2026-01-01"
-            )
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate startDate,
+      @Parameter(description = "Filter by transaction type")
+      @RequestParam(required = false)
+      TransactionType type,
 
-            @Parameter(
-                    description = "End date (inclusive)",
-                    example = "2026-01-31"
-            )
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate endDate,
+      @Parameter(
+          description = "Start date (inclusive)",
+          example = "2026-01-01"
+      )
+      @RequestParam(required = false)
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      LocalDate startDate,
 
-            @ParameterObject
-            @PageableDefault(
-                    size = 10,
-                    sort = {"createdAt", "id"},
-                    direction = Sort.Direction.DESC
-            )
-            Pageable pageable,
-            @Parameter(
-                    description = "Snapshot token returned by the previous page request. "
-                            + "Reuse it to keep subsequent pages consistent."
-            )
-            @RequestHeader(name = SNAPSHOT_HEADER, required = false)
-            String snapshotToken
-    ) {
-        SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
+      @Parameter(
+          description = "End date (inclusive)",
+          example = "2026-01-31"
+      )
+      @RequestParam(required = false)
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      LocalDate endDate,
 
-        TransactionPageResult result =
-                transactionQueryService.findByAccountNumber(
-                        accountNumber,
-                        digit,
-                        type,
-                        startDate,
-                        endDate,
-                        pageable,
-                        snapshotToken
-                );
+      @ParameterObject
+      @PageableDefault(
+          sort = {"createdAt", "id"},
+          direction = Sort.Direction.DESC
+      )
+      Pageable pageable,
+      @Parameter(
+          description = "Snapshot token returned by the previous page request. "
+              + "Reuse it to keep subsequent pages consistent."
+      )
+      @RequestHeader(name = SNAPSHOT_HEADER, required = false)
+      String snapshotToken
+  ) {
+    SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
 
-        return ResponseEntity.ok()
-                .header(SNAPSHOT_HEADER, result.snapshotToken())
-                .body(result.page());
-    }
+    TransactionPageResult result =
+        transactionQueryService.findByAccountNumber(
+            accountNumber,
+            digit,
+            type,
+            startDate,
+            endDate,
+            pageable,
+            snapshotToken
+        );
+
+    return ResponseEntity.ok()
+        .header(SNAPSHOT_HEADER, result.snapshotToken())
+        .body(result.page());
+  }
 }

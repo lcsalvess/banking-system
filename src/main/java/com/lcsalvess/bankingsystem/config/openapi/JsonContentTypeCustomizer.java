@@ -1,5 +1,7 @@
 package com.lcsalvess.bankingsystem.config.openapi;
 
+import static com.lcsalvess.bankingsystem.config.openapi.OpenApiConstants.JSON_MEDIA_TYPE;
+
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
@@ -7,8 +9,6 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-
-import static com.lcsalvess.bankingsystem.config.openapi.OpenApiConstants.JSON_MEDIA_TYPE;
 
 /**
  * Exposes only {@code application/json} on successful (200 and 201) responses.
@@ -21,29 +21,29 @@ import static com.lcsalvess.bankingsystem.config.openapi.OpenApiConstants.JSON_M
 @Order(OpenApiConstants.Order.JSON_CONTENT_TYPE)
 public class JsonContentTypeCustomizer implements OpenApiCustomizer {
 
-    @Override
-    public void customise(OpenAPI openApi) {
-        openApi.getPaths().forEach((path, pathItem) ->
-                pathItem.readOperationsMap().forEach((httpMethod, operation) ->
-                        operation.getResponses().forEach((status, response) -> {
-                            if ("200".equals(status) || "201".equals(status)) {
-                                keepOnlyJson(response);
-                            }
-                        })
-                )
-        );
+  @Override
+  public void customise(OpenAPI openApi) {
+    openApi.getPaths().forEach((path, pathItem) ->
+        pathItem.readOperationsMap().forEach((httpMethod, operation) ->
+            operation.getResponses().forEach((status, response) -> {
+              if ("200".equals(status) || "201".equals(status)) {
+                keepOnlyJson(response);
+              }
+            })
+        )
+    );
+  }
+
+  private static void keepOnlyJson(ApiResponse response) {
+    Content content = response.getContent();
+
+    if (content == null || content.isEmpty()) {
+      return;
     }
 
-    private static void keepOnlyJson(ApiResponse response) {
-        Content content = response.getContent();
+    MediaType mediaType = content.values().iterator().next();
 
-        if (content == null || content.isEmpty()) {
-            return;
-        }
-
-        MediaType mediaType = content.values().iterator().next();
-
-        content.clear();
-        content.addMediaType(JSON_MEDIA_TYPE, mediaType);
-    }
+    content.clear();
+    content.addMediaType(JSON_MEDIA_TYPE, mediaType);
+  }
 }

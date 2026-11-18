@@ -1,0 +1,48 @@
+package com.lcsalvess.bankingsystem.dto.response.audit;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
+import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
+import com.lcsalvess.bankingsystem.entity.audit.AuditEvent;
+import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
+import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
+import java.time.Instant;
+import java.util.UUID;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record AuditEventResponseDto(
+    Long id,
+    AuditEventType eventType,
+    AuditOutcome outcome,
+    AuditActorType actorType,
+    Long actorUserId,
+    String actorUsername,
+    AuditEntityType entityType,
+    String entityId,
+    UUID correlationId,
+    Instant createdAt,
+    String ipAddress,
+    String reason,
+    Integer httpStatus
+) {
+
+  public static AuditEventResponseDto fromEntity(AuditEvent event) {
+    return new AuditEventResponseDto(
+        event.getId(),
+        event.getEventType(),
+        event.getOutcome(),
+        event.getActorType(),
+        event.getActorUserId(),
+        event.getActorUsername(),
+        event.getEntityType(),
+        event.getEntityId(),
+        event.getCorrelationId(),
+        event.getCreatedAt(),
+        event.getIpAddress() != null
+            ? event.getIpAddress().getHostAddress()
+            : null,
+        event.getReason(),
+        event.getHttpStatus()
+    );
+  }
+}

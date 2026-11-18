@@ -11,6 +11,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,131 +28,138 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-
+/**
+ * Authenticates HTTP requests using JWT bearer tokens.
+ *
+ * <p>Validates token signatures, expiration, issuer, and token version,
+ * loads the associated user, and establishes the Spring Security context.
+ *
+ * <p>Delegates authentication failures and infrastructure errors to the
+ * configured authentication entry point.
+ */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final Logger log =
-            LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+  private static final Logger log =
+      LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    private static final String BEARER_PREFIX = "Bearer ";
+  private static final String BEARER_PREFIX = "Bearer ";
 
-    /**
-     * The only route excluded by this filter: it must match the route permitted
-     * by {@code permitAll} in {@code SecurityConfig}. This ensures that an
-     * expired token resent with a login request does not prevent new
-     * authentication, while all other routes under {@code /api/v1/auth/}
-     * continue to pass through the filter.
-     */
-    private static final PathPatternRequestMatcher LOGIN_REQUEST_MATCHER =
-            PathPatternRequestMatcher.withDefaults()
-                    .matcher(HttpMethod.POST, "/api/v1/auth/login");
+  /**
+   * The only route excluded by this filter: it must match the route permitted
+   * by {@code permitAll} in {@code SecurityConfig}. This ensures that an
+   * expired token resent with a login request does not prevent new
+   * authentication, while all other routes under {@code /api/v1/auth/}
+   * continue to pass through the filter.
+   */
+  private static final PathPatternRequestMatcher LOGIN_REQUEST_MATCHER =
+      PathPatternRequestMatcher.withDefaults()
+          .matcher(HttpMethod.POST, "/api/v1/auth/login");
 
-    private final JwtService jwtService;
-    private final CustomUserDetailsService userDetailsService;
-    private final RestAuthenticationEntryPoint authenticationEntryPoint;
+  private final JwtService jwtService;
+  private final CustomUserDetailsService userDetailsService;
+  private final RestAuthenticationEntryPoint authenticationEntryPoint;
 
-    public JwtAuthenticationFilter(
-            JwtService jwtService,
-            CustomUserDetailsService userDetailsService,
-            RestAuthenticationEntryPoint authenticationEntryPoint
-    ) {
-        this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
-        this.authenticationEntryPoint = authenticationEntryPoint;
+  public JwtAuthenticationFilter(
+      JwtService jwtService,
+      CustomUserDetailsService userDetailsService,
+      RestAuthenticationEntryPoint authenticationEntryPoint
+  ) {
+    this.jwtService = jwtService;
+    this.userDetailsService = userDetailsService;
+    this.authenticationEntryPoint = authenticationEntryPoint;
+  }
+
+  @Override
+  protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+    return LOGIN_REQUEST_MATCHER.matches(request);
+  }
+
+  @Override
+  protected void doFilterInternal(
+      @NonNull HttpServletRequest request,
+      @NonNull HttpServletResponse response,
+      @NonNull FilterChain filterChain
+  ) throws ServletException, IOException {
+
+    String authHeader = request.getHeader("Authorization");
+
+    if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+      filterChain.doFilter(request, response);
+      return;
     }
 
-    @Override
-    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
-        return LOGIN_REQUEST_MATCHER.matches(request);
+    String jwt = authHeader.substring(BEARER_PREFIX.length()).trim();
+
+    // "Bearer" without a token is equivalent to missing credentials:
+    // the request proceeds unauthenticated, and protected routes respond
+    // with 401 as usual.
+    if (jwt.isEmpty()) {
+      filterChain.doFilter(request, response);
+      return;
     }
 
-    @Override
-    protected void doFilterInternal(
-            @NonNull HttpServletRequest request,
-            @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+    try {
+      JwtClaims claims = jwtService.parse(jwt);
 
-        String authHeader = request.getHeader("Authorization");
+      UserDetails userDetails =
+          userDetailsService.loadUserByUsername(claims.username());
 
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+      if (!userDetails.isEnabled()) {
+        authenticationEntryPoint.commence(
+            request,
+            response,
+            new DisabledException("User is disabled")
+        );
+        return;
+      }
 
-        String jwt = authHeader.substring(BEARER_PREFIX.length()).trim();
+      // A token issued before the most recent password change is no
+      // longer valid.
+      if (!(userDetails instanceof User user)
+          || user.getTokenVersion() != claims.tokenVersion()) {
+        authenticationEntryPoint.commence(
+            request,
+            response,
+            new BadCredentialsException("Invalid authentication")
+        );
+        return;
+      }
 
-        // "Bearer" without a token is equivalent to missing credentials:
-        // the request proceeds unauthenticated, and protected routes respond
-        // with 401 as usual.
-        if (jwt.isEmpty()) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+      UsernamePasswordAuthenticationToken authentication =
+          new UsernamePasswordAuthenticationToken(
+              userDetails,
+              null,
+              userDetails.getAuthorities()
+          );
 
-        try {
-            JwtClaims claims = jwtService.parse(jwt);
+      SecurityContextHolder.getContext()
+          .setAuthentication(authentication);
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(claims.username());
+      // The audit filter runs outside the security filter chain, after
+      // the SecurityContext has already been cleared: the actor is
+      // therefore carried through the request.
+      request.setAttribute(
+          AuditRequestAttributes.AUTHENTICATED_USER,
+          userDetails
+      );
 
-            if (!userDetails.isEnabled()) {
-                authenticationEntryPoint.commence(
-                        request,
-                        response,
-                        new DisabledException("User is disabled")
-                );
-                return;
-            }
-
-            // A token issued before the most recent password change is no
-            // longer valid.
-            if (!(userDetails instanceof User user)
-                    || user.getTokenVersion() != claims.tokenVersion()) {
-                authenticationEntryPoint.commence(
-                        request,
-                        response,
-                        new BadCredentialsException("Invalid authentication")
-                );
-                return;
-            }
-
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-
-            SecurityContextHolder.getContext()
-                    .setAuthentication(authentication);
-
-            // The audit filter runs outside the security filter chain, after
-            // the SecurityContext has already been cleared: the actor is
-            // therefore carried through the request.
-            request.setAttribute(
-                    AuditRequestAttributes.AUTHENTICATED_USER,
-                    userDetails
-            );
-
-        } catch (JwtException | UsernameNotFoundException exception) {
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new BadCredentialsException("Invalid authentication")
-            );
-            return;
-        } catch (DataAccessException | TransactionException exception) {
-            // An infrastructure failure is not an invalid credential: returning
-            // 401 would cause the client to discard a valid token and
-            // unnecessarily reauthenticate.
-            log.error("Could not load the user while authenticating the request.", exception);
-            authenticationEntryPoint.commenceServiceUnavailable(response);
-            return;
-        }
-
-        filterChain.doFilter(request, response);
+    } catch (JwtException | UsernameNotFoundException exception) {
+      authenticationEntryPoint.commence(
+          request,
+          response,
+          new BadCredentialsException("Invalid authentication")
+      );
+      return;
+    } catch (DataAccessException | TransactionException exception) {
+      // An infrastructure failure is not an invalid credential: returning
+      // 401 would cause the client to discard a valid token and
+      // unnecessarily reauthenticate.
+      log.error("Could not load the user while authenticating the request.", exception);
+      authenticationEntryPoint.commenceServiceUnavailable(response);
+      return;
     }
+
+    filterChain.doFilter(request, response);
+  }
 }

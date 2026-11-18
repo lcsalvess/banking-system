@@ -9,18 +9,22 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+/**
+ * Loads user details from the database during authentication.
+ */
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
-    private final UserRepository userRepository;
+  private final UserRepository userRepository;
 
-    public CustomUserDetailsService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
+  public CustomUserDetailsService(UserRepository userRepository) {
+    this.userRepository = userRepository;
+  }
 
-    @Override
-    public @NonNull UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
-        String normalizedUsername = UsernameNormalizer.normalize(username);
-        return userRepository.findByUsernameIgnoreCase(normalizedUsername)
-                .orElseThrow(() -> new UsernameNotFoundException(ApiErrorMessages.INVALID_CREDENTIALS));
-    }
+  @Override
+  public @NonNull UserDetails loadUserByUsername(@NonNull String username)
+      throws UsernameNotFoundException {
+    String normalizedUsername = UsernameNormalizer.normalize(username);
+    return userRepository.findByUsernameIgnoreCase(normalizedUsername)
+        .orElseThrow(() -> new UsernameNotFoundException(ApiErrorMessages.INVALID_CREDENTIALS));
+  }
 }

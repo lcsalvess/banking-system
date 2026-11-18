@@ -2,7 +2,7 @@ package com.lcsalvess.bankingsystem.unit.controller.account;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.account.ClientAccountController;
-import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
 import com.lcsalvess.bankingsystem.exception.client.ClientNotFoundException;
@@ -73,14 +73,14 @@ public class ClientAccountControllerTests {
         @Test
         @DisplayName("Should return a page of the client's accounts successfully")
         void shouldReturnPageOfAccountsSuccessfully() throws Exception {
-            AccountResponseDTO checking = account(
+            AccountResponseDto checking = account(
                     "00001", "9", AccountType.CHECKING, AccountStatus.ACTIVE
             );
-            AccountResponseDTO savings = account(
+            AccountResponseDto savings = account(
                     "00002", "7", AccountType.SAVINGS, AccountStatus.CANCELLED
             );
 
-            Page<AccountResponseDTO> page = new PageImpl<>(
+            Page<AccountResponseDto> page = new PageImpl<>(
                     List.of(checking, savings),
                     DEFAULT_PAGEABLE,
                     2
@@ -113,7 +113,7 @@ public class ClientAccountControllerTests {
         @Test
         @DisplayName("Should return an empty page when the client has no accounts")
         void shouldReturnEmptyPageWhenClientHasNoAccounts() throws Exception {
-            Page<AccountResponseDTO> page = new PageImpl<>(
+            Page<AccountResponseDto> page = new PageImpl<>(
                     List.of(),
                     DEFAULT_PAGEABLE,
                     0
@@ -138,7 +138,7 @@ public class ClientAccountControllerTests {
         @Test
         @DisplayName("Should pass the type and status filters to the service")
         void shouldPassFiltersToService() throws Exception {
-            AccountResponseDTO savings = account(
+            AccountResponseDto savings = account(
                     "00002", "7", AccountType.SAVINGS, AccountStatus.ACTIVE
             );
 
@@ -279,13 +279,13 @@ public class ClientAccountControllerTests {
         }
     }
 
-    private static AccountResponseDTO account(
+    private static AccountResponseDto account(
             String number,
             String digit,
             AccountType type,
             AccountStatus status
     ) {
-        return new AccountResponseDTO(
+        return new AccountResponseDto(
                 number,
                 digit,
                 CLIENT_NAME,

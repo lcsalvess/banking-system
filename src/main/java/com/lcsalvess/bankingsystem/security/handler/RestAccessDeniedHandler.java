@@ -4,6 +4,9 @@ import com.lcsalvess.bankingsystem.dto.response.exception.ApiErrorResponse;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -16,62 +19,61 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.time.Clock;
-
+/**
+ * Handles access-denied failures for REST endpoints and returns standardized JSON responses.
+ */
 @Component
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
-    private static final Logger log =
-            LoggerFactory.getLogger(RestAccessDeniedHandler.class);
+  private static final Logger log =
+      LoggerFactory.getLogger(RestAccessDeniedHandler.class);
 
-    private static final AuthenticationTrustResolver TRUST_RESOLVER =
-            new AuthenticationTrustResolverImpl();
+  private static final AuthenticationTrustResolver TRUST_RESOLVER =
+      new AuthenticationTrustResolverImpl();
 
-    private final JsonMapper jsonMapper;
-    private final Clock clock;
+  private final JsonMapper jsonMapper;
+  private final Clock clock;
 
-    public RestAccessDeniedHandler(JsonMapper jsonMapper, Clock clock) {
-        this.jsonMapper = jsonMapper;
-        this.clock = clock;
-    }
+  public RestAccessDeniedHandler(JsonMapper jsonMapper, Clock clock) {
+    this.jsonMapper = jsonMapper;
+    this.clock = clock;
+  }
 
-    @Override
-    public void handle(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            AccessDeniedException exception
-    ) throws IOException {
+  @Override
+  public void handle(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      AccessDeniedException exception
+  ) throws IOException {
 
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
+    Authentication authentication =
+        SecurityContextHolder.getContext().getAuthentication();
 
-        String username = authentication != null
-                && authentication.isAuthenticated()
-                && !TRUST_RESOLVER.isAnonymous(authentication)
-                ? authentication.getName()
-                : "anonymous";
+    String username = authentication != null
+        && authentication.isAuthenticated()
+        && !TRUST_RESOLVER.isAnonymous(authentication)
+        ? authentication.getName()
+        : "anonymous";
 
-        log.warn(
-                "Access denied: user={}, path={}, exception={}",
-                username,
-                request.getRequestURI(),
-                exception.getClass().getSimpleName()
-        );
+    log.warn(
+        "Access denied: user={}, path={}, exception={}",
+        username,
+        request.getRequestURI(),
+        exception.getClass().getSimpleName()
+    );
 
-        ApiErrorResponse errorResponse = ApiErrorResponse.of(
-                clock,
-                HttpServletResponse.SC_FORBIDDEN,
-                ApiErrorMessages.ACCESS_DENIED_RESOURCE
-        );
+    final ApiErrorResponse errorResponse = ApiErrorResponse.of(
+        clock,
+        HttpServletResponse.SC_FORBIDDEN,
+        ApiErrorMessages.ACCESS_DENIED_RESOURCE
+    );
 
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 
-        response.getWriter().write(
-                jsonMapper.writeValueAsString(errorResponse)
-        );
-    }
+    response.getWriter().write(
+        jsonMapper.writeValueAsString(errorResponse)
+    );
+  }
 }

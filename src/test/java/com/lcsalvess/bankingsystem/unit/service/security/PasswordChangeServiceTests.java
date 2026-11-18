@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.service.security;
 
 import com.lcsalvess.bankingsystem.config.security.LoginRateLimitProperties;
-import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDto;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
@@ -426,7 +426,7 @@ class PasswordChangeServiceTests {
         when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(persistedUser));
     }
 
-    private ChangePasswordRequestDTO request(String currentPassword, String newPassword) {
-        return new ChangePasswordRequestDTO(currentPassword, newPassword);
+    private ChangePasswordRequestDto request(String currentPassword, String newPassword) {
+        return new ChangePasswordRequestDto(currentPassword, newPassword);
     }
 }

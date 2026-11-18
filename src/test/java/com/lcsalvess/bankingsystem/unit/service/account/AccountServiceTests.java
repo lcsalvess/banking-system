@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.service.account;
 
-import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
@@ -145,7 +145,7 @@ public class AccountServiceTests {
                     pageable
             );
 
-            Page<AccountResponseDTO> result = accountService.findAll(pageable);
+            Page<AccountResponseDto> result = accountService.findAll(pageable);
 
             assertEquals(
                     List.of(
@@ -185,7 +185,7 @@ public class AccountServiceTests {
 
             stubAccountPage(List.of(), pageable);
 
-            Page<AccountResponseDTO> result = accountService.findAll(pageable);
+            Page<AccountResponseDto> result = accountService.findAll(pageable);
 
             assertTrue(result.isEmpty());
             assertEquals(0, result.getNumber());
@@ -283,7 +283,7 @@ public class AccountServiceTests {
             when(accountRepository.findByAccountNumberWithClient(SAVINGS_NUMBER))
                     .thenReturn(Optional.of(account));
 
-            AccountResponseDTO result = accountService.findByAccountNumber(SAVINGS_NUMBER, SAVINGS_DIGIT);
+            AccountResponseDto result = accountService.findByAccountNumber(SAVINGS_NUMBER, SAVINGS_DIGIT);
 
             assertEquals(
                     accountResponse(
@@ -393,7 +393,7 @@ public class AccountServiceTests {
                 String number,
                 String digit
         ) {
-            AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, type);
+            AccountRequestDto request = new AccountRequestDto(CLIENT_ID, type);
             Client client = client();
 
             when(clientService.findEntityById(CLIENT_ID)).thenReturn(client);
@@ -406,7 +406,7 @@ public class AccountServiceTests {
                 return savedAccount;
             });
 
-            AccountResponseDTO result = accountService.create(request);
+            AccountResponseDto result = accountService.create(request);
 
             assertEquals(accountResponse(client.getName(), number, digit, type), result);
 
@@ -432,7 +432,7 @@ public class AccountServiceTests {
         @Test
         @DisplayName("Should throw when client does not exist")
         void shouldThrowWhenClientDoesNotExist() {
-            AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, AccountType.CHECKING);
+            AccountRequestDto request = new AccountRequestDto(CLIENT_ID, AccountType.CHECKING);
 
             when(clientService.findEntityById(CLIENT_ID))
                     .thenThrow(new ClientNotFoundException());
@@ -457,7 +457,7 @@ public class AccountServiceTests {
                 String digit,
                 String message
         ) {
-            AccountRequestDTO request = new AccountRequestDTO(CLIENT_ID, type);
+            AccountRequestDto request = new AccountRequestDto(CLIENT_ID, type);
 
             when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
             when(accountNumberGenerator.generate())
@@ -497,8 +497,8 @@ public class AccountServiceTests {
                 String scenario,
                 DataIntegrityViolationException exception
         ) {
-            AccountRequestDTO request =
-                    new AccountRequestDTO(CLIENT_ID, AccountType.CHECKING);
+            AccountRequestDto request =
+                    new AccountRequestDto(CLIENT_ID, AccountType.CHECKING);
 
             when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
             when(accountNumberGenerator.generate())
@@ -692,7 +692,7 @@ public class AccountServiceTests {
                 Arguments.of("findByAccountNumber is read-only", "findByAccountNumber",
                         new Class<?>[]{String.class, String.class}, true),
                 Arguments.of("create is a write transaction", "create",
-                        new Class<?>[]{AccountRequestDTO.class}, false),
+                        new Class<?>[]{AccountRequestDto.class}, false),
                 Arguments.of("cancel is a write transaction", "cancel",
                         new Class<?>[]{String.class, String.class}, false)
         );
@@ -844,13 +844,13 @@ public class AccountServiceTests {
         return account;
     }
 
-    private static AccountResponseDTO accountResponse(
+    private static AccountResponseDto accountResponse(
             String clientName,
             String number,
             String digit,
             AccountType type
     ) {
-        return new AccountResponseDTO(
+        return new AccountResponseDto(
                 number, digit, clientName, BigDecimal.ZERO, type, AccountStatus.ACTIVE
         );
     }

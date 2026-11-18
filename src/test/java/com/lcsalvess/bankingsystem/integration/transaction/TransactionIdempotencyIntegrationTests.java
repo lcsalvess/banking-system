@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.integration.transaction;
 
-import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.client.Client;
@@ -132,19 +132,19 @@ class TransactionIdempotencyIntegrationTests {
             CheckingAccount account = createCheckingAccount("0.00");
             UUID idempotencyKey = UUID.randomUUID();
 
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operation(account, "100.00");
 
-            AccountOperationRequestDTO retryRequest =
+            AccountOperationRequestDto retryRequest =
                     operation(account, "100.00");
 
-            TransactionResponseDTO firstResponse =
+            TransactionResponseDto firstResponse =
                     transactionIdempotencyService.deposit(
                             idempotencyKey,
                             firstRequest
                     );
 
-            TransactionResponseDTO retryResponse =
+            TransactionResponseDto retryResponse =
                     transactionIdempotencyService.deposit(
                             idempotencyKey,
                             retryRequest
@@ -171,13 +171,13 @@ class TransactionIdempotencyIntegrationTests {
             CheckingAccount account = createCheckingAccount("0.00");
             UUID idempotencyKey = UUID.randomUUID();
 
-            TransactionResponseDTO firstResponse =
+            TransactionResponseDto firstResponse =
                     transactionIdempotencyService.deposit(
                             idempotencyKey,
                             operation(account, "100")
                     );
 
-            TransactionResponseDTO retryResponse =
+            TransactionResponseDto retryResponse =
                     transactionIdempotencyService.deposit(
                             idempotencyKey,
                             operation(account, "100.00")
@@ -196,19 +196,19 @@ class TransactionIdempotencyIntegrationTests {
             CheckingAccount destination = createCheckingAccount("0.00");
             UUID idempotencyKey = UUID.randomUUID();
 
-            TransferRequestDTO firstRequest =
+            TransferRequestDto firstRequest =
                     transfer(source, destination, "100.00");
 
-            TransferRequestDTO retryRequest =
+            TransferRequestDto retryRequest =
                     transfer(source, destination, "100.00");
 
-            TransactionResponseDTO firstResponse =
+            TransactionResponseDto firstResponse =
                     transactionIdempotencyService.transfer(
                             idempotencyKey,
                             firstRequest
                     );
 
-            TransactionResponseDTO retryResponse =
+            TransactionResponseDto retryResponse =
                     transactionIdempotencyService.transfer(
                             idempotencyKey,
                             retryRequest
@@ -234,7 +234,7 @@ class TransactionIdempotencyIntegrationTests {
 
             User otherUser = createUser();
 
-            TransactionResponseDTO firstResponse =
+            TransactionResponseDto firstResponse =
                     transactionIdempotencyService.deposit(
                             idempotencyKey,
                             operation(account, "100.00")
@@ -243,7 +243,7 @@ class TransactionIdempotencyIntegrationTests {
             when(currentUserService.getCurrentUser()).thenReturn(otherUser);
             when(currentUserService.getUsername()).thenReturn(otherUser.getUsername());
 
-            TransactionResponseDTO secondResponse =
+            TransactionResponseDto secondResponse =
                     transactionIdempotencyService.deposit(
                             idempotencyKey,
                             operation(account, "100.00")
@@ -349,7 +349,7 @@ class TransactionIdempotencyIntegrationTests {
             CheckingAccount account = createCheckingAccount("0.00");
             UUID idempotencyKey = UUID.randomUUID();
 
-            AccountOperationRequestDTO withdrawalRequest =
+            AccountOperationRequestDto withdrawalRequest =
                     operation(account, "100.00");
 
             assertThrows(
@@ -370,7 +370,7 @@ class TransactionIdempotencyIntegrationTests {
                     operation(account, "200.00")
             );
 
-            TransactionResponseDTO response =
+            TransactionResponseDto response =
                     transactionIdempotencyService.withdraw(
                             idempotencyKey,
                             withdrawalRequest
@@ -396,7 +396,7 @@ class TransactionIdempotencyIntegrationTests {
             UUID idempotencyKey = UUID.randomUUID();
 
             ExecutorService executor = Executors.newSingleThreadExecutor();
-            Future<TransactionResponseDTO> blockedCall;
+            Future<TransactionResponseDto> blockedCall;
 
             TransactionStatus reservingTransaction =
                     transactionManager.getTransaction(
@@ -430,7 +430,7 @@ class TransactionIdempotencyIntegrationTests {
             }
 
             try {
-                TransactionResponseDTO response =
+                TransactionResponseDto response =
                         blockedCall.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
                 assertNotNull(response.transactionCode());
@@ -451,13 +451,13 @@ class TransactionIdempotencyIntegrationTests {
             CheckingAccount account = createCheckingAccount("0.00");
             UUID idempotencyKey = UUID.randomUUID();
 
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operation(account, "100.00");
 
-            AccountOperationRequestDTO secondRequest =
+            AccountOperationRequestDto secondRequest =
                     operation(account, "100.00");
 
-            List<Callable<TransactionResponseDTO>> tasks = List.of(
+            List<Callable<TransactionResponseDto>> tasks = List.of(
                     () -> transactionIdempotencyService.deposit(
                             idempotencyKey,
                             firstRequest
@@ -468,7 +468,7 @@ class TransactionIdempotencyIntegrationTests {
                     )
             );
 
-            List<TransactionResponseDTO> results = runConcurrently(tasks);
+            List<TransactionResponseDto> results = runConcurrently(tasks);
 
             assertEquals(2, results.size());
 
@@ -487,10 +487,10 @@ class TransactionIdempotencyIntegrationTests {
             CheckingAccount account = createCheckingAccount("0.00");
             UUID idempotencyKey = UUID.randomUUID();
 
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operation(account, "100.00");
 
-            AccountOperationRequestDTO secondRequest =
+            AccountOperationRequestDto secondRequest =
                     operation(account, "200.00");
 
             List<Callable<DepositOutcome>> tasks = List.of(
@@ -530,11 +530,11 @@ class TransactionIdempotencyIntegrationTests {
 
     private Callable<DepositOutcome> depositOutcome(
             UUID idempotencyKey,
-            AccountOperationRequestDTO request
+            AccountOperationRequestDto request
     ) {
         return () -> {
             try {
-                TransactionResponseDTO response =
+                TransactionResponseDto response =
                         transactionIdempotencyService.deposit(
                                 idempotencyKey,
                                 request
@@ -631,23 +631,23 @@ class TransactionIdempotencyIntegrationTests {
         );
     }
 
-    private AccountOperationRequestDTO operation(
+    private AccountOperationRequestDto operation(
             Account account,
             String amount
     ) {
-        return new AccountOperationRequestDTO(
+        return new AccountOperationRequestDto(
                 account.getAccountNumber(),
                 account.getDigit(),
                 new BigDecimal(amount)
         );
     }
 
-    private TransferRequestDTO transfer(
+    private TransferRequestDto transfer(
             Account source,
             Account destination,
             String amount
     ) {
-        return new TransferRequestDTO(
+        return new TransferRequestDto(
                 source.getAccountNumber(),
                 source.getDigit(),
                 destination.getAccountNumber(),
@@ -657,8 +657,8 @@ class TransactionIdempotencyIntegrationTests {
     }
 
     private void assertSameTransaction(
-            TransactionResponseDTO expected,
-            TransactionResponseDTO actual
+            TransactionResponseDto expected,
+            TransactionResponseDto actual
     ) {
         assertEquals(expected.transactionCode(), actual.transactionCode());
         assertEquals(expected.transferCode(), actual.transferCode());
@@ -713,7 +713,7 @@ class TransactionIdempotencyIntegrationTests {
     }
 
     private record DepositOutcome(
-            TransactionResponseDTO response,
+            TransactionResponseDto response,
             boolean conflict
     ) {
     }

@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.service.transaction;
 
-import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
@@ -121,13 +121,13 @@ public class TransactionServiceTests {
         void shouldDepositSuccessfully() {
             CheckingAccount account = account();
 
-            AccountOperationRequestDTO request = operationRequest(OPERATION_AMOUNT);
+            AccountOperationRequestDto request = operationRequest(OPERATION_AMOUNT);
 
             stubAccountOperationLookup(account);
             when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
-            TransactionResponseDTO result = transactionService.deposit(request);
+            TransactionResponseDto result = transactionService.deposit(request);
 
             assertBalance("110.00", account);
 
@@ -255,7 +255,7 @@ public class TransactionServiceTests {
             when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
-            TransactionResponseDTO result =
+            TransactionResponseDto result =
                     transactionService.withdraw(operationRequest(amount));
 
             assertBalance(expectedBalance, account);
@@ -369,7 +369,7 @@ public class TransactionServiceTests {
             when(currentUserService.getCurrentUser()).thenReturn(TEST_USER);
             stubSaveReturningArgument();
 
-            TransactionResponseDTO result =
+            TransactionResponseDto result =
                     transactionService.transfer(transferRequest(amount));
 
             assertBalance(expectedSourceBalance, source);
@@ -460,7 +460,7 @@ public class TransactionServiceTests {
         @Test
         @DisplayName("Should throw when accounts are the same")
         void shouldThrowWhenAccountsAreTheSame() {
-            TransferRequestDTO request = new TransferRequestDTO(
+            TransferRequestDto request = new TransferRequestDto(
                     ACCOUNT_NUMBER,
                     ACCOUNT_DIGIT,
                     ACCOUNT_NUMBER,
@@ -759,8 +759,8 @@ public class TransactionServiceTests {
         assertEquals(CLOCK.instant(), transaction.getCreatedAt());
     }
 
-    private static TransactionResponseDTO response(Transaction transaction) {
-        return new TransactionResponseDTO(
+    private static TransactionResponseDto response(Transaction transaction) {
+        return new TransactionResponseDto(
                 transaction.getTransactionCode(),
                 transaction.getTransferCode(),
                 transaction.getType(),
@@ -771,20 +771,20 @@ public class TransactionServiceTests {
         );
     }
 
-    private static AccountOperationRequestDTO operationRequest(
+    private static AccountOperationRequestDto operationRequest(
             BigDecimal amount
     ) {
-        return new AccountOperationRequestDTO(
+        return new AccountOperationRequestDto(
                 ACCOUNT_NUMBER,
                 ACCOUNT_DIGIT,
                 amount
         );
     }
 
-    private static TransferRequestDTO transferRequest(
+    private static TransferRequestDto transferRequest(
             BigDecimal amount
     ) {
-        return new TransferRequestDTO(
+        return new TransferRequestDto(
                 ACCOUNT_NUMBER,
                 ACCOUNT_DIGIT,
                 DESTINATION_NUMBER,

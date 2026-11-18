@@ -7,18 +7,22 @@ import jakarta.persistence.PrimaryKeyJoinColumn;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.DynamicUpdate;
 
+/**
+ * Represents a checking account associated with a client.
+ */
 @Entity
 @Table(name = "checking_accounts")
 @PrimaryKeyJoinColumn(
-        name = "id",
-        foreignKey = @ForeignKey(name = "fk_checking_accounts_account")
+    name = "id",
+    foreignKey = @ForeignKey(name = "fk_checking_accounts_account")
 )
 @DynamicUpdate
 public class CheckingAccount extends Account {
-    protected CheckingAccount() {
-    }
 
-    public CheckingAccount(Client client, String accountNumber, String accountDigit) {
-        super(client, accountNumber, accountDigit, AccountType.CHECKING);
-    }
+  protected CheckingAccount() {
+  }
+
+  public CheckingAccount(Client client, String accountNumber, String accountDigit) {
+    super(client, accountNumber, accountDigit, AccountType.CHECKING);
+  }
 }

@@ -3,10 +3,9 @@ package com.lcsalvess.bankingsystem.entity.user;
 import com.lcsalvess.bankingsystem.util.time.InstantPrecision;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
-import org.springframework.stereotype.Component;
-
 import java.time.Clock;
 import java.time.Instant;
+import org.springframework.stereotype.Component;
 
 /**
  * Populates the {@code created_at} and {@code updated_at} fields of {@link User}
@@ -21,26 +20,36 @@ import java.time.Instant;
 @Component
 public class UserTimestampListener {
 
-    private final Clock clock;
+  private final Clock clock;
 
-    public UserTimestampListener(Clock clock) {
-        this.clock = clock;
-    }
+  public UserTimestampListener(Clock clock) {
+    this.clock = clock;
+  }
 
-    @PrePersist
-    public void onCreate(User user) {
-        user.initializeTimestamps(now());
-    }
+  /**
+   * Initializes the creation and modification timestamps before persisting a user.
+   *
+   * @param user the user entity being persisted
+   */
+  @PrePersist
+  public void onCreate(User user) {
+    user.initializeTimestamps(now());
+  }
 
-    @PreUpdate
-    public void onUpdate(User user) {
-        user.refreshUpdatedAt(now());
-    }
+  /**
+   * Updates the modification timestamp before updating a user.
+   *
+   * @param user the user entity being updated
+   */
+  @PreUpdate
+  public void onUpdate(User user) {
+    user.refreshUpdatedAt(now());
+  }
 
-    private Instant now() {
-        return InstantPrecision.truncateToMicros(
-                clock.instant(),
-                "The application clock must provide a valid instant."
-        );
-    }
+  private Instant now() {
+    return InstantPrecision.truncateToMicros(
+        clock.instant(),
+        "The application clock must provide a valid instant."
+    );
+  }
 }

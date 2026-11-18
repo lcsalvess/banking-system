@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.service.audit.query;
 
-import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDto;
 import com.lcsalvess.bankingsystem.service.audit.contract.AuditEventPageResult;
 import com.lcsalvess.bankingsystem.service.audit.contract.AuditEventQueryFilter;
 import com.lcsalvess.bankingsystem.service.audit.query.AuditEventQueryService;
@@ -178,7 +178,7 @@ class AuditEventQueryServiceTests {
     }
 
     private static AuditEventPageResult result() {
-        Page<AuditEventResponseDTO> page = new PageImpl<>(List.of());
+        Page<AuditEventResponseDto> page = new PageImpl<>(List.of());
 
         return new AuditEventPageResult(
                 page,

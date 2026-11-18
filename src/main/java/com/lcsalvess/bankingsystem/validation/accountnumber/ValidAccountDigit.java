@@ -3,7 +3,6 @@ package com.lcsalvess.bankingsystem.validation.accountnumber;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -27,9 +26,9 @@ import java.lang.annotation.Target;
 // This allows Bean Validation to discover it during application execution.
 public @interface ValidAccountDigit {
 
-    String message() default ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH;
+  String message() default ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH;
 
-    Class<?>[] groups() default {};
+  Class<?>[] groups() default {};
 
-    Class<? extends Payload>[] payload() default {};
+  Class<? extends Payload>[] payload() default {};
 }

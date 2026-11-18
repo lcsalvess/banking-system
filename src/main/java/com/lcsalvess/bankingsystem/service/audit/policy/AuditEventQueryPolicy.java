@@ -1,23 +1,26 @@
 package com.lcsalvess.bankingsystem.service.audit.policy;
 
+/**
+ * Defines the limits and constraints applied to audit event queries and snapshots.
+ */
 public final class AuditEventQueryPolicy {
 
-    /**
-     * Maximum inclusive date range accepted for audit event queries.
-     */
-    public static final int MAX_RANGE_DAYS = 366;
+  /**
+   * Maximum inclusive date range accepted for audit event queries.
+   */
+  public static final int MAX_RANGE_DAYS = 366;
 
-    /**
-     * Largest page size accepted by audit event queries.
-     */
-    public static final int MAX_PAGE_SIZE = 100;
+  /**
+   * Largest page size accepted by audit event queries.
+   */
+  public static final int MAX_PAGE_SIZE = 100;
 
-    /**
-     * Maximum number of unexpired snapshots kept for each auditor. Creating
-     * another snapshot discards the oldest ones.
-     */
-    public static final int MAX_ACTIVE_SNAPSHOTS_PER_ACTOR = 5;
+  /**
+   * Maximum number of unexpired snapshots kept for each auditor. Creating
+   * another snapshot discards the oldest ones.
+   */
+  public static final int MAX_ACTIVE_SNAPSHOTS_PER_ACTOR = 5;
 
-    private AuditEventQueryPolicy() {
-    }
+  private AuditEventQueryPolicy() {
+  }
 }

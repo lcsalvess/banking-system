@@ -3,8 +3,13 @@ package com.lcsalvess.bankingsystem.exception.user;
 import com.lcsalvess.bankingsystem.exception.base.BusinessException;
 import org.springframework.http.HttpStatus;
 
+/**
+ * Signals that the email address is already associated with another user.
+ *
+ * <p>Represents an HTTP 409 Conflict response.
+ */
 public class UserEmailAlreadyExistsException extends BusinessException {
-    public UserEmailAlreadyExistsException(String message) {
-        super(message, HttpStatus.CONFLICT);
-    }
+  public UserEmailAlreadyExistsException(String message) {
+    super(message, HttpStatus.CONFLICT);
+  }
 }

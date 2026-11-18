@@ -20,39 +20,45 @@ import org.springframework.stereotype.Component;
 @Profile("!test")
 public class TransactionIdempotencyCleanupStartupRecovery {
 
-    private static final Logger log =
-            LoggerFactory.getLogger(
-                    TransactionIdempotencyCleanupStartupRecovery.class
-            );
+  private static final Logger log =
+      LoggerFactory.getLogger(
+          TransactionIdempotencyCleanupStartupRecovery.class
+      );
 
-    private final TransactionIdempotencyCleanupJob cleanupJob;
-    private final TaskExecutor taskExecutor;
+  private final TransactionIdempotencyCleanupJob cleanupJob;
+  private final TaskExecutor taskExecutor;
 
-    public TransactionIdempotencyCleanupStartupRecovery(
-            TransactionIdempotencyCleanupJob cleanupJob,
-            @Qualifier(TaskExecutorConfig.STARTUP_RECOVERY_EXECUTOR)
-            TaskExecutor taskExecutor
-    ) {
-        this.cleanupJob = cleanupJob;
-        this.taskExecutor = taskExecutor;
-    }
+  public TransactionIdempotencyCleanupStartupRecovery(
+      TransactionIdempotencyCleanupJob cleanupJob,
+      @Qualifier(TaskExecutorConfig.STARTUP_RECOVERY_EXECUTOR)
+      TaskExecutor taskExecutor
+  ) {
+    this.cleanupJob = cleanupJob;
+    this.taskExecutor = taskExecutor;
+  }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void cleanUpExpiredRequestsOnStartup() {
-        taskExecutor.execute(() -> {
-            try {
-                log.info(
-                        "Triggering transaction idempotency cleanup after application startup."
-                );
+  /**
+   * Schedules the cleanup of expired transaction idempotency records after application startup.
+   *
+   * <p>Executes the cleanup asynchronously using a dedicated task executor
+   * and logs unexpected runtime exceptions without interrupting the application.
+   */
+  @EventListener(ApplicationReadyEvent.class)
+  public void cleanUpExpiredRequestsOnStartup() {
+    taskExecutor.execute(() -> {
+      try {
+        log.info(
+            "Triggering transaction idempotency cleanup after application startup."
+        );
 
-                cleanupJob.cleanUp();
+        cleanupJob.cleanUp();
 
-            } catch (RuntimeException ex) {
-                log.error(
-                        "Transaction idempotency cleanup after startup failed unexpectedly.",
-                        ex
-                );
-            }
-        });
-    }
+      } catch (RuntimeException ex) {
+        log.error(
+            "Transaction idempotency cleanup after startup failed unexpectedly.",
+            ex
+        );
+      }
+    });
+  }
 }

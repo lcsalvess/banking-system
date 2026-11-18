@@ -26,37 +26,46 @@ import org.springframework.stereotype.Component;
 @Profile("!test")
 public class DailyYieldStartupRecovery {
 
-    private static final Logger log =
-            LoggerFactory.getLogger(DailyYieldStartupRecovery.class);
+  private static final Logger log =
+      LoggerFactory.getLogger(DailyYieldStartupRecovery.class);
 
-    private final DailyYieldScheduler dailyYieldScheduler;
-    private final TaskExecutor taskExecutor;
+  private final DailyYieldScheduler dailyYieldScheduler;
+  private final TaskExecutor taskExecutor;
 
-    public DailyYieldStartupRecovery(
-            DailyYieldScheduler dailyYieldScheduler,
-            @Qualifier(TaskExecutorConfig.STARTUP_RECOVERY_EXECUTOR)
-            TaskExecutor taskExecutor
-    ) {
-        this.dailyYieldScheduler = dailyYieldScheduler;
-        this.taskExecutor = taskExecutor;
-    }
+  public DailyYieldStartupRecovery(
+      DailyYieldScheduler dailyYieldScheduler,
+      @Qualifier(TaskExecutorConfig.STARTUP_RECOVERY_EXECUTOR)
+      TaskExecutor taskExecutor
+  ) {
+    this.dailyYieldScheduler = dailyYieldScheduler;
+    this.taskExecutor = taskExecutor;
+  }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void recoverPendingYieldsOnStartup() {
-        taskExecutor.execute(() -> {
-            try {
-                log.info(
-                        "Triggering daily yield recovery after application startup."
-                );
+  /**
+   * Schedules the recovery of pending daily yields after application startup.
+   *
+   * <p>Executes the recovery process asynchronously using a dedicated task executor
+   * to prevent application readiness from being blocked by yield processing.
+   *
+   * <p>Unexpected runtime exceptions during recovery are logged without interrupting
+   * the application.
+   */
+  @EventListener(ApplicationReadyEvent.class)
+  public void recoverPendingYieldsOnStartup() {
+    taskExecutor.execute(() -> {
+      try {
+        log.info(
+            "Triggering daily yield recovery after application startup."
+        );
 
-                dailyYieldScheduler.processDailyYields();
+        dailyYieldScheduler.processDailyYields();
 
-            } catch (RuntimeException ex) {
-                log.error(
-                        "Daily yield recovery after startup failed unexpectedly.",
-                        ex
-                );
-            }
-        });
-    }
+      } catch (RuntimeException ex) {
+        log.error(
+            "Daily yield recovery after startup failed unexpectedly.",
+            ex
+        );
+      }
+    });
+  }
 }

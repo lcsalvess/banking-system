@@ -7,17 +7,22 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
  * reason code (it matches ck_audit_events_reason).
  */
 public enum DailyYieldRunStatus {
-    COMPLETED(AuditOutcome.SUCCESS),
-    COMPLETED_WITH_FAILURES(AuditOutcome.FAILURE),
-    ABORTED(AuditOutcome.FAILURE);
+  COMPLETED(AuditOutcome.SUCCESS),
+  COMPLETED_WITH_FAILURES(AuditOutcome.FAILURE),
+  ABORTED(AuditOutcome.FAILURE);
 
-    private final AuditOutcome outcome;
+  private final AuditOutcome outcome;
 
-    DailyYieldRunStatus(AuditOutcome outcome) {
-        this.outcome = outcome;
-    }
+  DailyYieldRunStatus(AuditOutcome outcome) {
+    this.outcome = outcome;
+  }
 
-    public AuditOutcome outcome() {
-        return outcome;
-    }
+  /**
+   * Returns the audit outcome associated with this daily yield run status.
+   *
+   * @return the corresponding audit outcome
+   */
+  public AuditOutcome outcome() {
+    return outcome;
+  }
 }

@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.service.account;
 
-import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
@@ -131,7 +131,7 @@ public class AccountServiceFindByClientIdTests {
                         AccountSpecifications.byClientAndFilters(CLIENT_ID, null, null)
                 ).thenReturn(specification);
 
-                Page<AccountResponseDTO> result =
+                Page<AccountResponseDto> result =
                         accountService.findByClientId(CLIENT_ID, null, null, pageable);
 
                 assertEquals(
@@ -181,7 +181,7 @@ public class AccountServiceFindByClientIdTests {
                         )
                 ).thenReturn(specification);
 
-                Page<AccountResponseDTO> result = accountService.findByClientId(
+                Page<AccountResponseDto> result = accountService.findByClientId(
                         CLIENT_ID,
                         AccountType.SAVINGS,
                         AccountStatus.ACTIVE,
@@ -223,7 +223,7 @@ public class AccountServiceFindByClientIdTests {
                     ArgumentMatchers.any(Pageable.class)
             )).thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-            Page<AccountResponseDTO> result =
+            Page<AccountResponseDto> result =
                     accountService.findByClientId(CLIENT_ID, null, null, pageable);
 
             assertTrue(result.isEmpty());
@@ -351,13 +351,13 @@ public class AccountServiceFindByClientIdTests {
         return account;
     }
 
-    private static AccountResponseDTO response(
+    private static AccountResponseDto response(
             String clientName,
             String number,
             String digit,
             AccountType type
     ) {
-        return new AccountResponseDTO(
+        return new AccountResponseDto(
                 number, digit, clientName, BigDecimal.ZERO, type, AccountStatus.ACTIVE
         );
     }

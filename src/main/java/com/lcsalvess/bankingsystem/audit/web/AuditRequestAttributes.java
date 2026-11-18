@@ -6,14 +6,18 @@ package com.lcsalvess.bankingsystem.audit.web;
  */
 public final class AuditRequestAttributes {
 
-    /** User authenticated through JWT (the application's {@code User} entity). */
-    public static final String AUTHENTICATED_USER =
-            AuditRequestAttributes.class.getName() + ".AUTHENTICATED_USER";
+  /**
+   * User authenticated through JWT (the application's {@code User} entity).
+   */
+  public static final String AUTHENTICATED_USER =
+      AuditRequestAttributes.class.getName() + ".AUTHENTICATED_USER";
 
-    /** Last exception observed by Spring MVC for the request. */
-    public static final String FAILURE_EXCEPTION =
-            AuditRequestAttributes.class.getName() + ".FAILURE_EXCEPTION";
+  /**
+   * Last exception observed by Spring MVC for the request.
+   */
+  public static final String FAILURE_EXCEPTION =
+      AuditRequestAttributes.class.getName() + ".FAILURE_EXCEPTION";
 
-    private AuditRequestAttributes() {
-    }
+  private AuditRequestAttributes() {
+  }
 }

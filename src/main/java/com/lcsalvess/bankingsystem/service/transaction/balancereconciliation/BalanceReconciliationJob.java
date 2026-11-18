@@ -4,21 +4,20 @@ import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.repository.projection.BalanceChainBreak;
 import com.lcsalvess.bankingsystem.repository.projection.BalanceMismatch;
 import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
 /**
  * Checks the consistency of account balances and the historical transaction balance chain.
- *
- * <p>Detects discrepancies between the current account balance and the latest
+ * <p>
+ * Detects discrepancies between the current account balance and the latest
  * {@code balance_after} value, as well as breaks in the historical balance sequence.
  * This job reports detected inconsistencies only and never corrects account balances
  * automatically.
@@ -26,88 +25,94 @@ import java.util.TreeSet;
 @Component
 public class BalanceReconciliationJob {
 
-    private static final Logger log =
-            LoggerFactory.getLogger(BalanceReconciliationJob.class);
+  private static final Logger log =
+      LoggerFactory.getLogger(BalanceReconciliationJob.class);
 
-    private final TransactionRepository transactionRepository;
+  private final TransactionRepository transactionRepository;
 
-    public BalanceReconciliationJob(TransactionRepository transactionRepository) {
-        this.transactionRepository = transactionRepository;
+  public BalanceReconciliationJob(TransactionRepository transactionRepository) {
+    this.transactionRepository = transactionRepository;
+  }
+
+  /**
+   * Executes the scheduled balance reconciliation and logs unexpected failures.
+   * <p>
+   * Runtime exceptions are caught to prevent an execution failure from propagating
+   * beyond the scheduled task.
+   */
+  @Scheduled(cron = "${banking.reconciliation.cron}", zone = AppTimeZone.ID)
+  public void run() {
+    try {
+      reconcile();
+    } catch (RuntimeException ex) {
+      log.error("Scheduled balance reconciliation failed.", ex);
+    }
+  }
+
+  /**
+   * Checks account balances against their transaction history and reports discrepancies.
+   *
+   * @return the number of distinct accounts with balance or transaction history discrepancies
+   */
+  public int reconcile() {
+    List<BalanceMismatch> mismatches =
+        transactionRepository.findBalanceMismatches();
+
+    List<BalanceChainBreak> chainBreaks =
+        transactionRepository.findBalanceChainBreaks();
+
+    Map<Long, BalanceMismatch> mismatchesByAccount = new TreeMap<>();
+    for (BalanceMismatch mismatch : mismatches) {
+      mismatchesByAccount.put(mismatch.getAccountId(), mismatch);
     }
 
-    @Scheduled(cron = "${banking.reconciliation.cron}", zone = AppTimeZone.ID)
-    public void run() {
-        try {
-            reconcile();
-        } catch (RuntimeException ex) {
-            log.error("Scheduled balance reconciliation failed.", ex);
-        }
+    Map<Long, Long> firstBreakByAccount = new TreeMap<>();
+    for (BalanceChainBreak chainBreak : chainBreaks) {
+      firstBreakByAccount.put(
+          chainBreak.getAccountId(),
+          chainBreak.getTransactionId()
+      );
     }
 
-    /**
-     * Checks account balances against their transaction history.
-     *
-     * @return the number of accounts with balance or history discrepancies.
-     */
-    public int reconcile() {
-        List<BalanceMismatch> mismatches =
-                transactionRepository.findBalanceMismatches();
+    if (mismatchesByAccount.isEmpty() && firstBreakByAccount.isEmpty()) {
+      log.info("Balance reconciliation completed: no mismatches found.");
+      return 0;
+    }
 
-        List<BalanceChainBreak> chainBreaks =
-                transactionRepository.findBalanceChainBreaks();
+    Set<Long> affectedAccounts = new TreeSet<>();
+    affectedAccounts.addAll(mismatchesByAccount.keySet());
+    affectedAccounts.addAll(firstBreakByAccount.keySet());
 
-        Map<Long, BalanceMismatch> mismatchesByAccount = new TreeMap<>();
-        for (BalanceMismatch mismatch : mismatches) {
-            mismatchesByAccount.put(mismatch.getAccountId(), mismatch);
-        }
+    for (Long accountId : affectedAccounts) {
+      BalanceMismatch mismatch = mismatchesByAccount.get(accountId);
+      Long firstBreak = firstBreakByAccount.get(accountId);
 
-        Map<Long, Long> firstBreakByAccount = new TreeMap<>();
-        for (BalanceChainBreak chainBreak : chainBreaks) {
-            firstBreakByAccount.put(
-                    chainBreak.getAccountId(),
-                    chainBreak.getTransactionId()
-            );
-        }
-
-        if (mismatchesByAccount.isEmpty() && firstBreakByAccount.isEmpty()) {
-            log.info("Balance reconciliation completed: no mismatches found.");
-            return 0;
-        }
-
-        Set<Long> affectedAccounts = new TreeSet<>();
-        affectedAccounts.addAll(mismatchesByAccount.keySet());
-        affectedAccounts.addAll(firstBreakByAccount.keySet());
-
-        for (Long accountId : affectedAccounts) {
-            BalanceMismatch mismatch = mismatchesByAccount.get(accountId);
-            Long firstBreak = firstBreakByAccount.get(accountId);
-
-            if (mismatch != null) {
-                log.error(
-                        "Balance mismatch: accountId={}, accountNumber={}, "
-                                + "accountBalance={}, ledgerBalance={}, "
-                                + "firstChainBreakTransactionId={}",
-                        mismatch.getAccountId(),
-                        mismatch.getAccountNumber(),
-                        mismatch.getAccountBalance(),
-                        mismatch.getLedgerBalance(),
-                        firstBreak
-                );
-            } else {
-                log.error(
-                        "Balance chain break: accountId={}, "
-                                + "firstChainBreakTransactionId={}",
-                        accountId,
-                        firstBreak
-                );
-            }
-        }
-
+      if (mismatch != null) {
         log.error(
-                "Balance reconciliation completed with {} affected account(s).",
-                affectedAccounts.size()
+            "Balance mismatch: accountId={}, accountNumber={}, "
+                + "accountBalance={}, ledgerBalance={}, "
+                + "firstChainBreakTransactionId={}",
+            mismatch.getAccountId(),
+            mismatch.getAccountNumber(),
+            mismatch.getAccountBalance(),
+            mismatch.getLedgerBalance(),
+            firstBreak
         );
-
-        return affectedAccounts.size();
+      } else {
+        log.error(
+            "Balance chain break: accountId={}, "
+                + "firstChainBreakTransactionId={}",
+            accountId,
+            firstBreak
+        );
+      }
     }
+
+    log.error(
+        "Balance reconciliation completed with {} affected account(s).",
+        affectedAccounts.size()
+    );
+
+    return affectedAccounts.size();
+  }
 }

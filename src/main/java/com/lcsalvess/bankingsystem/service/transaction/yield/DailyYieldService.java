@@ -13,14 +13,13 @@ import com.lcsalvess.bankingsystem.repository.TransactionRepository;
 import com.lcsalvess.bankingsystem.service.account.AccountService;
 import com.lcsalvess.bankingsystem.util.actor.SystemActor;
 import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processes an individual savings-account yield date.
@@ -31,174 +30,190 @@ import java.time.LocalDate;
 @Service
 public class DailyYieldService {
 
-    private final TransactionRepository transactionRepository;
-    private final AccountService accountService;
-    private final ApplicationEventPublisher eventPublisher;
-    private final Clock clock;
+  private final TransactionRepository transactionRepository;
+  private final AccountService accountService;
+  private final ApplicationEventPublisher eventPublisher;
+  private final Clock clock;
 
-    public DailyYieldService(
-            TransactionRepository transactionRepository,
-            AccountService accountService,
-            ApplicationEventPublisher eventPublisher,
-            Clock clock
-    ) {
-        this.transactionRepository = transactionRepository;
-        this.accountService = accountService;
-        this.eventPublisher = eventPublisher;
-        this.clock = clock;
+  public DailyYieldService(
+      TransactionRepository transactionRepository,
+      AccountService accountService,
+      ApplicationEventPublisher eventPublisher,
+      Clock clock
+  ) {
+    this.transactionRepository = transactionRepository;
+    this.accountService = accountService;
+    this.eventPublisher = eventPublisher;
+    this.clock = clock;
+  }
+
+  /**
+   * Processes the daily yield for a savings account on the specified reference date.
+   *
+   * <p>The account is locked during processing to prevent concurrent modifications.
+   * Yield dates must be processed sequentially, and duplicate yield transactions
+   * are handled idempotently.
+   *
+   * @param accountNumber the savings account number
+   * @param accountDigit the savings account check digit
+   * @param referenceDate the date for which the yield is being processed
+   * @return the result of the daily yield processing operation
+   * @throws IllegalArgumentException if the reference date is null or in the future
+   * @throws IllegalStateException if the reference date is not the next date in sequence
+   * @throws AccountIsNotActiveException if the account is not active
+   * @throws AccountIsNotSavingsException if the account is not a savings account
+   */
+  @Transactional
+  public DailyYieldProcessingResult processDailyYieldForDate(
+      String accountNumber,
+      String accountDigit,
+      LocalDate referenceDate
+  ) {
+    if (referenceDate == null) {
+      throw new IllegalArgumentException(
+          "A data de referência do rendimento é obrigatória."
+      );
     }
 
-    @Transactional
-    public DailyYieldProcessingResult processDailyYieldForDate(
-            String accountNumber,
-            String accountDigit,
-            LocalDate referenceDate
-    ) {
-        if (referenceDate == null) {
-            throw new IllegalArgumentException(
-                    "A data de referência do rendimento é obrigatória."
-            );
-        }
+    if (referenceDate.isAfter(LocalDate.now(clock))) {
+      throw new IllegalArgumentException(
+          "A data de referência não pode estar no futuro."
+      );
+    }
 
-        if (referenceDate.isAfter(LocalDate.now(clock))) {
-            throw new IllegalArgumentException(
-                    "A data de referência não pode estar no futuro."
-            );
-        }
+    Account account = accountService.findEntityByAccountNumberForUpdate(
+        accountNumber,
+        accountDigit
+    );
 
-        Account account = accountService.findEntityByAccountNumberForUpdate(
-                accountNumber,
-                accountDigit
+    SavingsAccount savingsAccount =
+        validateAndGetSavingsAccount(account);
+
+    validateActiveAccount(savingsAccount);
+
+    LocalDate lastProcessedDate =
+        savingsAccount.getLastYieldProcessedDate();
+
+    if (!referenceDate.isAfter(lastProcessedDate)) {
+      return DailyYieldProcessingResult.ALREADY_PROCESSED;
+    }
+
+    if (!referenceDate.equals(lastProcessedDate.plusDays(1))) {
+      throw new IllegalStateException(
+          "As datas de rendimento devem ser processadas em ordem."
+      );
+    }
+
+    boolean alreadyApplied =
+        transactionRepository.existsByAccountIdAndTypeAndYieldDate(
+            savingsAccount.getId(),
+            TransactionType.YIELD,
+            referenceDate
         );
 
-        SavingsAccount savingsAccount =
-                validateAndGetSavingsAccount(account);
-
-        validateActiveAccount(savingsAccount);
-
-        LocalDate lastProcessedDate =
-                savingsAccount.getLastYieldProcessedDate();
-
-        if (!referenceDate.isAfter(lastProcessedDate)) {
-            return DailyYieldProcessingResult.ALREADY_PROCESSED;
-        }
-
-        if (!referenceDate.equals(lastProcessedDate.plusDays(1))) {
-            throw new IllegalStateException(
-                    "As datas de rendimento devem ser processadas em ordem."
-            );
-        }
-
-        boolean alreadyApplied =
-                transactionRepository.existsByAccountIdAndTypeAndYieldDate(
-                        savingsAccount.getId(),
-                        TransactionType.YIELD,
-                        referenceDate
-                );
-
-        if (alreadyApplied) {
-            if (referenceDate.isAfter(savingsAccount.getLastYieldDate())) {
-                savingsAccount.updateLastYieldDate(referenceDate);
-            }
-
-            savingsAccount.markYieldDateProcessed(referenceDate);
-
-            return DailyYieldProcessingResult.ALREADY_PROCESSED;
-        }
-
-        if (!savingsAccount.isEligibleForYield(referenceDate)) {
-            savingsAccount.markYieldDateProcessed(referenceDate);
-
-            return DailyYieldProcessingResult.NOT_ELIGIBLE;
-        }
-
-        Instant dayStart = referenceDate
-                .atStartOfDay(AppTimeZone.ZONE)
-                .toInstant();
-
-        // Fast path: retrieves the balance_after of the last transaction
-        // before the given day. If the transaction history is out of order
-        // (e.g., retroactive yield recorded after newer transactions), the
-        // query returns nothing and the balance is reconstructed by summing
-        // the transaction history.
-        BigDecimal balanceAtStartOfDay =
-                transactionRepository.findBalanceAtStartOfDayFromSnapshot(
-                                savingsAccount.getId(),
-                                referenceDate,
-                                dayStart
-                        )
-                        .orElseGet(() ->
-                                transactionRepository.calculateBalanceAtStartOfDay(
-                                        savingsAccount.getId(),
-                                        referenceDate,
-                                        dayStart
-                                )
-                        );
-
-        BigDecimal yieldAmount =
-                savingsAccount.calculateYield(balanceAtStartOfDay);
-
-        if (yieldAmount.signum() <= 0) {
-            savingsAccount.markYieldDateProcessed(referenceDate);
-
-            return DailyYieldProcessingResult.NO_YIELD_AVAILABLE;
-        }
-
-        if (!savingsAccount.canCredit(yieldAmount)) {
-            savingsAccount.markYieldDateProcessed(referenceDate);
-
-            return DailyYieldProcessingResult.BALANCE_LIMIT_REACHED;
-        }
-
-        savingsAccount.credit(yieldAmount);
+    if (alreadyApplied) {
+      if (referenceDate.isAfter(savingsAccount.getLastYieldDate())) {
         savingsAccount.updateLastYieldDate(referenceDate);
-        savingsAccount.markYieldDateProcessed(referenceDate);
+      }
 
-        Transaction yieldTransaction = registerSystemYieldTransaction(
-                yieldAmount,
+      savingsAccount.markYieldDateProcessed(referenceDate);
+
+      return DailyYieldProcessingResult.ALREADY_PROCESSED;
+    }
+
+    if (!savingsAccount.isEligibleForYield(referenceDate)) {
+      savingsAccount.markYieldDateProcessed(referenceDate);
+
+      return DailyYieldProcessingResult.NOT_ELIGIBLE;
+    }
+
+    Instant dayStart = referenceDate
+        .atStartOfDay(AppTimeZone.ZONE)
+        .toInstant();
+
+    // Fast path: retrieves the balance_after of the last transaction
+    // before the given day. If the transaction history is out of order
+    // (e.g., retroactive yield recorded after newer transactions), the
+    // query returns nothing and the balance is reconstructed by summing
+    // the transaction history.
+    BigDecimal balanceAtStartOfDay =
+        transactionRepository.findBalanceAtStartOfDayFromSnapshot(
+                savingsAccount.getId(),
                 referenceDate,
-                savingsAccount
-        );
-
-        eventPublisher.publishEvent(
-                new TransactionOperationEvent(
-                        TransactionType.YIELD,
-                        savingsAccount.getAccountNumber(),
-                        yieldAmount,
-                        SystemActor.NAME,
-                        yieldTransaction.getTransactionCode()
+                dayStart
+            )
+            .orElseGet(() ->
+                transactionRepository.calculateBalanceAtStartOfDay(
+                    savingsAccount.getId(),
+                    referenceDate,
+                    dayStart
                 )
-        );
+            );
 
-        return DailyYieldProcessingResult.APPLIED;
+    BigDecimal yieldAmount =
+        savingsAccount.calculateYield(balanceAtStartOfDay);
+
+    if (yieldAmount.signum() <= 0) {
+      savingsAccount.markYieldDateProcessed(referenceDate);
+
+      return DailyYieldProcessingResult.NO_YIELD_AVAILABLE;
     }
 
-    private void validateActiveAccount(Account account) {
-        if (account.getStatus() != AccountStatus.ACTIVE) {
-            throw new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_NOT_ACTIVE);
-        }
+    if (!savingsAccount.canCredit(yieldAmount)) {
+      savingsAccount.markYieldDateProcessed(referenceDate);
+
+      return DailyYieldProcessingResult.BALANCE_LIMIT_REACHED;
     }
 
-    private SavingsAccount validateAndGetSavingsAccount(Account account) {
-        if (!(account instanceof SavingsAccount savingsAccount)) {
-            throw new AccountIsNotSavingsException(ApiErrorMessages.ACCOUNT_NOT_SAVINGS);
-        }
-        return savingsAccount;
-    }
+    savingsAccount.credit(yieldAmount);
+    savingsAccount.updateLastYieldDate(referenceDate);
+    savingsAccount.markYieldDateProcessed(referenceDate);
 
-    private Transaction registerSystemYieldTransaction(
-            BigDecimal amount,
-            LocalDate referenceDate,
-            SavingsAccount account
-    ) {
-        Transaction transaction = Transaction.createSystemYield(
-                amount,
-                clock.instant(),
-                referenceDate,
-                account,
-                account.getBalance()
-        );
-        transactionRepository.save(transaction);
-        return transaction;
+    Transaction yieldTransaction = registerSystemYieldTransaction(
+        yieldAmount,
+        referenceDate,
+        savingsAccount
+    );
+
+    eventPublisher.publishEvent(
+        new TransactionOperationEvent(
+            TransactionType.YIELD,
+            savingsAccount.getAccountNumber(),
+            yieldAmount,
+            SystemActor.NAME,
+            yieldTransaction.getTransactionCode()
+        )
+    );
+
+    return DailyYieldProcessingResult.APPLIED;
+  }
+
+  private void validateActiveAccount(Account account) {
+    if (account.getStatus() != AccountStatus.ACTIVE) {
+      throw new AccountIsNotActiveException(ApiErrorMessages.ACCOUNT_NOT_ACTIVE);
     }
+  }
+
+  private SavingsAccount validateAndGetSavingsAccount(Account account) {
+    if (!(account instanceof SavingsAccount savingsAccount)) {
+      throw new AccountIsNotSavingsException(ApiErrorMessages.ACCOUNT_NOT_SAVINGS);
+    }
+    return savingsAccount;
+  }
+
+  private Transaction registerSystemYieldTransaction(
+      BigDecimal amount,
+      LocalDate referenceDate,
+      SavingsAccount account
+  ) {
+    Transaction transaction = Transaction.createSystemYield(
+        amount,
+        clock.instant(),
+        referenceDate,
+        account,
+        account.getBalance()
+    );
+    transactionRepository.save(transaction);
+    return transaction;
+  }
 }

@@ -2,10 +2,10 @@ package com.lcsalvess.bankingsystem.unit.controller.user;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.user.UserController;
-import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDto;
+import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDto;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.user.LastAdminCannotBeDeactivatedException;
@@ -112,7 +112,7 @@ public class UserControllerTests {
         @Test
         @DisplayName("Should return a page of users successfully")
         void shouldReturnPageOfUsersSuccessfully() throws Exception {
-            UserSummaryResponseDTO user1 = new UserSummaryResponseDTO(
+            UserSummaryResponseDto user1 = new UserSummaryResponseDto(
                     "EMP-000001",
                     "System Administrator",
                     "admin",
@@ -120,7 +120,7 @@ public class UserControllerTests {
                     Role.ADMIN,
                     true
             );
-            UserSummaryResponseDTO user2 = new UserSummaryResponseDTO(
+            UserSummaryResponseDto user2 = new UserSummaryResponseDto(
                     "EMP-000002",
                     "John Michael Doe",
                     "john.doe",
@@ -129,7 +129,7 @@ public class UserControllerTests {
                     false
             );
 
-            Page<UserSummaryResponseDTO> users = new PageImpl<>(
+            Page<UserSummaryResponseDto> users = new PageImpl<>(
                     List.of(user1, user2),
                     defaultPageable,
                     2
@@ -163,7 +163,7 @@ public class UserControllerTests {
         @Test
         @DisplayName("Should return an empty page when there are no users")
         void shouldReturnEmptyPageWhenThereAreNoUsers() throws Exception {
-            Page<UserSummaryResponseDTO> emptyPage = new PageImpl<>(
+            Page<UserSummaryResponseDto> emptyPage = new PageImpl<>(
                     List.of(),
                     defaultPageable,
                     0
@@ -191,7 +191,7 @@ public class UserControllerTests {
                     Sort.by("username").descending()
             );
 
-            Page<UserSummaryResponseDTO> users = new PageImpl<>(
+            Page<UserSummaryResponseDto> users = new PageImpl<>(
                     List.of(),
                     pageable,
                     0
@@ -343,8 +343,8 @@ public class UserControllerTests {
         @Test
         @DisplayName("Should create user successfully")
         void shouldCreateUserSuccessfully() throws Exception {
-            UserRequestDTO request = validUserRequest();
-            UserResponseDTO expected = userResponse(true);
+            UserRequestDto request = validUserRequest();
+            UserResponseDto expected = userResponse(true);
 
             when(userService.create(request)).thenReturn(expected);
 
@@ -367,7 +367,7 @@ public class UserControllerTests {
         @ValueSource(strings = {"ADMIN", "EMPLOYEE", "AUDITOR"})
         @DisplayName("Should accept every valid role")
         void shouldAcceptEveryValidRole(String role) throws Exception {
-            UserRequestDTO request = new UserRequestDTO(
+            UserRequestDto request = new UserRequestDto(
                     VALID_FULL_NAME,
                     VALID_USERNAME,
                     VALID_EMAIL,
@@ -388,7 +388,7 @@ public class UserControllerTests {
         @DisplayName("Should return 400 when request body is invalid")
         void shouldReturnBadRequestWhenRequestBodyIsInvalid(
                 String scenario,
-                UserRequestDTO request,
+                UserRequestDto request,
                 String field,
                 String message
         ) throws Exception {
@@ -432,7 +432,7 @@ public class UserControllerTests {
         @Test
         @DisplayName("Should return 409 when username already exists")
         void shouldReturnConflictWhenUsernameAlreadyExists() throws Exception {
-            UserRequestDTO request = validUserRequest();
+            UserRequestDto request = validUserRequest();
 
             when(userService.create(request))
                     .thenThrow(new UsernameAlreadyExistsException(ApiErrorMessages.USERNAME_ALREADY_EXISTS));
@@ -446,7 +446,7 @@ public class UserControllerTests {
         @Test
         @DisplayName("Should return 409 when email already exists")
         void shouldReturnConflictWhenEmailAlreadyExists() throws Exception {
-            UserRequestDTO request = validUserRequest();
+            UserRequestDto request = validUserRequest();
 
             when(userService.create(request))
                     .thenThrow(new UserEmailAlreadyExistsException(ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS));
@@ -460,7 +460,7 @@ public class UserControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            UserRequestDTO request = validUserRequest();
+            UserRequestDto request = validUserRequest();
 
             when(userService.create(request)).thenThrow(new RuntimeException());
 
@@ -478,7 +478,7 @@ public class UserControllerTests {
         @Test
         @DisplayName("Should reactivate user successfully")
         void shouldReactivateUserSuccessfully() throws Exception {
-            UserResponseDTO expected = userResponse(true);
+            UserResponseDto expected = userResponse(true);
 
             when(userService.reactivate(VALID_EMPLOYEE_ID)).thenReturn(expected);
 
@@ -532,7 +532,7 @@ public class UserControllerTests {
         @Test
         @DisplayName("Should deactivate user successfully")
         void shouldDeactivateUserSuccessfully() throws Exception {
-            UserResponseDTO expected = userResponse(false);
+            UserResponseDto expected = userResponse(false);
 
             when(userService.deactivate(VALID_EMPLOYEE_ID)).thenReturn(expected);
 
@@ -743,13 +743,13 @@ public class UserControllerTests {
         }
 
         private String roleBody(Role role) throws Exception {
-            return objectMapper.writeValueAsString(new UserRoleUpdateRequestDTO(role));
+            return objectMapper.writeValueAsString(new UserRoleUpdateRequestDto(role));
         }
 
         @Test
         @DisplayName("Should change the user's role successfully")
         void shouldChangeRoleSuccessfully() throws Exception {
-            UserResponseDTO expected = userResponse(true);
+            UserResponseDto expected = userResponse(true);
 
             when(userService.changeRole(VALID_EMPLOYEE_ID, Role.AUDITOR)).thenReturn(expected);
 
@@ -817,18 +817,18 @@ public class UserControllerTests {
         }
     }
 
-    private UserResponseDTO readUser(MvcResult result) throws Exception {
+    private UserResponseDto readUser(MvcResult result) throws Exception {
         return objectMapper.readValue(
                 result.getResponse().getContentAsString(),
-                UserResponseDTO.class
+                UserResponseDto.class
         );
     }
 
-    private static UserRequestDTO validUserRequest() {
+    private static UserRequestDto validUserRequest() {
         return userRequest(VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE);
     }
 
-    private static UserRequestDTO userRequest(
+    private static UserRequestDto userRequest(
             String username,
             String email,
             String password,
@@ -843,14 +843,14 @@ public class UserControllerTests {
         );
     }
 
-    private static UserRequestDTO userRequest(
+    private static UserRequestDto userRequest(
             String fullName,
             String username,
             String email,
             String password,
             Role role
     ) {
-        return new UserRequestDTO(
+        return new UserRequestDto(
                 fullName,
                 username,
                 email,
@@ -859,8 +859,8 @@ public class UserControllerTests {
         );
     }
 
-    private static UserResponseDTO userResponse(boolean active) {
-        return new UserResponseDTO(
+    private static UserResponseDto userResponse(boolean active) {
+        return new UserResponseDto(
                 VALID_EMPLOYEE_ID,
                 VALID_FULL_NAME,
                 VALID_USERNAME,

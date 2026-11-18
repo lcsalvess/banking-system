@@ -13,7 +13,7 @@ import java.time.Instant;
  * <p>The window start prevents cancellation from affecting a newer sequence.
  */
 public record PasswordChangeAttempt(
-        String key,
-        Instant windowStartedAt
+    String key,
+    Instant windowStartedAt
 ) {
 }

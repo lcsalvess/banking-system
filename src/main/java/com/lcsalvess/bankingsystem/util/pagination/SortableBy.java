@@ -15,6 +15,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SortableBy {
-    String value();
-    String defaultSort() default "";
+  String value();
+
+  String defaultSort() default "";
 }

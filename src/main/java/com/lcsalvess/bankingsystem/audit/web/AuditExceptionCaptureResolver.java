@@ -16,25 +16,25 @@ import org.springframework.web.servlet.ModelAndView;
  * the cause of the failure without modifying any exception handler.
  */
 public class AuditExceptionCaptureResolver
-        implements HandlerExceptionResolver, Ordered {
+    implements HandlerExceptionResolver, Ordered {
 
-    @Override
-    public @Nullable ModelAndView resolveException(
-            HttpServletRequest request,
-            @NonNull HttpServletResponse response,
-            @Nullable Object handler,
-            @NonNull Exception exception
-    ) {
-        request.setAttribute(
-                AuditRequestAttributes.FAILURE_EXCEPTION,
-                exception
-        );
+  @Override
+  public @Nullable ModelAndView resolveException(
+      HttpServletRequest request,
+      @NonNull HttpServletResponse response,
+      @Nullable Object handler,
+      @NonNull Exception exception
+  ) {
+    request.setAttribute(
+        AuditRequestAttributes.FAILURE_EXCEPTION,
+        exception
+    );
 
-        return null;
-    }
+    return null;
+  }
 
-    @Override
-    public int getOrder() {
-        return Ordered.HIGHEST_PRECEDENCE;
-    }
+  @Override
+  public int getOrder() {
+    return Ordered.HIGHEST_PRECEDENCE;
+  }
 }

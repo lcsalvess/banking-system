@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.service.transaction.idempotency;
 
-import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDto;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionRequestFingerprint;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,10 +23,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate the same fingerprint for equivalent monetary values")
         void shouldGenerateSameFingerprintForEquivalentMonetaryValues() {
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operationRequest("00001", "9", "150.5");
 
-            AccountOperationRequestDTO secondRequest =
+            AccountOperationRequestDto secondRequest =
                     operationRequest("00001", "9", "150.50");
 
             assertEquals(
@@ -38,10 +38,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different amounts")
         void shouldGenerateDifferentFingerprintsForDifferentAmounts() {
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operationRequest("00001", "9", "150.00");
 
-            AccountOperationRequestDTO secondRequest =
+            AccountOperationRequestDto secondRequest =
                     operationRequest("00001", "9", "250.00");
 
             assertNotEquals(
@@ -53,10 +53,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different account numbers")
         void shouldGenerateDifferentFingerprintsForDifferentAccountNumbers() {
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operationRequest("00001", "9", "150.00");
 
-            AccountOperationRequestDTO secondRequest =
+            AccountOperationRequestDto secondRequest =
                     operationRequest("00002", "9", "150.00");
 
             assertNotEquals(
@@ -68,10 +68,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different account digits")
         void shouldGenerateDifferentFingerprintsForDifferentAccountDigits() {
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operationRequest("00001", "9", "150.00");
 
-            AccountOperationRequestDTO secondRequest =
+            AccountOperationRequestDto secondRequest =
                     operationRequest("00001", "8", "150.00");
 
             assertNotEquals(
@@ -88,10 +88,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate the same fingerprint for equivalent monetary values")
         void shouldGenerateSameFingerprintForEquivalentMonetaryValues() {
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operationRequest("00001", "9", "150.5");
 
-            AccountOperationRequestDTO secondRequest =
+            AccountOperationRequestDto secondRequest =
                     operationRequest("00001", "9", "150.50");
 
             assertEquals(
@@ -103,10 +103,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different amounts")
         void shouldGenerateDifferentFingerprintsForDifferentAmounts() {
-            AccountOperationRequestDTO firstRequest =
+            AccountOperationRequestDto firstRequest =
                     operationRequest("00001", "9", "150.00");
 
-            AccountOperationRequestDTO secondRequest =
+            AccountOperationRequestDto secondRequest =
                     operationRequest("00001", "9", "250.00");
 
             assertNotEquals(
@@ -123,10 +123,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate the same fingerprint for equivalent monetary values")
         void shouldGenerateSameFingerprintForEquivalentMonetaryValues() {
-            TransferRequestDTO firstRequest =
+            TransferRequestDto firstRequest =
                     transferRequest("00001", "9", "00002", "8", "150.5");
 
-            TransferRequestDTO secondRequest =
+            TransferRequestDto secondRequest =
                     transferRequest("00001", "9", "00002", "8", "150.50");
 
             assertEquals(
@@ -138,10 +138,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different amounts")
         void shouldGenerateDifferentFingerprintsForDifferentAmounts() {
-            TransferRequestDTO firstRequest =
+            TransferRequestDto firstRequest =
                     transferRequest("00001", "9", "00002", "8", "150.00");
 
-            TransferRequestDTO secondRequest =
+            TransferRequestDto secondRequest =
                     transferRequest("00001", "9", "00002", "8", "250.00");
 
             assertNotEquals(
@@ -153,10 +153,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different source accounts")
         void shouldGenerateDifferentFingerprintsForDifferentSourceAccounts() {
-            TransferRequestDTO firstRequest =
+            TransferRequestDto firstRequest =
                     transferRequest("00001", "9", "00002", "8", "150.00");
 
-            TransferRequestDTO secondRequest =
+            TransferRequestDto secondRequest =
                     transferRequest("00003", "7", "00002", "8", "150.00");
 
             assertNotEquals(
@@ -168,10 +168,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different source account digits")
         void shouldGenerateDifferentFingerprintsForDifferentSourceAccountDigits() {
-            TransferRequestDTO firstRequest =
+            TransferRequestDto firstRequest =
                     transferRequest("00001", "9", "00002", "8", "150.00");
 
-            TransferRequestDTO secondRequest =
+            TransferRequestDto secondRequest =
                     transferRequest("00001", "8", "00002", "8", "150.00");
 
             assertNotEquals(
@@ -183,10 +183,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different destination accounts")
         void shouldGenerateDifferentFingerprintsForDifferentDestinationAccounts() {
-            TransferRequestDTO firstRequest =
+            TransferRequestDto firstRequest =
                     transferRequest("00001", "9", "00002", "8", "150.00");
 
-            TransferRequestDTO secondRequest =
+            TransferRequestDto secondRequest =
                     transferRequest("00001", "9", "00003", "7", "150.00");
 
             assertNotEquals(
@@ -198,10 +198,10 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for different destination account digits")
         void shouldGenerateDifferentFingerprintsForDifferentDestinationAccountDigits() {
-            TransferRequestDTO firstRequest =
+            TransferRequestDto firstRequest =
                     transferRequest("00001", "9", "00002", "8", "150.00");
 
-            TransferRequestDTO secondRequest =
+            TransferRequestDto secondRequest =
                     transferRequest("00001", "9", "00002", "7", "150.00");
 
             assertNotEquals(
@@ -218,7 +218,7 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate different fingerprints for deposit and withdrawal")
         void shouldGenerateDifferentFingerprintsForDifferentOperationTypes() {
-            AccountOperationRequestDTO request =
+            AccountOperationRequestDto request =
                     operationRequest("00001", "9", "150.00");
 
             assertNotEquals(
@@ -235,7 +235,7 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate a 64-character lowercase SHA-256 hexadecimal fingerprint")
         void shouldGenerateSha256FingerprintInExpectedFormat() {
-            AccountOperationRequestDTO request =
+            AccountOperationRequestDto request =
                     operationRequest("00001", "9", "150.00");
 
             String fingerprint = fingerprintForDeposit(request);
@@ -246,7 +246,7 @@ class TransactionRequestFingerprintTests {
         @Test
         @DisplayName("Should generate a deterministic fingerprint for the same request")
         void shouldGenerateDeterministicFingerprintForSameRequest() {
-            AccountOperationRequestDTO request =
+            AccountOperationRequestDto request =
                     operationRequest("00001", "9", "150.00");
 
             assertEquals(
@@ -256,26 +256,26 @@ class TransactionRequestFingerprintTests {
         }
     }
 
-    private static AccountOperationRequestDTO operationRequest(
+    private static AccountOperationRequestDto operationRequest(
             String accountNumber,
             String digit,
             String amount
     ) {
-        return new AccountOperationRequestDTO(
+        return new AccountOperationRequestDto(
                 accountNumber,
                 digit,
                 new BigDecimal(amount)
         );
     }
 
-    private static TransferRequestDTO transferRequest(
+    private static TransferRequestDto transferRequest(
             String fromAccountNumber,
             String fromAccountDigit,
             String toAccountNumber,
             String toAccountDigit,
             String amount
     ) {
-        return new TransferRequestDTO(
+        return new TransferRequestDto(
                 fromAccountNumber,
                 fromAccountDigit,
                 toAccountNumber,
@@ -285,19 +285,19 @@ class TransactionRequestFingerprintTests {
     }
 
     private static String fingerprintForDeposit(
-            AccountOperationRequestDTO request
+            AccountOperationRequestDto request
     ) {
         return TransactionRequestFingerprint.forDeposit(request);
     }
 
     private static String fingerprintForWithdrawal(
-            AccountOperationRequestDTO request
+            AccountOperationRequestDto request
     ) {
         return TransactionRequestFingerprint.forWithdrawal(request);
     }
 
     private static String fingerprintForTransfer(
-            TransferRequestDTO request
+            TransferRequestDto request
     ) {
         return TransactionRequestFingerprint.forTransfer(request);
     }

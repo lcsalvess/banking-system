@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.service.transaction;
 
-import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
 import com.lcsalvess.bankingsystem.entity.transaction.Transaction;
@@ -157,7 +157,7 @@ class TransactionQueryServiceTests {
                         2L
                 );
 
-                Page<TransactionResponseDTO> result =
+                Page<TransactionResponseDto> result =
                         transactionQueryService.findByAccountNumber(
                                 ACCOUNT_NUMBER,
                                 ACCOUNT_DIGIT,
@@ -186,7 +186,7 @@ class TransactionQueryServiceTests {
             }
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+            verify(transactionRepository).findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             );
             verify(transactionRepository).findAll(specification, PAGEABLE);
@@ -245,7 +245,7 @@ class TransactionQueryServiceTests {
                 when(transactionRepository.findAll(specification, PAGEABLE))
                         .thenReturn(page);
 
-                Page<TransactionResponseDTO> result =
+                Page<TransactionResponseDto> result =
                         transactionQueryService.findByAccountNumber(
                                 ACCOUNT_NUMBER,
                                 ACCOUNT_DIGIT,
@@ -276,7 +276,7 @@ class TransactionQueryServiceTests {
             }
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+            verify(transactionRepository).findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             );
             verifyNoMoreInteractionsOnMocks();
@@ -291,7 +291,7 @@ class TransactionQueryServiceTests {
 
             stubAccountLookup(account);
 
-            when(transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+            when(transactionRepository.findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             )).thenReturn(Optional.empty());
 
@@ -310,7 +310,7 @@ class TransactionQueryServiceTests {
                         0L
                 );
 
-                Page<TransactionResponseDTO> result =
+                Page<TransactionResponseDto> result =
                         transactionQueryService.findByAccountNumber(
                                 ACCOUNT_NUMBER,
                                 ACCOUNT_DIGIT,
@@ -334,7 +334,7 @@ class TransactionQueryServiceTests {
             }
 
             verifyAccountLookup(account);
-            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+            verify(transactionRepository).findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             );
             verify(transactionRepository).findAll(specification, PAGEABLE);
@@ -431,7 +431,7 @@ class TransactionQueryServiceTests {
 
             verifyAccountLookup(account);
 
-            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+            verify(transactionRepository).findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             );
 
@@ -496,11 +496,11 @@ class TransactionQueryServiceTests {
 
             stubAccountLookup(account);
 
-            when(transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+            when(transactionRepository.findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             )).thenReturn(Optional.of(boundaryTransaction));
 
-            when(transactionRepository.findByTransactionCodeAndAccount_Id(
+            when(transactionRepository.findByTransactionCodeAndAccountId(
                     boundaryTransaction.getTransactionCode(),
                     ACCOUNT_ID
             )).thenReturn(Optional.of(boundaryTransaction));
@@ -570,11 +570,11 @@ class TransactionQueryServiceTests {
                     ACCOUNT_DIGIT
             );
 
-            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+            verify(transactionRepository).findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             );
 
-            verify(transactionRepository).findByTransactionCodeAndAccount_Id(
+            verify(transactionRepository).findByTransactionCodeAndAccountId(
                     boundaryTransaction.getTransactionCode(),
                     ACCOUNT_ID
             );
@@ -628,7 +628,7 @@ class TransactionQueryServiceTests {
 
             stubAccountLookup(account);
 
-            when(transactionRepository.findByTransactionCodeAndAccount_Id(
+            when(transactionRepository.findByTransactionCodeAndAccountId(
                     transactionCode,
                     ACCOUNT_ID
             )).thenReturn(Optional.empty());
@@ -645,7 +645,7 @@ class TransactionQueryServiceTests {
 
             verifyAccountLookup(account);
 
-            verify(transactionRepository).findByTransactionCodeAndAccount_Id(
+            verify(transactionRepository).findByTransactionCodeAndAccountId(
                     transactionCode,
                     ACCOUNT_ID
             );
@@ -668,7 +668,7 @@ class TransactionQueryServiceTests {
 
             stubAccountLookup(account);
 
-            when(transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+            when(transactionRepository.findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             )).thenReturn(Optional.empty());
 
@@ -729,7 +729,7 @@ class TransactionQueryServiceTests {
                     ACCOUNT_DIGIT
             );
 
-            verify(transactionRepository).findFirstByAccount_IdOrderByIdDesc(
+            verify(transactionRepository).findFirstByAccountIdOrderByIdDesc(
                     ACCOUNT_ID
             );
 
@@ -796,7 +796,7 @@ class TransactionQueryServiceTests {
                     transaction.getTransactionCode()
             )).thenReturn(Optional.of(transaction));
 
-            TransactionResponseDTO result =
+            TransactionResponseDto result =
                     transactionQueryService.findByTransactionCode(
                             transaction.getTransactionCode()
                     );
@@ -848,7 +848,7 @@ class TransactionQueryServiceTests {
     ) {
         ReflectionTestUtils.setField(transaction, "id", id);
 
-        when(transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+        when(transactionRepository.findFirstByAccountIdOrderByIdDesc(
                 account.getId()
         )).thenReturn(Optional.of(transaction));
     }
@@ -950,8 +950,8 @@ class TransactionQueryServiceTests {
         assertEquals(message, exception.getMessage());
     }
 
-    private static TransactionResponseDTO response(Transaction transaction) {
-        return new TransactionResponseDTO(
+    private static TransactionResponseDto response(Transaction transaction) {
+        return new TransactionResponseDto(
                 transaction.getTransactionCode(),
                 transaction.getTransferCode(),
                 transaction.getType(),

@@ -2,9 +2,9 @@ package com.lcsalvess.bankingsystem.unit.controller.transaction;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.transaction.TransactionController;
-import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.exception.account.AccountIsNotActiveException;
 import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
@@ -88,8 +88,8 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should deposit successfully")
         void shouldDepositSuccessfully() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
-            TransactionResponseDTO expected =
+            AccountOperationRequestDto request = operationRequest();
+            TransactionResponseDto expected =
                     mockTransaction(TransactionType.DEPOSIT);
 
             when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
@@ -115,7 +115,7 @@ public class TransactionControllerTests {
         @DisplayName("Should return 400 when request body is invalid")
         void shouldReturnBadRequestWhenRequestBodyIsInvalid(
                 String scenario,
-                AccountOperationRequestDTO request,
+                AccountOperationRequestDto request,
                 String field,
                 String message
         ) throws Exception {
@@ -135,7 +135,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 400 when digit is invalid")
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -154,7 +154,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 404 when account does not exist")
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -173,7 +173,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 409 when account is not active")
         void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -192,7 +192,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
                     .thenThrow(new RuntimeException());
@@ -214,8 +214,8 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should withdraw successfully")
         void shouldWithdrawSuccessfully() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
-            TransactionResponseDTO expected =
+            AccountOperationRequestDto request = operationRequest();
+            TransactionResponseDto expected =
                     mockTransaction(TransactionType.WITHDRAWAL);
 
             when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
@@ -241,7 +241,7 @@ public class TransactionControllerTests {
         @DisplayName("Should return 400 when request body is invalid")
         void shouldReturnBadRequestWhenRequestBodyIsInvalid(
                 String scenario,
-                AccountOperationRequestDTO request,
+                AccountOperationRequestDto request,
                 String field,
                 String message
         ) throws Exception {
@@ -261,7 +261,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 400 when digit is invalid")
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -280,7 +280,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 404 when account does not exist")
         void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -299,7 +299,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 409 when balance is insufficient")
         void shouldReturnConflictWhenBalanceIsInsufficient() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -318,7 +318,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 409 when account is not active")
         void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -337,7 +337,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            AccountOperationRequestDTO request = operationRequest();
+            AccountOperationRequestDto request = operationRequest();
 
             when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
                     .thenThrow(new RuntimeException());
@@ -359,8 +359,8 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should transfer successfully")
         void shouldTransferSuccessfully() throws Exception {
-            TransferRequestDTO request = transferRequest();
-            TransactionResponseDTO expected =
+            TransferRequestDto request = transferRequest();
+            TransactionResponseDto expected =
                     mockTransaction(TransactionType.TRANSFER_SENT);
 
             when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
@@ -386,7 +386,7 @@ public class TransactionControllerTests {
         @DisplayName("Should return 400 when request body is invalid")
         void shouldReturnBadRequestWhenRequestBodyIsInvalid(
                 String scenario,
-                TransferRequestDTO request,
+                TransferRequestDto request,
                 String field,
                 String message
         ) throws Exception {
@@ -406,7 +406,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 400 when digit is invalid")
         void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            TransferRequestDTO request = transferRequest();
+            TransferRequestDto request = transferRequest();
 
             when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -425,7 +425,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 404 when an account does not exist")
         void shouldReturnNotFoundWhenAnAccountDoesNotExist() throws Exception {
-            TransferRequestDTO request = transferRequest();
+            TransferRequestDto request = transferRequest();
 
             when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -444,7 +444,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 400 when accounts are the same")
         void shouldReturnConflictWhenAccountsAreSame() throws Exception {
-            TransferRequestDTO request = transferRequest();
+            TransferRequestDto request = transferRequest();
 
             when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -468,7 +468,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 409 when balance is insufficient")
         void shouldReturnConflictWhenBalanceIsInsufficient() throws Exception {
-            TransferRequestDTO request = transferRequest();
+            TransferRequestDto request = transferRequest();
 
             when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -487,7 +487,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 409 when an account is not active")
         void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
-            TransferRequestDTO request = transferRequest();
+            TransferRequestDto request = transferRequest();
 
             when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(
@@ -506,7 +506,7 @@ public class TransactionControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            TransferRequestDTO request = transferRequest();
+            TransferRequestDto request = transferRequest();
 
             when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
                     .thenThrow(new RuntimeException());
@@ -531,7 +531,7 @@ public class TransactionControllerTests {
         void shouldReturnTransactionSuccessfully() throws Exception {
             UUID transactionCode = UUID.randomUUID();
 
-            TransactionResponseDTO expected = new TransactionResponseDTO(
+            TransactionResponseDto expected = new TransactionResponseDto(
                     transactionCode,
                     null,
                     TransactionType.DEPOSIT,
@@ -626,37 +626,37 @@ public class TransactionControllerTests {
         return Stream.of(
                 Arguments.of(
                         "account number is null",
-                        new AccountOperationRequestDTO(null, "5", amount),
+                        new AccountOperationRequestDto(null, "5", amount),
                         "accountNumber",
                         ValidationMessages.REQUIRED_ACCOUNT_NUMBER
                 ),
                 Arguments.of(
                         "account number is too short",
-                        new AccountOperationRequestDTO("1234", "5", amount),
+                        new AccountOperationRequestDto("1234", "5", amount),
                         "accountNumber",
                         ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
                 ),
                 Arguments.of(
                         "digit is null",
-                        new AccountOperationRequestDTO("99999", null, amount),
+                        new AccountOperationRequestDto("99999", null, amount),
                         "digit",
                         ValidationMessages.REQUIRED_ACCOUNT_DIGIT
                 ),
                 Arguments.of(
                         "digit does not have 1 digit",
-                        new AccountOperationRequestDTO("99999", "12", amount),
+                        new AccountOperationRequestDto("99999", "12", amount),
                         "digit",
                         ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
                 ),
                 Arguments.of(
                         "amount is null",
-                        new AccountOperationRequestDTO("99999", "5", null),
+                        new AccountOperationRequestDto("99999", "5", null),
                         "amount",
                         ValidationMessages.REQUIRED_OPERATION_AMOUNT
                 ),
                 Arguments.of(
                         "amount is zero",
-                        new AccountOperationRequestDTO(
+                        new AccountOperationRequestDto(
                                 "99999",
                                 "5",
                                 BigDecimal.ZERO
@@ -666,7 +666,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "amount is negative",
-                        new AccountOperationRequestDTO(
+                        new AccountOperationRequestDto(
                                 "99999",
                                 "5",
                                 new BigDecimal("-1.00")
@@ -684,7 +684,7 @@ public class TransactionControllerTests {
         return Stream.of(
                 Arguments.of(
                         "origin account number is null",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 null,
                                 "5",
                                 "88888",
@@ -696,7 +696,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "origin account number is too short",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "1234",
                                 "5",
                                 "88888",
@@ -708,7 +708,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "origin digit is null",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 null,
                                 "88888",
@@ -720,7 +720,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "origin digit does not have 1 digit",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 "12",
                                 "88888",
@@ -732,7 +732,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "destination account number is null",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 "5",
                                 null,
@@ -744,7 +744,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "destination account number is too short",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 "5",
                                 "1234",
@@ -756,7 +756,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "destination digit is null",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 "5",
                                 "88888",
@@ -768,7 +768,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "destination digit does not have 1 digit",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 "5",
                                 "88888",
@@ -780,7 +780,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "amount is null",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 "5",
                                 "88888",
@@ -792,7 +792,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "amount is zero",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 "5",
                                 "88888",
@@ -804,7 +804,7 @@ public class TransactionControllerTests {
                 ),
                 Arguments.of(
                         "amount is negative",
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 "99999",
                                 "5",
                                 "88888",
@@ -876,17 +876,17 @@ public class TransactionControllerTests {
                 .andExpect(jsonPath("$.message").value(ApiErrorMessages.INVALID_REQUEST_DATA));
     }
 
-    private TransactionResponseDTO readTransaction(MvcResult result)
+    private TransactionResponseDto readTransaction(MvcResult result)
             throws Exception {
         return objectMapper.readValue(
                 result.getResponse().getContentAsString(),
-                TransactionResponseDTO.class
+                TransactionResponseDto.class
         );
     }
 
     private static void assertTransactionEquals(
-            TransactionResponseDTO expected,
-            TransactionResponseDTO actual
+            TransactionResponseDto expected,
+            TransactionResponseDto actual
     ) {
         assertEquals(expected.transactionCode(), actual.transactionCode());
         assertEquals(expected.transferCode(), actual.transferCode());
@@ -903,16 +903,16 @@ public class TransactionControllerTests {
         );
     }
 
-    private static AccountOperationRequestDTO operationRequest() {
-        return new AccountOperationRequestDTO(
+    private static AccountOperationRequestDto operationRequest() {
+        return new AccountOperationRequestDto(
                 "99999",
                 "5",
                 new BigDecimal("100.00")
         );
     }
 
-    private static TransferRequestDTO transferRequest() {
-        return new TransferRequestDTO(
+    private static TransferRequestDto transferRequest() {
+        return new TransferRequestDto(
                 "99999",
                 "5",
                 "88888",
@@ -921,10 +921,10 @@ public class TransactionControllerTests {
         );
     }
 
-    private static TransactionResponseDTO mockTransaction(
+    private static TransactionResponseDto mockTransaction(
             TransactionType type
     ) {
-        return new TransactionResponseDTO(
+        return new TransactionResponseDto(
                 UUID.randomUUID(),
                 type == TransactionType.TRANSFER_SENT
                         ? UUID.randomUUID()

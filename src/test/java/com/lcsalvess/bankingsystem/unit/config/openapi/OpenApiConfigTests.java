@@ -32,7 +32,7 @@ class OpenApiConfigTests {
     @DisplayName("bankingSystemOpenAPI")
     class BankingSystemOpenApiTests {
 
-        private final OpenAPI openApi = config.bankingSystemOpenAPI(APPLICATION_VERSION);
+        private final OpenAPI openApi = config.bankingSystemOpenApi(APPLICATION_VERSION);
 
         @Test
         @DisplayName("Should describe the API")
@@ -50,7 +50,7 @@ class OpenApiConfigTests {
         @DisplayName("Should use the application version provided by configuration")
         void shouldUseTheProvidedApplicationVersion() {
             assertEquals(APPLICATION_VERSION, openApi.getInfo().getVersion());
-            assertEquals("2.5.1", config.bankingSystemOpenAPI("2.5.1").getInfo().getVersion());
+            assertEquals("2.5.1", config.bankingSystemOpenApi("2.5.1").getInfo().getVersion());
         }
 
         @Test

@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.integration.transaction;
 
-import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
@@ -818,7 +818,7 @@ class TransactionConcurrencyTests {
             transactionService.deposit(operation(source, "100.00"));
             transactionService.withdraw(operation(source, "30.00"));
             transactionService.transfer(
-                    new TransferRequestDTO(
+                    new TransferRequestDto(
                             source.getAccountNumber(),
                             source.getDigit(),
                             destination.getAccountNumber(),
@@ -1136,7 +1136,7 @@ class TransactionConcurrencyTests {
             transactionService.deposit(operation(account, "30.00"));
 
             Transaction newestTransaction =
-                    transactionRepository.findFirstByAccount_IdOrderByIdDesc(
+                    transactionRepository.findFirstByAccountIdOrderByIdDesc(
                             account.getId()
                     ).orElseThrow();
 
@@ -1165,7 +1165,7 @@ class TransactionConcurrencyTests {
                     List.of(olderTransactionCode),
                     secondResult.page().getContent()
                             .stream()
-                            .map(TransactionResponseDTO::transactionCode)
+                            .map(TransactionResponseDto::transactionCode)
                             .toList()
             );
 
@@ -1264,7 +1264,7 @@ class TransactionConcurrencyTests {
         return () -> {
             try {
                 transactionService.transfer(
-                        new TransferRequestDTO(
+                        new TransferRequestDto(
                                 source.getAccountNumber(),
                                 source.getDigit(),
                                 destination.getAccountNumber(),
@@ -1306,8 +1306,8 @@ class TransactionConcurrencyTests {
         };
     }
 
-    private AccountOperationRequestDTO operation(Account account, String amount) {
-        return new AccountOperationRequestDTO(
+    private AccountOperationRequestDto operation(Account account, String amount) {
+        return new AccountOperationRequestDto(
                 account.getAccountNumber(),
                 account.getDigit(),
                 new BigDecimal(amount)

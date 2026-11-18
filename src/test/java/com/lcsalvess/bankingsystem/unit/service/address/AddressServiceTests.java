@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.service.address;
 
-import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDto;
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
@@ -43,7 +43,7 @@ class AddressServiceTests {
         @Test
         @DisplayName("Should create address combining provider data with street number and complement")
         void shouldCreateAddressCombiningProviderDataWithStreetNumberAndComplement() {
-            AddressRequestDTO dto = new AddressRequestDTO("123", "Apto 45", POSTAL_CODE);
+            AddressRequestDto dto = new AddressRequestDto("123", "Apto 45", POSTAL_CODE);
 
             when(addressLookupService.findByPostalCode(POSTAL_CODE))
                     .thenReturn(lookupResponse());
@@ -66,7 +66,7 @@ class AddressServiceTests {
         @Test
         @DisplayName("Should create address without complement when it is not informed")
         void shouldCreateAddressWithoutComplementWhenItIsNotInformed() {
-            AddressRequestDTO dto = new AddressRequestDTO("123", null, POSTAL_CODE);
+            AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
 
             when(addressLookupService.findByPostalCode(POSTAL_CODE))
                     .thenReturn(lookupResponse());
@@ -83,7 +83,7 @@ class AddressServiceTests {
         @Test
         @DisplayName("Should throw PostalCodeNotFoundException when postal code is not found")
         void shouldThrowPostalCodeNotFoundExceptionWhenPostalCodeIsNotFound() {
-            AddressRequestDTO dto = new AddressRequestDTO("123", null, POSTAL_CODE);
+            AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
 
             when(addressLookupService.findByPostalCode(POSTAL_CODE))
                     .thenThrow(new PostalCodeNotFoundException(
@@ -104,7 +104,7 @@ class AddressServiceTests {
         @Test
         @DisplayName("Should throw AddressProviderUnavailableException when providers are unavailable")
         void shouldThrowAddressProviderUnavailableExceptionWhenProvidersAreUnavailable() {
-            AddressRequestDTO dto = new AddressRequestDTO("123", null, POSTAL_CODE);
+            AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
 
             when(addressLookupService.findByPostalCode(POSTAL_CODE))
                     .thenThrow(new AddressProviderUnavailableException(

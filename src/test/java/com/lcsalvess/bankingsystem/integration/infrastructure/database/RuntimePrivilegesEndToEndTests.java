@@ -1,9 +1,9 @@
 package com.lcsalvess.bankingsystem.integration.infrastructure.database;
 
-import com.lcsalvess.bankingsystem.dto.request.client.ClientUpdateRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDTO;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientUpdateRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.security.ChangePasswordRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.transaction.TransferRequestDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.CheckingAccount;
@@ -178,7 +178,7 @@ class RuntimePrivilegesEndToEndTests {
 
         transactionService.deposit(operation(source, "100.00"));
         transactionService.withdraw(operation(source, "30.00"));
-        transactionService.transfer(new TransferRequestDTO(
+        transactionService.transfer(new TransferRequestDto(
                 source.getAccountNumber(),
                 source.getDigit(),
                 destination.getAccountNumber(),
@@ -278,7 +278,7 @@ class RuntimePrivilegesEndToEndTests {
         actAs(user);
 
         passwordChangeService.changePassword(
-                new ChangePasswordRequestDTO(PASSWORD, NEW_PASSWORD)
+                new ChangePasswordRequestDto(PASSWORD, NEW_PASSWORD)
         );
 
         User reloaded = userRepository.findById(user.getId()).orElseThrow();
@@ -316,7 +316,7 @@ class RuntimePrivilegesEndToEndTests {
 
         clientService.update(
                 client.getId(),
-                new ClientUpdateRequestDTO(null, newEmail, "11988887777", null)
+                new ClientUpdateRequestDto(null, newEmail, "11988887777", null)
         );
 
         Client reloaded = clientRepository.findById(client.getId())
@@ -441,11 +441,11 @@ class RuntimePrivilegesEndToEndTests {
         return accountRepository.saveAndFlush(account);
     }
 
-    private AccountOperationRequestDTO operation(
+    private AccountOperationRequestDto operation(
             Account account,
             String amount
     ) {
-        return new AccountOperationRequestDTO(
+        return new AccountOperationRequestDto(
                 account.getAccountNumber(),
                 account.getDigit(),
                 new BigDecimal(amount)

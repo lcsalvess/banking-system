@@ -297,6 +297,51 @@
             </plugin>
 
             <!--
+                Enforces the project's Checkstyle rules during Maven verification.
+                Uses Checkstyle 14.4.0 to keep Maven validation aligned
+                with the CheckStyle-IDEA configuration.
+                Loads the centralized Checkstyle configuration and suppressions.
+                Includes production and test source directories.
+                Fails the build when violations are detected.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.6.0</version>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>14.4.0</version>
+                    </dependency>
+                </dependencies>
+
+                <configuration>
+                    <configLocation>${project.basedir}/config/checkstyle/checkstyle.xml</configLocation>
+
+                    <propertyExpansion>config_loc=${project.basedir}/config/checkstyle</propertyExpansion>
+
+                    <inputEncoding>UTF-8</inputEncoding>
+                    <consoleOutput>true</consoleOutput>
+                    <logViolationsToConsole>true</logViolationsToConsole>
+                    <failOnViolation>true</failOnViolation>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                    <linkXRef>false</linkXRef>
+                </configuration>
+
+                <executions>
+                    <execution>
+                        <id>checkstyle-validation</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
                 Runs Google Error Prone during Java compilation to detect
                 common programming mistakes and potentially problematic
                 code patterns.
@@ -485,6 +530,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.6.1</version>
                 <configuration>
+                    <!--suppress UnresolvedMavenProperty -->
                     <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} -Dspring.profiles.active=test</argLine>
                 </configuration>
             </plugin>

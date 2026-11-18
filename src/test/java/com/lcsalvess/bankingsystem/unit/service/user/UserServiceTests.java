@@ -1,8 +1,8 @@
 package com.lcsalvess.bankingsystem.unit.service.user;
 
-import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDto;
+import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDto;
 import com.lcsalvess.bankingsystem.entity.user.Role;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
@@ -93,7 +93,7 @@ class UserServiceTests {
                     any(Pageable.class)
             )).thenReturn(new PageImpl<>(List.of(user), pageable, 31));
 
-            Page<UserSummaryResponseDTO> page = userService.findAll(
+            Page<UserSummaryResponseDto> page = userService.findAll(
                     "  test  ",
                     Role.EMPLOYEE,
                     true,
@@ -102,7 +102,7 @@ class UserServiceTests {
 
             assertEquals(1, page.getContent().size());
 
-            UserSummaryResponseDTO summary = page.getContent().getFirst();
+            UserSummaryResponseDto summary = page.getContent().getFirst();
             assertEquals(user.getEmployeeId(), summary.employeeId());
             assertEquals(user.getFullName(), summary.fullName());
             assertEquals(user.getUsername(), summary.username());
@@ -134,7 +134,7 @@ class UserServiceTests {
                     any(Pageable.class)
             )).thenReturn(Page.empty(pageable));
 
-            Page<UserSummaryResponseDTO> page = userService.findAll(
+            Page<UserSummaryResponseDto> page = userService.findAll(
                     null,
                     null,
                     null,
@@ -157,7 +157,7 @@ class UserServiceTests {
         @Test
         @DisplayName("Should create a user successfully with valid data")
         void shouldCreateUserSuccessfully() {
-            UserRequestDTO dto = createUserRequestDTO();
+            UserRequestDto dto = createUserRequestDTO();
             String employeeId = "EMP-UNIT-000001";
 
             User savedUser = UserTestFactory.aUser()
@@ -185,7 +185,7 @@ class UserServiceTests {
             when(userRepository.save(any(User.class)))
                     .thenReturn(savedUser);
 
-            UserResponseDTO response = userService.create(dto);
+            UserResponseDto response = userService.create(dto);
 
             assertEquals(savedUser.getEmployeeId(), response.employeeId());
             assertEquals(dto.fullName(), response.fullName());
@@ -211,7 +211,7 @@ class UserServiceTests {
         @Test
         @DisplayName("Should throw an exception when the username already exists")
         void shouldThrowWhenUsernameAlreadyExists() {
-            UserRequestDTO dto = createUserRequestDTO();
+            UserRequestDto dto = createUserRequestDTO();
 
             when(userRepository.existsByUsernameIgnoreCase(dto.username()))
                     .thenReturn(true);
@@ -232,7 +232,7 @@ class UserServiceTests {
         @Test
         @DisplayName("Should throw an exception when the email already exists")
         void shouldThrowWhenEmailAlreadyExists() {
-            UserRequestDTO dto = createUserRequestDTO();
+            UserRequestDto dto = createUserRequestDTO();
 
             when(userRepository.existsByUsernameIgnoreCase(dto.username()))
                     .thenReturn(false);
@@ -253,12 +253,12 @@ class UserServiceTests {
             verifyNoInteractions(eventPublisher);
         }
 
-        private UserRequestDTO createUserRequestDTO() {
+        private UserRequestDto createUserRequestDTO() {
             User user = UserTestFactory.aUser()
                     .withRole(Role.ADMIN)
                     .build();
 
-            return new UserRequestDTO(
+            return new UserRequestDto(
                     user.getFullName(),
                     user.getUsername(),
                     user.getEmail(),
@@ -280,7 +280,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(employee.getEmployeeId()))
                     .thenReturn(Optional.of(employee));
 
-            UserResponseDTO response = userService.reactivate(employee.getEmployeeId());
+            UserResponseDto response = userService.reactivate(employee.getEmployeeId());
 
             assertEquals(employee.getEmployeeId(), response.employeeId());
             assertEquals(employee.getFullName(), response.fullName());
@@ -326,7 +326,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(employee.getEmployeeId()))
                     .thenReturn(Optional.of(employee));
 
-            UserResponseDTO response = userService.reactivate(employee.getEmployeeId());
+            UserResponseDto response = userService.reactivate(employee.getEmployeeId());
 
             assertEquals(employee.getEmployeeId(), response.employeeId());
             assertEquals(employee.getFullName(), response.fullName());
@@ -362,7 +362,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(admin.getEmployeeId()))
                     .thenReturn(Optional.of(admin));
 
-            UserResponseDTO response = userService.deactivate(admin.getEmployeeId());
+            UserResponseDto response = userService.deactivate(admin.getEmployeeId());
 
             assertEquals(admin.getEmployeeId(), response.employeeId());
             assertEquals(admin.getFullName(), response.fullName());
@@ -426,7 +426,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(user.getEmployeeId()))
                     .thenReturn(Optional.of(user));
 
-            UserResponseDTO response = userService.deactivate(user.getEmployeeId());
+            UserResponseDto response = userService.deactivate(user.getEmployeeId());
 
             assertEquals(user.getEmployeeId(), response.employeeId());
             assertEquals(user.getFullName(), response.fullName());
@@ -523,7 +523,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(employee.getEmployeeId()))
                     .thenReturn(Optional.of(employee));
 
-            UserResponseDTO response = userService.deactivate(employee.getEmployeeId());
+            UserResponseDto response = userService.deactivate(employee.getEmployeeId());
 
             assertEquals(employee.getEmployeeId(), response.employeeId());
             assertEquals(employee.getFullName(), response.fullName());
@@ -586,7 +586,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(employee.getEmployeeId()))
                     .thenReturn(Optional.of(employee));
 
-            UserResponseDTO response = userService.deactivate(employee.getEmployeeId());
+            UserResponseDto response = userService.deactivate(employee.getEmployeeId());
 
             assertFalse(response.active());
             assertFalse(employee.isActive());
@@ -616,7 +616,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(target.getEmployeeId()))
                     .thenReturn(Optional.of(target));
 
-            UserResponseDTO response = userService.deactivate(target.getEmployeeId());
+            UserResponseDto response = userService.deactivate(target.getEmployeeId());
 
             assertFalse(response.active());
             assertFalse(target.isActive());
@@ -650,7 +650,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(target.getEmployeeId()))
                     .thenReturn(Optional.of(target));
 
-            UserResponseDTO response = userService.changeRole(
+            UserResponseDto response = userService.changeRole(
                     target.getEmployeeId(),
                     Role.AUDITOR
             );
@@ -684,7 +684,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(target.getEmployeeId()))
                     .thenReturn(Optional.of(target));
 
-            UserResponseDTO response = userService.changeRole(
+            UserResponseDto response = userService.changeRole(
                     target.getEmployeeId(),
                     Role.EMPLOYEE
             );
@@ -743,7 +743,7 @@ class UserServiceTests {
             when(userRepository.findByEmployeeIdForUpdate(target.getEmployeeId()))
                     .thenReturn(Optional.of(target));
 
-            UserResponseDTO response = userService.changeRole(
+            UserResponseDto response = userService.changeRole(
                     target.getEmployeeId(),
                     Role.EMPLOYEE
             );

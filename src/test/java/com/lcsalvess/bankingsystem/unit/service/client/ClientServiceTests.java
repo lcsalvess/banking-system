@@ -1,12 +1,12 @@
 package com.lcsalvess.bankingsystem.unit.service.client;
 
-import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.address.AddressUpdateRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.client.ClientRequestDTO;
-import com.lcsalvess.bankingsystem.dto.request.client.ClientUpdateRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.address.AddressResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.client.ClientResponseDTO;
-import com.lcsalvess.bankingsystem.dto.response.client.ClientSummaryResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.address.AddressUpdateRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientRequestDto;
+import com.lcsalvess.bankingsystem.dto.request.client.ClientUpdateRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.address.AddressResponseDto;
+import com.lcsalvess.bankingsystem.dto.response.client.ClientResponseDto;
+import com.lcsalvess.bankingsystem.dto.response.client.ClientSummaryResponseDto;
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
 import com.lcsalvess.bankingsystem.entity.client.Client;
@@ -133,7 +133,7 @@ public class ClientServiceTests {
 
             when(clientRepository.findAll(pageable)).thenReturn(clients);
 
-            Page<ClientSummaryResponseDTO> result =
+            Page<ClientSummaryResponseDto> result =
                     clientService.findAll(null, pageable);
 
             assertEquals(
@@ -163,7 +163,7 @@ public class ClientServiceTests {
 
             when(clientRepository.findAll(pageable)).thenReturn(emptyPage);
 
-            Page<ClientSummaryResponseDTO> result =
+            Page<ClientSummaryResponseDto> result =
                     clientService.findAll(null, pageable);
 
             assertTrue(result.isEmpty());
@@ -193,7 +193,7 @@ public class ClientServiceTests {
                     pageable
             )).thenReturn(clients);
 
-            Page<ClientSummaryResponseDTO> result =
+            Page<ClientSummaryResponseDto> result =
                     clientService.findAll("  emily  ", pageable);
 
             assertEquals(
@@ -221,7 +221,7 @@ public class ClientServiceTests {
 
             when(clientRepository.findAll(pageable)).thenReturn(clients);
 
-            Page<ClientSummaryResponseDTO> result =
+            Page<ClientSummaryResponseDto> result =
                     clientService.findAll("   ", pageable);
 
             assertEquals(1, result.getTotalElements());
@@ -273,7 +273,7 @@ public class ClientServiceTests {
         void shouldReturnClientResponseWhenIdExists() {
             stubClientLookup(baseClient);
 
-            ClientResponseDTO result = clientService.findById(CLIENT_ID);
+            ClientResponseDto result = clientService.findById(CLIENT_ID);
 
             assertEquals(clientResponse(baseClient), result);
 
@@ -304,7 +304,7 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should look up the address before calling the persistence service")
         void shouldCreateClientSuccessfully() {
-            ClientRequestDTO request = clientRequest();
+            ClientRequestDto request = clientRequest();
             Address address = baseClient.getAddress();
 
             when(clientRepository.existsByCpf(cpf)).thenReturn(false);
@@ -313,7 +313,7 @@ public class ClientServiceTests {
             when(clientPersistenceService.create(any(Client.class), eq(USERNAME)))
                     .thenReturn(baseClient);
 
-            ClientResponseDTO result = clientService.create(request);
+            ClientResponseDto result = clientService.create(request);
 
             ArgumentCaptor<Client> clientCaptor = ArgumentCaptor.forClass(Client.class);
 
@@ -345,7 +345,7 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should throw when CPF already exists")
         void shouldThrowWhenCpfAlreadyExists() {
-            ClientRequestDTO request = clientRequest();
+            ClientRequestDto request = clientRequest();
 
             when(clientRepository.existsByCpf(cpf)).thenReturn(true);
 
@@ -362,7 +362,7 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should translate the integrity violation when the email already exists")
         void shouldTranslateViolationWhenEmailAlreadyExists() {
-            ClientRequestDTO request = clientRequest();
+            ClientRequestDto request = clientRequest();
             Address address = baseClient.getAddress();
 
             ConstraintViolationException cause =
@@ -406,7 +406,7 @@ public class ClientServiceTests {
                 String scenario,
                 RuntimeException exception
         ) {
-            ClientRequestDTO request = clientRequest();
+            ClientRequestDto request = clientRequest();
 
             when(clientRepository.existsByCpf(cpf)).thenReturn(false);
             when(addressService.createFromPostalCode(request.address()))
@@ -427,7 +427,7 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should rethrow the failure when persistence fails and the CPF does not exist")
         void shouldRethrowWhenPersistenceFailsForOtherReasons() {
-            ClientRequestDTO request = clientRequest();
+            ClientRequestDto request = clientRequest();
             Address address = baseClient.getAddress();
             DataIntegrityViolationException exception =
                     new DataIntegrityViolationException("fk_client_address");
@@ -457,7 +457,7 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should translate the integrity violation when the CPF was taken concurrently")
         void shouldTranslateViolationWhenCpfWasTakenConcurrently() {
-            ClientRequestDTO request = clientRequest();
+            ClientRequestDto request = clientRequest();
             Address address = baseClient.getAddress();
 
             ConstraintViolationException cause =
@@ -500,7 +500,7 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should look up the address before calling the persistence service")
         void shouldUpdateClientAndAddressSuccessfully() {
-            ClientUpdateRequestDTO request = fullUpdateRequest();
+            ClientUpdateRequestDto request = fullUpdateRequest();
             AddressData addressData = addressData();
 
             ClientUpdateData expectedData = new ClientUpdateData(
@@ -517,7 +517,7 @@ public class ClientServiceTests {
             when(clientPersistenceService.update(CLIENT_ID, expectedData, USERNAME))
                     .thenReturn(baseClient);
 
-            ClientResponseDTO result = clientService.update(CLIENT_ID, request);
+            ClientResponseDto result = clientService.update(CLIENT_ID, request);
 
             assertNotNull(result);
             assertEquals(baseClient.getId(), result.id());
@@ -548,14 +548,14 @@ public class ClientServiceTests {
         @DisplayName("Should forward updates without address and without looking it up")
         void shouldForwardUpdatesWithoutLookingUpTheAddress(
                 String scenario,
-                ClientUpdateRequestDTO request,
+                ClientUpdateRequestDto request,
                 ClientUpdateData expectedData
         ) {
             when(currentUserService.getUsername()).thenReturn(USERNAME);
             when(clientPersistenceService.update(CLIENT_ID, expectedData, USERNAME))
                     .thenReturn(baseClient);
 
-            ClientResponseDTO result = clientService.update(CLIENT_ID, request);
+            ClientResponseDto result = clientService.update(CLIENT_ID, request);
 
             assertNotNull(result);
             assertEquals(baseClient.getId(), result.id());
@@ -577,13 +577,13 @@ public class ClientServiceTests {
         @DisplayName("Should forward street number and complement from the address request")
         void shouldForwardStreetNumberAndComplement(
                 String scenario,
-                AddressUpdateRequestDTO addressRequest,
+                AddressUpdateRequestDto addressRequest,
                 String expectedStreetNumber,
                 String expectedComplement
         ) {
             AddressData addressData = addressData();
 
-            ClientUpdateRequestDTO request = new ClientUpdateRequestDTO(
+            ClientUpdateRequestDto request = new ClientUpdateRequestDto(
                     null,
                     null,
                     null,
@@ -607,7 +607,7 @@ public class ClientServiceTests {
             when(clientPersistenceService.update(CLIENT_ID, expectedData, USERNAME))
                     .thenReturn(baseClient);
 
-            ClientResponseDTO result = clientService.update(CLIENT_ID, request);
+            ClientResponseDto result = clientService.update(CLIENT_ID, request);
 
             assertNotNull(result);
             assertEquals(baseClient.getId(), result.id());
@@ -626,7 +626,7 @@ public class ClientServiceTests {
                 String scenario,
                 RuntimeException exception
         ) {
-            ClientUpdateRequestDTO request = fullUpdateRequest();
+            ClientUpdateRequestDto request = fullUpdateRequest();
 
             when(addressService.findAddressByPostalCode(
                     request.address().postalCode()
@@ -653,7 +653,7 @@ public class ClientServiceTests {
         @Test
         @DisplayName("Should propagate the failure when persistence fails")
         void shouldPropagateFailureWhenPersistenceFails() {
-            ClientUpdateRequestDTO request = fullUpdateRequest();
+            ClientUpdateRequestDto request = fullUpdateRequest();
             AddressData addressData = addressData();
 
             ClientUpdateData expectedData = new ClientUpdateData(
@@ -709,11 +709,11 @@ public class ClientServiceTests {
         @Test
         @DisplayName("create and update should not run inside a transaction")
         void createAndUpdateShouldNotBeTransactional() throws NoSuchMethodException {
-            Method create = ClientService.class.getMethod("create", ClientRequestDTO.class);
+            Method create = ClientService.class.getMethod("create", ClientRequestDto.class);
             Method update = ClientService.class.getMethod(
                     "update",
                     Long.class,
-                    ClientUpdateRequestDTO.class
+                    ClientUpdateRequestDto.class
             );
 
             assertFalse(AnnotatedElementUtils.hasAnnotation(ClientService.class, Transactional.class));
@@ -745,22 +745,22 @@ public class ClientServiceTests {
         return Stream.of(
                 Arguments.of(
                         "only name is sent",
-                        new ClientUpdateRequestDTO(UPDATED_NAME, null, null, null),
+                        new ClientUpdateRequestDto(UPDATED_NAME, null, null, null),
                         new ClientUpdateData(UPDATED_NAME, null, null, null)
                 ),
                 Arguments.of(
                         "only email is sent",
-                        new ClientUpdateRequestDTO(null, UPDATED_EMAIL, null, null),
+                        new ClientUpdateRequestDto(null, UPDATED_EMAIL, null, null),
                         new ClientUpdateData(null, UPDATED_EMAIL, null, null)
                 ),
                 Arguments.of(
                         "only phone number is sent",
-                        new ClientUpdateRequestDTO(null, null, UPDATED_PHONE, null),
+                        new ClientUpdateRequestDto(null, null, UPDATED_PHONE, null),
                         new ClientUpdateData(null, null, UPDATED_PHONE, null)
                 ),
                 Arguments.of(
                         "nothing is sent",
-                        new ClientUpdateRequestDTO(null, null, null, null),
+                        new ClientUpdateRequestDto(null, null, null, null),
                         new ClientUpdateData(null, null, null, null)
                 )
         );
@@ -771,19 +771,19 @@ public class ClientServiceTests {
         return Stream.of(
                 Arguments.of(
                         "street number and complement are sent",
-                        new AddressUpdateRequestDTO("456", "Apto 22", POSTAL_CODE),
+                        new AddressUpdateRequestDto("456", "Apto 22", POSTAL_CODE),
                         "456",
                         "Apto 22"
                 ),
                 Arguments.of(
                         "complement is null",
-                        new AddressUpdateRequestDTO("456", null, POSTAL_CODE),
+                        new AddressUpdateRequestDto("456", null, POSTAL_CODE),
                         "456",
                         null
                 ),
                 Arguments.of(
                         "blank complement is forwarded untouched",
-                        new AddressUpdateRequestDTO("456", "   ", POSTAL_CODE),
+                        new AddressUpdateRequestDto("456", "   ", POSTAL_CODE),
                         "456",
                         "   "
                 )
@@ -812,15 +812,15 @@ public class ClientServiceTests {
         assertEquals(message, exception.getMessage());
     }
 
-    private ClientRequestDTO clientRequest() {
+    private ClientRequestDto clientRequest() {
         Address address = baseClient.getAddress();
 
-        return new ClientRequestDTO(
+        return new ClientRequestDto(
                 baseClient.getName(),
                 baseClient.getCpf(),
                 baseClient.getEmail(),
                 baseClient.getPhoneNumber(),
-                new AddressRequestDTO(
+                new AddressRequestDto(
                         address.getStreetNumber(),
                         address.getComplement(),
                         address.getPostalCode()
@@ -828,12 +828,12 @@ public class ClientServiceTests {
         );
     }
 
-    private static ClientUpdateRequestDTO fullUpdateRequest() {
-        return new ClientUpdateRequestDTO(
+    private static ClientUpdateRequestDto fullUpdateRequest() {
+        return new ClientUpdateRequestDto(
                 UPDATED_NAME,
                 UPDATED_EMAIL,
                 UPDATED_PHONE,
-                new AddressUpdateRequestDTO(
+                new AddressUpdateRequestDto(
                         "456",
                         "Apto 22",
                         "87654321"
@@ -855,8 +855,8 @@ public class ClientServiceTests {
         return "***.***.***-" + cpf.substring(9);
     }
 
-    private static ClientSummaryResponseDTO clientSummaryResponse(Client client) {
-        return new ClientSummaryResponseDTO(
+    private static ClientSummaryResponseDto clientSummaryResponse(Client client) {
+        return new ClientSummaryResponseDto(
                 client.getId(),
                 client.getName(),
                 maskedCpf(client.getCpf()),
@@ -865,14 +865,14 @@ public class ClientServiceTests {
         );
     }
 
-    private static ClientResponseDTO clientResponse(Client client) {
-        return new ClientResponseDTO(
+    private static ClientResponseDto clientResponse(Client client) {
+        return new ClientResponseDto(
                 client.getId(),
                 client.getName(),
                 maskedCpf(client.getCpf()),
                 client.getEmail(),
                 client.getPhoneNumber(),
-                AddressResponseDTO.fromEntity(client.getAddress())
+                AddressResponseDto.fromEntity(client.getAddress())
         );
     }
 }

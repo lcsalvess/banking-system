@@ -9,8 +9,8 @@ package com.lcsalvess.bankingsystem.util.actor;
  */
 public final class SystemActor {
 
-    public static final String NAME = "SYSTEM";
+  public static final String NAME = "SYSTEM";
 
-    private SystemActor() {
-    }
+  private SystemActor() {
+  }
 }

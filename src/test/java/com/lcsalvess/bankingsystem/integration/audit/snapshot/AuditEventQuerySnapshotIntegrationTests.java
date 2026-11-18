@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.integration.audit.snapshot;
 
-import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDto;
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEvent;
@@ -516,7 +516,7 @@ class AuditEventQuerySnapshotIntegrationTests {
         return result.page()
                 .getContent()
                 .stream()
-                .map(AuditEventResponseDTO::id)
+                .map(AuditEventResponseDto::id)
                 .toList();
     }
 }

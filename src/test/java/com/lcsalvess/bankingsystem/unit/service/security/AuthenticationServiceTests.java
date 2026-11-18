@@ -1,7 +1,7 @@
 package com.lcsalvess.bankingsystem.unit.service.security;
 
-import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.security.LoginRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.security.LoginResponseDto;
 import com.lcsalvess.bankingsystem.entity.user.User;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.exception.security.RateLimitExceededException;
@@ -114,7 +114,7 @@ class AuthenticationServiceTests {
         @DisplayName("Should authenticate the user with valid credentials")
         void shouldAuthenticateUserSuccessfully() {
             String jwtToken = "jwt-token";
-            LoginRequestDTO dto = createLoginRequestDTO();
+            LoginRequestDto dto = createLoginRequestDTO();
 
             allowAttempt();
 
@@ -125,7 +125,7 @@ class AuthenticationServiceTests {
             when(authentication.getPrincipal()).thenReturn(testUser);
             when(jwtService.generateToken(testUser)).thenReturn(jwtToken);
 
-            LoginResponseDTO response =
+            LoginResponseDto response =
                     authService.authenticate(dto, TEST_CLIENT_IP);
 
             assertEquals(jwtToken, response.token());
@@ -155,7 +155,7 @@ class AuthenticationServiceTests {
         @Test
         @DisplayName("Should throw and record a failure when credentials are invalid")
         void shouldThrowWhenCredentialsAreInvalid() {
-            LoginRequestDTO dto = createLoginRequestDTO();
+            LoginRequestDto dto = createLoginRequestDTO();
 
             allowAttempt();
 
@@ -204,7 +204,7 @@ class AuthenticationServiceTests {
                 String scenario,
                 AuthenticationException original
         ) {
-            LoginRequestDTO dto = createLoginRequestDTO();
+            LoginRequestDto dto = createLoginRequestDTO();
 
             allowAttempt();
 
@@ -255,7 +255,7 @@ class AuthenticationServiceTests {
         @Test
         @DisplayName("Should cancel the attempt when an infrastructure failure occurs")
         void shouldCancelAttemptOnInfrastructureFailure() {
-            LoginRequestDTO dto = createLoginRequestDTO();
+            LoginRequestDto dto = createLoginRequestDTO();
 
             allowAttempt();
 
@@ -290,7 +290,7 @@ class AuthenticationServiceTests {
         @Test
         @DisplayName("Should propagate unexpected exceptions unchanged and cancel the attempt")
         void shouldPropagateUnexpectedExceptionsAndCancelAttempt() {
-            LoginRequestDTO dto = createLoginRequestDTO();
+            LoginRequestDto dto = createLoginRequestDTO();
 
             allowAttempt();
 
@@ -323,7 +323,7 @@ class AuthenticationServiceTests {
         @Test
         @DisplayName("Should cancel the attempt when the authentication principal is null")
         void shouldCancelAttemptWhenAuthenticationPrincipalIsNull() {
-            LoginRequestDTO dto = createLoginRequestDTO();
+            LoginRequestDto dto = createLoginRequestDTO();
 
             allowAttempt();
 
@@ -370,7 +370,7 @@ class AuthenticationServiceTests {
         void shouldRejectBeforeCheckingCredentials(
                 RateLimitScope scope
         ) {
-            LoginRequestDTO dto = createLoginRequestDTO();
+            LoginRequestDto dto = createLoginRequestDTO();
 
             RateLimitExceededException original =
                     new RateLimitExceededException(
@@ -410,7 +410,7 @@ class AuthenticationServiceTests {
         @Test
         @DisplayName("Should not compare the password against the dummy hash when the attempt is rejected")
         void shouldNotRunPasswordCheckWhenRejected() {
-            LoginRequestDTO dto = createLoginRequestDTO();
+            LoginRequestDto dto = createLoginRequestDTO();
 
             when(rateLimitProtectionService.beginAttempt(
                     TEST_CLIENT_IP,
@@ -444,8 +444,8 @@ class AuthenticationServiceTests {
         )).thenReturn(testAttempt);
     }
 
-    private LoginRequestDTO createLoginRequestDTO() {
-        return new LoginRequestDTO(
+    private LoginRequestDto createLoginRequestDTO() {
+        return new LoginRequestDto(
                 testUser.getUsername(),
                 "teste123456"
         );

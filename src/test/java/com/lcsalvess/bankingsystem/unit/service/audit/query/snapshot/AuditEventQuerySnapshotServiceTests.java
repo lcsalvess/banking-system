@@ -1,6 +1,6 @@
 package com.lcsalvess.bankingsystem.unit.service.audit.query.snapshot;
 
-import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDto;
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEvent;
@@ -160,8 +160,8 @@ class AuditEventQuerySnapshotServiceTests {
 
             assertEquals(
                     List.of(
-                            AuditEventResponseDTO.fromEntity(firstEvent),
-                            AuditEventResponseDTO.fromEntity(secondEvent)
+                            AuditEventResponseDto.fromEntity(firstEvent),
+                            AuditEventResponseDto.fromEntity(secondEvent)
                     ),
                     result.page().getContent()
             );
@@ -564,7 +564,7 @@ class AuditEventQuerySnapshotServiceTests {
             );
 
             assertEquals(
-                    List.of(AuditEventResponseDTO.fromEntity(event)),
+                    List.of(AuditEventResponseDto.fromEntity(event)),
                     result.page().getContent()
             );
 

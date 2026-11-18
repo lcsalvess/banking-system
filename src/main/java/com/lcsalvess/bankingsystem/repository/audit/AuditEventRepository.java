@@ -4,11 +4,18 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditEvent;
 import org.springframework.data.repository.Repository;
 
 /**
- * Only exposes write operations: the audit trail is append-only, so no read
- * or delete operations are provided here (the database also rejects UPDATE,
- * DELETE, and TRUNCATE operations).
+ * Exposes only write operations for the append-only audit trail.
+ * <p>
+ * Read and delete operations are intentionally excluded. The database also
+ * rejects UPDATE, DELETE, and TRUNCATE operations.
  */
 public interface AuditEventRepository extends Repository<AuditEvent, Long> {
 
-    AuditEvent save(AuditEvent auditEvent);
+  /**
+   * Saves an audit event to the append-only audit trail.
+   *
+   * @param auditEvent the audit event to save
+   * @return the saved audit event
+   */
+  AuditEvent save(AuditEvent auditEvent);
 }

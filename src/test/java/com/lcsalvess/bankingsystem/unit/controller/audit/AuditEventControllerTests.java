@@ -2,7 +2,7 @@ package com.lcsalvess.bankingsystem.unit.controller.audit;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.audit.AuditEventController;
-import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.audit.AuditEventResponseDto;
 import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
@@ -263,11 +263,11 @@ class AuditEventControllerTests {
             verifyFindAll(emptyFilter(), " ");
         }
 
-        private AuditEventResponseDTO getEvent(UUID correlationId) {
+        private AuditEventResponseDto getEvent(UUID correlationId) {
             Instant createdAt =
                     Instant.parse("2026-10-26T13:15:30Z");
 
-            return new AuditEventResponseDTO(
+            return new AuditEventResponseDto(
                     1L,
                     AuditEventType.USER_CREATED,
                     AuditOutcome.SUCCESS,
@@ -361,7 +361,7 @@ class AuditEventControllerTests {
         verifyNoInteractions(auditEventQueryService);
     }
 
-    private void stubFindAll(Page<AuditEventResponseDTO> page) {
+    private void stubFindAll(Page<AuditEventResponseDto> page) {
         when(auditEventQueryService.findAll(
                 any(AuditEventQueryFilter.class),
                 any(Pageable.class),

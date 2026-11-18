@@ -7,7 +7,7 @@ package com.lcsalvess.bankingsystem.service.security;
  * @param tokenVersion the user's credential version when the token was issued
  */
 public record JwtClaims(
-        String username,
-        int tokenVersion
+    String username,
+    int tokenVersion
 ) {
 }

@@ -8,11 +8,31 @@ import java.math.BigDecimal;
  */
 public interface BalanceMismatch {
 
-    Long getAccountId();
+  /**
+   * Returns the identifier of the account with the balance mismatch.
+   *
+   * @return the account identifier
+   */
+  Long getAccountId();
 
-    String getAccountNumber();
+  /**
+   * Returns the account number.
+   *
+   * @return the account number
+   */
+  String getAccountNumber();
 
-    BigDecimal getAccountBalance();
+  /**
+   * Returns the current balance stored for the account.
+   *
+   * @return the account balance
+   */
+  BigDecimal getAccountBalance();
 
-    BigDecimal getLedgerBalance();
+  /**
+   * Returns the balance recorded by the most recent transaction.
+   *
+   * @return the ledger balance
+   */
+  BigDecimal getLedgerBalance();
 }

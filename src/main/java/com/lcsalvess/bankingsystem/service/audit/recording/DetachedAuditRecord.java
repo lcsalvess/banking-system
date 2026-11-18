@@ -4,7 +4,6 @@ import com.lcsalvess.bankingsystem.entity.audit.AuditActorType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditOutcome;
-
 import java.net.InetAddress;
 import java.util.Objects;
 import java.util.UUID;
@@ -22,56 +21,56 @@ import java.util.regex.Pattern;
  * parsed before this record is created.
  */
 public record DetachedAuditRecord(
-        AuditEventType eventType,
-        AuditOutcome outcome,
-        AuditActorType actorType,
-        Long actorUserId,
-        String actorUsername,
-        AuditEntityType entityType,
-        String entityId,
-        String reason,
-        InetAddress ipAddress,
-        Integer httpStatus,
-        UUID correlationId
+    AuditEventType eventType,
+    AuditOutcome outcome,
+    AuditActorType actorType,
+    Long actorUserId,
+    String actorUsername,
+    AuditEntityType entityType,
+    String entityId,
+    String reason,
+    InetAddress ipAddress,
+    Integer httpStatus,
+    UUID correlationId
 ) {
 
-    static final int MAX_USERNAME_LENGTH = 20;
-    static final int MAX_ENTITY_ID_LENGTH = 64;
-    static final String UNKNOWN_ENTITY_ID = "UNKNOWN";
-    static final String UNSPECIFIED_REASON = "UNSPECIFIED";
+  static final int MAX_USERNAME_LENGTH = 20;
+  static final int MAX_ENTITY_ID_LENGTH = 64;
+  static final String UNKNOWN_ENTITY_ID = "UNKNOWN";
+  static final String UNSPECIFIED_REASON = "UNSPECIFIED";
 
-    private static final Pattern REASON_PATTERN =
-            Pattern.compile("^[A-Z][A-Z0-9_]{0,59}$");
+  private static final Pattern REASON_PATTERN =
+      Pattern.compile("^[A-Z][A-Z0-9_]{0,59}$");
 
-    public DetachedAuditRecord {
-        Objects.requireNonNull(eventType, "eventType");
-        Objects.requireNonNull(outcome, "outcome");
-        Objects.requireNonNull(actorType, "actorType");
-        Objects.requireNonNull(entityType, "entityType");
+  public DetachedAuditRecord {
+    Objects.requireNonNull(eventType, "eventType");
+    Objects.requireNonNull(outcome, "outcome");
+    Objects.requireNonNull(actorType, "actorType");
+    Objects.requireNonNull(entityType, "entityType");
 
-        actorUsername = truncate(actorUsername, MAX_USERNAME_LENGTH);
+    actorUsername = truncate(actorUsername, MAX_USERNAME_LENGTH);
 
-        entityId = truncate(entityId, MAX_ENTITY_ID_LENGTH);
-        if (entityId == null || entityId.isBlank()) {
-            entityId = UNKNOWN_ENTITY_ID;
-        }
-
-        if (reason == null || !REASON_PATTERN.matcher(reason).matches()) {
-            reason = outcome == AuditOutcome.SUCCESS ? null : UNSPECIFIED_REASON;
-        }
-
-        if (httpStatus != null && (httpStatus < 100 || httpStatus > 599)) {
-            httpStatus = null;
-        }
+    entityId = truncate(entityId, MAX_ENTITY_ID_LENGTH);
+    if (entityId == null || entityId.isBlank()) {
+      entityId = UNKNOWN_ENTITY_ID;
     }
 
-    private static String truncate(String value, int maxLength) {
-        if (value == null) {
-            return null;
-        }
-
-        return value.length() <= maxLength
-                ? value
-                : value.substring(0, maxLength);
+    if (reason == null || !REASON_PATTERN.matcher(reason).matches()) {
+      reason = outcome == AuditOutcome.SUCCESS ? null : UNSPECIFIED_REASON;
     }
+
+    if (httpStatus != null && (httpStatus < 100 || httpStatus > 599)) {
+      httpStatus = null;
+    }
+  }
+
+  private static String truncate(String value, int maxLength) {
+    if (value == null) {
+      return null;
+    }
+
+    return value.length() <= maxLength
+        ? value
+        : value.substring(0, maxLength);
+  }
 }

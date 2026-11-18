@@ -1,16 +1,23 @@
 package com.lcsalvess.bankingsystem.config.time;
 
 import com.lcsalvess.bankingsystem.util.time.AppTimeZone;
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.time.Clock;
-
+/**
+ * Configures the application-wide clock using the configured application time zone.
+ */
 @Configuration
 public class ClockConfig {
 
-    @Bean
-    public Clock clock() {
-        return Clock.system(AppTimeZone.ZONE);
-    }
+  /**
+   * Provides a system clock configured with the application time zone.
+   *
+   * @return the application clock
+   */
+  @Bean
+  public Clock clock() {
+    return Clock.system(AppTimeZone.ZONE);
+  }
 }

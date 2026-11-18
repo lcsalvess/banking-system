@@ -16,82 +16,95 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import org.hibernate.annotations.DynamicUpdate;
 
+/**
+ * Represents a client and their personal, contact, and address information.
+ */
 @Entity
 @Table(name = "clients",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_clients_cpf", columnNames = "cpf"),
-                @UniqueConstraint(name = "uk_clients_address", columnNames = "address_id")
-        })
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_clients_cpf", columnNames = "cpf"),
+        @UniqueConstraint(name = "uk_clients_address", columnNames = "address_id")
+    })
 @DynamicUpdate
 public class Client {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(nullable = false, length = 125)
-    private String name;
+  @Column(nullable = false, length = 125)
+  private String name;
 
-    @Column(nullable = false, length = 11)
-    private String cpf;
+  @Column(nullable = false, length = 11)
+  private String cpf;
 
-    @Column(nullable = false)
-    private String email;
+  @Column(nullable = false)
+  private String email;
 
-    @Column(name = "phone_number", nullable = false, length = 11)
-    private String phoneNumber;
+  @Column(name = "phone_number", nullable = false, length = 11)
+  private String phoneNumber;
 
-    @OneToOne(cascade = CascadeType.ALL, optional = false)
-    @JoinColumn(name = "address_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_clients_address"))
-    private Address address;
+  @OneToOne(cascade = CascadeType.ALL, optional = false)
+  @JoinColumn(name = "address_id", nullable = false,
+      foreignKey = @ForeignKey(name = "fk_clients_address"))
+  private Address address;
 
-    protected Client() {
+  protected Client() {
+  }
+
+  public Client(String name, String cpf, String email, String phoneNumber, Address address) {
+    this.name = NameNormalizer.normalize(name);
+    this.cpf = cpf;
+    this.email = EmailNormalizer.normalize(email);
+    this.phoneNumber = phoneNumber;
+    this.address = address;
+  }
+
+  /**
+   * Updates the client's personal and contact information.
+   * <p>
+   * Only non-null values are applied. Names and email addresses are normalized
+   * before being assigned.
+   *
+   * @param name the new client name, or {@code null} to keep the current value
+   * @param email the new email address, or {@code null} to keep the current value
+   * @param phoneNumber the new phone number, or {@code null} to keep the current value
+   */
+  public void update(String name, String email, String phoneNumber) {
+    if (name != null) {
+      this.name = NameNormalizer.normalize(name);
     }
 
-    public Client(String name, String cpf, String email, String phoneNumber, Address address) {
-        this.name = NameNormalizer.normalize(name);
-        this.cpf = cpf;
-        this.email = EmailNormalizer.normalize(email);
-        this.phoneNumber = phoneNumber;
-        this.address = address;
+    if (email != null) {
+      this.email = EmailNormalizer.normalize(email);
     }
 
-    public void update(String name, String email, String phoneNumber) {
-        if (name != null) {
-            this.name = NameNormalizer.normalize(name);
-        }
-
-        if (email != null) {
-            this.email = EmailNormalizer.normalize(email);
-        }
-
-        if (phoneNumber != null) {
-            this.phoneNumber = phoneNumber;
-        }
+    if (phoneNumber != null) {
+      this.phoneNumber = phoneNumber;
     }
+  }
 
-    public Long getId() {
-        return id;
-    }
+  public Long getId() {
+    return id;
+  }
 
-    public String getName() {
-        return name;
-    }
+  public String getName() {
+    return name;
+  }
 
-    public String getCpf() {
-        return cpf;
-    }
+  public String getCpf() {
+    return cpf;
+  }
 
-    public String getEmail() {
-        return email;
-    }
+  public String getEmail() {
+    return email;
+  }
 
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
+  public String getPhoneNumber() {
+    return phoneNumber;
+  }
 
-    public Address getAddress() {
-        return address;
-    }
+  public Address getAddress() {
+    return address;
+  }
 }

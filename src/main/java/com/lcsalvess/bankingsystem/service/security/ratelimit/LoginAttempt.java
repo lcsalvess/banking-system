@@ -13,9 +13,9 @@ import java.time.Instant;
  * affecting a newer sequence.
  */
 public record LoginAttempt(
-        String usernameAndIpKey,
-        Instant usernameAndIpWindowStartedAt,
-        String usernameKey,
-        Instant usernameWindowStartedAt
+    String usernameAndIpKey,
+    Instant usernameAndIpWindowStartedAt,
+    String usernameKey,
+    Instant usernameWindowStartedAt
 ) {
 }

@@ -2,8 +2,8 @@ package com.lcsalvess.bankingsystem.unit.controller.account;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.account.AccountController;
-import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.AccountStatus;
 import com.lcsalvess.bankingsystem.entity.account.AccountType;
 import com.lcsalvess.bankingsystem.exception.account.*;
@@ -69,13 +69,13 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return a page of accounts successfully")
         void shouldReturnPageOfAccountsSuccessfully() throws Exception {
-            AccountResponseDTO account1 =
+            AccountResponseDto account1 =
                     mockAccount("99999", "5", AccountType.CHECKING);
-            AccountResponseDTO account2 =
+            AccountResponseDto account2 =
                     mockAccount("99998", "6", AccountType.SAVINGS);
 
             Pageable pageable = PageRequest.of(0, 10, Sort.by("accountNumber"));
-            Page<AccountResponseDTO> page =
+            Page<AccountResponseDto> page =
                     new PageImpl<>(List.of(account1, account2), pageable, 2);
 
             when(accountService.findAll(any(Pageable.class))).thenReturn(page);
@@ -97,9 +97,9 @@ public class AccountControllerTests {
                     result.getResponse().getContentAsString()
             ).get("content");
 
-            AccountResponseDTO[] response = objectMapper.treeToValue(
+            AccountResponseDto[] response = objectMapper.treeToValue(
                     content,
-                    AccountResponseDTO[].class
+                    AccountResponseDto[].class
             );
 
             assertAccountEquals(account1, response[0]);
@@ -113,7 +113,7 @@ public class AccountControllerTests {
         @DisplayName("Should return an empty page when there are no accounts")
         void shouldReturnEmptyPageWhenThereAreNoAccounts() throws Exception {
             Pageable pageable = PageRequest.of(0, 10, Sort.by("accountNumber"));
-            Page<AccountResponseDTO> page =
+            Page<AccountResponseDto> page =
                     new PageImpl<>(List.of(), pageable, 0);
 
             when(accountService.findAll(any(Pageable.class))).thenReturn(page);
@@ -157,7 +157,7 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return the account successfully")
         void shouldReturnTheAccountSuccessfully() throws Exception {
-            AccountResponseDTO expected = mockAccount("99999", "5", AccountType.CHECKING);
+            AccountResponseDto expected = mockAccount("99999", "5", AccountType.CHECKING);
 
             when(accountService.findByAccountNumber("99999", "5")).thenReturn(expected);
 
@@ -278,8 +278,8 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should create an account successfully")
         void shouldCreateAnAccountSuccessfully() throws Exception {
-            AccountRequestDTO request = accountRequest();
-            AccountResponseDTO expected = mockAccount("12345", "6", AccountType.CHECKING);
+            AccountRequestDto request = accountRequest();
+            AccountResponseDto expected = mockAccount("12345", "6", AccountType.CHECKING);
 
             when(accountService.create(request)).thenReturn(expected);
 
@@ -301,7 +301,7 @@ public class AccountControllerTests {
         @DisplayName("Should return 400 when request body is invalid")
         void shouldReturnBadRequestWhenRequestBodyIsInvalid(
                 String scenario,
-                AccountRequestDTO request,
+                AccountRequestDto request,
                 String field,
                 String message
         ) throws Exception {
@@ -337,7 +337,7 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 404 when client does not exist")
         void shouldReturnNotFoundWhenClientDoesNotExist() throws Exception {
-            AccountRequestDTO request = accountRequest();
+            AccountRequestDto request = accountRequest();
 
             when(accountService.create(request))
                     .thenThrow(new ClientNotFoundException(ApiErrorMessages.CLIENT_NOT_FOUND));
@@ -351,7 +351,7 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 409 when client already has an account of the same type")
         void shouldReturnConflictWhenAccountAlreadyExists() throws Exception {
-            AccountRequestDTO request = accountRequest();
+            AccountRequestDto request = accountRequest();
 
             when(accountService.create(request))
                     .thenThrow(new AccountAlreadyExistsException(ApiErrorMessages.CHECKING_ACCOUNT_ALREADY_EXISTS));
@@ -365,7 +365,7 @@ public class AccountControllerTests {
         @Test
         @DisplayName("Should return 500 when service throws an unexpected exception")
         void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            AccountRequestDTO request = accountRequest();
+            AccountRequestDto request = accountRequest();
 
             when(accountService.create(request))
                     .thenThrow(new RuntimeException());
@@ -521,16 +521,16 @@ public class AccountControllerTests {
     static Stream<Arguments> invalidAccountRequests() {
         return Stream.of(
                 Arguments.of("client ID is null",
-                        new AccountRequestDTO(null, AccountType.CHECKING),
+                        new AccountRequestDto(null, AccountType.CHECKING),
                         "clientId", ValidationMessages.REQUIRED_HOLDER_ID),
                 Arguments.of("client ID is zero",
-                        new AccountRequestDTO(0L, AccountType.CHECKING),
+                        new AccountRequestDto(0L, AccountType.CHECKING),
                         "clientId", ValidationMessages.POSITIVE_HOLDER_ID),
                 Arguments.of("client ID is negative",
-                        new AccountRequestDTO(-1L, AccountType.CHECKING),
+                        new AccountRequestDto(-1L, AccountType.CHECKING),
                         "clientId", ValidationMessages.POSITIVE_HOLDER_ID),
                 Arguments.of("account type is null",
-                        new AccountRequestDTO(1L, null),
+                        new AccountRequestDto(1L, null),
                         "type", ValidationMessages.REQUIRED_ACCOUNT_TYPE)
         );
     }
@@ -609,16 +609,16 @@ public class AccountControllerTests {
                 .andExpect(jsonPath("$.message").value(ApiErrorMessages.INVALID_REQUEST_DATA));
     }
 
-    private AccountResponseDTO readAccount(MvcResult result) throws Exception {
+    private AccountResponseDto readAccount(MvcResult result) throws Exception {
         return objectMapper.readValue(
                 result.getResponse().getContentAsString(),
-                AccountResponseDTO.class
+                AccountResponseDto.class
         );
     }
 
     private static void assertAccountEquals(
-            AccountResponseDTO expected,
-            AccountResponseDTO actual
+            AccountResponseDto expected,
+            AccountResponseDto actual
     ) {
         assertEquals(expected.accountNumber(), actual.accountNumber());
         assertEquals(expected.accountDigit(), actual.accountDigit());
@@ -628,16 +628,16 @@ public class AccountControllerTests {
         assertEquals(expected.status(), actual.status());
     }
 
-    private static AccountRequestDTO accountRequest() {
-        return new AccountRequestDTO(1L, AccountType.CHECKING);
+    private static AccountRequestDto accountRequest() {
+        return new AccountRequestDto(1L, AccountType.CHECKING);
     }
 
-    private static AccountResponseDTO mockAccount(
+    private static AccountResponseDto mockAccount(
             String accountNumber,
             String accountDigit,
             AccountType type
     ) {
-        return new AccountResponseDTO(
+        return new AccountResponseDto(
                 accountNumber,
                 accountDigit,
                 "Lucas Alves",

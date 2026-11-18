@@ -16,178 +16,201 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import org.hibernate.annotations.DynamicUpdate;
-
 import java.math.BigDecimal;
 import java.util.Objects;
+import org.hibernate.annotations.DynamicUpdate;
 
+/**
+ * Base entity for bank accounts.
+ */
 @Entity
 @Table(
-        name = "accounts",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_accounts_account_number", columnNames = "account_number")
-        }
+    name = "accounts",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_accounts_account_number", columnNames = "account_number")
+    }
 )
 @DynamicUpdate
 @Inheritance(strategy = InheritanceType.JOINED)
 public abstract class Account {
 
-    /**
-     * Maximum balance per account. Keeps the value within NUMERIC(19,2)
-     * and within the 15 significant digits that a double (JavaScript clients)
-     * can represent without precision loss. Mirrors the
-     * {@code ck_accounts_balance_max} constraint.
-     */
-    public static final BigDecimal MAX_BALANCE = new BigDecimal("9999999999999.99");
+  /**
+   * Maximum balance per account. Keeps the value within NUMERIC(19,2)
+   * and within the 15 significant digits that a double (JavaScript clients)
+   * can represent without precision loss. Mirrors the
+   * {@code ck_accounts_balance_max} constraint.
+   */
+  public static final BigDecimal MAX_BALANCE = new BigDecimal("9999999999999.99");
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "client_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_accounts_client"))
-    private Client client;
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
+  @JoinColumn(
+      name = "client_id",
+      nullable = false,
+      foreignKey = @ForeignKey(name = "fk_accounts_client")
+  )
+  private Client client;
 
-    @Column(name = "account_number", nullable = false, length = 20)
-    private String accountNumber;
+  @Column(name = "account_number", nullable = false, length = 20)
+  private String accountNumber;
 
-    @Column(name = "account_digit", nullable = false, length = 1)
-    private String digit;
+  @Column(name = "account_digit", nullable = false, length = 1)
+  private String digit;
 
-    @Column(nullable = false, precision = 19, scale = 2)
-    private BigDecimal balance = BigDecimal.ZERO;
+  @Column(nullable = false, precision = 19, scale = 2)
+  private BigDecimal balance = BigDecimal.ZERO;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private AccountStatus status = AccountStatus.ACTIVE;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private AccountStatus status = AccountStatus.ACTIVE;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "account_type", nullable = false, length = 20)
-    private AccountType type;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "account_type", nullable = false, length = 20)
+  private AccountType type;
 
-    protected Account() {
+  /**
+   * Required by JPA.
+   */
+  protected Account() {
+  }
+
+  /**
+   * Creates an account for the specified client.
+   *
+   * @param client        the account owner
+   * @param accountNumber the account number
+   * @param digit         the account verification digit
+   * @param type          the account type
+   */
+  public Account(Client client, String accountNumber, String digit, AccountType type) {
+    this.client = client;
+    this.accountNumber = accountNumber;
+    this.digit = digit;
+    this.type = type;
+  }
+
+  public Long getId() {
+    return id;
+  }
+
+  public AccountType getType() {
+    return type;
+  }
+
+  public Client getClient() {
+    return client;
+  }
+
+  public String getAccountNumber() {
+    return accountNumber;
+  }
+
+  public String getDigit() {
+    return digit;
+  }
+
+  public BigDecimal getBalance() {
+    return balance;
+  }
+
+  /**
+   * Returns whether the amount can be credited without violating the
+   * account's status, monetary precision, or maximum balance.
+   *
+   * @param amount the amount to credit
+   * @return true if the credit operation is valid
+   */
+  public boolean canCredit(BigDecimal amount) {
+    return status == AccountStatus.ACTIVE
+        && isValidAmount(amount)
+        && balance.add(amount).compareTo(MAX_BALANCE) <= 0;
+  }
+
+  /**
+   * Credits the account only when the operation preserves its invariants.
+   * Application services still validate first to return API-specific errors.
+   *
+   * @param amount the amount to credit
+   */
+  public void credit(BigDecimal amount) {
+    requireActive();
+    BigDecimal validatedAmount = requireValidAmount(amount);
+
+    if (!canCredit(validatedAmount)) {
+      throw new IllegalStateException(
+          "Crediting this amount would exceed the account balance limit."
+      );
     }
 
-    public Account(Client client, String accountNumber, String digit, AccountType type) {
-        this.client = client;
-        this.accountNumber = accountNumber;
-        this.digit = digit;
-        this.type = type;
+    this.balance = this.balance.add(validatedAmount);
+  }
+
+  /**
+   * Debits the account only when the amount is positive and the balance
+   * remains non-negative.
+   *
+   * @param amount the amount to debit
+   */
+  public void debit(BigDecimal amount) {
+    requireActive();
+    BigDecimal validatedAmount = requireValidAmount(amount);
+
+    if (balance.compareTo(validatedAmount) < 0) {
+      throw new IllegalStateException(
+          "The account has insufficient balance for this debit."
+      );
     }
 
-    public Long getId() {
-        return id;
+    this.balance = this.balance.subtract(validatedAmount);
+  }
+
+  /**
+   * Cancellation is only valid for an active account with no remaining funds.
+   */
+  public void cancel() {
+    requireActive();
+
+    if (balance.signum() != 0) {
+      throw new IllegalStateException(
+          "An account can only be cancelled with a zero balance."
+      );
     }
 
-    public AccountType getType() {
-        return type;
+    this.status = AccountStatus.CANCELLED;
+  }
+
+  private void requireActive() {
+    if (status != AccountStatus.ACTIVE) {
+      throw new IllegalStateException(
+          "Operations are not allowed on an inactive account."
+      );
+    }
+  }
+
+  private static BigDecimal requireValidAmount(BigDecimal amount) {
+    Objects.requireNonNull(amount, "The operation amount is required.");
+
+    if (!isValidAmount(amount)) {
+      throw new IllegalArgumentException(
+          "The operation amount must be positive and within the "
+              + "supported monetary range."
+      );
     }
 
-    public Client getClient() {
-        return client;
-    }
+    return amount;
+  }
 
-    public String getAccountNumber() {
-        return accountNumber;
-    }
+  private static boolean isValidAmount(BigDecimal amount) {
+    return amount != null
+        && amount.signum() > 0
+        && amount.scale() <= 2
+        && amount.compareTo(MAX_BALANCE) <= 0;
+  }
 
-    public String getDigit() {
-        return digit;
-    }
-
-    public BigDecimal getBalance() {
-        return balance;
-    }
-
-    /**
-     * Returns whether the amount can be credited without violating the
-     * account's status, monetary precision, or maximum balance.
-     */
-    public boolean canCredit(BigDecimal amount) {
-        return status == AccountStatus.ACTIVE
-                && isValidAmount(amount)
-                && balance.add(amount).compareTo(MAX_BALANCE) <= 0;
-    }
-
-    /**
-     * Credits the account only when the operation preserves its invariants.
-     * Application services still validate first to return API-specific errors.
-     */
-    public void credit(BigDecimal amount) {
-        requireActive();
-        BigDecimal validatedAmount = requireValidAmount(amount);
-
-        if (!canCredit(validatedAmount)) {
-            throw new IllegalStateException(
-                    "Crediting this amount would exceed the account balance limit."
-            );
-        }
-
-        this.balance = this.balance.add(validatedAmount);
-    }
-
-    /**
-     * Debits the account only when the amount is positive and the balance
-     * remains non-negative.
-     */
-    public void debit(BigDecimal amount) {
-        requireActive();
-        BigDecimal validatedAmount = requireValidAmount(amount);
-
-        if (balance.compareTo(validatedAmount) < 0) {
-            throw new IllegalStateException(
-                    "The account has insufficient balance for this debit."
-            );
-        }
-
-        this.balance = this.balance.subtract(validatedAmount);
-    }
-
-    /**
-     * Cancellation is only valid for an active account with no remaining funds.
-     */
-    public void cancel() {
-        requireActive();
-
-        if (balance.signum() != 0) {
-            throw new IllegalStateException(
-                    "An account can only be cancelled with a zero balance."
-            );
-        }
-
-        this.status = AccountStatus.CANCELLED;
-    }
-
-    private void requireActive() {
-        if (status != AccountStatus.ACTIVE) {
-            throw new IllegalStateException(
-                    "Operations are not allowed on an inactive account."
-            );
-        }
-    }
-
-    private static BigDecimal requireValidAmount(BigDecimal amount) {
-        Objects.requireNonNull(amount, "The operation amount is required.");
-
-        if (!isValidAmount(amount)) {
-            throw new IllegalArgumentException(
-                    "The operation amount must be positive and within the supported monetary range."
-            );
-        }
-
-        return amount;
-    }
-
-    private static boolean isValidAmount(BigDecimal amount) {
-        return amount != null
-                && amount.signum() > 0
-                && amount.scale() <= 2
-                && amount.compareTo(MAX_BALANCE) <= 0;
-    }
-
-    public AccountStatus getStatus() {
-        return status;
-    }
-
+  public AccountStatus getStatus() {
+    return status;
+  }
 }

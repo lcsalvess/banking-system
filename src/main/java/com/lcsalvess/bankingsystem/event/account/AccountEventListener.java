@@ -6,16 +6,26 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+/**
+ * Listens for account operation events and records their successful completion.
+ */
 @Component
 public class AccountEventListener {
 
-    private static final Logger log = LoggerFactory.getLogger(AccountEventListener.class);
+  private static final Logger log = LoggerFactory.getLogger(AccountEventListener.class);
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handleAccountOperation(AccountOperationEvent event) {
-        log.info("Account operation {} successfully completed: id={}, user={}",
-                event.type(),
-                event.accountId(),
-                event.username());
-    }
+  /**
+   * Handles account operation events after the associated transaction commits.
+   *
+   * @param event the account operation event containing operation details
+   */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void handleAccountOperation(AccountOperationEvent event) {
+    log.info(
+        "Account operation {} successfully completed: id={}, user={}",
+        event.type(),
+        event.accountId(),
+        event.username()
+    );
+  }
 }

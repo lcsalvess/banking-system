@@ -4,18 +4,24 @@ import com.lcsalvess.bankingsystem.repository.UserRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Generates employee identifiers using the PostgreSQL database.
+ *
+ * <p>Delegates identifier generation to the database function
+ * through the user repository.
+ */
 @Component
 public class PostgresEmployeeIdGenerator implements EmployeeIdGenerator {
 
-    private final UserRepository userRepository;
+  private final UserRepository userRepository;
 
-    public PostgresEmployeeIdGenerator(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
+  public PostgresEmployeeIdGenerator(UserRepository userRepository) {
+    this.userRepository = userRepository;
+  }
 
-    @Override
-    @Transactional
-    public String generate() {
-        return userRepository.nextEmployeeId();
-    }
+  @Override
+  @Transactional
+  public String generate() {
+    return userRepository.nextEmployeeId();
+  }
 }

@@ -2,7 +2,7 @@ package com.lcsalvess.bankingsystem.unit.controller.transaction;
 
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.transaction.AccountTransactionController;
-import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.exception.account.AccountNotFoundException;
 import com.lcsalvess.bankingsystem.exception.account.InvalidAccountDigitException;
@@ -97,10 +97,10 @@ class AccountTransactionControllerTests {
         @Test
         @DisplayName("Should return the page of account transactions successfully")
         void shouldReturnThePageOfAccountTransactionsSuccessfully() throws Exception {
-            TransactionResponseDTO transaction1 =
+            TransactionResponseDto transaction1 =
                     mockTransaction(TransactionType.DEPOSIT);
 
-            TransactionResponseDTO transaction2 =
+            TransactionResponseDto transaction2 =
                     mockTransaction(TransactionType.WITHDRAWAL);
 
             stubService(new PageImpl<>(
@@ -119,7 +119,7 @@ class AccountTransactionControllerTests {
                     .andExpect(header().string(SNAPSHOT_HEADER, SNAPSHOT_TOKEN))
                     .andReturn();
 
-            TransactionResponseDTO[] content = readPageContent(result);
+            TransactionResponseDto[] content = readPageContent(result);
 
             assertTransactionEquals(transaction1, content[0]);
             assertTransactionEquals(transaction2, content[1]);
@@ -332,7 +332,7 @@ class AccountTransactionControllerTests {
         @Test
         @DisplayName("Should forward snapshot token to the service")
         void shouldForwardSnapshotTokenToService() throws Exception {
-            Page<TransactionResponseDTO> page =
+            Page<TransactionResponseDto> page =
                     new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0);
 
             when(transactionQueryService.findByAccountNumber(
@@ -353,7 +353,7 @@ class AccountTransactionControllerTests {
             verifyNoMoreInteractions(transactionQueryService);
         }
 
-        private void stubService(Page<TransactionResponseDTO> page) {
+        private void stubService(Page<TransactionResponseDto> page) {
             when(transactionQueryService.findByAccountNumber(
                     eq("99999"),
                     eq("5"),
@@ -387,7 +387,7 @@ class AccountTransactionControllerTests {
             return pageableCaptor.getValue();
         }
 
-        private TransactionResponseDTO[] readPageContent(MvcResult result)
+        private TransactionResponseDto[] readPageContent(MvcResult result)
                 throws Exception {
             JsonNode root = objectMapper.readTree(
                     result.getResponse().getContentAsString()
@@ -395,7 +395,7 @@ class AccountTransactionControllerTests {
 
             return objectMapper.treeToValue(
                     root.get("content"),
-                    TransactionResponseDTO[].class
+                    TransactionResponseDto[].class
             );
         }
 
@@ -455,8 +455,8 @@ class AccountTransactionControllerTests {
     }
 
     private static void assertTransactionEquals(
-            TransactionResponseDTO expected,
-            TransactionResponseDTO actual
+            TransactionResponseDto expected,
+            TransactionResponseDto actual
     ) {
         assertEquals(expected.transactionCode(), actual.transactionCode());
         assertEquals(expected.transferCode(), actual.transferCode());
@@ -473,10 +473,10 @@ class AccountTransactionControllerTests {
         );
     }
 
-    private static TransactionResponseDTO mockTransaction(
+    private static TransactionResponseDto mockTransaction(
             TransactionType type
     ) {
-        return new TransactionResponseDTO(
+        return new TransactionResponseDto(
                 UUID.randomUUID(),
                 type == TransactionType.TRANSFER_SENT
                         ? UUID.randomUUID()

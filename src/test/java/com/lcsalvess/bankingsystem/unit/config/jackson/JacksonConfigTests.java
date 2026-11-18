@@ -2,8 +2,8 @@ package com.lcsalvess.bankingsystem.unit.config.jackson;
 
 import com.lcsalvess.bankingsystem.config.jackson.JacksonConfig;
 import com.lcsalvess.bankingsystem.controller.transaction.TransactionController;
-import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDTO;
-import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDTO;
+import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.transaction.TransactionResponseDto;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
 import com.lcsalvess.bankingsystem.exception.messages.ApiErrorMessages;
 import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionIdempotencyService;
@@ -78,8 +78,8 @@ class JacksonConfigTests {
         void shouldAcceptStringsForIdentifiersAndANumberForTheAmount() throws Exception {
             when(transactionIdempotencyService.deposit(
                     any(UUID.class),
-                    any(AccountOperationRequestDTO.class)
-            )).thenReturn(new TransactionResponseDTO(
+                    any(AccountOperationRequestDto.class)
+            )).thenReturn(new TransactionResponseDto(
                     UUID.randomUUID(),
                     null,
                     TransactionType.DEPOSIT,
@@ -97,7 +97,7 @@ class JacksonConfigTests {
 
             verify(transactionIdempotencyService).deposit(
                     any(UUID.class),
-                    any(AccountOperationRequestDTO.class)
+                    any(AccountOperationRequestDto.class)
             );
             verifyNoMoreInteractions(transactionIdempotencyService);
             verifyNoInteractions(transactionQueryService);

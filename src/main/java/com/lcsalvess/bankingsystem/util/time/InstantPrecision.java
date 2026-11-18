@@ -13,22 +13,22 @@ import java.util.Objects;
  */
 public final class InstantPrecision {
 
-    private InstantPrecision() {
-    }
+  private InstantPrecision() {
+  }
 
-    /**
-     * Truncates an instant to microsecond precision.
-     *
-     * @param value the instant to normalize
-     * @param nullMessage the exception message if the instant is {@code null}
-     * @return the instant truncated to microsecond precision
-     * @throws NullPointerException if the instant is {@code null}
-     */
-    public static Instant truncateToMicros(
-            Instant value,
-            String nullMessage
-    ) {
-        return Objects.requireNonNull(value, nullMessage)
-                .truncatedTo(ChronoUnit.MICROS);
-    }
+  /**
+   * Truncates an instant to microsecond precision.
+   *
+   * @param value       the instant to normalize
+   * @param nullMessage the exception message if the instant is {@code null}
+   * @return the instant truncated to microsecond precision
+   * @throws NullPointerException if the instant is {@code null}
+   */
+  public static Instant truncateToMicros(
+      Instant value,
+      String nullMessage
+  ) {
+    return Objects.requireNonNull(value, nullMessage)
+        .truncatedTo(ChronoUnit.MICROS);
+  }
 }

@@ -1,5 +1,10 @@
 package com.lcsalvess.bankingsystem.unit.event.audit;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
 import com.lcsalvess.bankingsystem.entity.audit.AuditEntityType;
 import com.lcsalvess.bankingsystem.entity.audit.AuditEventType;
 import com.lcsalvess.bankingsystem.entity.transaction.TransactionType;
@@ -15,6 +20,8 @@ import com.lcsalvess.bankingsystem.event.user.UserOperationEvent;
 import com.lcsalvess.bankingsystem.event.user.UserOperationType;
 import com.lcsalvess.bankingsystem.event.user.UserRoleChangedEvent;
 import com.lcsalvess.bankingsystem.service.audit.recording.AuditService;
+import java.math.BigDecimal;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,205 +31,200 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-
 @ExtendWith(MockitoExtension.class)
 class AuditEventListenerTests {
 
-    private static final String USERNAME = "joe.doe";
-    private static final String ACCOUNT_NUMBER = "123456";
-    private static final BigDecimal AMOUNT = new BigDecimal("10.00");
+  private static final String USERNAME = "joe.doe";
+  private static final String ACCOUNT_NUMBER = "123456";
+  private static final BigDecimal AMOUNT = new BigDecimal("10.00");
 
-    @Mock
-    private AuditService auditService;
+  @Mock
+  private AuditService auditService;
 
-    private AuditEventListener listener;
+  private AuditEventListener listener;
 
-    @BeforeEach
-    void setUp() {
-        listener = new AuditEventListener(auditService);
-    }
+  @BeforeEach
+  void setUp() {
+    listener = new AuditEventListener(auditService);
+  }
 
-    @ParameterizedTest(name = "{0} -> {1}")
-    @CsvSource({
-            "CREATED, USER_CREATED",
-            "DEACTIVATED, USER_DEACTIVATED",
-            "REACTIVATED, USER_REACTIVATED",
-            "PASSWORD_CHANGED, USER_PASSWORD_CHANGED"
-    })
-    @DisplayName("Should audit user operations with the user id as the entity")
-    void shouldAuditUserOperations(
-            UserOperationType operation,
-            AuditEventType expectedType
-    ) {
-        listener.handleUserOperation(new UserOperationEvent(42L, operation));
+  @ParameterizedTest(name = "{0} -> {1}")
+  @CsvSource({
+      "CREATED, USER_CREATED",
+      "DEACTIVATED, USER_DEACTIVATED",
+      "REACTIVATED, USER_REACTIVATED",
+      "PASSWORD_CHANGED, USER_PASSWORD_CHANGED"
+  })
+  @DisplayName("Should audit user operations with the user id as the entity")
+  void shouldAuditUserOperations(
+      UserOperationType operation,
+      AuditEventType expectedType
+  ) {
+    listener.handleUserOperation(new UserOperationEvent(42L, operation));
 
-        verify(auditService).recordSuccess(
-                expectedType,
-                AuditEntityType.USER,
-                "42"
-        );
-        verifyNoMoreInteractions(auditService);
-    }
+    verify(auditService).recordSuccess(
+        expectedType,
+        AuditEntityType.USER,
+        "42"
+    );
+    verifyNoMoreInteractions(auditService);
+  }
 
-    @Test
-    @DisplayName("Should audit role changes with the previous and the new role as the reason")
-    void shouldAuditUserRoleChange() {
-        listener.handleUserRoleChange(
-                new UserRoleChangedEvent(42L, Role.EMPLOYEE, Role.AUDITOR)
-        );
+  @Test
+  @DisplayName("Should audit role changes with the previous and the new role as the reason")
+  void shouldAuditUserRoleChange() {
+    listener.handleUserRoleChange(
+        new UserRoleChangedEvent(42L, Role.EMPLOYEE, Role.AUDITOR)
+    );
 
-        verify(auditService).recordSuccess(
-                AuditEventType.USER_ROLE_CHANGED,
-                AuditEntityType.USER,
-                "42",
-                "EMPLOYEE_TO_AUDITOR"
-        );
-        verifyNoMoreInteractions(auditService);
-    }
+    verify(auditService).recordSuccess(
+        AuditEventType.USER_ROLE_CHANGED,
+        AuditEntityType.USER,
+        "42",
+        "EMPLOYEE_TO_AUDITOR"
+    );
+    verifyNoMoreInteractions(auditService);
+  }
 
-    @ParameterizedTest(name = "{0} -> {1}")
-    @CsvSource({
-            "CREATED, CLIENT_CREATED",
-            "UPDATED, CLIENT_UPDATED"
-    })
-    @DisplayName("Should audit client operations with the client id as the entity")
-    void shouldAuditClientOperations(
-            ClientOperationType operation,
-            AuditEventType expectedType
-    ) {
-        listener.handleClientOperation(
-                new ClientOperationEvent(7L, operation, USERNAME)
-        );
+  @ParameterizedTest(name = "{0} -> {1}")
+  @CsvSource({
+      "CREATED, CLIENT_CREATED",
+      "UPDATED, CLIENT_UPDATED"
+  })
+  @DisplayName("Should audit client operations with the client id as the entity")
+  void shouldAuditClientOperations(
+      ClientOperationType operation,
+      AuditEventType expectedType
+  ) {
+    listener.handleClientOperation(
+        new ClientOperationEvent(7L, operation, USERNAME)
+    );
 
-        verify(auditService).recordSuccess(
-                expectedType,
-                AuditEntityType.CLIENT,
-                "7"
-        );
-        verifyNoMoreInteractions(auditService);
-    }
+    verify(auditService).recordSuccess(
+        expectedType,
+        AuditEntityType.CLIENT,
+        "7"
+    );
+    verifyNoMoreInteractions(auditService);
+  }
 
-    @ParameterizedTest(name = "{0} -> {1}")
-    @CsvSource({
-            "CREATED, ACCOUNT_CREATED",
-            "CANCELLED, ACCOUNT_CANCELLED"
-    })
-    @DisplayName("Should audit account operations with the account id as the entity")
-    void shouldAuditAccountOperations(
-            AccountOperationType operation,
-            AuditEventType expectedType
-    ) {
-        listener.handleAccountOperation(
-                new AccountOperationEvent(9L, operation, USERNAME)
-        );
+  @ParameterizedTest(name = "{0} -> {1}")
+  @CsvSource({
+      "CREATED, ACCOUNT_CREATED",
+      "CANCELLED, ACCOUNT_CANCELLED"
+  })
+  @DisplayName("Should audit account operations with the account id as the entity")
+  void shouldAuditAccountOperations(
+      AccountOperationType operation,
+      AuditEventType expectedType
+  ) {
+    listener.handleAccountOperation(
+        new AccountOperationEvent(9L, operation, USERNAME)
+    );
 
-        verify(auditService).recordSuccess(
-                expectedType,
-                AuditEntityType.ACCOUNT,
-                "9"
-        );
-        verifyNoMoreInteractions(auditService);
-    }
+    verify(auditService).recordSuccess(
+        expectedType,
+        AuditEntityType.ACCOUNT,
+        "9"
+    );
+    verifyNoMoreInteractions(auditService);
+  }
 
-    @ParameterizedTest(name = "{0} -> {1}")
-    @CsvSource({
-            "DEPOSIT, DEPOSIT",
-            "WITHDRAWAL, WITHDRAWAL"
-    })
-    @DisplayName("Should audit deposits and withdrawals with the transaction code as the entity")
-    void shouldAuditTransactionOperations(
-            TransactionType type,
-            AuditEventType expectedType
-    ) {
-        UUID transactionCode = UUID.randomUUID();
+  @ParameterizedTest(name = "{0} -> {1}")
+  @CsvSource({
+      "DEPOSIT, DEPOSIT",
+      "WITHDRAWAL, WITHDRAWAL"
+  })
+  @DisplayName("Should audit deposits and withdrawals with the transaction code as the entity")
+  void shouldAuditTransactionOperations(
+      TransactionType type,
+      AuditEventType expectedType
+  ) {
+    UUID transactionCode = UUID.randomUUID();
 
-        listener.handleTransactionOperation(
-                new TransactionOperationEvent(
-                        type,
-                        ACCOUNT_NUMBER,
-                        AMOUNT,
-                        USERNAME,
-                        transactionCode
-                )
-        );
+    listener.handleTransactionOperation(
+        new TransactionOperationEvent(
+            type,
+            ACCOUNT_NUMBER,
+            AMOUNT,
+            USERNAME,
+            transactionCode
+        )
+    );
 
-        verify(auditService).recordSuccess(
-                expectedType,
-                AuditEntityType.TRANSACTION,
-                transactionCode.toString()
-        );
-        verifyNoMoreInteractions(auditService);
-    }
+    verify(auditService).recordSuccess(
+        expectedType,
+        AuditEntityType.TRANSACTION,
+        transactionCode.toString()
+    );
+    verifyNoMoreInteractions(auditService);
+  }
 
-    @Test
-    @DisplayName("Should audit the daily yield as a system event, with the transaction code as the entity")
-    void shouldAuditDailyYieldAsSystemEvent() {
-        UUID transactionCode = UUID.randomUUID();
+  @Test
+  @DisplayName(
+      "Should audit the daily yield as a system event, with the transaction code "
+          + "as the entity"
+  )
+  void shouldAuditDailyYieldAsSystemEvent() {
+    UUID transactionCode = UUID.randomUUID();
 
-        listener.handleTransactionOperation(
-                new TransactionOperationEvent(
-                        TransactionType.YIELD,
-                        ACCOUNT_NUMBER,
-                        AMOUNT,
-                        "SYSTEM",
-                        transactionCode
-                )
-        );
+    listener.handleTransactionOperation(
+        new TransactionOperationEvent(
+            TransactionType.YIELD,
+            ACCOUNT_NUMBER,
+            AMOUNT,
+            "SYSTEM",
+            transactionCode
+        )
+    );
 
-        verify(auditService).recordSystemSuccess(
-                AuditEventType.YIELD,
-                AuditEntityType.TRANSACTION,
-                transactionCode.toString()
-        );
-        verifyNoMoreInteractions(auditService);
-    }
+    verify(auditService).recordSystemSuccess(
+        AuditEventType.YIELD,
+        AuditEntityType.TRANSACTION,
+        transactionCode.toString()
+    );
+    verifyNoMoreInteractions(auditService);
+  }
 
-    @Test
-    @DisplayName("Should reject a daily yield event without a transaction code")
-    void shouldRejectDailyYieldWithoutTransactionCode() {
-        TransactionOperationEvent event = new TransactionOperationEvent(
-                TransactionType.YIELD,
-                ACCOUNT_NUMBER,
-                AMOUNT,
-                "SYSTEM",
-                null
-        );
+  @Test
+  @DisplayName("Should reject a daily yield event without a transaction code")
+  void shouldRejectDailyYieldWithoutTransactionCode() {
+    TransactionOperationEvent event = new TransactionOperationEvent(
+        TransactionType.YIELD,
+        ACCOUNT_NUMBER,
+        AMOUNT,
+        "SYSTEM",
+        null
+    );
 
-        assertThrows(
-                NullPointerException.class,
-                () -> listener.handleTransactionOperation(event)
-        );
-        verifyNoInteractions(auditService);
-    }
+    assertThrows(
+        NullPointerException.class,
+        () -> listener.handleTransactionOperation(event)
+    );
+    verifyNoInteractions(auditService);
+  }
 
-    @Test
-    @DisplayName("Should audit a transfer once, with the transfer code as the entity")
-    void shouldAuditTransfer() {
-        UUID transferCode = UUID.randomUUID();
+  @Test
+  @DisplayName("Should audit a transfer once, with the transfer code as the entity")
+  void shouldAuditTransfer() {
+    UUID transferCode = UUID.randomUUID();
 
-        listener.handleTransactionTransfer(
-                new TransactionTransferEvent(
-                        TransactionType.TRANSFER_SENT,
-                        ACCOUNT_NUMBER,
-                        "654321",
-                        AMOUNT,
-                        USERNAME,
-                        transferCode
-                )
-        );
+    listener.handleTransactionTransfer(
+        new TransactionTransferEvent(
+            TransactionType.TRANSFER_SENT,
+            ACCOUNT_NUMBER,
+            "654321",
+            AMOUNT,
+            USERNAME,
+            transferCode
+        )
+    );
 
-        verify(auditService).recordSuccess(
-                AuditEventType.TRANSFER,
-                AuditEntityType.TRANSFER,
-                transferCode.toString()
-        );
-        verifyNoMoreInteractions(auditService);
-    }
+    verify(auditService).recordSuccess(
+        AuditEventType.TRANSFER,
+        AuditEntityType.TRANSFER,
+        transferCode.toString()
+    );
+    verifyNoMoreInteractions(auditService);
+  }
 }

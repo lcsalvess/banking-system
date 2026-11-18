@@ -1,5 +1,20 @@
 package com.lcsalvess.bankingsystem.unit.service.account;
 
+import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.clientBuilder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+
 import com.lcsalvess.bankingsystem.dto.request.account.AccountRequestDto;
 import com.lcsalvess.bankingsystem.dto.response.account.AccountResponseDto;
 import com.lcsalvess.bankingsystem.entity.account.Account;
@@ -24,6 +39,16 @@ import com.lcsalvess.bankingsystem.service.account.generator.AccountNumberGenera
 import com.lcsalvess.bankingsystem.service.account.generator.GeneratedAccountNumber;
 import com.lcsalvess.bankingsystem.service.client.ClientService;
 import com.lcsalvess.bankingsystem.service.security.CurrentUserService;
+import com.lcsalvess.bankingsystem.testsupport.ClientTestFactory;
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,810 +73,789 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Method;
-import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Stream;
-
-import static com.lcsalvess.bankingsystem.testsupport.ClientTestFactory.aClient;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 public class AccountServiceTests {
 
-    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.service.account.AccountServiceTests#";
+  private static final String PROVIDER =
+      "com.lcsalvess.bankingsystem.unit.service.account.AccountServiceTests#";
 
-    private static final String USERNAME = "test.user";
-    private static final Long CLIENT_ID = 1L;
-    private static final Long SAVED_ACCOUNT_ID = 10L;
+  private static final String USERNAME = "test.user";
+  private static final Long CLIENT_ID = 1L;
+  private static final Long SAVED_ACCOUNT_ID = 10L;
 
-    private static final String CHECKING_NUMBER = "00001";
-    private static final String CHECKING_DIGIT = "9";
-    private static final String SAVINGS_NUMBER = "00002";
-    private static final String SAVINGS_DIGIT = "7";
-    private static final String INVALID_DIGIT = "8";
-    private static final String NON_EXISTENT_NUMBER = "99999";
-    private static final String NON_EXISTENT_DIGIT = "7";
+  private static final String CHECKING_NUMBER = "00001";
+  private static final String CHECKING_DIGIT = "9";
+  private static final String SAVINGS_NUMBER = "00002";
+  private static final String SAVINGS_DIGIT = "7";
+  private static final String INVALID_DIGIT = "8";
+  private static final String NON_EXISTENT_NUMBER = "99999";
+  private static final String NON_EXISTENT_DIGIT = "7";
 
-    // 2026-01-01 23:30 in São Paulo = 2026-01-02T02:30Z. If someone uses UTC, the date changes.
-    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
-    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-01-02T02:30:00Z"), ZONE);
-    private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
+  // 2026-01-01 23:30 in São Paulo = 2026-01-02T02:30Z. If someone uses UTC, the date changes.
+  private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
+  private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-01-02T02:30:00Z"), ZONE);
+  private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
 
-    @Mock
-    private AccountRepository accountRepository;
+  @Mock
+  private AccountRepository accountRepository;
 
-    @Mock
-    private ClientService clientService;
+  @Mock
+  private ClientService clientService;
 
-    @Mock
-    private AccountNumberGenerator accountNumberGenerator;
+  @Mock
+  private AccountNumberGenerator accountNumberGenerator;
 
-    @Mock
-    private CurrentUserService currentUserService;
+  @Mock
+  private CurrentUserService currentUserService;
 
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
+  @Mock
+  private ApplicationEventPublisher eventPublisher;
 
-    private AccountService accountService;
+  private AccountService accountService;
 
-    @BeforeEach
-    void setUp() {
-        accountService = new AccountService(
-                accountRepository,
-                accountNumberGenerator,
-                clientService,
-                currentUserService,
-                eventPublisher,
-                CLOCK
-        );
+  @BeforeEach
+  void setUp() {
+    accountService = new AccountService(
+        accountRepository,
+        accountNumberGenerator,
+        clientService,
+        currentUserService,
+        eventPublisher,
+        CLOCK
+    );
+  }
+
+  @Nested
+  @DisplayName("findAll(Pageable)")
+  class FindAll {
+
+    @Test
+    @DisplayName("Should return a page of accounts successfully")
+    void shouldReturnPageOfAccountsSuccessfully() {
+      Pageable pageable = PageRequest.of(
+          0,
+          10,
+          Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
+      );
+
+      CheckingAccount checking = checkingAccount();
+      SavingsAccount savings = savingsAccount();
+
+      stubAccountPage(
+          List.of(checking, savings),
+          pageable
+      );
+
+      Page<AccountResponseDto> result = accountService.findAll(pageable);
+
+      assertEquals(
+          List.of(
+              accountResponse(
+                  checking.getClient().getName(),
+                  CHECKING_NUMBER,
+                  CHECKING_DIGIT,
+                  AccountType.CHECKING
+              ),
+              accountResponse(
+                  savings.getClient().getName(),
+                  SAVINGS_NUMBER,
+                  SAVINGS_DIGIT,
+                  AccountType.SAVINGS
+              )
+          ),
+          result.getContent()
+      );
+
+      assertEquals(0, result.getNumber());
+      assertEquals(10, result.getSize());
+      assertEquals(2, result.getTotalElements());
+      assertEquals(1, result.getTotalPages());
+
+      verify(accountRepository).findAllWithClient(pageable);
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @Nested
-    @DisplayName("findAll(Pageable)")
-    class FindAll {
+    @Test
+    @DisplayName("Should return an empty page when there are no accounts")
+    void shouldReturnEmptyPageWhenThereAreNoAccounts() {
+      Pageable pageable = PageRequest.of(
+          0,
+          10,
+          Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
+      );
 
-        @Test
-        @DisplayName("Should return a page of accounts successfully")
-        void shouldReturnPageOfAccountsSuccessfully() {
-            Pageable pageable = PageRequest.of(
-                    0,
-                    10,
-                    Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
-            );
+      stubAccountPage(List.of(), pageable);
 
-            CheckingAccount checking = checkingAccount();
-            SavingsAccount savings = savingsAccount();
+      Page<AccountResponseDto> result = accountService.findAll(pageable);
 
-            stubAccountPage(
-                    List.of(checking, savings),
-                    pageable
-            );
+      assertTrue(result.isEmpty());
+      assertEquals(0, result.getNumber());
+      assertEquals(10, result.getSize());
+      assertEquals(0, result.getTotalElements());
+      assertEquals(0, result.getTotalPages());
 
-            Page<AccountResponseDto> result = accountService.findAll(pageable);
-
-            assertEquals(
-                    List.of(
-                            accountResponse(
-                                    checking.getClient().getName(),
-                                    CHECKING_NUMBER,
-                                    CHECKING_DIGIT,
-                                    AccountType.CHECKING
-                            ),
-                            accountResponse(
-                                    savings.getClient().getName(),
-                                    SAVINGS_NUMBER,
-                                    SAVINGS_DIGIT,
-                                    AccountType.SAVINGS
-                            )
-                    ),
-                    result.getContent()
-            );
-
-            assertEquals(0, result.getNumber());
-            assertEquals(10, result.getSize());
-            assertEquals(2, result.getTotalElements());
-            assertEquals(1, result.getTotalPages());
-
-            verify(accountRepository).findAllWithClient(pageable);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should return an empty page when there are no accounts")
-        void shouldReturnEmptyPageWhenThereAreNoAccounts() {
-            Pageable pageable = PageRequest.of(
-                    0,
-                    10,
-                    Sort.by("accountNumber").ascending().and(Sort.by("id").ascending())
-            );
-
-            stubAccountPage(List.of(), pageable);
-
-            Page<AccountResponseDto> result = accountService.findAll(pageable);
-
-            assertTrue(result.isEmpty());
-            assertEquals(0, result.getNumber());
-            assertEquals(10, result.getSize());
-            assertEquals(0, result.getTotalElements());
-            assertEquals(0, result.getTotalPages());
-
-            verify(accountRepository).findAllWithClient(pageable);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should append the id tie-breaker when the sort has no id")
-        void shouldAppendIdTieBreakerWhenSortHasNoId() {
-            Pageable requested = PageRequest.of(0, 10, Sort.by("balance").descending());
-
-            when(accountRepository.findAllWithClient(any(Pageable.class)))
-                    .thenReturn(new PageImpl<>(List.of(), requested, 0));
-
-            accountService.findAll(requested);
-
-            ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-
-            verify(accountRepository).findAllWithClient(captor.capture());
-            verifyNoMoreInteractionsOnMocks();
-
-            assertEquals(
-                    Sort.by(Sort.Order.desc("balance"), Sort.Order.asc("id")),
-                    captor.getValue().getSort()
-            );
-            assertEquals(0, captor.getValue().getPageNumber());
-            assertEquals(10, captor.getValue().getPageSize());
-        }
+      verify(accountRepository).findAllWithClient(pageable);
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @Nested
-    @DisplayName("findEntityByAccountNumber(String, String)")
-    class FindEntityByAccountNumber {
+    @Test
+    @DisplayName("Should append the id tie-breaker when the sort has no id")
+    void shouldAppendIdTieBreakerWhenSortHasNoId() {
+      Pageable requested = PageRequest.of(0, 10, Sort.by("balance").descending());
 
-        @Test
-        @DisplayName("Should return the account entity when account number exists")
-        void shouldReturnAccountEntityWhenAccountNumberExists() {
-            CheckingAccount account = checkingAccount();
-            stubAccountLookup(account);
+      when(accountRepository.findAllWithClient(any(Pageable.class)))
+          .thenReturn(new PageImpl<>(List.of(), requested, 0));
 
-            Account result = accountService.findEntityByAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT);
+      accountService.findAll(requested);
 
-            assertSame(account, result);
+      ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
 
-            verifyAccountLookup(account);
-            verifyNoMoreInteractionsOnMocks();
-        }
+      verify(accountRepository).findAllWithClient(captor.capture());
+      verifyNoMoreInteractionsOnMocks();
 
-        @Test
-        @DisplayName("Should throw when account does not exist")
-        void shouldThrowWhenAccountDoesNotExist() {
-            stubAccountNotFound();
+      assertEquals(
+          Sort.by(Sort.Order.desc("balance"), Sort.Order.asc("id")),
+          captor.getValue().getSort()
+      );
+      assertEquals(0, captor.getValue().getPageNumber());
+      assertEquals(10, captor.getValue().getPageSize());
+    }
+  }
 
-            assertThrowsWithMessage(
-                    AccountNotFoundException.class,
-                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
-                    () -> accountService.findEntityByAccountNumber(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
-            );
+  @Nested
+  @DisplayName("findEntityByAccountNumber(String, String)")
+  class FindEntityByAccountNumber {
 
-            verifyAccountNotFoundLookup();
-            verifyNoMoreInteractionsOnMocks();
-        }
+    @Test
+    @DisplayName("Should return the account entity when account number exists")
+    void shouldReturnAccountEntityWhenAccountNumberExists() {
+      CheckingAccount account = checkingAccount();
+      stubAccountLookup(account);
 
-        @Test
-        @DisplayName("Should throw when account digit is invalid")
-        void shouldThrowWhenAccountDigitIsInvalid() {
-            when(accountNumberGenerator.isValid(CHECKING_NUMBER, INVALID_DIGIT)).thenReturn(false);
+      Account result = accountService.findEntityByAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT);
 
-            assertThrowsWithMessage(
-                    InvalidAccountDigitException.class,
-                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
-                    () -> accountService.findEntityByAccountNumber(CHECKING_NUMBER, INVALID_DIGIT)
-            );
+      assertSame(account, result);
 
-            verify(accountNumberGenerator).isValid(CHECKING_NUMBER, INVALID_DIGIT);
-            verifyNoMoreInteractionsOnMocks();
-        }
+      verifyAccountLookup(account);
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @Nested
-    @DisplayName("findByAccountNumber(String, String)")
-    class FindByAccountNumber {
+    @Test
+    @DisplayName("Should throw when account does not exist")
+    void shouldThrowWhenAccountDoesNotExist() {
+      stubAccountNotFound();
 
-        @Test
-        @DisplayName("Should return the account response when account number exists")
-        void shouldReturnAccountResponseWhenAccountNumberExists() {
-            SavingsAccount account = savingsAccount();
+      assertThrowsWithMessage(
+          AccountNotFoundException.class,
+          ApiErrorMessages.ACCOUNT_NOT_FOUND,
+          () -> accountService.findEntityByAccountNumber(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
+      );
 
-            when(accountNumberGenerator.isValid(SAVINGS_NUMBER, SAVINGS_DIGIT)).thenReturn(true);
-            when(accountRepository.findByAccountNumberWithClient(SAVINGS_NUMBER))
-                    .thenReturn(Optional.of(account));
-
-            AccountResponseDto result = accountService.findByAccountNumber(SAVINGS_NUMBER, SAVINGS_DIGIT);
-
-            assertEquals(
-                    accountResponse(
-                            account.getClient().getName(),
-                            SAVINGS_NUMBER,
-                            SAVINGS_DIGIT,
-                            AccountType.SAVINGS
-                    ),
-                    result
-            );
-
-            verify(accountNumberGenerator).isValid(SAVINGS_NUMBER, SAVINGS_DIGIT);
-            verify(accountRepository).findByAccountNumberWithClient(SAVINGS_NUMBER);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when account does not exist")
-        void shouldThrowWhenAccountDoesNotExist() {
-            when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)).thenReturn(true);
-            when(accountRepository.findByAccountNumberWithClient(NON_EXISTENT_NUMBER))
-                    .thenReturn(Optional.empty());
-
-            assertThrowsWithMessage(
-                    AccountNotFoundException.class,
-                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
-                    () -> accountService.findByAccountNumber(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
-            );
-
-            verify(accountNumberGenerator).isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT);
-            verify(accountRepository).findByAccountNumberWithClient(NON_EXISTENT_NUMBER);
-            verifyNoMoreInteractionsOnMocks();
-        }
-
-        @Test
-        @DisplayName("Should throw when account digit is invalid")
-        void shouldThrowWhenAccountDigitIsInvalid() {
-            when(accountNumberGenerator.isValid(SAVINGS_NUMBER, INVALID_DIGIT)).thenReturn(false);
-
-            assertThrowsWithMessage(
-                    InvalidAccountDigitException.class,
-                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
-                    () -> accountService.findByAccountNumber(SAVINGS_NUMBER, INVALID_DIGIT)
-            );
-
-            verify(accountNumberGenerator).isValid(SAVINGS_NUMBER, INVALID_DIGIT);
-            verifyNoMoreInteractionsOnMocks();
-        }
+      verifyAccountNotFoundLookup();
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @Nested
-    @DisplayName("findEntityByAccountNumberForUpdate(String, String)")
-    class FindEntityByAccountNumberForUpdate {
+    @Test
+    @DisplayName("Should throw when account digit is invalid")
+    void shouldThrowWhenAccountDigitIsInvalid() {
+      when(accountNumberGenerator.isValid(CHECKING_NUMBER, INVALID_DIGIT)).thenReturn(false);
 
-        @Test
-        @DisplayName("Should throw when locked account ID cannot be resolved")
-        void shouldThrowWhenLockedAccountIdCannotBeResolved() {
-            Long lockedAccountId = 99L;
+      assertThrowsWithMessage(
+          InvalidAccountDigitException.class,
+          ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
+          () -> accountService.findEntityByAccountNumber(CHECKING_NUMBER, INVALID_DIGIT)
+      );
 
-            when(accountNumberGenerator.isValid(
-                    NON_EXISTENT_NUMBER,
-                    NON_EXISTENT_DIGIT
-            )).thenReturn(true);
+      verify(accountNumberGenerator).isValid(CHECKING_NUMBER, INVALID_DIGIT);
+      verifyNoMoreInteractionsOnMocks();
+    }
+  }
 
-            when(accountRepository.lockIdByAccountNumber(
-                    NON_EXISTENT_NUMBER
-            )).thenReturn(Optional.of(lockedAccountId));
+  @Nested
+  @DisplayName("findByAccountNumber(String, String)")
+  class FindByAccountNumber {
 
-            when(accountRepository.findById(lockedAccountId))
-                    .thenReturn(Optional.empty());
+    @Test
+    @DisplayName("Should return the account response when account number exists")
+    void shouldReturnAccountResponseWhenAccountNumberExists() {
+      SavingsAccount account = savingsAccount();
 
-            assertThrowsWithMessage(
-                    AccountNotFoundException.class,
-                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
-                    () -> accountService.findEntityByAccountNumberForUpdate(
-                            NON_EXISTENT_NUMBER,
-                            NON_EXISTENT_DIGIT
-                    )
-            );
+      when(accountNumberGenerator.isValid(SAVINGS_NUMBER, SAVINGS_DIGIT)).thenReturn(true);
+      when(accountRepository.findByAccountNumberWithClient(SAVINGS_NUMBER))
+          .thenReturn(Optional.of(account));
 
-            verify(accountNumberGenerator).isValid(
-                    NON_EXISTENT_NUMBER,
-                    NON_EXISTENT_DIGIT
-            );
+      AccountResponseDto result = accountService.findByAccountNumber(SAVINGS_NUMBER, SAVINGS_DIGIT);
 
-            verify(accountRepository).lockIdByAccountNumber(
-                    NON_EXISTENT_NUMBER
-            );
+      assertEquals(
+          accountResponse(
+              account.getClient().getName(),
+              SAVINGS_NUMBER,
+              SAVINGS_DIGIT,
+              AccountType.SAVINGS
+          ),
+          result
+      );
 
-            verify(accountRepository).findById(lockedAccountId);
-
-            verifyNoMoreInteractionsOnMocks();
-        }
+      verify(accountNumberGenerator).isValid(SAVINGS_NUMBER, SAVINGS_DIGIT);
+      verify(accountRepository).findByAccountNumberWithClient(SAVINGS_NUMBER);
+      verifyNoMoreInteractionsOnMocks();
     }
 
-    @Nested
-    @DisplayName("create(AccountRequestDTO)")
-    class Create {
+    @Test
+    @DisplayName("Should throw when account does not exist")
+    void shouldThrowWhenAccountDoesNotExist() {
+      when(accountNumberGenerator.isValid(
+          NON_EXISTENT_NUMBER,
+          NON_EXISTENT_DIGIT
+      )).thenReturn(true);
+      when(accountRepository.findByAccountNumberWithClient(NON_EXISTENT_NUMBER))
+          .thenReturn(Optional.empty());
 
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "accountTypes")
-        @DisplayName("Should create account successfully")
-        void shouldCreateAccountSuccessfully(
-                String scenario,
-                AccountType type,
-                Class<? extends Account> expectedClass,
-                String number,
-                String digit
-        ) {
-            AccountRequestDto request = new AccountRequestDto(CLIENT_ID, type);
-            Client client = client();
+      assertThrowsWithMessage(
+          AccountNotFoundException.class,
+          ApiErrorMessages.ACCOUNT_NOT_FOUND,
+          () -> accountService.findByAccountNumber(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
+      );
 
-            when(clientService.findEntityById(CLIENT_ID)).thenReturn(client);
-            when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber(number, digit));
-            when(currentUserService.getUsername()).thenReturn(USERNAME);
+      verify(accountNumberGenerator).isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT);
+      verify(accountRepository).findByAccountNumberWithClient(NON_EXISTENT_NUMBER);
+      verifyNoMoreInteractionsOnMocks();
+    }
 
-            when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer(invocation -> {
-                Account savedAccount = invocation.getArgument(0);
-                ReflectionTestUtils.setField(savedAccount, "id", SAVED_ACCOUNT_ID);
-                return savedAccount;
-            });
+    @Test
+    @DisplayName("Should throw when account digit is invalid")
+    void shouldThrowWhenAccountDigitIsInvalid() {
+      when(accountNumberGenerator.isValid(SAVINGS_NUMBER, INVALID_DIGIT)).thenReturn(false);
 
-            AccountResponseDto result = accountService.create(request);
+      assertThrowsWithMessage(
+          InvalidAccountDigitException.class,
+          ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
+          () -> accountService.findByAccountNumber(SAVINGS_NUMBER, INVALID_DIGIT)
+      );
 
-            assertEquals(accountResponse(client.getName(), number, digit, type), result);
+      verify(accountNumberGenerator).isValid(SAVINGS_NUMBER, INVALID_DIGIT);
+      verifyNoMoreInteractionsOnMocks();
+    }
+  }
 
-            ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
+  @Nested
+  @DisplayName("findEntityByAccountNumberForUpdate(String, String)")
+  class FindEntityByAccountNumberForUpdate {
 
-            verify(clientService).findEntityById(CLIENT_ID);
-            verify(accountNumberGenerator).generate();
-            verify(currentUserService).getUsername();
-            verify(accountRepository).saveAndFlush(accountCaptor.capture());
-            verify(eventPublisher).publishEvent(
-                    new AccountOperationEvent(SAVED_ACCOUNT_ID, AccountOperationType.CREATED, USERNAME)
-            );
-            verifyNoMoreInteractionsOnMocks();
+    @Test
+    @DisplayName("Should throw when locked account ID cannot be resolved")
+    void shouldThrowWhenLockedAccountIdCannotBeResolved() {
+      Long lockedAccountId = 99L;
 
-            assertInstanceOf(expectedClass, accountCaptor.getValue());
-            assertSame(client, accountCaptor.getValue().getClient());
+      when(accountNumberGenerator.isValid(
+          NON_EXISTENT_NUMBER,
+          NON_EXISTENT_DIGIT
+      )).thenReturn(true);
 
-            if (accountCaptor.getValue() instanceof SavingsAccount savingsAccount) {
-                assertEquals(TODAY, savingsAccount.getLastYieldDate());
-            }
-        }
+      when(accountRepository.lockIdByAccountNumber(
+          NON_EXISTENT_NUMBER
+      )).thenReturn(Optional.of(lockedAccountId));
 
-        @Test
-        @DisplayName("Should throw when client does not exist")
-        void shouldThrowWhenClientDoesNotExist() {
-            AccountRequestDto request = new AccountRequestDto(CLIENT_ID, AccountType.CHECKING);
+      when(accountRepository.findById(lockedAccountId))
+          .thenReturn(Optional.empty());
 
-            when(clientService.findEntityById(CLIENT_ID))
-                    .thenThrow(new ClientNotFoundException());
+      assertThrowsWithMessage(
+          AccountNotFoundException.class,
+          ApiErrorMessages.ACCOUNT_NOT_FOUND,
+          () -> accountService.findEntityByAccountNumberForUpdate(
+              NON_EXISTENT_NUMBER,
+              NON_EXISTENT_DIGIT
+          )
+      );
 
-            assertThrowsWithMessage(
-                    ClientNotFoundException.class,
-                    ApiErrorMessages.CLIENT_NOT_FOUND,
-                    () -> accountService.create(request)
-            );
+      verify(accountNumberGenerator).isValid(
+          NON_EXISTENT_NUMBER,
+          NON_EXISTENT_DIGIT
+      );
 
-            verify(clientService).findEntityById(CLIENT_ID);
-            verifyNoMoreInteractionsOnMocks();
-        }
+      verify(accountRepository).lockIdByAccountNumber(
+          NON_EXISTENT_NUMBER
+      );
 
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "databaseDuplicateScenarios")
-        @DisplayName("Should throw when database rejects duplicate active account")
-        void shouldThrowWhenDatabaseRejectsDuplicateActiveAccount(
-                String scenario,
-                AccountType type,
-                String number,
-                String digit,
-                String message
-        ) {
-            AccountRequestDto request = new AccountRequestDto(CLIENT_ID, type);
+      verify(accountRepository).findById(lockedAccountId);
 
-            when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
-            when(accountNumberGenerator.generate())
-                    .thenReturn(new GeneratedAccountNumber(number, digit));
-            when(currentUserService.getUsername()).thenReturn(USERNAME);
+      verifyNoMoreInteractionsOnMocks();
+    }
+  }
 
-            ConstraintViolationException cause = new ConstraintViolationException(
-                    "Unique index violation",
+  @Nested
+  @DisplayName("create(AccountRequestDTO)")
+  class Create {
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "accountTypes")
+    @DisplayName("Should create account successfully")
+    void shouldCreateAccountSuccessfully(
+        String scenario,
+        AccountType type,
+        Class<? extends Account> expectedClass,
+        String number,
+        String digit
+    ) {
+      AccountRequestDto request = new AccountRequestDto(CLIENT_ID, type);
+      Client client = client();
+
+      when(clientService.findEntityById(CLIENT_ID)).thenReturn(client);
+      when(accountNumberGenerator.generate()).thenReturn(new GeneratedAccountNumber(number, digit));
+      when(currentUserService.getUsername()).thenReturn(USERNAME);
+
+      when(accountRepository.saveAndFlush(any(Account.class))).thenAnswer(invocation -> {
+        Account savedAccount = invocation.getArgument(0);
+        ReflectionTestUtils.setField(savedAccount, "id", SAVED_ACCOUNT_ID);
+        return savedAccount;
+      });
+
+      AccountResponseDto result = accountService.create(request);
+
+      assertEquals(accountResponse(client.getName(), number, digit, type), result);
+
+      ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
+
+      verify(clientService).findEntityById(CLIENT_ID);
+      verify(accountNumberGenerator).generate();
+      verify(currentUserService).getUsername();
+      verify(accountRepository).saveAndFlush(accountCaptor.capture());
+      verify(eventPublisher).publishEvent(
+          new AccountOperationEvent(SAVED_ACCOUNT_ID, AccountOperationType.CREATED, USERNAME)
+      );
+      verifyNoMoreInteractionsOnMocks();
+
+      assertInstanceOf(expectedClass, accountCaptor.getValue());
+      assertSame(client, accountCaptor.getValue().getClient());
+
+      if (accountCaptor.getValue() instanceof SavingsAccount savingsAccount) {
+        assertEquals(TODAY, savingsAccount.getLastYieldDate());
+      }
+    }
+
+    @Test
+    @DisplayName("Should throw when client does not exist")
+    void shouldThrowWhenClientDoesNotExist() {
+      AccountRequestDto request = new AccountRequestDto(CLIENT_ID, AccountType.CHECKING);
+
+      when(clientService.findEntityById(CLIENT_ID))
+          .thenThrow(new ClientNotFoundException());
+
+      assertThrowsWithMessage(
+          ClientNotFoundException.class,
+          ApiErrorMessages.CLIENT_NOT_FOUND,
+          () -> accountService.create(request)
+      );
+
+      verify(clientService).findEntityById(CLIENT_ID);
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "databaseDuplicateScenarios")
+    @DisplayName("Should throw when database rejects duplicate active account")
+    void shouldThrowWhenDatabaseRejectsDuplicateActiveAccount(
+        String scenario,
+        AccountType type,
+        String number,
+        String digit,
+        String message
+    ) {
+      final AccountRequestDto request = new AccountRequestDto(CLIENT_ID, type);
+
+      when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
+      when(accountNumberGenerator.generate())
+          .thenReturn(new GeneratedAccountNumber(number, digit));
+      when(currentUserService.getUsername()).thenReturn(USERNAME);
+
+      ConstraintViolationException cause = new ConstraintViolationException(
+          "Unique index violation",
+          null,
+          DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE.getConstraintName()
+      );
+
+      when(accountRepository.saveAndFlush(any(Account.class)))
+          .thenThrow(new DataIntegrityViolationException(
+              "Could not execute statement",
+              cause
+          ));
+
+      assertThrowsWithMessage(
+          AccountAlreadyExistsException.class,
+          message,
+          () -> accountService.create(request)
+      );
+
+      verify(clientService).findEntityById(CLIENT_ID);
+      verify(accountNumberGenerator).generate();
+      verify(currentUserService).getUsername();
+      verify(accountRepository).saveAndFlush(any(Account.class));
+      verifyNoInteractions(eventPublisher);
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "unrelatedDataIntegrityViolations")
+    @DisplayName("Should propagate unrelated data integrity violations")
+    void shouldPropagateUnrelatedDataIntegrityViolation(
+        String scenario,
+        DataIntegrityViolationException exception
+    ) {
+      AccountRequestDto request =
+          new AccountRequestDto(CLIENT_ID, AccountType.CHECKING);
+
+      when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
+      when(accountNumberGenerator.generate())
+          .thenReturn(new GeneratedAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT));
+      when(currentUserService.getUsername()).thenReturn(USERNAME);
+      when(accountRepository.saveAndFlush(any(Account.class)))
+          .thenThrow(exception);
+
+      DataIntegrityViolationException thrown = assertThrows(
+          DataIntegrityViolationException.class,
+          () -> accountService.create(request)
+      );
+
+      assertSame(exception, thrown);
+
+      verify(clientService).findEntityById(CLIENT_ID);
+      verify(accountNumberGenerator).generate();
+      verify(currentUserService).getUsername();
+      verify(accountRepository).saveAndFlush(any(Account.class));
+      verifyNoInteractions(eventPublisher);
+      verifyNoMoreInteractionsOnMocks();
+    }
+  }
+
+  @Nested
+  @DisplayName("cancel(String, String)")
+  class Cancel {
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "cancellableAccounts")
+    @DisplayName("Should cancel account successfully")
+    void shouldCancelAccountSuccessfully(String scenario, Account account) {
+      stubAccountLookupForUpdate(account);
+      when(currentUserService.getUsername()).thenReturn(USERNAME);
+
+      accountService.cancel(account.getAccountNumber(), account.getDigit());
+
+      assertEquals(AccountStatus.CANCELLED, account.getStatus());
+
+      verifyAccountLookupForUpdate(account);
+      verify(currentUserService).getUsername();
+      verify(eventPublisher).publishEvent(
+          new AccountOperationEvent(account.getId(), AccountOperationType.CANCELLED, USERNAME)
+      );
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "accountsWithBalance")
+    @DisplayName("Should throw when account has balance")
+    void shouldThrowWhenAccountHasBalance(String scenario, BigDecimal balance) {
+      Account account = checkingAccount();
+      // This includes a negative-balance fixture to prove the service rejects every
+      // non-zero balance. Such a state is not reachable through domain methods.
+      ReflectionTestUtils.setField(account, "balance", balance);
+      stubAccountLookupForUpdate(account);
+
+      assertThrowsWithMessage(
+          AccountHasBalanceException.class,
+          ApiErrorMessages.ACCOUNT_HAS_BALANCE,
+          () -> accountService.cancel(account.getAccountNumber(), account.getDigit())
+      );
+
+      verifyAccountLookupForUpdate(account);
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    // The active-account check runs before the balance check: a cancelled
+    // account with a balance must fail with "not active".
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "cancelledAccountBalances")
+    @DisplayName("Should throw when account is not active")
+    void shouldThrowWhenAccountIsNotActive(String scenario, BigDecimal balance) {
+      Account account = checkingAccount();
+      // Simulate a pre-existing inconsistent row to verify validation precedence:
+      // inactivity must be reported before the balance check.
+      ReflectionTestUtils.setField(account, "balance", balance);
+      ReflectionTestUtils.setField(account, "status", AccountStatus.CANCELLED);
+      stubAccountLookupForUpdate(account);
+
+      assertThrowsWithMessage(
+          AccountIsNotActiveException.class,
+          ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE,
+          () -> accountService.cancel(account.getAccountNumber(), account.getDigit())
+      );
+
+      verifyAccountLookupForUpdate(account);
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @Test
+    @DisplayName("Should throw when account does not exist")
+    void shouldThrowWhenAccountDoesNotExist() {
+      stubAccountNotFoundForUpdate();
+
+      assertThrowsWithMessage(
+          AccountNotFoundException.class,
+          ApiErrorMessages.ACCOUNT_NOT_FOUND,
+          () -> accountService.cancel(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
+      );
+
+      verifyAccountNotFoundLookupForUpdate();
+      verifyNoMoreInteractionsOnMocks();
+    }
+
+    @Test
+    @DisplayName("Should throw when account digit is invalid")
+    void shouldThrowWhenAccountDigitIsInvalid() {
+      when(accountNumberGenerator.isValid(CHECKING_NUMBER, INVALID_DIGIT)).thenReturn(false);
+
+      assertThrowsWithMessage(
+          InvalidAccountDigitException.class,
+          ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
+          () -> accountService.cancel(CHECKING_NUMBER, INVALID_DIGIT)
+      );
+
+      verify(accountNumberGenerator).isValid(CHECKING_NUMBER, INVALID_DIGIT);
+      verifyNoMoreInteractionsOnMocks();
+    }
+  }
+
+  @Nested
+  @DisplayName("transaction boundaries")
+  class TransactionBoundaries {
+
+    // Queries must be read-only; create and cancel need a write transaction.
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "transactionModes")
+    @DisplayName("Should declare the expected transaction mode")
+    void shouldDeclareExpectedTransactionMode(
+        String scenario,
+        String methodName,
+        Class<?>[] parameterTypes,
+        boolean readOnly
+    ) throws NoSuchMethodException {
+      Method method = AccountService.class.getMethod(methodName, parameterTypes);
+
+      Transactional transactional =
+          AnnotatedElementUtils.findMergedAnnotation(method, Transactional.class);
+
+      assertNotNull(transactional);
+      assertEquals(readOnly, transactional.readOnly());
+    }
+  }
+
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> accountTypes() {
+    return Stream.of(
+        Arguments.of("checking account", AccountType.CHECKING, CheckingAccount.class,
+            CHECKING_NUMBER, CHECKING_DIGIT),
+        Arguments.of("savings account", AccountType.SAVINGS, SavingsAccount.class,
+            SAVINGS_NUMBER, SAVINGS_DIGIT)
+    );
+  }
+
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> databaseDuplicateScenarios() {
+    return Stream.of(
+        Arguments.of("database rejects duplicate checking account", AccountType.CHECKING,
+            CHECKING_NUMBER, CHECKING_DIGIT, ApiErrorMessages.CHECKING_ACCOUNT_ALREADY_EXISTS),
+        Arguments.of("database rejects duplicate savings account", AccountType.SAVINGS,
+            SAVINGS_NUMBER, SAVINGS_DIGIT, ApiErrorMessages.SAVINGS_ACCOUNT_ALREADY_EXISTS)
+    );
+  }
+
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> unrelatedDataIntegrityViolations() {
+    return Stream.of(
+        Arguments.of("another constraint is violated",
+            new DataIntegrityViolationException(
+                "Database error",
+                new ConstraintViolationException(
+                    "Other constraint violation",
                     null,
-                    DatabaseConstraint.ACCOUNT_CLIENT_TYPE_ACTIVE_UNIQUE.getConstraintName()
-            );
+                    "uk_other_constraint"
+                )
+            )),
+        Arguments.of("no constraint violation in the cause chain",
+            new DataIntegrityViolationException("Database error"))
+    );
+  }
 
-            when(accountRepository.saveAndFlush(any(Account.class)))
-                    .thenThrow(new DataIntegrityViolationException(
-                            "Could not execute statement",
-                            cause
-                    ));
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> transactionModes() {
+    return Stream.of(
+        Arguments.of("findAll is read-only", "findAll",
+            new Class<?>[] {Pageable.class},
+            true),
+        Arguments.of("findEntityByAccountNumber is read-only", "findEntityByAccountNumber",
+            new Class<?>[] {String.class, String.class}, true),
+        Arguments.of("findByAccountNumber is read-only", "findByAccountNumber",
+            new Class<?>[] {String.class, String.class}, true),
+        Arguments.of("create is a write transaction", "create",
+            new Class<?>[] {AccountRequestDto.class}, false),
+        Arguments.of("cancel is a write transaction", "cancel",
+            new Class<?>[] {String.class, String.class}, false)
+    );
+  }
 
-            assertThrowsWithMessage(
-                    AccountAlreadyExistsException.class,
-                    message,
-                    () -> accountService.create(request)
-            );
+  // "0.00" has a different BigDecimal scale than BigDecimal.ZERO: the service
+  // compares with compareTo, not equals.
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> cancellableAccounts() {
+    return Stream.of(
+        Arguments.of("checking account", checkingAccount()),
+        Arguments.of("savings account", savingsAccount()),
+        Arguments.of("checking account with balance 0.00", withBalance(checkingAccount(), "0.00"))
+    );
+  }
 
-            verify(clientService).findEntityById(CLIENT_ID);
-            verify(accountNumberGenerator).generate();
-            verify(currentUserService).getUsername();
-            verify(accountRepository).saveAndFlush(any(Account.class));
-            verifyNoInteractions(eventPublisher);
-            verifyNoMoreInteractionsOnMocks();
-        }
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> accountsWithBalance() {
+    return Stream.of(
+        Arguments.of("positive balance", new BigDecimal("10.00")),
+        Arguments.of("smallest positive balance", new BigDecimal("0.01")),
+        Arguments.of("negative balance", new BigDecimal("-5.00"))
+    );
+  }
 
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "unrelatedDataIntegrityViolations")
-        @DisplayName("Should propagate unrelated data integrity violations")
-        void shouldPropagateUnrelatedDataIntegrityViolation(
-                String scenario,
-                DataIntegrityViolationException exception
-        ) {
-            AccountRequestDto request =
-                    new AccountRequestDto(CLIENT_ID, AccountType.CHECKING);
+  @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
+  static Stream<Arguments> cancelledAccountBalances() {
+    return Stream.of(
+        Arguments.of("cancelled account without balance", BigDecimal.ZERO),
+        Arguments.of("cancelled account with balance", BigDecimal.TEN)
+    );
+  }
 
-            when(clientService.findEntityById(CLIENT_ID)).thenReturn(client());
-            when(accountNumberGenerator.generate())
-                    .thenReturn(new GeneratedAccountNumber(CHECKING_NUMBER, CHECKING_DIGIT));
-            when(currentUserService.getUsername()).thenReturn(USERNAME);
-            when(accountRepository.saveAndFlush(any(Account.class)))
-                    .thenThrow(exception);
+  private void stubAccountPage(List<Account> accounts, Pageable pageable) {
+    Page<Account> page = new PageImpl<>(accounts, pageable, accounts.size());
 
-            DataIntegrityViolationException thrown = assertThrows(
-                    DataIntegrityViolationException.class,
-                    () -> accountService.create(request)
-            );
+    when(accountRepository.findAllWithClient(pageable))
+        .thenReturn(page);
+  }
 
-            assertSame(exception, thrown);
+  private void stubAccountLookup(Account account) {
+    when(accountNumberGenerator.isValid(account.getAccountNumber(), account.getDigit()))
+        .thenReturn(true);
+    when(accountRepository.findByAccountNumber(account.getAccountNumber()))
+        .thenReturn(Optional.of(account));
+  }
 
-            verify(clientService).findEntityById(CLIENT_ID);
-            verify(accountNumberGenerator).generate();
-            verify(currentUserService).getUsername();
-            verify(accountRepository).saveAndFlush(any(Account.class));
-            verifyNoInteractions(eventPublisher);
-            verifyNoMoreInteractionsOnMocks();
-        }
-    }
+  private void stubAccountLookupForUpdate(Account account) {
+    when(accountNumberGenerator.isValid(account.getAccountNumber(), account.getDigit()))
+        .thenReturn(true);
+    when(accountRepository.lockIdByAccountNumber(
+        account.getAccountNumber()
+    )).thenReturn(Optional.of(account.getId()));
 
-    @Nested
-    @DisplayName("cancel(String, String)")
-    class Cancel {
+    when(accountRepository.findById(
+        account.getId()
+    )).thenReturn(Optional.of(account));
+  }
 
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "cancellableAccounts")
-        @DisplayName("Should cancel account successfully")
-        void shouldCancelAccountSuccessfully(String scenario, Account account) {
-            stubAccountLookupForUpdate(account);
-            when(currentUserService.getUsername()).thenReturn(USERNAME);
+  private void verifyAccountLookup(Account account) {
+    verify(accountNumberGenerator)
+        .isValid(account.getAccountNumber(), account.getDigit());
+    verify(accountRepository)
+        .findByAccountNumber(account.getAccountNumber());
+  }
 
-            accountService.cancel(account.getAccountNumber(), account.getDigit());
+  private void verifyAccountLookupForUpdate(Account account) {
+    verify(accountNumberGenerator)
+        .isValid(account.getAccountNumber(), account.getDigit());
+    verify(accountRepository)
+        .lockIdByAccountNumber(account.getAccountNumber());
+    verify(accountRepository)
+        .findById(account.getId());
+  }
 
-            assertEquals(AccountStatus.CANCELLED, account.getStatus());
+  private void stubAccountNotFound() {
+    when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT))
+        .thenReturn(true);
+    when(accountRepository.findByAccountNumber(NON_EXISTENT_NUMBER))
+        .thenReturn(Optional.empty());
+  }
 
-            verifyAccountLookupForUpdate(account);
-            verify(currentUserService).getUsername();
-            verify(eventPublisher).publishEvent(
-                    new AccountOperationEvent(account.getId(), AccountOperationType.CANCELLED, USERNAME)
-            );
-            verifyNoMoreInteractionsOnMocks();
-        }
+  private void stubAccountNotFoundForUpdate() {
+    when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT))
+        .thenReturn(true);
+    when(accountRepository.lockIdByAccountNumber(NON_EXISTENT_NUMBER))
+        .thenReturn(Optional.empty());
+  }
 
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "accountsWithBalance")
-        @DisplayName("Should throw when account has balance")
-        void shouldThrowWhenAccountHasBalance(String scenario, BigDecimal balance) {
-            Account account = checkingAccount();
-            // This includes a negative-balance fixture to prove the service rejects every
-            // non-zero balance. Such a state is not reachable through domain methods.
-            ReflectionTestUtils.setField(account, "balance", balance);
-            stubAccountLookupForUpdate(account);
+  private void verifyAccountNotFoundLookup() {
+    verify(accountNumberGenerator).isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT);
+    verify(accountRepository).findByAccountNumber(NON_EXISTENT_NUMBER);
+  }
 
-            assertThrowsWithMessage(
-                    AccountHasBalanceException.class,
-                    ApiErrorMessages.ACCOUNT_HAS_BALANCE,
-                    () -> accountService.cancel(account.getAccountNumber(), account.getDigit())
-            );
+  private void verifyAccountNotFoundLookupForUpdate() {
+    verify(accountNumberGenerator).isValid(
+        NON_EXISTENT_NUMBER,
+        NON_EXISTENT_DIGIT
+    );
 
-            verifyAccountLookupForUpdate(account);
-            verifyNoMoreInteractionsOnMocks();
-        }
+    verify(accountRepository).lockIdByAccountNumber(
+        NON_EXISTENT_NUMBER
+    );
 
-        // The active-account check runs before the balance check: a cancelled
-        // account with a balance must fail with "not active".
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "cancelledAccountBalances")
-        @DisplayName("Should throw when account is not active")
-        void shouldThrowWhenAccountIsNotActive(String scenario, BigDecimal balance) {
-            Account account = checkingAccount();
-            // Simulate a pre-existing inconsistent row to verify validation precedence:
-            // inactivity must be reported before the balance check.
-            ReflectionTestUtils.setField(account, "balance", balance);
-            ReflectionTestUtils.setField(account, "status", AccountStatus.CANCELLED);
-            stubAccountLookupForUpdate(account);
+    verify(accountRepository, never()).findById(anyLong());
+  }
 
-            assertThrowsWithMessage(
-                    AccountIsNotActiveException.class,
-                    ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE,
-                    () -> accountService.cancel(account.getAccountNumber(), account.getDigit())
-            );
+  private void verifyNoMoreInteractionsOnMocks() {
+    verifyNoMoreInteractions(
+        accountRepository,
+        clientService,
+        accountNumberGenerator,
+        currentUserService,
+        eventPublisher
+    );
+  }
 
-            verifyAccountLookupForUpdate(account);
-            verifyNoMoreInteractionsOnMocks();
-        }
+  private static void assertThrowsWithMessage(
+      Class<? extends Exception> type,
+      String message,
+      Executable executable
+  ) {
+    Exception exception = assertThrows(type, executable);
+    assertEquals(message, exception.getMessage());
+  }
 
-        @Test
-        @DisplayName("Should throw when account does not exist")
-        void shouldThrowWhenAccountDoesNotExist() {
-            stubAccountNotFoundForUpdate();
+  private static Client client() {
+    return ClientTestFactory.clientBuilder("account-client")
+        .withId(CLIENT_ID)
+        .build();
+  }
 
-            assertThrowsWithMessage(
-                    AccountNotFoundException.class,
-                    ApiErrorMessages.ACCOUNT_NOT_FOUND,
-                    () -> accountService.cancel(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT)
-            );
+  private static CheckingAccount checkingAccount() {
+    CheckingAccount account = new CheckingAccount(client(), CHECKING_NUMBER, CHECKING_DIGIT);
+    ReflectionTestUtils.setField(account, "id", 1L);
+    return account;
+  }
 
-            verifyAccountNotFoundLookupForUpdate();
-            verifyNoMoreInteractionsOnMocks();
-        }
+  private static SavingsAccount savingsAccount() {
+    SavingsAccount account = SavingsAccount.create(client(), SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
+    ReflectionTestUtils.setField(account, "id", 2L);
+    return account;
+  }
 
-        @Test
-        @DisplayName("Should throw when account digit is invalid")
-        void shouldThrowWhenAccountDigitIsInvalid() {
-            when(accountNumberGenerator.isValid(CHECKING_NUMBER, INVALID_DIGIT)).thenReturn(false);
+  private static <T extends Account> T withBalance(T account, String balance) {
+    // Fixture helper: represent persisted edge cases without invoking an operation
+    // that intentionally rejects those values.
+    ReflectionTestUtils.setField(account, "balance", new BigDecimal(balance));
+    return account;
+  }
 
-            assertThrowsWithMessage(
-                    InvalidAccountDigitException.class,
-                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT,
-                    () -> accountService.cancel(CHECKING_NUMBER, INVALID_DIGIT)
-            );
-
-            verify(accountNumberGenerator).isValid(CHECKING_NUMBER, INVALID_DIGIT);
-            verifyNoMoreInteractionsOnMocks();
-        }
-    }
-
-    @Nested
-    @DisplayName("transaction boundaries")
-    class TransactionBoundaries {
-
-        // Queries must be read-only; create and cancel need a write transaction.
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "transactionModes")
-        @DisplayName("Should declare the expected transaction mode")
-        void shouldDeclareExpectedTransactionMode(
-                String scenario,
-                String methodName,
-                Class<?>[] parameterTypes,
-                boolean readOnly
-        ) throws NoSuchMethodException {
-            Method method = AccountService.class.getMethod(methodName, parameterTypes);
-
-            Transactional transactional =
-                    AnnotatedElementUtils.findMergedAnnotation(method, Transactional.class);
-
-            assertNotNull(transactional);
-            assertEquals(readOnly, transactional.readOnly());
-        }
-    }
-
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> accountTypes() {
-        return Stream.of(
-                Arguments.of("checking account", AccountType.CHECKING, CheckingAccount.class,
-                        CHECKING_NUMBER, CHECKING_DIGIT),
-                Arguments.of("savings account", AccountType.SAVINGS, SavingsAccount.class,
-                        SAVINGS_NUMBER, SAVINGS_DIGIT)
-        );
-    }
-
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> databaseDuplicateScenarios() {
-        return Stream.of(
-                Arguments.of("database rejects duplicate checking account", AccountType.CHECKING,
-                        CHECKING_NUMBER, CHECKING_DIGIT, ApiErrorMessages.CHECKING_ACCOUNT_ALREADY_EXISTS),
-                Arguments.of("database rejects duplicate savings account", AccountType.SAVINGS,
-                        SAVINGS_NUMBER, SAVINGS_DIGIT, ApiErrorMessages.SAVINGS_ACCOUNT_ALREADY_EXISTS)
-        );
-    }
-
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> unrelatedDataIntegrityViolations() {
-        return Stream.of(
-                Arguments.of("another constraint is violated",
-                        new DataIntegrityViolationException(
-                                "Database error",
-                                new ConstraintViolationException(
-                                        "Other constraint violation",
-                                        null,
-                                        "uk_other_constraint"
-                                )
-                        )),
-                Arguments.of("no constraint violation in the cause chain",
-                        new DataIntegrityViolationException("Database error"))
-        );
-    }
-
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> transactionModes() {
-        return Stream.of(
-                Arguments.of("findAll is read-only", "findAll",
-                        new Class<?>[]{Pageable.class},
-                        true),
-                Arguments.of("findEntityByAccountNumber is read-only", "findEntityByAccountNumber",
-                        new Class<?>[]{String.class, String.class}, true),
-                Arguments.of("findByAccountNumber is read-only", "findByAccountNumber",
-                        new Class<?>[]{String.class, String.class}, true),
-                Arguments.of("create is a write transaction", "create",
-                        new Class<?>[]{AccountRequestDto.class}, false),
-                Arguments.of("cancel is a write transaction", "cancel",
-                        new Class<?>[]{String.class, String.class}, false)
-        );
-    }
-
-    // "0.00" has a different BigDecimal scale than BigDecimal.ZERO: the service
-    // compares with compareTo, not equals.
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> cancellableAccounts() {
-        return Stream.of(
-                Arguments.of("checking account", checkingAccount()),
-                Arguments.of("savings account", savingsAccount()),
-                Arguments.of("checking account with balance 0.00", withBalance(checkingAccount(), "0.00"))
-        );
-    }
-
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> accountsWithBalance() {
-        return Stream.of(
-                Arguments.of("positive balance", new BigDecimal("10.00")),
-                Arguments.of("smallest positive balance", new BigDecimal("0.01")),
-                Arguments.of("negative balance", new BigDecimal("-5.00"))
-        );
-    }
-
-    @SuppressWarnings("unused") // used via @MethodSource (referenced by String)
-    static Stream<Arguments> cancelledAccountBalances() {
-        return Stream.of(
-                Arguments.of("cancelled account without balance", BigDecimal.ZERO),
-                Arguments.of("cancelled account with balance", BigDecimal.TEN)
-        );
-    }
-
-    private void stubAccountPage(List<Account> accounts, Pageable pageable) {
-        Page<Account> page = new PageImpl<>(accounts, pageable, accounts.size());
-
-        when(accountRepository.findAllWithClient(pageable))
-                .thenReturn(page);
-    }
-
-    private void stubAccountLookup(Account account) {
-        when(accountNumberGenerator.isValid(account.getAccountNumber(), account.getDigit()))
-                .thenReturn(true);
-        when(accountRepository.findByAccountNumber(account.getAccountNumber()))
-                .thenReturn(Optional.of(account));
-    }
-
-    private void stubAccountLookupForUpdate(Account account) {
-        when(accountNumberGenerator.isValid(account.getAccountNumber(), account.getDigit()))
-                .thenReturn(true);
-        when(accountRepository.lockIdByAccountNumber(
-                account.getAccountNumber()
-        )).thenReturn(Optional.of(account.getId()));
-
-        when(accountRepository.findById(
-                account.getId()
-        )).thenReturn(Optional.of(account));
-    }
-
-    private void verifyAccountLookup(Account account) {
-        verify(accountNumberGenerator)
-                .isValid(account.getAccountNumber(), account.getDigit());
-        verify(accountRepository)
-                .findByAccountNumber(account.getAccountNumber());
-    }
-
-    private void verifyAccountLookupForUpdate(Account account) {
-        verify(accountNumberGenerator)
-                .isValid(account.getAccountNumber(), account.getDigit());
-        verify(accountRepository)
-                .lockIdByAccountNumber(account.getAccountNumber());
-        verify(accountRepository)
-                .findById(account.getId());
-    }
-
-    private void stubAccountNotFound() {
-        when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT))
-                .thenReturn(true);
-        when(accountRepository.findByAccountNumber(NON_EXISTENT_NUMBER))
-                .thenReturn(Optional.empty());
-    }
-
-    private void stubAccountNotFoundForUpdate() {
-        when(accountNumberGenerator.isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT))
-                .thenReturn(true);
-        when(accountRepository.lockIdByAccountNumber(NON_EXISTENT_NUMBER))
-                .thenReturn(Optional.empty());
-    }
-
-    private void verifyAccountNotFoundLookup() {
-        verify(accountNumberGenerator).isValid(NON_EXISTENT_NUMBER, NON_EXISTENT_DIGIT);
-        verify(accountRepository).findByAccountNumber(NON_EXISTENT_NUMBER);
-    }
-
-    private void verifyAccountNotFoundLookupForUpdate() {
-        verify(accountNumberGenerator).isValid(
-                NON_EXISTENT_NUMBER,
-                NON_EXISTENT_DIGIT
-        );
-
-        verify(accountRepository).lockIdByAccountNumber(
-                NON_EXISTENT_NUMBER
-        );
-
-        verify(accountRepository, never()).findById(anyLong());
-    }
-
-    private void verifyNoMoreInteractionsOnMocks() {
-        verifyNoMoreInteractions(
-                accountRepository,
-                clientService,
-                accountNumberGenerator,
-                currentUserService,
-                eventPublisher
-        );
-    }
-
-    private static void assertThrowsWithMessage(
-            Class<? extends Exception> type,
-            String message,
-            Executable executable
-    ) {
-        Exception exception = assertThrows(type, executable);
-        assertEquals(message, exception.getMessage());
-    }
-
-    private static Client client() {
-        return aClient("account-client")
-                .withId(CLIENT_ID)
-                .build();
-    }
-
-    private static CheckingAccount checkingAccount() {
-        CheckingAccount account = new CheckingAccount(client(), CHECKING_NUMBER, CHECKING_DIGIT);
-        ReflectionTestUtils.setField(account, "id", 1L);
-        return account;
-    }
-
-    private static SavingsAccount savingsAccount() {
-        SavingsAccount account = SavingsAccount.create(client(), SAVINGS_NUMBER, SAVINGS_DIGIT, TODAY);
-        ReflectionTestUtils.setField(account, "id", 2L);
-        return account;
-    }
-
-    private static <T extends Account> T withBalance(T account, String balance) {
-        // Fixture helper: represent persisted edge cases without invoking an operation
-        // that intentionally rejects those values.
-        ReflectionTestUtils.setField(account, "balance", new BigDecimal(balance));
-        return account;
-    }
-
-    private static AccountResponseDto accountResponse(
-            String clientName,
-            String number,
-            String digit,
-            AccountType type
-    ) {
-        return new AccountResponseDto(
-                number, digit, clientName, BigDecimal.ZERO, type, AccountStatus.ACTIVE
-        );
-    }
+  private static AccountResponseDto accountResponse(
+      String clientName,
+      String number,
+      String digit,
+      AccountType type
+  ) {
+    return new AccountResponseDto(
+        number, digit, clientName, BigDecimal.ZERO, type, AccountStatus.ACTIVE
+    );
+  }
 }

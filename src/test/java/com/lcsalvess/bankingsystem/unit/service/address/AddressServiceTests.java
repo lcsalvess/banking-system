@@ -1,5 +1,12 @@
 package com.lcsalvess.bankingsystem.unit.service.address;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+
 import com.lcsalvess.bankingsystem.dto.request.address.AddressRequestDto;
 import com.lcsalvess.bankingsystem.entity.address.Address;
 import com.lcsalvess.bankingsystem.entity.address.State;
@@ -18,191 +25,184 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class AddressServiceTests {
 
-    private static final String POSTAL_CODE = "01001000";
+  private static final String POSTAL_CODE = "01001000";
 
-    @Mock
-    private AddressLookupService addressLookupService;
+  @Mock
+  private AddressLookupService addressLookupService;
 
-    @InjectMocks
-    private AddressService addressService;
+  @InjectMocks
+  private AddressService addressService;
 
-    @Nested
-    @DisplayName("When creating an address from postal code")
-    class CreateFromPostalCode {
+  @Nested
+  @DisplayName("When creating an address from postal code")
+  class CreateFromPostalCode {
 
-        @Test
-        @DisplayName("Should create address combining provider data with street number and complement")
-        void shouldCreateAddressCombiningProviderDataWithStreetNumberAndComplement() {
-            AddressRequestDto dto = new AddressRequestDto("123", "Apto 45", POSTAL_CODE);
+    @Test
+    @DisplayName("Should create address combining provider data with street number and complement")
+    void shouldCreateAddressCombiningProviderDataWithStreetNumberAndComplement() {
+      AddressRequestDto dto = new AddressRequestDto("123", "Apto 45", POSTAL_CODE);
 
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenReturn(lookupResponse());
+      when(addressLookupService.findByPostalCode(POSTAL_CODE))
+          .thenReturn(lookupResponse());
 
-            Address result = addressService.createFromPostalCode(dto);
+      Address result = addressService.createFromPostalCode(dto);
 
-            assertNull(result.getId());
-            assertEquals("Praça da Sé", result.getStreetName());
-            assertEquals("123", result.getStreetNumber());
-            assertEquals("Apto 45", result.getComplement());
-            assertEquals("Sé", result.getNeighborhood());
-            assertEquals("São Paulo", result.getCity());
-            assertEquals(State.SP, result.getState());
-            assertEquals(POSTAL_CODE, result.getPostalCode());
+      assertNull(result.getId());
+      assertEquals("Praça da Sé", result.getStreetName());
+      assertEquals("123", result.getStreetNumber());
+      assertEquals("Apto 45", result.getComplement());
+      assertEquals("Sé", result.getNeighborhood());
+      assertEquals("São Paulo", result.getCity());
+      assertEquals(State.SP, result.getState());
+      assertEquals(POSTAL_CODE, result.getPostalCode());
 
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
-        }
-
-        @Test
-        @DisplayName("Should create address without complement when it is not informed")
-        void shouldCreateAddressWithoutComplementWhenItIsNotInformed() {
-            AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
-
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenReturn(lookupResponse());
-
-            Address result = addressService.createFromPostalCode(dto);
-
-            assertNull(result.getComplement());
-            assertEquals("123", result.getStreetNumber());
-
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
-        }
-
-        @Test
-        @DisplayName("Should throw PostalCodeNotFoundException when postal code is not found")
-        void shouldThrowPostalCodeNotFoundExceptionWhenPostalCodeIsNotFound() {
-            AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
-
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenThrow(new PostalCodeNotFoundException(
-                            ApiErrorMessages.POSTAL_CODE_NOT_FOUND
-                    ));
-
-            PostalCodeNotFoundException exception = assertThrows(
-                    PostalCodeNotFoundException.class,
-                    () -> addressService.createFromPostalCode(dto)
-            );
-
-            assertEquals(ApiErrorMessages.POSTAL_CODE_NOT_FOUND, exception.getMessage());
-
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
-        }
-
-        @Test
-        @DisplayName("Should throw AddressProviderUnavailableException when providers are unavailable")
-        void shouldThrowAddressProviderUnavailableExceptionWhenProvidersAreUnavailable() {
-            AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
-
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenThrow(new AddressProviderUnavailableException(
-                            ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
-                    ));
-
-            AddressProviderUnavailableException exception = assertThrows(
-                    AddressProviderUnavailableException.class,
-                    () -> addressService.createFromPostalCode(dto)
-            );
-
-            assertEquals(
-                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
-                    exception.getMessage()
-            );
-
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
-        }
+      verify(addressLookupService).findByPostalCode(POSTAL_CODE);
+      verifyNoMoreInteractions(addressLookupService);
     }
 
-    @Nested
-    @DisplayName("When finding an address by postal code")
-    class FindAddressByPostalCode {
+    @Test
+    @DisplayName("Should create address without complement when it is not informed")
+    void shouldCreateAddressWithoutComplementWhenItIsNotInformed() {
+      AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
 
-        @Test
-        @DisplayName("Should return address data with the state converted to enum")
-        void shouldReturnAddressDataWithTheStateConvertedToEnum() {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenReturn(lookupResponse());
+      when(addressLookupService.findByPostalCode(POSTAL_CODE))
+          .thenReturn(lookupResponse());
 
-            AddressData result =
-                    addressService.findAddressByPostalCode(POSTAL_CODE);
+      Address result = addressService.createFromPostalCode(dto);
 
-            assertEquals(
-                    new AddressData(
-                            "Praça da Sé",
-                            "Sé",
-                            "São Paulo",
-                            State.SP,
-                            POSTAL_CODE
-                    ),
-                    result
-            );
+      assertNull(result.getComplement());
+      assertEquals("123", result.getStreetNumber());
 
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
-        }
-
-        @Test
-        @DisplayName("Should throw PostalCodeNotFoundException when postal code is not found")
-        void shouldThrowPostalCodeNotFoundExceptionWhenPostalCodeIsNotFound() {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenThrow(new PostalCodeNotFoundException(
-                            ApiErrorMessages.POSTAL_CODE_NOT_FOUND
-                    ));
-
-            PostalCodeNotFoundException exception = assertThrows(
-                    PostalCodeNotFoundException.class,
-                    () -> addressService.findAddressByPostalCode(POSTAL_CODE)
-            );
-
-            assertEquals(ApiErrorMessages.POSTAL_CODE_NOT_FOUND, exception.getMessage());
-
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
-        }
-
-        @Test
-        @DisplayName("Should throw AddressProviderUnavailableException when providers are unavailable")
-        void shouldThrowAddressProviderUnavailableExceptionWhenProvidersAreUnavailable() {
-            when(addressLookupService.findByPostalCode(POSTAL_CODE))
-                    .thenThrow(new AddressProviderUnavailableException(
-                            ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
-                    ));
-
-            AddressProviderUnavailableException exception = assertThrows(
-                    AddressProviderUnavailableException.class,
-                    () -> addressService.findAddressByPostalCode(POSTAL_CODE)
-            );
-
-            assertEquals(
-                    ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
-                    exception.getMessage()
-            );
-
-            verify(addressLookupService).findByPostalCode(POSTAL_CODE);
-            verifyNoMoreInteractions(addressLookupService);
-        }
+      verify(addressLookupService).findByPostalCode(POSTAL_CODE);
+      verifyNoMoreInteractions(addressLookupService);
     }
 
-    private static AddressLookupResponse lookupResponse() {
-        return new AddressLookupResponse(
-                "Praça da Sé",
-                "Sé",
-                "São Paulo",
-                "SP",
-                POSTAL_CODE
-        );
+    @Test
+    @DisplayName("Should throw PostalCodeNotFoundException when postal code is not found")
+    void shouldThrowPostalCodeNotFoundExceptionWhenPostalCodeIsNotFound() {
+      AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
+
+      when(addressLookupService.findByPostalCode(POSTAL_CODE))
+          .thenThrow(new PostalCodeNotFoundException(
+              ApiErrorMessages.POSTAL_CODE_NOT_FOUND
+          ));
+
+      PostalCodeNotFoundException exception = assertThrows(
+          PostalCodeNotFoundException.class,
+          () -> addressService.createFromPostalCode(dto)
+      );
+
+      assertEquals(ApiErrorMessages.POSTAL_CODE_NOT_FOUND, exception.getMessage());
+
+      verify(addressLookupService).findByPostalCode(POSTAL_CODE);
+      verifyNoMoreInteractions(addressLookupService);
     }
+
+    @Test
+    @DisplayName("Should throw AddressProviderUnavailableException when providers are unavailable")
+    void shouldThrowAddressProviderUnavailableExceptionWhenProvidersAreUnavailable() {
+      AddressRequestDto dto = new AddressRequestDto("123", null, POSTAL_CODE);
+
+      when(addressLookupService.findByPostalCode(POSTAL_CODE))
+          .thenThrow(new AddressProviderUnavailableException(
+              ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
+          ));
+
+      AddressProviderUnavailableException exception = assertThrows(
+          AddressProviderUnavailableException.class,
+          () -> addressService.createFromPostalCode(dto)
+      );
+
+      assertEquals(
+          ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
+          exception.getMessage()
+      );
+
+      verify(addressLookupService).findByPostalCode(POSTAL_CODE);
+      verifyNoMoreInteractions(addressLookupService);
+    }
+  }
+
+  @Nested
+  @DisplayName("When finding an address by postal code")
+  class FindAddressByPostalCode {
+
+    @Test
+    @DisplayName("Should return address data with the state converted to enum")
+    void shouldReturnAddressDataWithTheStateConvertedToEnum() {
+      when(addressLookupService.findByPostalCode(POSTAL_CODE))
+          .thenReturn(lookupResponse());
+
+      AddressData result =
+          addressService.findAddressByPostalCode(POSTAL_CODE);
+
+      assertEquals(
+          new AddressData(
+              "Praça da Sé",
+              "Sé",
+              "São Paulo",
+              State.SP,
+              POSTAL_CODE
+          ),
+          result
+      );
+
+      verify(addressLookupService).findByPostalCode(POSTAL_CODE);
+      verifyNoMoreInteractions(addressLookupService);
+    }
+
+    @Test
+    @DisplayName("Should throw PostalCodeNotFoundException when postal code is not found")
+    void shouldThrowPostalCodeNotFoundExceptionWhenPostalCodeIsNotFound() {
+      when(addressLookupService.findByPostalCode(POSTAL_CODE))
+          .thenThrow(new PostalCodeNotFoundException(
+              ApiErrorMessages.POSTAL_CODE_NOT_FOUND
+          ));
+
+      PostalCodeNotFoundException exception = assertThrows(
+          PostalCodeNotFoundException.class,
+          () -> addressService.findAddressByPostalCode(POSTAL_CODE)
+      );
+
+      assertEquals(ApiErrorMessages.POSTAL_CODE_NOT_FOUND, exception.getMessage());
+
+      verify(addressLookupService).findByPostalCode(POSTAL_CODE);
+      verifyNoMoreInteractions(addressLookupService);
+    }
+
+    @Test
+    @DisplayName("Should throw AddressProviderUnavailableException when providers are unavailable")
+    void shouldThrowAddressProviderUnavailableExceptionWhenProvidersAreUnavailable() {
+      when(addressLookupService.findByPostalCode(POSTAL_CODE))
+          .thenThrow(new AddressProviderUnavailableException(
+              ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE
+          ));
+
+      AddressProviderUnavailableException exception = assertThrows(
+          AddressProviderUnavailableException.class,
+          () -> addressService.findAddressByPostalCode(POSTAL_CODE)
+      );
+
+      assertEquals(
+          ApiErrorMessages.ADDRESS_PROVIDER_UNAVAILABLE,
+          exception.getMessage()
+      );
+
+      verify(addressLookupService).findByPostalCode(POSTAL_CODE);
+      verifyNoMoreInteractions(addressLookupService);
+    }
+  }
+
+  private static AddressLookupResponse lookupResponse() {
+    return new AddressLookupResponse(
+        "Praça da Sé",
+        "Sé",
+        "São Paulo",
+        "SP",
+        POSTAL_CODE
+    );
+  }
 }

@@ -14,4 +14,13 @@
             checks="MissingJavadocMethod"
             files=".*[\\/]dto[\\/].*"/>
 
+    <!-- Test classes do not require Javadocs. -->
+    <suppress
+            checks="MissingJavadocType"
+            files=".*[\\/]src[\\/]test[\\/]java[\\/].*"/>
+
+    <!-- Test methods do not require Javadocs. -->
+    <suppress
+            checks="MissingJavadocMethod"
+            files=".*[\\/]src[\\/]test[\\/]java[\\/].*"/>
 </suppressions>

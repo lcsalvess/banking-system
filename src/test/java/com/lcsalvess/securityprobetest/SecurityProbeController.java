@@ -15,40 +15,40 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class SecurityProbeController {
 
-    @GetMapping("/api/v1/transactions/probe")
-    public String whoAmI(Authentication authentication) {
-        return authentication.getName();
-    }
+  @GetMapping("/api/v1/transactions/probe")
+  public String whoAmI(Authentication authentication) {
+    return authentication.getName();
+  }
 
-    @GetMapping("/api/v1/accounts/probe/transactions")
-    public String accountTransactions(Authentication authentication) {
-        return authentication.getName();
-    }
+  @GetMapping("/api/v1/accounts/probe/transactions")
+  public String accountTransactions(Authentication authentication) {
+    return authentication.getName();
+  }
 
-    @PostMapping("/api/v1/transactions/deposits")
-    public String create() {
-        return "created";
-    }
+  @PostMapping("/api/v1/transactions/deposits")
+  public String create() {
+    return "created";
+  }
 
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/api/v1/users/test-probe")
-    public String adminOnly() {
-        return "admin";
-    }
+  @PreAuthorize("hasRole('ADMIN')")
+  @GetMapping("/api/v1/users/test-probe")
+  public String adminOnly() {
+    return "admin";
+  }
 
-    @PostMapping("/api/v1/auth/probe")
-    public String protectedAuthRoute() {
-        return "auth-probe";
-    }
+  @PostMapping("/api/v1/auth/probe")
+  public String protectedAuthRoute() {
+    return "auth-probe";
+  }
 
-    @PatchMapping("/api/v1/auth/password")
-    public String passwordRoute() {
-        return "password-probe";
-    }
+  @PatchMapping("/api/v1/auth/password")
+  public String passwordRoute() {
+    return "password-probe";
+  }
 
-    @PreAuthorize("hasRole('AUDITOR')")
-    @GetMapping("/api/v1/audit-events/probe")
-    public String auditEvents() {
-        return "audit-events";
-    }
+  @PreAuthorize("hasRole('AUDITOR')")
+  @GetMapping("/api/v1/audit-events/probe")
+  public String auditEvents() {
+    return "audit-events";
+  }
 }

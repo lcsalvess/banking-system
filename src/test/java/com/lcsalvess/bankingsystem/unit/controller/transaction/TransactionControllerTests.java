@@ -1,5 +1,16 @@
 package com.lcsalvess.bankingsystem.unit.controller.transaction;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.transaction.TransactionController;
 import com.lcsalvess.bankingsystem.dto.request.transaction.AccountOperationRequestDto;
@@ -17,6 +28,10 @@ import com.lcsalvess.bankingsystem.service.transaction.idempotency.TransactionId
 import com.lcsalvess.bankingsystem.service.transaction.query.TransactionQueryService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -35,905 +50,889 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @WebMvcTest(TransactionController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import({
-        WebMvcTestSecurityConfig.class,
-        PaginationConfig.class
+    WebMvcTestSecurityConfig.class,
+    PaginationConfig.class
 })
 public class TransactionControllerTests {
 
-    private static final String PROVIDER =
-            "com.lcsalvess.bankingsystem.unit.controller.transaction.TransactionControllerTests#";
+  private static final String PROVIDER =
+      "com.lcsalvess.bankingsystem.unit.controller.transaction.TransactionControllerTests#";
 
-    private static final String IDEMPOTENCY_HEADER = "Idempotency-Key";
+  private static final String IDEMPOTENCY_HEADER = "Idempotency-Key";
 
-    private static final UUID IDEMPOTENCY_KEY =
-            UUID.fromString("8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210");
+  private static final UUID IDEMPOTENCY_KEY =
+      UUID.fromString("8e26c4a1-2f5d-4b8a-9c31-7d6e5f4a3210");
 
-    @Autowired
-    private MockMvc mockMvc;
+  @Autowired
+  private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+  @Autowired
+  private ObjectMapper objectMapper;
 
-    @MockitoBean
-    private TransactionQueryService transactionQueryService;
+  @MockitoBean
+  private TransactionQueryService transactionQueryService;
 
-    @MockitoBean
-    private TransactionIdempotencyService transactionIdempotencyService;
+  @MockitoBean
+  private TransactionIdempotencyService transactionIdempotencyService;
 
-    @Nested
-    @DisplayName("POST /api/v1/transactions/deposits")
-    class Deposit {
+  @Nested
+  @DisplayName("POST /api/v1/transactions/deposits")
+  class Deposit {
 
-        private static final String URL = "/api/v1/transactions/deposits";
+    private static final String URL = "/api/v1/transactions/deposits";
 
-        @Test
-        @DisplayName("Should deposit successfully")
-        void shouldDepositSuccessfully() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-            TransactionResponseDto expected =
-                    mockTransaction(TransactionType.DEPOSIT);
+    @Test
+    @DisplayName("Should deposit successfully")
+    void shouldDepositSuccessfully() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+      TransactionResponseDto expected =
+          mockTransaction(TransactionType.DEPOSIT);
 
-            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
-                    .thenReturn(expected);
+      when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
+          .thenReturn(expected);
 
-            MvcResult result = mockMvc.perform(post(URL)
-                            .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isCreated())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andReturn();
+      MvcResult result = mockMvc.perform(post(URL)
+              .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isCreated())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andReturn();
 
-            assertTransactionEquals(expected, readTransaction(result));
+      assertTransactionEquals(expected, readTransaction(result));
 
-            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "invalidOperationRequests")
-        @DisplayName("Should return 400 when request body is invalid")
-        void shouldReturnBadRequestWhenRequestBodyIsInvalid(
-                String scenario,
-                AccountOperationRequestDto request,
-                String field,
-                String message
-        ) throws Exception {
-            performValidationError(URL, request, field, message);
-
-            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when request body is missing")
-        void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
-            performMissingBody(URL);
-
-            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when digit is invalid")
-        void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new InvalidAccountDigitException(
-                                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT
-                            )
-                    );
-
-            performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
-
-            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when account does not exist")
-        void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new AccountNotFoundException(
-                                    ApiErrorMessages.ACCOUNT_NOT_FOUND
-                            )
-                    );
-
-            performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
-
-            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when account is not active")
-        void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new AccountIsNotActiveException(
-                                    ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
-                            )
-                    );
-
-            performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
-
-            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 500 when service throws an unexpected exception")
-        void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
-                    .thenThrow(new RuntimeException());
-
-            performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
-
-            verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
+      verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
     }
 
-    @Nested
-    @DisplayName("POST /api/v1/transactions/withdrawals")
-    class Withdraw {
-
-        private static final String URL = "/api/v1/transactions/withdrawals";
-
-        @Test
-        @DisplayName("Should withdraw successfully")
-        void shouldWithdrawSuccessfully() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-            TransactionResponseDto expected =
-                    mockTransaction(TransactionType.WITHDRAWAL);
-
-            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
-                    .thenReturn(expected);
-
-            MvcResult result = mockMvc.perform(post(URL)
-                            .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isCreated())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andReturn();
-
-            assertTransactionEquals(expected, readTransaction(result));
-
-            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "invalidOperationRequests")
-        @DisplayName("Should return 400 when request body is invalid")
-        void shouldReturnBadRequestWhenRequestBodyIsInvalid(
-                String scenario,
-                AccountOperationRequestDto request,
-                String field,
-                String message
-        ) throws Exception {
-            performValidationError(URL, request, field, message);
-
-            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when request body is missing")
-        void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
-            performMissingBody(URL);
-
-            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when digit is invalid")
-        void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new InvalidAccountDigitException(
-                                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT
-                            )
-                    );
-
-            performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
-
-            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when account does not exist")
-        void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new AccountNotFoundException(
-                                    ApiErrorMessages.ACCOUNT_NOT_FOUND
-                            )
-                    );
-
-            performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
-
-            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when balance is insufficient")
-        void shouldReturnConflictWhenBalanceIsInsufficient() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new InsufficientBalanceException(
-                                    ApiErrorMessages.INSUFFICIENT_BALANCE
-                            )
-                    );
-
-            performPost(URL, request, 409, ApiErrorMessages.INSUFFICIENT_BALANCE);
-
-            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when account is not active")
-        void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new AccountIsNotActiveException(
-                                    ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
-                            )
-                    );
-
-            performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
-
-            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 500 when service throws an unexpected exception")
-        void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            AccountOperationRequestDto request = operationRequest();
-
-            when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
-                    .thenThrow(new RuntimeException());
-
-            performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
-
-            verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-    }
-
-    @Nested
-    @DisplayName("POST /api/v1/transactions/transfers")
-    class Transfer {
-
-        private static final String URL = "/api/v1/transactions/transfers";
-
-        @Test
-        @DisplayName("Should transfer successfully")
-        void shouldTransferSuccessfully() throws Exception {
-            TransferRequestDto request = transferRequest();
-            TransactionResponseDto expected =
-                    mockTransaction(TransactionType.TRANSFER_SENT);
-
-            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
-                    .thenReturn(expected);
-
-            MvcResult result = mockMvc.perform(post(URL)
-                            .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isCreated())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andReturn();
-
-            assertTransactionEquals(expected, readTransaction(result));
-
-            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "invalidTransferRequests")
-        @DisplayName("Should return 400 when request body is invalid")
-        void shouldReturnBadRequestWhenRequestBodyIsInvalid(
-                String scenario,
-                TransferRequestDto request,
-                String field,
-                String message
-        ) throws Exception {
-            performValidationError(URL, request, field, message);
-
-            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when request body is missing")
-        void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
-            performMissingBody(URL);
-
-            verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when digit is invalid")
-        void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
-            TransferRequestDto request = transferRequest();
-
-            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new InvalidAccountDigitException(
-                                    ApiErrorMessages.INVALID_ACCOUNT_DIGIT
-                            )
-                    );
-
-            performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
-
-            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when an account does not exist")
-        void shouldReturnNotFoundWhenAnAccountDoesNotExist() throws Exception {
-            TransferRequestDto request = transferRequest();
-
-            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new AccountNotFoundException(
-                                    ApiErrorMessages.ACCOUNT_NOT_FOUND
-                            )
-                    );
-
-            performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
-
-            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when accounts are the same")
-        void shouldReturnConflictWhenAccountsAreSame() throws Exception {
-            TransferRequestDto request = transferRequest();
-
-            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new AccountsAreSameException(
-                                    ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT
-                            )
-                    );
-
-            performPost(
-                    URL,
-                    request,
-                    400,
-                    ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT
-            );
-
-            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when balance is insufficient")
-        void shouldReturnConflictWhenBalanceIsInsufficient() throws Exception {
-            TransferRequestDto request = transferRequest();
-
-            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new InsufficientBalanceException(
-                                    ApiErrorMessages.INSUFFICIENT_BALANCE
-                            )
-                    );
-
-            performPost(URL, request, 409, ApiErrorMessages.INSUFFICIENT_BALANCE);
-
-            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when an account is not active")
-        void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
-            TransferRequestDto request = transferRequest();
-
-            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
-                    .thenThrow(
-                            new AccountIsNotActiveException(
-                                    ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
-                            )
-                    );
-
-            performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
-
-            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 500 when service throws an unexpected exception")
-        void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            TransferRequestDto request = transferRequest();
-
-            when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
-                    .thenThrow(new RuntimeException());
-
-            performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
-
-            verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
-            verifyNoMoreInteractions(transactionIdempotencyService);
-            verifyNoInteractions(transactionQueryService);
-        }
-    }
-
-    @Nested
-    @DisplayName("GET /api/v1/transactions/{transactionCode}")
-    class FindByTransactionCode {
-
-        private static final String URL =
-                "/api/v1/transactions/{transactionCode}";
-
-        @Test
-        @DisplayName("Should return transaction successfully")
-        void shouldReturnTransactionSuccessfully() throws Exception {
-            UUID transactionCode = UUID.randomUUID();
-
-            TransactionResponseDto expected = new TransactionResponseDto(
-                    transactionCode,
-                    null,
-                    TransactionType.DEPOSIT,
-                    new BigDecimal("100.00"),
-                    Instant.parse("2026-01-15T13:30:45Z"),
-                    null,
-                    new BigDecimal("100.00")
-            );
-
-            when(transactionQueryService.findByTransactionCode(transactionCode))
-                    .thenReturn(expected);
-
-            MvcResult result =
-                    performGetByTransactionCode(transactionCode.toString())
-                            .andExpect(status().isOk())
-                            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                            .andExpect(
-                                    jsonPath("$.transactionCode")
-                                            .value(transactionCode.toString())
-                            )
-                            .andExpect(jsonPath("$.type").value("DEPOSIT"))
-                            .andExpect(jsonPath("$.amount").value(100.00))
-                            .andExpect(jsonPath("$.transferCode").doesNotExist())
-                            .andReturn();
-
-            assertTransactionEquals(expected, readTransaction(result));
-
-            verify(transactionQueryService).findByTransactionCode(transactionCode);
-            verifyNoMoreInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when transaction does not exist")
-        void shouldReturnNotFoundWhenTransactionDoesNotExist() throws Exception {
-            UUID transactionCode = UUID.randomUUID();
-
-            when(transactionQueryService.findByTransactionCode(transactionCode))
-                    .thenThrow(
-                            new TransactionNotFoundException(
-                                    ApiErrorMessages.TRANSACTION_NOT_FOUND
-                            )
-                    );
-
-            performErrorResponse(
-                    performGetByTransactionCode(transactionCode.toString()),
-                    404,
-                    ApiErrorMessages.TRANSACTION_NOT_FOUND
-            );
-
-            verify(transactionQueryService).findByTransactionCode(transactionCode);
-            verifyNoMoreInteractions(transactionQueryService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when transaction UUID is invalid")
-        void shouldReturnNotFoundWhenTransactionCodeIsInvalid() throws Exception {
-            performErrorResponse(
-                    performGetByTransactionCode("invalid-uuid"),
-                    404,
-                    ApiErrorMessages.RESOURCE_NOT_FOUND
-            );
-
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        @ParameterizedTest(name = "GET /api/v1/transactions/{0}")
-        @ValueSource(strings = {"deposits", "withdrawals", "transfers"})
-        @DisplayName("Should return 405 for GET on POST-only operation routes")
-        void shouldReturnMethodNotAllowedForGetOnOperationRoutes(
-                String operation
-        ) throws Exception {
-            performErrorResponse(
-                    performGetByTransactionCode(operation),
-                    405,
-                    ApiErrorMessages.METHOD_NOT_ALLOWED
-            );
-
-            verifyNoInteractions(transactionQueryService);
-        }
-
-        private ResultActions performGetByTransactionCode(
-                String transactionCode
-        ) throws Exception {
-            return mockMvc.perform(get(URL, transactionCode));
-        }
-    }
-
-    @SuppressWarnings("unused")
-    static Stream<Arguments> invalidOperationRequests() {
-        BigDecimal amount = new BigDecimal("100.00");
-
-        return Stream.of(
-                Arguments.of(
-                        "account number is null",
-                        new AccountOperationRequestDto(null, "5", amount),
-                        "accountNumber",
-                        ValidationMessages.REQUIRED_ACCOUNT_NUMBER
-                ),
-                Arguments.of(
-                        "account number is too short",
-                        new AccountOperationRequestDto("1234", "5", amount),
-                        "accountNumber",
-                        ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
-                ),
-                Arguments.of(
-                        "digit is null",
-                        new AccountOperationRequestDto("99999", null, amount),
-                        "digit",
-                        ValidationMessages.REQUIRED_ACCOUNT_DIGIT
-                ),
-                Arguments.of(
-                        "digit does not have 1 digit",
-                        new AccountOperationRequestDto("99999", "12", amount),
-                        "digit",
-                        ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
-                ),
-                Arguments.of(
-                        "amount is null",
-                        new AccountOperationRequestDto("99999", "5", null),
-                        "amount",
-                        ValidationMessages.REQUIRED_OPERATION_AMOUNT
-                ),
-                Arguments.of(
-                        "amount is zero",
-                        new AccountOperationRequestDto(
-                                "99999",
-                                "5",
-                                BigDecimal.ZERO
-                        ),
-                        "amount",
-                        ValidationMessages.POSITIVE_OPERATION_AMOUNT
-                ),
-                Arguments.of(
-                        "amount is negative",
-                        new AccountOperationRequestDto(
-                                "99999",
-                                "5",
-                                new BigDecimal("-1.00")
-                        ),
-                        "amount",
-                        ValidationMessages.POSITIVE_OPERATION_AMOUNT
-                )
-        );
-    }
-
-    @SuppressWarnings("unused")
-    static Stream<Arguments> invalidTransferRequests() {
-        BigDecimal amount = new BigDecimal("100.00");
-
-        return Stream.of(
-                Arguments.of(
-                        "origin account number is null",
-                        new TransferRequestDto(
-                                null,
-                                "5",
-                                "88888",
-                                "3",
-                                amount
-                        ),
-                        "fromAccountNumber",
-                        ValidationMessages.REQUIRED_SOURCE_ACCOUNT_NUMBER
-                ),
-                Arguments.of(
-                        "origin account number is too short",
-                        new TransferRequestDto(
-                                "1234",
-                                "5",
-                                "88888",
-                                "3",
-                                amount
-                        ),
-                        "fromAccountNumber",
-                        ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
-                ),
-                Arguments.of(
-                        "origin digit is null",
-                        new TransferRequestDto(
-                                "99999",
-                                null,
-                                "88888",
-                                "3",
-                                amount
-                        ),
-                        "fromAccountDigit",
-                        ValidationMessages.REQUIRED_SOURCE_ACCOUNT_DIGIT
-                ),
-                Arguments.of(
-                        "origin digit does not have 1 digit",
-                        new TransferRequestDto(
-                                "99999",
-                                "12",
-                                "88888",
-                                "3",
-                                amount
-                        ),
-                        "fromAccountDigit",
-                        ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
-                ),
-                Arguments.of(
-                        "destination account number is null",
-                        new TransferRequestDto(
-                                "99999",
-                                "5",
-                                null,
-                                "3",
-                                amount
-                        ),
-                        "toAccountNumber",
-                        ValidationMessages.REQUIRED_DESTINATION_ACCOUNT_NUMBER
-                ),
-                Arguments.of(
-                        "destination account number is too short",
-                        new TransferRequestDto(
-                                "99999",
-                                "5",
-                                "1234",
-                                "3",
-                                amount
-                        ),
-                        "toAccountNumber",
-                        ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
-                ),
-                Arguments.of(
-                        "destination digit is null",
-                        new TransferRequestDto(
-                                "99999",
-                                "5",
-                                "88888",
-                                null,
-                                amount
-                        ),
-                        "toAccountDigit",
-                        ValidationMessages.REQUIRED_DESTINATION_ACCOUNT_DIGIT
-                ),
-                Arguments.of(
-                        "destination digit does not have 1 digit",
-                        new TransferRequestDto(
-                                "99999",
-                                "5",
-                                "88888",
-                                "12",
-                                amount
-                        ),
-                        "toAccountDigit",
-                        ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
-                ),
-                Arguments.of(
-                        "amount is null",
-                        new TransferRequestDto(
-                                "99999",
-                                "5",
-                                "88888",
-                                "3",
-                                null
-                        ),
-                        "amount",
-                        ValidationMessages.REQUIRED_TRANSFER_AMOUNT
-                ),
-                Arguments.of(
-                        "amount is zero",
-                        new TransferRequestDto(
-                                "99999",
-                                "5",
-                                "88888",
-                                "3",
-                                BigDecimal.ZERO
-                        ),
-                        "amount",
-                        ValidationMessages.POSITIVE_TRANSFER_AMOUNT
-                ),
-                Arguments.of(
-                        "amount is negative",
-                        new TransferRequestDto(
-                                "99999",
-                                "5",
-                                "88888",
-                                "3",
-                                new BigDecimal("-1.00")
-                        ),
-                        "amount",
-                        ValidationMessages.POSITIVE_TRANSFER_AMOUNT
-                )
-        );
-    }
-
-    private void performPost(
-            String url,
-            Object request,
-            int status,
-            String message
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "invalidOperationRequests")
+    @DisplayName("Should return 400 when request body is invalid")
+    void shouldReturnBadRequestWhenRequestBodyIsInvalid(
+        String scenario,
+        AccountOperationRequestDto request,
+        String field,
+        String message
     ) throws Exception {
-        ResultActions result = mockMvc.perform(
-                post(url)
-                        .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-        );
+      performValidationError(URL, request, field, message);
 
-        performErrorResponse(result, status, message);
+      verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
     }
 
-    private void performErrorResponse(
-            ResultActions result,
-            int status,
-            String message
+    @Test
+    @DisplayName("Should return 400 when request body is missing")
+    void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
+      performMissingBody(URL);
+
+      verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when digit is invalid")
+    void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new InvalidAccountDigitException(
+                  ApiErrorMessages.INVALID_ACCOUNT_DIGIT
+              )
+          );
+
+      performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
+
+      verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when account does not exist")
+    void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new AccountNotFoundException(
+                  ApiErrorMessages.ACCOUNT_NOT_FOUND
+              )
+          );
+
+      performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
+
+      verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when account is not active")
+    void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new AccountIsNotActiveException(
+                  ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
+              )
+          );
+
+      performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
+
+      verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 500 when service throws an unexpected exception")
+    void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.deposit(IDEMPOTENCY_KEY, request))
+          .thenThrow(new RuntimeException());
+
+      performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
+
+      verify(transactionIdempotencyService).deposit(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+  }
+
+  @Nested
+  @DisplayName("POST /api/v1/transactions/withdrawals")
+  class Withdraw {
+
+    private static final String URL = "/api/v1/transactions/withdrawals";
+
+    @Test
+    @DisplayName("Should withdraw successfully")
+    void shouldWithdrawSuccessfully() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+      TransactionResponseDto expected =
+          mockTransaction(TransactionType.WITHDRAWAL);
+
+      when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
+          .thenReturn(expected);
+
+      MvcResult result = mockMvc.perform(post(URL)
+              .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isCreated())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andReturn();
+
+      assertTransactionEquals(expected, readTransaction(result));
+
+      verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "invalidOperationRequests")
+    @DisplayName("Should return 400 when request body is invalid")
+    void shouldReturnBadRequestWhenRequestBodyIsInvalid(
+        String scenario,
+        AccountOperationRequestDto request,
+        String field,
+        String message
     ) throws Exception {
-        result
-                .andExpect(status().is(status))
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(status))
-                .andExpect(jsonPath("$.message").value(message));
+      performValidationError(URL, request, field, message);
+
+      verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
     }
 
-    private void performValidationError(
-            String url,
-            Object request,
-            String field,
-            String message
+    @Test
+    @DisplayName("Should return 400 when request body is missing")
+    void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
+      performMissingBody(URL);
+
+      verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when digit is invalid")
+    void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new InvalidAccountDigitException(
+                  ApiErrorMessages.INVALID_ACCOUNT_DIGIT
+              )
+          );
+
+      performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
+
+      verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when account does not exist")
+    void shouldReturnNotFoundWhenAccountDoesNotExist() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new AccountNotFoundException(
+                  ApiErrorMessages.ACCOUNT_NOT_FOUND
+              )
+          );
+
+      performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
+
+      verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when balance is insufficient")
+    void shouldReturnConflictWhenBalanceIsInsufficient() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new InsufficientBalanceException(
+                  ApiErrorMessages.INSUFFICIENT_BALANCE
+              )
+          );
+
+      performPost(URL, request, 409, ApiErrorMessages.INSUFFICIENT_BALANCE);
+
+      verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when account is not active")
+    void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new AccountIsNotActiveException(
+                  ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
+              )
+          );
+
+      performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
+
+      verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 500 when service throws an unexpected exception")
+    void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
+      AccountOperationRequestDto request = operationRequest();
+
+      when(transactionIdempotencyService.withdraw(IDEMPOTENCY_KEY, request))
+          .thenThrow(new RuntimeException());
+
+      performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
+
+      verify(transactionIdempotencyService).withdraw(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+  }
+
+  @Nested
+  @DisplayName("POST /api/v1/transactions/transfers")
+  class Transfer {
+
+    private static final String URL = "/api/v1/transactions/transfers";
+
+    @Test
+    @DisplayName("Should transfer successfully")
+    void shouldTransferSuccessfully() throws Exception {
+      TransferRequestDto request = transferRequest();
+      TransactionResponseDto expected =
+          mockTransaction(TransactionType.TRANSFER_SENT);
+
+      when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
+          .thenReturn(expected);
+
+      MvcResult result = mockMvc.perform(post(URL)
+              .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(objectMapper.writeValueAsString(request)))
+          .andExpect(status().isCreated())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andReturn();
+
+      assertTransactionEquals(expected, readTransaction(result));
+
+      verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "invalidTransferRequests")
+    @DisplayName("Should return 400 when request body is invalid")
+    void shouldReturnBadRequestWhenRequestBodyIsInvalid(
+        String scenario,
+        TransferRequestDto request,
+        String field,
+        String message
     ) throws Exception {
-        mockMvc.perform(
-                        post(url)
-                                .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
-                .andExpect(jsonPath("$.errors." + field).value(message));
+      performValidationError(URL, request, field, message);
+
+      verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
     }
 
-    private void performMissingBody(String url) throws Exception {
-        mockMvc.perform(
-                        post(url)
-                                .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
-                                .contentType(MediaType.APPLICATION_JSON)
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(ApiErrorMessages.INVALID_REQUEST_DATA));
+    @Test
+    @DisplayName("Should return 400 when request body is missing")
+    void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
+      performMissingBody(URL);
+
+      verifyNoInteractions(transactionIdempotencyService, transactionQueryService);
     }
 
-    private TransactionResponseDto readTransaction(MvcResult result)
-            throws Exception {
-        return objectMapper.readValue(
-                result.getResponse().getContentAsString(),
-                TransactionResponseDto.class
-        );
+    @Test
+    @DisplayName("Should return 400 when digit is invalid")
+    void shouldReturnBadRequestWhenDigitIsInvalid() throws Exception {
+      TransferRequestDto request = transferRequest();
+
+      when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new InvalidAccountDigitException(
+                  ApiErrorMessages.INVALID_ACCOUNT_DIGIT
+              )
+          );
+
+      performPost(URL, request, 400, ApiErrorMessages.INVALID_ACCOUNT_DIGIT);
+
+      verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
     }
 
-    private static void assertTransactionEquals(
-            TransactionResponseDto expected,
-            TransactionResponseDto actual
-    ) {
-        assertEquals(expected.transactionCode(), actual.transactionCode());
-        assertEquals(expected.transferCode(), actual.transferCode());
-        assertEquals(expected.type(), actual.type());
-        assertEquals(
-                0,
-                expected.amount().compareTo(actual.amount())
-        );
-        assertEquals(expected.createdAt(), actual.createdAt());
-        assertEquals(expected.yieldDate(), actual.yieldDate());
-        assertEquals(
-                0,
-                expected.balanceAfter().compareTo(actual.balanceAfter())
-        );
+    @Test
+    @DisplayName("Should return 404 when an account does not exist")
+    void shouldReturnNotFoundWhenAnAccountDoesNotExist() throws Exception {
+      TransferRequestDto request = transferRequest();
+
+      when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new AccountNotFoundException(
+                  ApiErrorMessages.ACCOUNT_NOT_FOUND
+              )
+          );
+
+      performPost(URL, request, 404, ApiErrorMessages.ACCOUNT_NOT_FOUND);
+
+      verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
     }
 
-    private static AccountOperationRequestDto operationRequest() {
-        return new AccountOperationRequestDto(
+    @Test
+    @DisplayName("Should return 400 when accounts are the same")
+    void shouldReturnConflictWhenAccountsAreSame() throws Exception {
+      TransferRequestDto request = transferRequest();
+
+      when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new AccountsAreSameException(
+                  ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT
+              )
+          );
+
+      performPost(
+          URL,
+          request,
+          400,
+          ApiErrorMessages.SAME_SOURCE_AND_DESTINATION_ACCOUNT
+      );
+
+      verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when balance is insufficient")
+    void shouldReturnConflictWhenBalanceIsInsufficient() throws Exception {
+      TransferRequestDto request = transferRequest();
+
+      when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new InsufficientBalanceException(
+                  ApiErrorMessages.INSUFFICIENT_BALANCE
+              )
+          );
+
+      performPost(URL, request, 409, ApiErrorMessages.INSUFFICIENT_BALANCE);
+
+      verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when an account is not active")
+    void shouldReturnConflictWhenAccountIsNotActive() throws Exception {
+      TransferRequestDto request = transferRequest();
+
+      when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
+          .thenThrow(
+              new AccountIsNotActiveException(
+                  ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE
+              )
+          );
+
+      performPost(URL, request, 409, ApiErrorMessages.ACCOUNT_IS_NOT_ACTIVE);
+
+      verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 500 when service throws an unexpected exception")
+    void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
+      TransferRequestDto request = transferRequest();
+
+      when(transactionIdempotencyService.transfer(IDEMPOTENCY_KEY, request))
+          .thenThrow(new RuntimeException());
+
+      performPost(URL, request, 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
+
+      verify(transactionIdempotencyService).transfer(IDEMPOTENCY_KEY, request);
+      verifyNoMoreInteractions(transactionIdempotencyService);
+      verifyNoInteractions(transactionQueryService);
+    }
+  }
+
+  @Nested
+  @DisplayName("GET /api/v1/transactions/{transactionCode}")
+  class FindByTransactionCode {
+
+    private static final String URL =
+        "/api/v1/transactions/{transactionCode}";
+
+    @Test
+    @DisplayName("Should return transaction successfully")
+    void shouldReturnTransactionSuccessfully() throws Exception {
+      UUID transactionCode = UUID.randomUUID();
+
+      TransactionResponseDto expected = new TransactionResponseDto(
+          transactionCode,
+          null,
+          TransactionType.DEPOSIT,
+          new BigDecimal("100.00"),
+          Instant.parse("2026-01-15T13:30:45Z"),
+          null,
+          new BigDecimal("100.00")
+      );
+
+      when(transactionQueryService.findByTransactionCode(transactionCode))
+          .thenReturn(expected);
+
+      MvcResult result =
+          performGetByTransactionCode(transactionCode.toString())
+              .andExpect(status().isOk())
+              .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+              .andExpect(
+                  jsonPath("$.transactionCode")
+                      .value(transactionCode.toString())
+              )
+              .andExpect(jsonPath("$.type").value("DEPOSIT"))
+              .andExpect(jsonPath("$.amount").value(100.00))
+              .andExpect(jsonPath("$.transferCode").doesNotExist())
+              .andReturn();
+
+      assertTransactionEquals(expected, readTransaction(result));
+
+      verify(transactionQueryService).findByTransactionCode(transactionCode);
+      verifyNoMoreInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when transaction does not exist")
+    void shouldReturnNotFoundWhenTransactionDoesNotExist() throws Exception {
+      UUID transactionCode = UUID.randomUUID();
+
+      when(transactionQueryService.findByTransactionCode(transactionCode))
+          .thenThrow(
+              new TransactionNotFoundException(
+                  ApiErrorMessages.TRANSACTION_NOT_FOUND
+              )
+          );
+
+      performErrorResponse(
+          performGetByTransactionCode(transactionCode.toString()),
+          404,
+          ApiErrorMessages.TRANSACTION_NOT_FOUND
+      );
+
+      verify(transactionQueryService).findByTransactionCode(transactionCode);
+      verifyNoMoreInteractions(transactionQueryService);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when transaction UUID is invalid")
+    void shouldReturnNotFoundWhenTransactionCodeIsInvalid() throws Exception {
+      performErrorResponse(
+          performGetByTransactionCode("invalid-uuid"),
+          404,
+          ApiErrorMessages.RESOURCE_NOT_FOUND
+      );
+
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    @ParameterizedTest(name = "GET /api/v1/transactions/{0}")
+    @ValueSource(strings = {"deposits", "withdrawals", "transfers"})
+    @DisplayName("Should return 405 for GET on POST-only operation routes")
+    void shouldReturnMethodNotAllowedForGetOnOperationRoutes(
+        String operation
+    ) throws Exception {
+      performErrorResponse(
+          performGetByTransactionCode(operation),
+          405,
+          ApiErrorMessages.METHOD_NOT_ALLOWED
+      );
+
+      verifyNoInteractions(transactionQueryService);
+    }
+
+    private ResultActions performGetByTransactionCode(
+        String transactionCode
+    ) throws Exception {
+      return mockMvc.perform(get(URL, transactionCode));
+    }
+  }
+
+  @SuppressWarnings("unused")
+  static Stream<Arguments> invalidOperationRequests() {
+    BigDecimal amount = new BigDecimal("100.00");
+
+    return Stream.of(
+        Arguments.of(
+            "account number is null",
+            new AccountOperationRequestDto(null, "5", amount),
+            "accountNumber",
+            ValidationMessages.REQUIRED_ACCOUNT_NUMBER
+        ),
+        Arguments.of(
+            "account number is too short",
+            new AccountOperationRequestDto("1234", "5", amount),
+            "accountNumber",
+            ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
+        ),
+        Arguments.of(
+            "digit is null",
+            new AccountOperationRequestDto("99999", null, amount),
+            "digit",
+            ValidationMessages.REQUIRED_ACCOUNT_DIGIT
+        ),
+        Arguments.of(
+            "digit does not have 1 digit",
+            new AccountOperationRequestDto("99999", "12", amount),
+            "digit",
+            ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
+        ),
+        Arguments.of(
+            "amount is null",
+            new AccountOperationRequestDto("99999", "5", null),
+            "amount",
+            ValidationMessages.REQUIRED_OPERATION_AMOUNT
+        ),
+        Arguments.of(
+            "amount is zero",
+            new AccountOperationRequestDto(
                 "99999",
                 "5",
-                new BigDecimal("100.00")
-        );
-    }
+                BigDecimal.ZERO
+            ),
+            "amount",
+            ValidationMessages.POSITIVE_OPERATION_AMOUNT
+        ),
+        Arguments.of(
+            "amount is negative",
+            new AccountOperationRequestDto(
+                "99999",
+                "5",
+                new BigDecimal("-1.00")
+            ),
+            "amount",
+            ValidationMessages.POSITIVE_OPERATION_AMOUNT
+        )
+    );
+  }
 
-    private static TransferRequestDto transferRequest() {
-        return new TransferRequestDto(
+  @SuppressWarnings("unused")
+  static Stream<Arguments> invalidTransferRequests() {
+    BigDecimal amount = new BigDecimal("100.00");
+
+    return Stream.of(
+        Arguments.of(
+            "origin account number is null",
+            new TransferRequestDto(
+                null,
+                "5",
+                "88888",
+                "3",
+                amount
+            ),
+            "fromAccountNumber",
+            ValidationMessages.REQUIRED_SOURCE_ACCOUNT_NUMBER
+        ),
+        Arguments.of(
+            "origin account number is too short",
+            new TransferRequestDto(
+                "1234",
+                "5",
+                "88888",
+                "3",
+                amount
+            ),
+            "fromAccountNumber",
+            ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
+        ),
+        Arguments.of(
+            "origin digit is null",
+            new TransferRequestDto(
+                "99999",
+                null,
+                "88888",
+                "3",
+                amount
+            ),
+            "fromAccountDigit",
+            ValidationMessages.REQUIRED_SOURCE_ACCOUNT_DIGIT
+        ),
+        Arguments.of(
+            "origin digit does not have 1 digit",
+            new TransferRequestDto(
+                "99999",
+                "12",
+                "88888",
+                "3",
+                amount
+            ),
+            "fromAccountDigit",
+            ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
+        ),
+        Arguments.of(
+            "destination account number is null",
+            new TransferRequestDto(
+                "99999",
+                "5",
+                null,
+                "3",
+                amount
+            ),
+            "toAccountNumber",
+            ValidationMessages.REQUIRED_DESTINATION_ACCOUNT_NUMBER
+        ),
+        Arguments.of(
+            "destination account number is too short",
+            new TransferRequestDto(
+                "99999",
+                "5",
+                "1234",
+                "3",
+                amount
+            ),
+            "toAccountNumber",
+            ValidationMessages.INVALID_ACCOUNT_NUMBER_LENGTH
+        ),
+        Arguments.of(
+            "destination digit is null",
+            new TransferRequestDto(
+                "99999",
+                "5",
+                "88888",
+                null,
+                amount
+            ),
+            "toAccountDigit",
+            ValidationMessages.REQUIRED_DESTINATION_ACCOUNT_DIGIT
+        ),
+        Arguments.of(
+            "destination digit does not have 1 digit",
+            new TransferRequestDto(
+                "99999",
+                "5",
+                "88888",
+                "12",
+                amount
+            ),
+            "toAccountDigit",
+            ValidationMessages.INVALID_ACCOUNT_CHECK_DIGIT_LENGTH
+        ),
+        Arguments.of(
+            "amount is null",
+            new TransferRequestDto(
                 "99999",
                 "5",
                 "88888",
                 "3",
-                new BigDecimal("100.00")
-        );
-    }
+                null
+            ),
+            "amount",
+            ValidationMessages.REQUIRED_TRANSFER_AMOUNT
+        ),
+        Arguments.of(
+            "amount is zero",
+            new TransferRequestDto(
+                "99999",
+                "5",
+                "88888",
+                "3",
+                BigDecimal.ZERO
+            ),
+            "amount",
+            ValidationMessages.POSITIVE_TRANSFER_AMOUNT
+        ),
+        Arguments.of(
+            "amount is negative",
+            new TransferRequestDto(
+                "99999",
+                "5",
+                "88888",
+                "3",
+                new BigDecimal("-1.00")
+            ),
+            "amount",
+            ValidationMessages.POSITIVE_TRANSFER_AMOUNT
+        )
+    );
+  }
 
-    private static TransactionResponseDto mockTransaction(
-            TransactionType type
-    ) {
-        return new TransactionResponseDto(
-                UUID.randomUUID(),
-                type == TransactionType.TRANSFER_SENT
-                        ? UUID.randomUUID()
-                        : null,
-                type,
-                new BigDecimal("100.00"),
-                Instant.parse("2026-01-15T13:30:45Z"),
-                null,
-                new BigDecimal("100.00")
-        );
-    }
+  private void performPost(
+      String url,
+      Object request,
+      int status,
+      String message
+  ) throws Exception {
+    ResultActions result = mockMvc.perform(
+        post(url)
+            .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request))
+    );
+
+    performErrorResponse(result, status, message);
+  }
+
+  private void performErrorResponse(
+      ResultActions result,
+      int status,
+      String message
+  ) throws Exception {
+    result
+        .andExpect(status().is(status))
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(status))
+        .andExpect(jsonPath("$.message").value(message));
+  }
+
+  private void performValidationError(
+      String url,
+      Object request,
+      String field,
+      String message
+  ) throws Exception {
+    mockMvc.perform(
+            post(url)
+                .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
+        .andExpect(jsonPath("$.errors." + field).value(message));
+  }
+
+  private void performMissingBody(String url) throws Exception {
+    mockMvc.perform(
+            post(url)
+                .header(IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY.toString())
+                .contentType(MediaType.APPLICATION_JSON)
+        )
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message").value(ApiErrorMessages.INVALID_REQUEST_DATA));
+  }
+
+  private TransactionResponseDto readTransaction(MvcResult result)
+      throws Exception {
+    return objectMapper.readValue(
+        result.getResponse().getContentAsString(),
+        TransactionResponseDto.class
+    );
+  }
+
+  private static void assertTransactionEquals(
+      TransactionResponseDto expected,
+      TransactionResponseDto actual
+  ) {
+    assertEquals(expected.transactionCode(), actual.transactionCode());
+    assertEquals(expected.transferCode(), actual.transferCode());
+    assertEquals(expected.type(), actual.type());
+    assertEquals(
+        0,
+        expected.amount().compareTo(actual.amount())
+    );
+    assertEquals(expected.createdAt(), actual.createdAt());
+    assertEquals(expected.yieldDate(), actual.yieldDate());
+    assertEquals(
+        0,
+        expected.balanceAfter().compareTo(actual.balanceAfter())
+    );
+  }
+
+  private static AccountOperationRequestDto operationRequest() {
+    return new AccountOperationRequestDto(
+        "99999",
+        "5",
+        new BigDecimal("100.00")
+    );
+  }
+
+  private static TransferRequestDto transferRequest() {
+    return new TransferRequestDto(
+        "99999",
+        "5",
+        "88888",
+        "3",
+        new BigDecimal("100.00")
+    );
+  }
+
+  private static TransactionResponseDto mockTransaction(
+      TransactionType type
+  ) {
+    return new TransactionResponseDto(
+        UUID.randomUUID(),
+        type == TransactionType.TRANSFER_SENT
+            ? UUID.randomUUID()
+            : null,
+        type,
+        new BigDecimal("100.00"),
+        Instant.parse("2026-01-15T13:30:45Z"),
+        null,
+        new BigDecimal("100.00")
+    );
+  }
 }

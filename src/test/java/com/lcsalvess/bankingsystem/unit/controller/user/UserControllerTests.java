@@ -1,5 +1,18 @@
 package com.lcsalvess.bankingsystem.unit.controller.user;
 
+import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.user.UserController;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDto;
@@ -17,6 +30,9 @@ import com.lcsalvess.bankingsystem.exception.user.UsernameAlreadyExistsException
 import com.lcsalvess.bankingsystem.service.user.UserService;
 import com.lcsalvess.bankingsystem.unit.config.WebMvcTestSecurityConfig;
 import com.lcsalvess.bankingsystem.validation.ValidationMessages;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -41,834 +57,870 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.stream.Stream;
-
-import static org.hamcrest.Matchers.hasSize;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @WebMvcTest(UserController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import({
-        WebMvcTestSecurityConfig.class,
-        PaginationConfig.class
+    WebMvcTestSecurityConfig.class,
+    PaginationConfig.class
 })
 public class UserControllerTests {
 
-    private static final String PROVIDER = "com.lcsalvess.bankingsystem.unit.controller.user.UserControllerTests#";
-    private static final String USERS_URL = "/api/v1/users";
-    private static final String REACTIVATE_URL = "/api/v1/users/{employeeId}/reactivate";
-    private static final String DEACTIVATE_URL = "/api/v1/users/{employeeId}/deactivate";
-    private static final String ROLE_URL = "/api/v1/users/{employeeId}/role";
+  private static final String PROVIDER =
+      "com.lcsalvess.bankingsystem.unit.controller.user.UserControllerTests#";
 
-    private static final String VALID_EMPLOYEE_ID = "EMP-000004";
-    private static final String UNKNOWN_EMPLOYEE_ID = "HR-EXT-999999";
-    private static final String VALID_FULL_NAME = "John Michael Doe";
-    private static final String VALID_USERNAME = "john.doe";
-    private static final String VALID_EMAIL = "john.doe@example.com";
-    private static final String VALID_PASSWORD = "SecurePass123!";
-    private static final Role VALID_ROLE = Role.EMPLOYEE;
+  private static final String USERS_URL = "/api/v1/users";
+  private static final String REACTIVATE_URL = "/api/v1/users/{employeeId}/reactivate";
+  private static final String DEACTIVATE_URL = "/api/v1/users/{employeeId}/deactivate";
+  private static final String ROLE_URL = "/api/v1/users/{employeeId}/role";
 
-    private static final Instant CREATED_AT = Instant.parse("2026-10-16T17:30:00Z");
-    private static final Instant UPDATED_AT = Instant.parse("2026-10-16T17:31:00Z");
+  private static final String VALID_EMPLOYEE_ID = "EMP-000004";
+  private static final String UNKNOWN_EMPLOYEE_ID = "HR-EXT-999999";
+  private static final String VALID_FULL_NAME = "John Michael Doe";
+  private static final String VALID_USERNAME = "john.doe";
+  private static final String VALID_EMAIL = "john.doe@example.com";
+  private static final String VALID_PASSWORD = "SecurePass123!";
+  private static final Role VALID_ROLE = Role.EMPLOYEE;
 
-    // Violates only @Size(max = 254).
-    private static final String EMAIL_ABOVE_LIMIT =
-            "a".repeat(64) + "@"
-                    + "b".repeat(63) + "."
-                    + "c".repeat(63) + "."
-                    + "d".repeat(60) + ".com";
+  private static final Instant CREATED_AT = Instant.parse("2026-10-16T17:30:00Z");
+  private static final Instant UPDATED_AT = Instant.parse("2026-10-16T17:31:00Z");
 
-    @Autowired
-    private MockMvc mockMvc;
+  // Violates only @Size(max = 254).
+  private static final String EMAIL_ABOVE_LIMIT =
+      "a".repeat(64) + "@"
+          + "b".repeat(63) + "."
+          + "c".repeat(63) + "."
+          + "d".repeat(60) + ".com";
 
-    @Autowired
-    private ObjectMapper objectMapper;
+  @Autowired
+  private MockMvc mockMvc;
 
-    @MockitoBean
-    private UserService userService;
+  @Autowired
+  private ObjectMapper objectMapper;
 
-    @Nested
-    @DisplayName("GET /api/v1/users")
-    class FindAll {
+  @MockitoBean
+  private UserService userService;
 
-        private final Pageable defaultPageable = PageRequest.of(
-                0,
-                20,
-                Sort.by("employeeId").ascending()
-        );
+  @Nested
+  @DisplayName("GET /api/v1/users")
+  class FindAll {
 
-        @Test
-        @DisplayName("Should return a page of users successfully")
-        void shouldReturnPageOfUsersSuccessfully() throws Exception {
-            UserSummaryResponseDto user1 = new UserSummaryResponseDto(
-                    "EMP-000001",
-                    "System Administrator",
-                    "admin",
-                    "admin@example.com",
-                    Role.ADMIN,
-                    true
-            );
-            UserSummaryResponseDto user2 = new UserSummaryResponseDto(
-                    "EMP-000002",
-                    "John Michael Doe",
-                    "john.doe",
-                    VALID_EMAIL,
-                    Role.EMPLOYEE,
-                    false
-            );
+    private final Pageable defaultPageable = PageRequest.of(
+        0,
+        20,
+        Sort.by("employeeId").ascending()
+    );
 
-            Page<UserSummaryResponseDto> users = new PageImpl<>(
-                    List.of(user1, user2),
-                    defaultPageable,
-                    2
-            );
+    @Test
+    @DisplayName("Should return a page of users successfully")
+    void shouldReturnPageOfUsersSuccessfully() throws Exception {
+      UserSummaryResponseDto user1 = new UserSummaryResponseDto(
+          "EMP-000001",
+          "System Administrator",
+          "admin",
+          "admin@example.com",
+          Role.ADMIN,
+          true
+      );
 
-            when(userService.findAll(null, null, null, defaultPageable)).thenReturn(users);
+      UserSummaryResponseDto user2 = new UserSummaryResponseDto(
+          "EMP-000002",
+          "John Michael Doe",
+          "john.doe",
+          VALID_EMAIL,
+          Role.EMPLOYEE,
+          false
+      );
 
-            mockMvc.perform(get(USERS_URL))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.content", hasSize(2)))
-                    .andExpect(jsonPath("$.content[0].employeeId").value("EMP-000001"))
-                    .andExpect(jsonPath("$.content[0].fullName").value("System Administrator"))
-                    .andExpect(jsonPath("$.content[0].username").value("admin"))
-                    .andExpect(jsonPath("$.content[0].role").value("ADMIN"))
-                    .andExpect(jsonPath("$.content[0].active").value(true))
-                    .andExpect(jsonPath("$.content[1].employeeId").value("EMP-000002"))
-                    .andExpect(jsonPath("$.content[1].fullName").value("John Michael Doe"))
-                    .andExpect(jsonPath("$.content[1].active").value(false))
-                    .andExpect(jsonPath("$.content[0].id").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].password").doesNotExist())
-                    .andExpect(jsonPath("$.page.number").value(0))
-                    .andExpect(jsonPath("$.page.size").value(20))
-                    .andExpect(jsonPath("$.page.totalElements").value(2))
-                    .andExpect(jsonPath("$.page.totalPages").value(1));
+      Page<UserSummaryResponseDto> users = new PageImpl<>(
+          List.of(user1, user2),
+          defaultPageable,
+          2
+      );
 
-            verify(userService).findAll(null, null, null, defaultPageable);
-            verifyNoMoreInteractions(userService);
-        }
+      when(userService.findAll(null, null, null, defaultPageable))
+          .thenReturn(users);
 
-        @Test
-        @DisplayName("Should return an empty page when there are no users")
-        void shouldReturnEmptyPageWhenThereAreNoUsers() throws Exception {
-            Page<UserSummaryResponseDto> emptyPage = new PageImpl<>(
-                    List.of(),
-                    defaultPageable,
-                    0
-            );
+      mockMvc.perform(get(USERS_URL))
+          .andExpect(status().isOk())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andExpect(jsonPath("$.content", hasSize(2)))
+          .andExpect(jsonPath("$.content[0].employeeId").value("EMP-000001"))
+          .andExpect(jsonPath("$.content[0].fullName").value("System Administrator"))
+          .andExpect(jsonPath("$.content[0].username").value("admin"))
+          .andExpect(jsonPath("$.content[0].role").value("ADMIN"))
+          .andExpect(jsonPath("$.content[0].active").value(true))
+          .andExpect(jsonPath("$.content[1].employeeId").value("EMP-000002"))
+          .andExpect(jsonPath("$.content[1].fullName").value("John Michael Doe"))
+          .andExpect(jsonPath("$.content[1].active").value(false))
+          .andExpect(jsonPath("$.content[0].id").doesNotExist())
+          .andExpect(jsonPath("$.content[0].password").doesNotExist())
+          .andExpect(jsonPath("$.page.number").value(0))
+          .andExpect(jsonPath("$.page.size").value(20))
+          .andExpect(jsonPath("$.page.totalElements").value(2))
+          .andExpect(jsonPath("$.page.totalPages").value(1));
 
-            when(userService.findAll(null, null, null, defaultPageable)).thenReturn(emptyPage);
-
-            mockMvc.perform(get(USERS_URL))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.content", hasSize(0)))
-                    .andExpect(jsonPath("$.page.totalElements").value(0))
-                    .andExpect(jsonPath("$.page.totalPages").value(0));
-
-            verify(userService).findAll(null, null, null, defaultPageable);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should apply filters, pagination and sorting parameters")
-        void shouldApplyFiltersPaginationAndSortingParameters() throws Exception {
-            Pageable pageable = PageRequest.of(
-                    1,
-                    5,
-                    Sort.by("username").descending()
-            );
-
-            Page<UserSummaryResponseDto> users = new PageImpl<>(
-                    List.of(),
-                    pageable,
-                    0
-            );
-
-            when(userService.findAll("lucas", Role.ADMIN, true, pageable)).thenReturn(users);
-
-            mockMvc.perform(get(USERS_URL)
-                            .param("search", "lucas")
-                            .param("role", "ADMIN")
-                            .param("active", "true")
-                            .param("page", "1")
-                            .param("size", "5")
-                            .param("sort", "username,desc"))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.content", hasSize(0)))
-                    .andExpect(jsonPath("$.page.number").value(1))
-                    .andExpect(jsonPath("$.page.size").value(5));
-
-            verify(userService).findAll("lucas", Role.ADMIN, true, pageable);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should filter by inactive users")
-        void shouldFilterByInactiveUsers() throws Exception {
-            when(userService.findAll(null, null, false, defaultPageable))
-                    .thenReturn(new PageImpl<>(List.of(), defaultPageable, 0));
-
-            mockMvc.perform(get(USERS_URL).param("active", "false"))
-                    .andExpect(status().isOk());
-
-            verify(userService).findAll(null, null, false, defaultPageable);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should limit the page size to the configured maximum")
-        void shouldLimitThePageSizeToTheMaximum() throws Exception {
-            Pageable maximumPageable = PageRequest.of(
-                    0,
-                    100,
-                    Sort.by("employeeId").ascending()
-            );
-
-            when(userService.findAll(null, null, null, maximumPageable))
-                    .thenReturn(new PageImpl<>(List.of(), maximumPageable, 0));
-
-            mockMvc.perform(get(USERS_URL).param("size", "1000"))
-                    .andExpect(status().isOk());
-
-            verify(userService).findAll(null, null, null, maximumPageable);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @ValueSource(strings = {
-                "employeeId", "fullName", "username", "email", "role", "active"
-        })
-        @DisplayName("Should accept each whitelisted sort property")
-        void shouldAcceptWhitelistedSortProperties(String property) throws Exception {
-            Pageable pageable = PageRequest.of(0, 20, Sort.by(property).ascending());
-
-            when(userService.findAll(null, null, null, pageable))
-                    .thenReturn(new PageImpl<>(List.of(), pageable, 0));
-
-            mockMvc.perform(get(USERS_URL).param("sort", property + ",asc"))
-                    .andExpect(status().isOk());
-
-            verify(userService).findAll(null, null, null, pageable);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @ValueSource(strings = {
-                "id", "password", "passwordHash", "tokenVersion", "createdAt", "unknown"
-        })
-        @DisplayName("Should return 400 when sort property is outside the whitelist")
-        void shouldReturnBadRequestWhenSortPropertyIsNotWhitelisted(String property) throws Exception {
-            performErrorResponse(
-                    mockMvc.perform(get(USERS_URL).param("sort", property + ",asc")),
-                    400,
-                    ApiErrorMessages.INVALID_SORT_PROPERTY
-            );
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when any of several sort properties is not whitelisted")
-        void shouldReturnBadRequestWhenOneOfSeveralSortPropertiesIsNotWhitelisted() throws Exception {
-            performErrorResponse(
-                    mockMvc.perform(get(USERS_URL)
-                            .param("sort", "employeeId,asc")
-                            .param("sort", "passwordHash,desc")),
-                    400,
-                    ApiErrorMessages.INVALID_SORT_PROPERTY
-            );
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when role is invalid")
-        void shouldReturnBadRequestWhenRoleIsInvalid() throws Exception {
-            performErrorResponse(
-                    mockMvc.perform(get(USERS_URL).param("role", "SUPERUSER")),
-                    400,
-                    ApiErrorMessages.INVALID_REQUEST_PARAMETER
-            );
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when active is not a boolean")
-        void shouldReturnBadRequestWhenActiveIsNotABoolean() throws Exception {
-            performErrorResponse(
-                    mockMvc.perform(get(USERS_URL).param("active", "maybe")),
-                    400,
-                    ApiErrorMessages.INVALID_REQUEST_PARAMETER
-            );
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 500 when service throws an unexpected exception")
-        void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(userService.findAll(null, null, null, defaultPageable))
-                    .thenThrow(new RuntimeException());
-
-            performErrorResponse(
-                    mockMvc.perform(get(USERS_URL)),
-                    500,
-                    ApiErrorMessages.INTERNAL_SERVER_ERROR
-            );
-
-            verify(userService).findAll(null, null, null, defaultPageable);
-            verifyNoMoreInteractions(userService);
-        }
+      verify(userService).findAll(null, null, null, defaultPageable);
+      verifyNoMoreInteractions(userService);
     }
 
-    @Nested
-    @DisplayName("POST /api/v1/users")
-    class Create {
+    @Test
+    @DisplayName("Should return an empty page when there are no users")
+    void shouldReturnEmptyPageWhenThereAreNoUsers() throws Exception {
+      Page<UserSummaryResponseDto> emptyPage = new PageImpl<>(
+          List.of(),
+          defaultPageable,
+          0
+      );
 
-        @Test
-        @DisplayName("Should create user successfully")
-        void shouldCreateUserSuccessfully() throws Exception {
-            UserRequestDto request = validUserRequest();
-            UserResponseDto expected = userResponse(true);
+      when(userService.findAll(null, null, null, defaultPageable))
+          .thenReturn(emptyPage);
 
-            when(userService.create(request)).thenReturn(expected);
+      mockMvc.perform(get(USERS_URL))
+          .andExpect(status().isOk())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andExpect(jsonPath("$.content", hasSize(0)))
+          .andExpect(jsonPath("$.page.totalElements").value(0))
+          .andExpect(jsonPath("$.page.totalPages").value(0));
 
-            MvcResult result = postUser(request)
-                    .andExpect(status().isCreated())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(jsonPath("$.employeeId").value(VALID_EMPLOYEE_ID))
-                    .andExpect(jsonPath("$.fullName").value(VALID_FULL_NAME))
-                    .andExpect(jsonPath("$.id").doesNotExist())
-                    .andExpect(jsonPath("$.password").doesNotExist())
-                    .andReturn();
-
-            assertEquals(expected, readUser(result));
-
-            verify(userService).create(request);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @ValueSource(strings = {"ADMIN", "EMPLOYEE", "AUDITOR"})
-        @DisplayName("Should accept every valid role")
-        void shouldAcceptEveryValidRole(String role) throws Exception {
-            UserRequestDto request = new UserRequestDto(
-                    VALID_FULL_NAME,
-                    VALID_USERNAME,
-                    VALID_EMAIL,
-                    VALID_PASSWORD,
-                    Role.valueOf(role)
-            );
-
-            when(userService.create(request)).thenReturn(userResponse(true));
-
-            postUser(request).andExpect(status().isCreated());
-
-            verify(userService).create(request);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource(PROVIDER + "invalidUserRequests")
-        @DisplayName("Should return 400 when request body is invalid")
-        void shouldReturnBadRequestWhenRequestBodyIsInvalid(
-                String scenario,
-                UserRequestDto request,
-                String field,
-                String message
-        ) throws Exception {
-            performValidationError(postUser(request), field, message);
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when request body is missing")
-        void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
-            performMissingBody(post(USERS_URL));
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when role is not a valid value")
-        void shouldReturnBadRequestWhenRoleIsNotAValidValue() throws Exception {
-            String body = """
-                    {
-                      "fullName": "John Michael Doe",
-                      "username": "john.doe",
-                      "email": "john.doe@example.com",
-                      "password": "SecurePass123!",
-                      "role": "SUPERUSER"
-                    }
-                    """;
-
-            performErrorResponse(
-                    mockMvc.perform(post(USERS_URL)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(body)),
-                    400,
-                    ApiErrorMessages.INVALID_REQUEST_DATA
-            );
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when username already exists")
-        void shouldReturnConflictWhenUsernameAlreadyExists() throws Exception {
-            UserRequestDto request = validUserRequest();
-
-            when(userService.create(request))
-                    .thenThrow(new UsernameAlreadyExistsException(ApiErrorMessages.USERNAME_ALREADY_EXISTS));
-
-            performErrorResponse(postUser(request), 409, ApiErrorMessages.USERNAME_ALREADY_EXISTS);
-
-            verify(userService).create(request);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when email already exists")
-        void shouldReturnConflictWhenEmailAlreadyExists() throws Exception {
-            UserRequestDto request = validUserRequest();
-
-            when(userService.create(request))
-                    .thenThrow(new UserEmailAlreadyExistsException(ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS));
-
-            performErrorResponse(postUser(request), 409, ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS);
-
-            verify(userService).create(request);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 500 when service throws an unexpected exception")
-        void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            UserRequestDto request = validUserRequest();
-
-            when(userService.create(request)).thenThrow(new RuntimeException());
-
-            performErrorResponse(postUser(request), 500, ApiErrorMessages.INTERNAL_SERVER_ERROR);
-
-            verify(userService).create(request);
-            verifyNoMoreInteractions(userService);
-        }
+      verify(userService).findAll(null, null, null, defaultPageable);
+      verifyNoMoreInteractions(userService);
     }
 
-    @Nested
-    @DisplayName("PATCH /api/v1/users/{employeeId}/reactivate")
-    class Reactivate {
+    @Test
+    @DisplayName("Should apply filters, pagination and sorting parameters")
+    void shouldApplyFiltersPaginationAndSortingParameters() throws Exception {
+      Pageable pageable = PageRequest.of(
+          1,
+          5,
+          Sort.by("username").descending()
+      );
 
-        @Test
-        @DisplayName("Should reactivate user successfully")
-        void shouldReactivateUserSuccessfully() throws Exception {
-            UserResponseDto expected = userResponse(true);
+      Page<UserSummaryResponseDto> users = new PageImpl<>(
+          List.of(),
+          pageable,
+          0
+      );
 
-            when(userService.reactivate(VALID_EMPLOYEE_ID)).thenReturn(expected);
+      when(userService.findAll("jane.doe", Role.ADMIN, true, pageable))
+          .thenReturn(users);
 
-            MvcResult result = mockMvc.perform(patch(REACTIVATE_URL, VALID_EMPLOYEE_ID))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andReturn();
+      mockMvc.perform(get(USERS_URL)
+              .param("search", "jane.doe")
+              .param("role", "ADMIN")
+              .param("active", "true")
+              .param("page", "1")
+              .param("size", "5")
+              .param("sort", "username,desc"))
+          .andExpect(status().isOk())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andExpect(jsonPath("$.content", hasSize(0)))
+          .andExpect(jsonPath("$.page.number").value(1))
+          .andExpect(jsonPath("$.page.size").value(5));
 
-            assertEquals(expected, readUser(result));
-
-            verify(userService).reactivate(VALID_EMPLOYEE_ID);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when employee ID does not exist")
-        void shouldReturnNotFoundWhenEmployeeIdDoesNotExist() throws Exception {
-            when(userService.reactivate(UNKNOWN_EMPLOYEE_ID))
-                    .thenThrow(new UserNotFoundException(ApiErrorMessages.USER_NOT_FOUND));
-
-            performErrorResponse(
-                    mockMvc.perform(patch(REACTIVATE_URL, UNKNOWN_EMPLOYEE_ID)),
-                    404,
-                    ApiErrorMessages.USER_NOT_FOUND
-            );
-
-            verify(userService).reactivate(UNKNOWN_EMPLOYEE_ID);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 500 when service throws an unexpected exception")
-        void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(userService.reactivate(VALID_EMPLOYEE_ID)).thenThrow(new RuntimeException());
-
-            performErrorResponse(
-                    mockMvc.perform(patch(REACTIVATE_URL, VALID_EMPLOYEE_ID)),
-                    500,
-                    ApiErrorMessages.INTERNAL_SERVER_ERROR
-            );
-
-            verify(userService).reactivate(VALID_EMPLOYEE_ID);
-            verifyNoMoreInteractions(userService);
-        }
+      verify(userService).findAll("jane.doe", Role.ADMIN, true, pageable);
+      verifyNoMoreInteractions(userService);
     }
 
-    @Nested
-    @DisplayName("PATCH /api/v1/users/{employeeId}/deactivate")
-    class Deactivate {
+    @Test
+    @DisplayName("Should filter by inactive users")
+    void shouldFilterByInactiveUsers() throws Exception {
+      when(userService.findAll(null, null, false, defaultPageable))
+          .thenReturn(new PageImpl<>(List.of(), defaultPageable, 0));
 
-        @Test
-        @DisplayName("Should deactivate user successfully")
-        void shouldDeactivateUserSuccessfully() throws Exception {
-            UserResponseDto expected = userResponse(false);
+      mockMvc.perform(get(USERS_URL).param("active", "false"))
+          .andExpect(status().isOk());
 
-            when(userService.deactivate(VALID_EMPLOYEE_ID)).thenReturn(expected);
-
-            MvcResult result = mockMvc.perform(patch(DEACTIVATE_URL, VALID_EMPLOYEE_ID))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andReturn();
-
-            assertEquals(expected, readUser(result));
-
-            verify(userService).deactivate(VALID_EMPLOYEE_ID);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 403 when an administrator deactivates their own account")
-        void shouldReturnForbiddenWhenAdministratorDeactivatesTheirOwnAccount() throws Exception {
-            when(userService.deactivate(VALID_EMPLOYEE_ID))
-                    .thenThrow(new SelfDeactivationNotAllowedException(
-                            ApiErrorMessages.SELF_DEACTIVATION_NOT_ALLOWED
-                    ));
-
-            performErrorResponse(
-                    mockMvc.perform(patch(DEACTIVATE_URL, VALID_EMPLOYEE_ID)),
-                    403,
-                    ApiErrorMessages.SELF_DEACTIVATION_NOT_ALLOWED
-            );
-
-            verify(userService).deactivate(VALID_EMPLOYEE_ID);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when employee ID does not exist")
-        void shouldReturnNotFoundWhenEmployeeIdDoesNotExist() throws Exception {
-            when(userService.deactivate(UNKNOWN_EMPLOYEE_ID))
-                    .thenThrow(new UserNotFoundException(ApiErrorMessages.USER_NOT_FOUND));
-
-            performErrorResponse(
-                    mockMvc.perform(patch(DEACTIVATE_URL, UNKNOWN_EMPLOYEE_ID)),
-                    404,
-                    ApiErrorMessages.USER_NOT_FOUND
-            );
-
-            verify(userService).deactivate(UNKNOWN_EMPLOYEE_ID);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 409 when user is the last active administrator")
-        void shouldReturnConflictWhenUserIsTheLastActiveAdministrator() throws Exception {
-            when(userService.deactivate(VALID_EMPLOYEE_ID))
-                    .thenThrow(new LastAdminCannotBeDeactivatedException(
-                            ApiErrorMessages.LAST_ADMIN_CANNOT_BE_DEACTIVATED
-                    ));
-
-            performErrorResponse(
-                    mockMvc.perform(patch(DEACTIVATE_URL, VALID_EMPLOYEE_ID)),
-                    409,
-                    ApiErrorMessages.LAST_ADMIN_CANNOT_BE_DEACTIVATED
-            );
-
-            verify(userService).deactivate(VALID_EMPLOYEE_ID);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 500 when service throws an unexpected exception")
-        void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
-            when(userService.deactivate(VALID_EMPLOYEE_ID)).thenThrow(new RuntimeException());
-
-            performErrorResponse(
-                    mockMvc.perform(patch(DEACTIVATE_URL, VALID_EMPLOYEE_ID)),
-                    500,
-                    ApiErrorMessages.INTERNAL_SERVER_ERROR
-            );
-
-            verify(userService).deactivate(VALID_EMPLOYEE_ID);
-            verifyNoMoreInteractions(userService);
-        }
+      verify(userService).findAll(null, null, false, defaultPageable);
+      verifyNoMoreInteractions(userService);
     }
 
-    // Each scenario has exactly ONE violation: the exception handler (HashMap)
-    // stores a single message per field. Therefore, empty or blank usernames
-    // and passwords are avoided when multiple constraints would fail together.
+    @Test
+    @DisplayName("Should limit the page size to the configured maximum")
+    void shouldLimitThePageSizeToTheMaximum() throws Exception {
+      Pageable maximumPageable = PageRequest.of(
+          0,
+          100,
+          Sort.by("employeeId").ascending()
+      );
 
-    @SuppressWarnings("unused") // Used through @MethodSource (String reference).
-    static Stream<Arguments> invalidUserRequests() {
-        return Stream.of(
-                Arguments.of("full name is null",
-                        userRequest(null, VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "fullName", ValidationMessages.REQUIRED_FULL_NAME),
-                Arguments.of("full name contains numeric characters",
-                        userRequest("John Doe 123", VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "fullName", ValidationMessages.INVALID_FULL_NAME_NUMERIC),
-                Arguments.of("full name exceeds 150 characters",
-                        userRequest("A".repeat(151), VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "fullName", ValidationMessages.INVALID_FULL_NAME_LENGTH.formatted(150)),
+      when(userService.findAll(null, null, null, maximumPageable))
+          .thenReturn(new PageImpl<>(List.of(), maximumPageable, 0));
 
-                Arguments.of("username is null",
-                        userRequest(null, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "username", ValidationMessages.REQUIRED_USERNAME),
-                Arguments.of("username exceeds 20 characters",
-                        userRequest("a".repeat(21), VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "username", ValidationMessages.INVALID_USERNAME_LENGTH),
-                Arguments.of("username contains a space",
-                        userRequest("john doe", VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "username", ValidationMessages.INVALID_USERNAME_FORMAT),
-                Arguments.of("username contains an at sign",
-                        userRequest("john@doe", VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "username", ValidationMessages.INVALID_USERNAME_FORMAT),
-                Arguments.of("username is the reserved system name",
-                        userRequest("system", VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "username", ValidationMessages.RESERVED_USERNAME),
-                Arguments.of("username is the reserved name in another case",
-                        userRequest("SYSTEM", VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
-                        "username", ValidationMessages.RESERVED_USERNAME),
+      mockMvc.perform(get(USERS_URL).param("size", "1000"))
+          .andExpect(status().isOk());
 
-                Arguments.of("email is null",
-                        userRequest(VALID_USERNAME, null, VALID_PASSWORD, VALID_ROLE),
-                        "email", ValidationMessages.REQUIRED_EMAIL),
-                Arguments.of("email is empty",
-                        userRequest(VALID_USERNAME, "", VALID_PASSWORD, VALID_ROLE),
-                        "email", ValidationMessages.REQUIRED_EMAIL),
-                Arguments.of("email format is invalid",
-                        userRequest(VALID_USERNAME, "email-invalido", VALID_PASSWORD, VALID_ROLE),
-                        "email", ValidationMessages.INVALID_EMAIL),
-                Arguments.of("email exceeds 254 characters",
-                        userRequest(VALID_USERNAME, EMAIL_ABOVE_LIMIT, VALID_PASSWORD, VALID_ROLE),
-                        "email", ValidationMessages.INVALID_EMAIL_LENGTH),
-
-                Arguments.of("password is null",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, null, VALID_ROLE),
-                        "password", ValidationMessages.REQUIRED_PASSWORD),
-                Arguments.of("password has fewer than 8 characters",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, "Ab1!", VALID_ROLE),
-                        "password", ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG),
-                Arguments.of("password has more than 64 characters",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, "Aa1!" + "a".repeat(61), VALID_ROLE),
-                        "password", ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG),
-                Arguments.of("password exceeds 72 bytes within 64 characters",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, "Aa1!" + "é".repeat(35), VALID_ROLE),
-                        "password", ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH),
-                Arguments.of("password has no uppercase letter",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, "securepass123!", VALID_ROLE),
-                        "password", ValidationMessages.INVALID_PASSWORD_STRENGTH),
-                Arguments.of("password has no lowercase letter",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, "SECUREPASS123!", VALID_ROLE),
-                        "password", ValidationMessages.INVALID_PASSWORD_STRENGTH),
-                Arguments.of("password has no digit",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, "SecurePass!!!", VALID_ROLE),
-                        "password", ValidationMessages.INVALID_PASSWORD_STRENGTH),
-                Arguments.of("password has no special character",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, "SecurePass1234", VALID_ROLE),
-                        "password", ValidationMessages.INVALID_PASSWORD_STRENGTH),
-
-                Arguments.of("role is null",
-                        userRequest(VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, null),
-                        "role", ValidationMessages.REQUIRED_USER_ROLE)
-        );
+      verify(userService).findAll(null, null, null, maximumPageable);
+      verifyNoMoreInteractions(userService);
     }
 
-    private ResultActions postUser(Object request) throws Exception {
-        return mockMvc.perform(post(USERS_URL)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)));
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {
+        "employeeId", "fullName", "username", "email", "role", "active"
+    })
+    @DisplayName("Should accept each whitelisted sort property")
+    void shouldAcceptWhitelistedSortProperties(String property) throws Exception {
+      Pageable pageable = PageRequest.of(0, 20, Sort.by(property).ascending());
+
+      when(userService.findAll(null, null, null, pageable))
+          .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+      mockMvc.perform(get(USERS_URL).param("sort", property + ",asc"))
+          .andExpect(status().isOk());
+
+      verify(userService).findAll(null, null, null, pageable);
+      verifyNoMoreInteractions(userService);
     }
 
-    private void performErrorResponse(
-            ResultActions result,
-            int status,
-            String message
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {
+        "id", "password", "passwordHash", "tokenVersion", "createdAt", "unknown"
+    })
+    @DisplayName("Should return 400 when sort property is outside the whitelist")
+    void shouldReturnBadRequestWhenSortPropertyIsNotWhitelisted(
+        String property
     ) throws Exception {
-        result.andExpect(status().is(status))
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(status))
-                .andExpect(jsonPath("$.message").value(message));
+      performErrorResponse(
+          mockMvc.perform(get(USERS_URL).param("sort", property + ",asc")),
+          400,
+          ApiErrorMessages.INVALID_SORT_PROPERTY
+      );
+
+      verifyNoInteractions(userService);
     }
 
-    private void performValidationError(
-            ResultActions result,
-            String field,
-            String message
+    @Test
+    @DisplayName("Should return 400 when any of several sort properties is not whitelisted")
+    void shouldReturnBadRequestWhenOneOfSeveralSortPropertiesIsNotWhitelisted()
+        throws Exception {
+      performErrorResponse(
+          mockMvc.perform(get(USERS_URL)
+              .param("sort", "employeeId,asc")
+              .param("sort", "passwordHash,desc")),
+          400,
+          ApiErrorMessages.INVALID_SORT_PROPERTY
+      );
+
+      verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when role is invalid")
+    void shouldReturnBadRequestWhenRoleIsInvalid() throws Exception {
+      performErrorResponse(
+          mockMvc.perform(get(USERS_URL).param("role", "SUPERUSER")),
+          400,
+          ApiErrorMessages.INVALID_REQUEST_PARAMETER
+      );
+
+      verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when active is not a boolean")
+    void shouldRejectNonBooleanActiveFilter() throws Exception {
+      performErrorResponse(
+          mockMvc.perform(get(USERS_URL).param("active", "maybe")),
+          400,
+          ApiErrorMessages.INVALID_REQUEST_PARAMETER
+      );
+
+      verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 500 when service throws an unexpected exception")
+    void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
+      when(userService.findAll(null, null, null, defaultPageable))
+          .thenThrow(new RuntimeException());
+
+      performErrorResponse(
+          mockMvc.perform(get(USERS_URL)),
+          500,
+          ApiErrorMessages.INTERNAL_SERVER_ERROR
+      );
+
+      verify(userService).findAll(null, null, null, defaultPageable);
+      verifyNoMoreInteractions(userService);
+    }
+  }
+
+  @Nested
+  @DisplayName("POST /api/v1/users")
+  class Create {
+
+    @Test
+    @DisplayName("Should create user successfully")
+    void shouldCreateUserSuccessfully() throws Exception {
+      UserRequestDto request = validUserRequest();
+      UserResponseDto expected = userResponse(true);
+
+      when(userService.create(request)).thenReturn(expected);
+
+      MvcResult result = postUser(request)
+          .andExpect(status().isCreated())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andExpect(jsonPath("$.employeeId").value(VALID_EMPLOYEE_ID))
+          .andExpect(jsonPath("$.fullName").value(VALID_FULL_NAME))
+          .andExpect(jsonPath("$.id").doesNotExist())
+          .andExpect(jsonPath("$.password").doesNotExist())
+          .andReturn();
+
+      assertEquals(expected, readUser(result));
+
+      verify(userService).create(request);
+      verifyNoMoreInteractions(userService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"ADMIN", "EMPLOYEE", "AUDITOR"})
+    @DisplayName("Should accept every valid role")
+    void shouldAcceptEveryValidRole(String role) throws Exception {
+      UserRequestDto request = new UserRequestDto(
+          VALID_FULL_NAME,
+          VALID_USERNAME,
+          VALID_EMAIL,
+          VALID_PASSWORD,
+          Role.valueOf(role)
+      );
+
+      when(userService.create(request)).thenReturn(userResponse(true));
+
+      postUser(request).andExpect(status().isCreated());
+
+      verify(userService).create(request);
+      verifyNoMoreInteractions(userService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(PROVIDER + "invalidUserRequests")
+    @DisplayName("Should return 400 when request body is invalid")
+    void shouldReturnBadRequestWhenRequestBodyIsInvalid(
+        String scenario,
+        UserRequestDto request,
+        String field,
+        String message
     ) throws Exception {
-        result.andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
-                .andExpect(jsonPath("$.errors['" + field + "']").value(message));
+      performValidationError(postUser(request), field, message);
+
+      verifyNoInteractions(userService);
     }
 
-    private void performMissingBody(MockHttpServletRequestBuilder request) throws Exception {
-        performErrorResponse(
-                mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON)),
-                400,
-                ApiErrorMessages.INVALID_REQUEST_DATA
-        );
+    @Test
+    @DisplayName("Should return 400 when request body is missing")
+    void shouldReturnBadRequestWhenRequestBodyIsMissing() throws Exception {
+      performMissingBody(post(USERS_URL));
+
+      verifyNoInteractions(userService);
     }
 
-    @Nested
-    @DisplayName("PATCH /api/v1/users/{employeeId}/role")
-    class ChangeRole {
+    @Test
+    @DisplayName("Should return 400 when role is not a valid value")
+    void shouldRejectInvalidRoleValue() throws Exception {
+      String body =
+          """
+          {
+            "fullName": "John Michael Doe",
+            "username": "john.doe",
+            "email": "john.doe@example.com",
+            "password": "SecurePass123!",
+            "role": "SUPERUSER"
+          }
+          """;
 
-        private MockHttpServletRequestBuilder request(String employeeId, String body) {
-            return patch(ROLE_URL, employeeId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(body);
-        }
+      performErrorResponse(
+          mockMvc.perform(post(USERS_URL)
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body)),
+          400,
+          ApiErrorMessages.INVALID_REQUEST_DATA
+      );
 
-        private String roleBody(Role role) throws Exception {
-            return objectMapper.writeValueAsString(new UserRoleUpdateRequestDto(role));
-        }
-
-        @Test
-        @DisplayName("Should change the user's role successfully")
-        void shouldChangeRoleSuccessfully() throws Exception {
-            UserResponseDto expected = userResponse(true);
-
-            when(userService.changeRole(VALID_EMPLOYEE_ID, Role.AUDITOR)).thenReturn(expected);
-
-            MvcResult result = mockMvc.perform(request(VALID_EMPLOYEE_ID, roleBody(Role.AUDITOR)))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                    .andReturn();
-
-            assertEquals(expected, readUser(result));
-
-            verify(userService).changeRole(VALID_EMPLOYEE_ID, Role.AUDITOR);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when the role is missing")
-        void shouldReturnBadRequestWhenRoleIsMissing() throws Exception {
-            mockMvc.perform(request(VALID_EMPLOYEE_ID, "{}"))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 400 when the role is unknown")
-        void shouldReturnBadRequestWhenRoleIsUnknown() throws Exception {
-            mockMvc.perform(request(VALID_EMPLOYEE_ID, "{\"role\":\"ROOT\"}"))
-                    .andExpect(status().isBadRequest());
-
-            verifyNoInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 403 when an administrator changes their own role")
-        void shouldReturnForbiddenWhenAdministratorChangesTheirOwnRole() throws Exception {
-            when(userService.changeRole(VALID_EMPLOYEE_ID, Role.EMPLOYEE))
-                    .thenThrow(new SelfRoleChangeNotAllowedException(
-                            ApiErrorMessages.SELF_ROLE_CHANGE_NOT_ALLOWED
-                    ));
-
-            performErrorResponse(
-                    mockMvc.perform(request(VALID_EMPLOYEE_ID, roleBody(Role.EMPLOYEE))),
-                    403,
-                    ApiErrorMessages.SELF_ROLE_CHANGE_NOT_ALLOWED
-            );
-
-            verify(userService).changeRole(VALID_EMPLOYEE_ID, Role.EMPLOYEE);
-            verifyNoMoreInteractions(userService);
-        }
-
-        @Test
-        @DisplayName("Should return 404 when employee ID does not exist")
-        void shouldReturnNotFoundWhenEmployeeIdDoesNotExist() throws Exception {
-            when(userService.changeRole(UNKNOWN_EMPLOYEE_ID, Role.EMPLOYEE))
-                    .thenThrow(new UserNotFoundException(ApiErrorMessages.USER_NOT_FOUND));
-
-            performErrorResponse(
-                    mockMvc.perform(request(UNKNOWN_EMPLOYEE_ID, roleBody(Role.EMPLOYEE))),
-                    404,
-                    ApiErrorMessages.USER_NOT_FOUND
-            );
-
-            verify(userService).changeRole(UNKNOWN_EMPLOYEE_ID, Role.EMPLOYEE);
-            verifyNoMoreInteractions(userService);
-        }
+      verifyNoInteractions(userService);
     }
 
-    private UserResponseDto readUser(MvcResult result) throws Exception {
-        return objectMapper.readValue(
-                result.getResponse().getContentAsString(),
-                UserResponseDto.class
-        );
+    @Test
+    @DisplayName("Should return 409 when username already exists")
+    void shouldReturnConflictWhenUsernameAlreadyExists() throws Exception {
+      UserRequestDto request = validUserRequest();
+
+      when(userService.create(request))
+          .thenThrow(
+              new UsernameAlreadyExistsException(
+                  ApiErrorMessages.USERNAME_ALREADY_EXISTS
+              )
+          );
+
+      performErrorResponse(
+          postUser(request),
+          409,
+          ApiErrorMessages.USERNAME_ALREADY_EXISTS
+      );
+
+      verify(userService).create(request);
+      verifyNoMoreInteractions(userService);
     }
 
-    private static UserRequestDto validUserRequest() {
-        return userRequest(VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE);
+    @Test
+    @DisplayName("Should return 409 when email already exists")
+    void shouldReturnConflictWhenEmailAlreadyExists() throws Exception {
+      UserRequestDto request = validUserRequest();
+
+      when(userService.create(request))
+          .thenThrow(
+              new UserEmailAlreadyExistsException(
+                  ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
+              )
+          );
+
+      performErrorResponse(
+          postUser(request),
+          409,
+          ApiErrorMessages.USER_EMAIL_ALREADY_EXISTS
+      );
+
+      verify(userService).create(request);
+      verifyNoMoreInteractions(userService);
     }
 
-    private static UserRequestDto userRequest(
-            String username,
-            String email,
-            String password,
-            Role role
-    ) {
-        return userRequest(
-                VALID_FULL_NAME,
-                username,
-                email,
-                password,
-                role
-        );
+    @Test
+    @DisplayName("Should return 500 when service throws an unexpected exception")
+    void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
+      UserRequestDto request = validUserRequest();
+
+      when(userService.create(request)).thenThrow(new RuntimeException());
+
+      performErrorResponse(
+          postUser(request),
+          500,
+          ApiErrorMessages.INTERNAL_SERVER_ERROR
+      );
+
+      verify(userService).create(request);
+      verifyNoMoreInteractions(userService);
+    }
+  }
+
+  @Nested
+  @DisplayName("PATCH /api/v1/users/{employeeId}/reactivate")
+  class Reactivate {
+
+    @Test
+    @DisplayName("Should reactivate user successfully")
+    void shouldReactivateUserSuccessfully() throws Exception {
+      UserResponseDto expected = userResponse(true);
+
+      when(userService.reactivate(VALID_EMPLOYEE_ID)).thenReturn(expected);
+
+      MvcResult result = mockMvc.perform(patch(REACTIVATE_URL, VALID_EMPLOYEE_ID))
+          .andExpect(status().isOk())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andReturn();
+
+      assertEquals(expected, readUser(result));
+
+      verify(userService).reactivate(VALID_EMPLOYEE_ID);
+      verifyNoMoreInteractions(userService);
     }
 
-    private static UserRequestDto userRequest(
-            String fullName,
-            String username,
-            String email,
-            String password,
-            Role role
-    ) {
-        return new UserRequestDto(
-                fullName,
-                username,
-                email,
-                password,
-                role
-        );
+    @Test
+    @DisplayName("Should return 404 when employee ID does not exist")
+    void shouldReturnNotFoundWhenEmployeeIdDoesNotExist() throws Exception {
+      when(userService.reactivate(UNKNOWN_EMPLOYEE_ID))
+          .thenThrow(new UserNotFoundException(ApiErrorMessages.USER_NOT_FOUND));
+
+      performErrorResponse(
+          mockMvc.perform(patch(REACTIVATE_URL, UNKNOWN_EMPLOYEE_ID)),
+          404,
+          ApiErrorMessages.USER_NOT_FOUND
+      );
+
+      verify(userService).reactivate(UNKNOWN_EMPLOYEE_ID);
+      verifyNoMoreInteractions(userService);
     }
 
-    private static UserResponseDto userResponse(boolean active) {
-        return new UserResponseDto(
-                VALID_EMPLOYEE_ID,
-                VALID_FULL_NAME,
+    @Test
+    @DisplayName("Should return 500 when service throws an unexpected exception")
+    void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
+      when(userService.reactivate(VALID_EMPLOYEE_ID))
+          .thenThrow(new RuntimeException());
+
+      performErrorResponse(
+          mockMvc.perform(patch(REACTIVATE_URL, VALID_EMPLOYEE_ID)),
+          500,
+          ApiErrorMessages.INTERNAL_SERVER_ERROR
+      );
+
+      verify(userService).reactivate(VALID_EMPLOYEE_ID);
+      verifyNoMoreInteractions(userService);
+    }
+  }
+
+  @Nested
+  @DisplayName("PATCH /api/v1/users/{employeeId}/deactivate")
+  class Deactivate {
+
+    @Test
+    @DisplayName("Should deactivate user successfully")
+    void shouldDeactivateUserSuccessfully() throws Exception {
+      UserResponseDto expected = userResponse(false);
+
+      when(userService.deactivate(VALID_EMPLOYEE_ID)).thenReturn(expected);
+
+      MvcResult result = mockMvc.perform(patch(DEACTIVATE_URL, VALID_EMPLOYEE_ID))
+          .andExpect(status().isOk())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andReturn();
+
+      assertEquals(expected, readUser(result));
+
+      verify(userService).deactivate(VALID_EMPLOYEE_ID);
+      verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 403 when an administrator deactivates their own account")
+    void shouldReturnForbiddenWhenAdministratorDeactivatesTheirOwnAccount()
+        throws Exception {
+      when(userService.deactivate(VALID_EMPLOYEE_ID))
+          .thenThrow(
+              new SelfDeactivationNotAllowedException(
+                  ApiErrorMessages.SELF_DEACTIVATION_NOT_ALLOWED
+              )
+          );
+
+      performErrorResponse(
+          mockMvc.perform(patch(DEACTIVATE_URL, VALID_EMPLOYEE_ID)),
+          403,
+          ApiErrorMessages.SELF_DEACTIVATION_NOT_ALLOWED
+      );
+
+      verify(userService).deactivate(VALID_EMPLOYEE_ID);
+      verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when employee ID does not exist")
+    void shouldReturnNotFoundWhenEmployeeIdDoesNotExist() throws Exception {
+      when(userService.deactivate(UNKNOWN_EMPLOYEE_ID))
+          .thenThrow(new UserNotFoundException(ApiErrorMessages.USER_NOT_FOUND));
+
+      performErrorResponse(
+          mockMvc.perform(patch(DEACTIVATE_URL, UNKNOWN_EMPLOYEE_ID)),
+          404,
+          ApiErrorMessages.USER_NOT_FOUND
+      );
+
+      verify(userService).deactivate(UNKNOWN_EMPLOYEE_ID);
+      verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when user is the last active administrator")
+    void shouldReturnConflictWhenUserIsTheLastActiveAdministrator()
+        throws Exception {
+      when(userService.deactivate(VALID_EMPLOYEE_ID))
+          .thenThrow(
+              new LastAdminCannotBeDeactivatedException(
+                  ApiErrorMessages.LAST_ADMIN_CANNOT_BE_DEACTIVATED
+              )
+          );
+
+      performErrorResponse(
+          mockMvc.perform(patch(DEACTIVATE_URL, VALID_EMPLOYEE_ID)),
+          409,
+          ApiErrorMessages.LAST_ADMIN_CANNOT_BE_DEACTIVATED
+      );
+
+      verify(userService).deactivate(VALID_EMPLOYEE_ID);
+      verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 500 when service throws an unexpected exception")
+    void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
+      when(userService.deactivate(VALID_EMPLOYEE_ID))
+          .thenThrow(new RuntimeException());
+
+      performErrorResponse(
+          mockMvc.perform(patch(DEACTIVATE_URL, VALID_EMPLOYEE_ID)),
+          500,
+          ApiErrorMessages.INTERNAL_SERVER_ERROR
+      );
+
+      verify(userService).deactivate(VALID_EMPLOYEE_ID);
+      verifyNoMoreInteractions(userService);
+    }
+  }
+
+  // Each scenario has exactly ONE violation: the exception handler (HashMap)
+  // stores a single message per field. Therefore, empty or blank usernames
+  // and passwords are avoided when multiple constraints would fail together.
+
+  @SuppressWarnings("unused") // Used through @MethodSource (String reference).
+  static Stream<Arguments> invalidUserRequests() {
+    return Stream.of(
+        Arguments.of("full name is null",
+            userRequest(null, VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "fullName", ValidationMessages.REQUIRED_FULL_NAME),
+        Arguments.of("full name contains numeric characters",
+            userRequest("John Doe 123", VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "fullName", ValidationMessages.INVALID_FULL_NAME_NUMERIC),
+        Arguments.of("full name exceeds 150 characters",
+            userRequest("A".repeat(151), VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "fullName", ValidationMessages.INVALID_FULL_NAME_LENGTH.formatted(150)),
+
+        Arguments.of("username is null",
+            userRequest(null, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "username", ValidationMessages.REQUIRED_USERNAME),
+        Arguments.of("username exceeds 20 characters",
+            userRequest("a".repeat(21), VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "username", ValidationMessages.INVALID_USERNAME_LENGTH),
+        Arguments.of("username contains a space",
+            userRequest("john doe", VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "username", ValidationMessages.INVALID_USERNAME_FORMAT),
+        Arguments.of("username contains an at sign",
+            userRequest("john@doe", VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "username", ValidationMessages.INVALID_USERNAME_FORMAT),
+        Arguments.of("username is the reserved system name",
+            userRequest("system", VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "username", ValidationMessages.RESERVED_USERNAME),
+        Arguments.of("username is the reserved name in another case",
+            userRequest("SYSTEM", VALID_EMAIL, VALID_PASSWORD, VALID_ROLE),
+            "username", ValidationMessages.RESERVED_USERNAME),
+
+        Arguments.of("email is null",
+            userRequest(VALID_USERNAME, null, VALID_PASSWORD, VALID_ROLE),
+            "email", ValidationMessages.REQUIRED_EMAIL),
+        Arguments.of("email is empty",
+            userRequest(VALID_USERNAME, "", VALID_PASSWORD, VALID_ROLE),
+            "email", ValidationMessages.REQUIRED_EMAIL),
+        Arguments.of("email format is invalid",
+            userRequest(VALID_USERNAME, "email-invalido", VALID_PASSWORD, VALID_ROLE),
+            "email", ValidationMessages.INVALID_EMAIL),
+        Arguments.of("email exceeds 254 characters",
+            userRequest(VALID_USERNAME, EMAIL_ABOVE_LIMIT, VALID_PASSWORD, VALID_ROLE),
+            "email", ValidationMessages.INVALID_EMAIL_LENGTH),
+
+        Arguments.of("password is null",
+            userRequest(VALID_USERNAME, VALID_EMAIL, null, VALID_ROLE),
+            "password", ValidationMessages.REQUIRED_PASSWORD),
+        Arguments.of("password has fewer than 8 characters",
+            userRequest(VALID_USERNAME, VALID_EMAIL, "Ab1!", VALID_ROLE),
+            "password", ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG),
+        Arguments.of("password has more than 64 characters",
+            userRequest(
                 VALID_USERNAME,
                 VALID_EMAIL,
-                VALID_ROLE,
-                active,
-                CREATED_AT,
-                UPDATED_AT
-        );
+                "Aa1!" + "a".repeat(61),
+                VALID_ROLE
+            ),
+            "password", ValidationMessages.PASSWORD_TOO_SHORT_OR_LONG),
+        Arguments.of("password exceeds 72 bytes within 64 characters",
+            userRequest(
+                VALID_USERNAME,
+                VALID_EMAIL,
+                "Aa1!" + "é".repeat(35),
+                VALID_ROLE
+            ),
+            "password", ValidationMessages.PASSWORD_EXCEEDS_MAX_BYTE_LENGTH),
+        Arguments.of("password has no uppercase letter",
+            userRequest(VALID_USERNAME, VALID_EMAIL, "securepass123!", VALID_ROLE),
+            "password", ValidationMessages.INVALID_PASSWORD_STRENGTH),
+        Arguments.of("password has no lowercase letter",
+            userRequest(VALID_USERNAME, VALID_EMAIL, "SECUREPASS123!", VALID_ROLE),
+            "password", ValidationMessages.INVALID_PASSWORD_STRENGTH),
+        Arguments.of("password has no digit",
+            userRequest(VALID_USERNAME, VALID_EMAIL, "SecurePass!!!", VALID_ROLE),
+            "password", ValidationMessages.INVALID_PASSWORD_STRENGTH),
+        Arguments.of("password has no special character",
+            userRequest(VALID_USERNAME, VALID_EMAIL, "SecurePass1234", VALID_ROLE),
+            "password", ValidationMessages.INVALID_PASSWORD_STRENGTH),
+
+        Arguments.of("role is null",
+            userRequest(VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, null),
+            "role", ValidationMessages.REQUIRED_USER_ROLE)
+    );
+  }
+
+  private ResultActions postUser(Object request) throws Exception {
+    return mockMvc.perform(post(USERS_URL)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)));
+  }
+
+  private void performErrorResponse(
+      ResultActions result,
+      int status,
+      String message
+  ) throws Exception {
+    result.andExpect(status().is(status))
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(status))
+        .andExpect(jsonPath("$.message").value(message));
+  }
+
+  private void performValidationError(
+      ResultActions result,
+      String field,
+      String message
+  ) throws Exception {
+    result.andExpect(status().isBadRequest())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.message").value(ApiErrorMessages.VALIDATION_ERROR))
+        .andExpect(jsonPath("$.errors['" + field + "']").value(message));
+  }
+
+  private void performMissingBody(MockHttpServletRequestBuilder request) throws Exception {
+    performErrorResponse(
+        mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON)),
+        400,
+        ApiErrorMessages.INVALID_REQUEST_DATA
+    );
+  }
+
+  @Nested
+  @DisplayName("PATCH /api/v1/users/{employeeId}/role")
+  class ChangeRole {
+
+    private MockHttpServletRequestBuilder request(String employeeId, String body) {
+      return patch(ROLE_URL, employeeId)
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(body);
     }
+
+    private String roleBody(Role role) throws Exception {
+      return objectMapper.writeValueAsString(new UserRoleUpdateRequestDto(role));
+    }
+
+    @Test
+    @DisplayName("Should change the user's role successfully")
+    void shouldChangeRoleSuccessfully() throws Exception {
+      UserResponseDto expected = userResponse(true);
+
+      when(userService.changeRole(VALID_EMPLOYEE_ID, Role.AUDITOR))
+          .thenReturn(expected);
+
+      MvcResult result = mockMvc.perform(
+              request(VALID_EMPLOYEE_ID, roleBody(Role.AUDITOR)))
+          .andExpect(status().isOk())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andReturn();
+
+      assertEquals(expected, readUser(result));
+
+      verify(userService).changeRole(VALID_EMPLOYEE_ID, Role.AUDITOR);
+      verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when the role is missing")
+    void shouldReturnBadRequestWhenRoleIsMissing() throws Exception {
+      mockMvc.perform(request(VALID_EMPLOYEE_ID, "{}"))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 400 when the role is unknown")
+    void shouldReturnBadRequestWhenRoleIsUnknown() throws Exception {
+      mockMvc.perform(request(VALID_EMPLOYEE_ID, "{\"role\":\"ROOT\"}"))
+          .andExpect(status().isBadRequest());
+
+      verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 403 when an administrator changes their own role")
+    void shouldReturnForbiddenWhenAdministratorChangesTheirOwnRole()
+        throws Exception {
+      when(userService.changeRole(VALID_EMPLOYEE_ID, Role.EMPLOYEE))
+          .thenThrow(
+              new SelfRoleChangeNotAllowedException(
+                  ApiErrorMessages.SELF_ROLE_CHANGE_NOT_ALLOWED
+              )
+          );
+
+      performErrorResponse(
+          mockMvc.perform(request(VALID_EMPLOYEE_ID, roleBody(Role.EMPLOYEE))),
+          403,
+          ApiErrorMessages.SELF_ROLE_CHANGE_NOT_ALLOWED
+      );
+
+      verify(userService).changeRole(VALID_EMPLOYEE_ID, Role.EMPLOYEE);
+      verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when employee ID does not exist")
+    void shouldReturnNotFoundWhenEmployeeIdDoesNotExist() throws Exception {
+      when(userService.changeRole(UNKNOWN_EMPLOYEE_ID, Role.EMPLOYEE))
+          .thenThrow(new UserNotFoundException(ApiErrorMessages.USER_NOT_FOUND));
+
+      performErrorResponse(
+          mockMvc.perform(request(UNKNOWN_EMPLOYEE_ID, roleBody(Role.EMPLOYEE))),
+          404,
+          ApiErrorMessages.USER_NOT_FOUND
+      );
+
+      verify(userService).changeRole(UNKNOWN_EMPLOYEE_ID, Role.EMPLOYEE);
+      verifyNoMoreInteractions(userService);
+    }
+  }
+
+  private UserResponseDto readUser(MvcResult result) throws Exception {
+    return objectMapper.readValue(
+        result.getResponse().getContentAsString(),
+        UserResponseDto.class
+    );
+  }
+
+  private static UserRequestDto validUserRequest() {
+    return userRequest(VALID_USERNAME, VALID_EMAIL, VALID_PASSWORD, VALID_ROLE);
+  }
+
+  private static UserRequestDto userRequest(
+      String username,
+      String email,
+      String password,
+      Role role
+  ) {
+    return userRequest(
+        VALID_FULL_NAME,
+        username,
+        email,
+        password,
+        role
+    );
+  }
+
+  private static UserRequestDto userRequest(
+      String fullName,
+      String username,
+      String email,
+      String password,
+      Role role
+  ) {
+    return new UserRequestDto(
+        fullName,
+        username,
+        email,
+        password,
+        role
+    );
+  }
+
+  private static UserResponseDto userResponse(boolean active) {
+    return new UserResponseDto(
+        VALID_EMPLOYEE_ID,
+        VALID_FULL_NAME,
+        VALID_USERNAME,
+        VALID_EMAIL,
+        VALID_ROLE,
+        active,
+        CREATED_AT,
+        UPDATED_AT
+    );
+  }
 }

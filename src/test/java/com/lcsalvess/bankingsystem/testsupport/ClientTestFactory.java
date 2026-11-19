@@ -234,8 +234,7 @@ public final class ClientTestFactory {
     int sum = 0;
 
     for (int index = 0; index < length; index++) {
-      sum += Character.getNumericValue(cpf.charAt(index))
-          * (length + 1 - index);
+      sum += (cpf.charAt(index) - '0') * (length + 1 - index);
     }
 
     int remainder = sum % 11;

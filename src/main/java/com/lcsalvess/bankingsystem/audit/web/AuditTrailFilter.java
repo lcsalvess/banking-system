@@ -67,7 +67,8 @@ public class AuditTrailFilter extends OncePerRequestFilter {
       "login", "password",
       "deposits", "withdrawals", "transfers",
       "accounts", "transactions",
-      "deactivate", "reactivate", "role"
+      "deactivate", "reactivate", "role",
+      "me"
   );
 
   private static final int MAX_UNMATCHED_SEGMENTS = 4;

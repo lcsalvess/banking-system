@@ -37,12 +37,12 @@ public class SecurityConfig {
    * <p>Defines endpoint authorization rules, exception handling, stateless
    * session management, and JWT and correlation ID filter ordering.
    *
-   * @param http the HTTP security configuration
-   * @param jwtAuthenticationFilter the filter responsible for JWT authentication
-   * @param correlationIdFilter the filter responsible for request correlation IDs
+   * @param http                     the HTTP security configuration
+   * @param jwtAuthenticationFilter  the filter responsible for JWT authentication
+   * @param correlationIdFilter      the filter responsible for request correlation IDs
    * @param authenticationEntryPoint the handler for unauthenticated requests
-   * @param accessDeniedHandler the handler for unauthorized access attempts
-   * @param environment the application environment used to determine active profiles
+   * @param accessDeniedHandler      the handler for unauthorized access attempts
+   * @param environment              the application environment used to determine active profiles
    * @return the configured security filter chain
    * @throws Exception if the security filter chain cannot be configured
    */
@@ -97,6 +97,12 @@ public class SecurityConfig {
               "/actuator/metrics",
               "/actuator/metrics/**"
           ).hasRole("ADMIN");
+
+          // Current user profile: any authenticated user.
+          auth.requestMatchers(
+              HttpMethod.GET,
+              "/api/v1/users/me"
+          ).authenticated();
 
           // User management: administrators only.
           auth.requestMatchers(

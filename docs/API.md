@@ -9,6 +9,7 @@ when running with the `local` profile.
 | ------ | ------------------------------------------------------ | --------------------------------------------------- | ------------- |
 | POST   | `/api/v1/auth/login`                                   | Authenticate and receive a JWT                      | Public        |
 | PATCH  | `/api/v1/auth/password`                                | Change the password of the authenticated user       | Authenticated |
+| GET    | `/api/v1/users/me`                                     | Retrieve the authenticated user's profile           | Authenticated |
 | POST   | `/api/v1/users`                                        | Create a user                                       | `ADMIN`       |
 | GET    | `/api/v1/users`                                        | Retrieve a paginated list of users                  | `ADMIN`       |
 | PATCH  | `/api/v1/users/{employeeId}/deactivate`                | Deactivate a user account                           | `ADMIN`       |

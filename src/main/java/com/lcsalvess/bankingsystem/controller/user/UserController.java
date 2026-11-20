@@ -2,6 +2,7 @@ package com.lcsalvess.bankingsystem.controller.user;
 
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDto;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.user.CurrentUserResponseDto;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDto;
 import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDto;
 import com.lcsalvess.bankingsystem.entity.user.Role;
@@ -114,6 +115,27 @@ public class UserController {
     SortWhitelist.validate(pageable, SORTABLE_PROPERTIES);
 
     return userService.findAll(search, role, active, pageable);
+  }
+
+  /**
+   * Retrieves the profile of the currently authenticated user.
+   *
+   * @return the authenticated user's profile
+   */
+  @Operation(
+      summary = "Get current user profile",
+      description = "Retrieves the profile of the currently authenticated user."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Current user profile retrieved successfully."
+      )
+  })
+  @GetMapping("/me")
+  @PreAuthorize("isAuthenticated()")
+  public CurrentUserResponseDto getCurrentUserProfile() {
+    return userService.getCurrentUserProfile();
   }
 
   /**

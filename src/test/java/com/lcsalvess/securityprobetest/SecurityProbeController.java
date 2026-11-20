@@ -36,6 +36,12 @@ public class SecurityProbeController {
     return "admin";
   }
 
+  @GetMapping("/api/v1/users/me")
+  @PreAuthorize("isAuthenticated()")
+  public String currentUserProfile(Authentication authentication) {
+    return authentication.getName();
+  }
+
   @PostMapping("/api/v1/auth/probe")
   public String protectedAuthRoute() {
     return "auth-probe";

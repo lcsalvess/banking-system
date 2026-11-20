@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.user.CurrentUserResponseDto;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDto;
 import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDto;
 import com.lcsalvess.bankingsystem.entity.user.Role;
@@ -146,6 +147,32 @@ class UserServiceTests {
           ArgumentMatchers.<Specification<User>>any(),
           any(Pageable.class)
       );
+    }
+  }
+
+  @Nested
+  @DisplayName("When retrieving the current user's profile")
+  class GetCurrentUserProfileTests {
+
+    @Test
+    @DisplayName("Should return the authenticated user's profile")
+    void shouldReturnCurrentUserProfile() {
+      User user = createUser(Role.EMPLOYEE, true);
+
+      when(currentUserService.getCurrentUser())
+          .thenReturn(user);
+
+      CurrentUserResponseDto response = userService.getCurrentUserProfile();
+
+      assertNotNull(response);
+      assertEquals(user.getEmployeeId(), response.employeeId());
+      assertEquals(user.getUsername(), response.username());
+      assertEquals(user.getFullName(), response.fullName());
+      assertEquals(user.getEmail(), response.email());
+      assertEquals(user.getRole(), response.role());
+
+      verify(currentUserService).getCurrentUser();
+      verifyNoInteractions(userRepository);
     }
   }
 

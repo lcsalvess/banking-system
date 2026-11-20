@@ -17,6 +17,7 @@ import com.lcsalvess.bankingsystem.config.pagination.PaginationConfig;
 import com.lcsalvess.bankingsystem.controller.user.UserController;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDto;
 import com.lcsalvess.bankingsystem.dto.request.user.UserRoleUpdateRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.user.CurrentUserResponseDto;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDto;
 import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDto;
 import com.lcsalvess.bankingsystem.entity.user.Role;
@@ -69,9 +70,10 @@ public class UserControllerTests {
       "com.lcsalvess.bankingsystem.unit.controller.user.UserControllerTests#";
 
   private static final String USERS_URL = "/api/v1/users";
-  private static final String REACTIVATE_URL = "/api/v1/users/{employeeId}/reactivate";
-  private static final String DEACTIVATE_URL = "/api/v1/users/{employeeId}/deactivate";
-  private static final String ROLE_URL = "/api/v1/users/{employeeId}/role";
+  private static final String REACTIVATE_URL = USERS_URL + "/{employeeId}/reactivate";
+  private static final String DEACTIVATE_URL = USERS_URL + "/{employeeId}/deactivate";
+  private static final String ROLE_URL = USERS_URL + "/{employeeId}/role";
+  private static final String CURRENT_USER_URL = USERS_URL + "/me";
 
   private static final String VALID_EMPLOYEE_ID = "EMP-000004";
   private static final String UNKNOWN_EMPLOYEE_ID = "HR-EXT-999999";
@@ -340,6 +342,58 @@ public class UserControllerTests {
       );
 
       verify(userService).findAll(null, null, null, defaultPageable);
+      verifyNoMoreInteractions(userService);
+    }
+  }
+
+  @Nested
+  @DisplayName("GET /api/v1/users/me")
+  class GetCurrentUserProfile {
+
+    @Test
+    @DisplayName("Should return the authenticated user's profile successfully")
+    void shouldReturnCurrentUserProfileSuccessfully() throws Exception {
+      CurrentUserResponseDto expected = new CurrentUserResponseDto(
+          VALID_EMPLOYEE_ID,
+          VALID_USERNAME,
+          VALID_FULL_NAME,
+          VALID_EMAIL,
+          VALID_ROLE
+      );
+
+      when(userService.getCurrentUserProfile()).thenReturn(expected);
+
+      mockMvc.perform(get(CURRENT_USER_URL))
+          .andExpect(status().isOk())
+          .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+          .andExpect(jsonPath("$.employeeId").value(VALID_EMPLOYEE_ID))
+          .andExpect(jsonPath("$.username").value(VALID_USERNAME))
+          .andExpect(jsonPath("$.fullName").value(VALID_FULL_NAME))
+          .andExpect(jsonPath("$.email").value(VALID_EMAIL))
+          .andExpect(jsonPath("$.role").value(VALID_ROLE.name()))
+          .andExpect(jsonPath("$.active").doesNotExist())
+          .andExpect(jsonPath("$.createdAt").doesNotExist())
+          .andExpect(jsonPath("$.updatedAt").doesNotExist())
+          .andExpect(jsonPath("$.id").doesNotExist())
+          .andExpect(jsonPath("$.password").doesNotExist());
+
+      verify(userService).getCurrentUserProfile();
+      verifyNoMoreInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("Should return 500 when service throws an unexpected exception")
+    void shouldReturnInternalServerErrorWhenServiceFails() throws Exception {
+      when(userService.getCurrentUserProfile())
+          .thenThrow(new RuntimeException());
+
+      performErrorResponse(
+          mockMvc.perform(get(CURRENT_USER_URL)),
+          500,
+          ApiErrorMessages.INTERNAL_SERVER_ERROR
+      );
+
+      verify(userService).getCurrentUserProfile();
       verifyNoMoreInteractions(userService);
     }
   }

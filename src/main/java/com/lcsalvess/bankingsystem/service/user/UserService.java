@@ -1,6 +1,7 @@
 package com.lcsalvess.bankingsystem.service.user;
 
 import com.lcsalvess.bankingsystem.dto.request.user.UserRequestDto;
+import com.lcsalvess.bankingsystem.dto.response.user.CurrentUserResponseDto;
 import com.lcsalvess.bankingsystem.dto.response.user.UserResponseDto;
 import com.lcsalvess.bankingsystem.dto.response.user.UserSummaryResponseDto;
 import com.lcsalvess.bankingsystem.entity.user.Role;
@@ -92,6 +93,23 @@ public class UserService {
             PageableTieBreaker.withTieBreaker(pageable, "employeeId")
         )
         .map(this::toSummaryResponse);
+  }
+
+  /**
+   * Retrieves the profile of the currently authenticated user.
+   *
+   * @return the response containing the authenticated user's profile
+   */
+  public CurrentUserResponseDto getCurrentUserProfile() {
+    User user = currentUserService.getCurrentUser();
+
+    return new CurrentUserResponseDto(
+        user.getEmployeeId(),
+        user.getUsername(),
+        user.getFullName(),
+        user.getEmail(),
+        user.getRole()
+    );
   }
 
   /**

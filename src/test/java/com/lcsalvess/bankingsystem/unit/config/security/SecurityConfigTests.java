@@ -149,6 +149,7 @@ class SecurityConfigTests {
   private static final String ACCOUNT_TRANSACTIONS_URL =
       "/api/v1/accounts/probe/transactions";
   private static final String ADMIN_URL = "/api/v1/users/test-probe";
+  private static final String CURRENT_USER_URL = "/api/v1/users/me";
   private static final String LOGIN_URL = "/api/v1/auth/login";
   private static final String AUTH_PROBE_URL = "/api/v1/auth/probe";
   private static final String PASSWORD_URL = "/api/v1/auth/password";
@@ -631,6 +632,59 @@ class SecurityConfigTests {
           .andExpect(status().isForbidden());
 
       verify(userDetailsService).loadUserByUsername(USERNAME);
+    }
+  }
+
+  @Nested
+  @DisplayName("Current user profile authorization")
+  class CurrentUserProfileAuthorizationTests {
+
+    @ParameterizedTest(name = "Should allow {0} to access their own profile")
+    @ValueSource(strings = {
+        "ADMIN",
+        "EMPLOYEE",
+        "AUDITOR"
+    })
+    @DisplayName("Should allow every authenticated role to access the current user profile")
+    void shouldAllowEveryAuthenticatedRoleToAccessCurrentUserProfile(
+        String role
+    ) throws Exception {
+      User user = createUser(Role.valueOf(role));
+
+      when(userDetailsService.loadUserByUsername(USERNAME))
+          .thenReturn(user);
+
+      mockMvc.perform(get(CURRENT_USER_URL)
+              .header(HttpHeaders.AUTHORIZATION, bearer(user)))
+          .andExpect(status().isOk())
+          .andExpect(content().string(USERNAME));
+
+      verify(userDetailsService).loadUserByUsername(USERNAME);
+      verifyNoMoreInteractions(userDetailsService);
+    }
+
+    @Test
+    @DisplayName("Should return 401 when accessing the current user profile without a token")
+    void shouldReturn401WithoutToken() throws Exception {
+      expectUnauthorized(mockMvc.perform(get(CURRENT_USER_URL)));
+
+      verifyNoInteractions(userDetailsService);
+    }
+
+    @Test
+    @DisplayName("Should deny non-ADMIN users on other HTTP methods of the current user path")
+    void shouldDenyNonAdminOnOtherHttpMethods() throws Exception {
+      User employee = createUser(Role.EMPLOYEE);
+
+      when(userDetailsService.loadUserByUsername(USERNAME))
+          .thenReturn(employee);
+
+      mockMvc.perform(post(CURRENT_USER_URL)
+              .header(HttpHeaders.AUTHORIZATION, bearer(employee)))
+          .andExpect(status().isForbidden());
+
+      verify(userDetailsService).loadUserByUsername(USERNAME);
+      verifyNoMoreInteractions(userDetailsService);
     }
   }
 

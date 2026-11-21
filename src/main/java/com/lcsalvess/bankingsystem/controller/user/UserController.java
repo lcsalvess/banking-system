@@ -69,10 +69,10 @@ public class UserController {
       summary = "List users",
       description =
           """
-              Retrieves a paginated list of human users with optional filters.
-              Search supports employee ID, full name, username and email.
-              The default page size is 20, and the default sort order is
-              ascending by employee ID. The maximum page size is 100.
+          Retrieves a paginated list of human users with optional filters.
+          Search supports employee ID, full name, username and email.
+          The default page size is 20, and the default sort order is
+          ascending by employee ID. The maximum page size is 100.
           """
   )
   @SortableBy(

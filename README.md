@@ -19,7 +19,7 @@ The main goal is to build a realistic backend system while exploring software en
 | Technology           | Version | Description                                                                 |
 |----------------------|---------|-----------------------------------------------------------------------------|
 | Java                 | 21      | Programming language                                                        |
-| Spring Boot          | 4.1.2   | Backend framework                                                           |
+| Spring Boot          | 4.1.3   | Backend framework                                                           |
 | Spring Web MVC       | -       | REST API development                                                        |
 | Spring RestClient    | -       | HTTP communication with external APIs                                       |
 | Bean Validation      | -       | Request and parameter validation                                            |
@@ -34,7 +34,7 @@ The main goal is to build a realistic backend system while exploring software en
 | BCrypt               | -       | Password hashing                                                            |
 | PostgreSQL           | 18      | Relational database                                                         |
 | Flyway               | -       | Versioned database migrations                                               |
-| springdoc-openapi    | 3.2.0   | OpenAPI / Swagger UI documentation                                          |
+| springdoc-openapi    | 3.2.1   | OpenAPI / Swagger UI documentation                                          |
 | Maven                | -       | Dependency management and build                                             |
 | JUnit                | 6       | Unit and integration testing                                                |
 | Mockito              | 5       | Mocking for tests                                                           |

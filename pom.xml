@@ -53,7 +53,7 @@
         <flyway.version>13.12.2</flyway.version>
         <bucket4j.version>8.22.0</bucket4j.version>
         <caffeine.version>3.3.1</caffeine.version>
-        <error-prone.version>2.52.0</error-prone.version>
+        <error-prone.version>2.53.0</error-prone.version>
         <!-- Allows Maven Surefire to replace argLine during late configuration. -->
         <argLine/>
     </properties>

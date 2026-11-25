@@ -48,7 +48,7 @@
         <asm.version>9.11.1</asm.version>
         <jjwt.version>0.13.0</jjwt.version>
         <springdoc-openapi.version>3.2.1</springdoc-openapi.version>
-        <postgresql.version>42.7.14</postgresql.version>
+        <postgresql.version>42.7.15</postgresql.version>
         <checkerframework.version>4.4.0</checkerframework.version>
         <flyway.version>13.12.2</flyway.version>
         <bucket4j.version>8.22.0</bucket4j.version>

@@ -50,7 +50,7 @@
         <springdoc-openapi.version>3.2.1</springdoc-openapi.version>
         <postgresql.version>42.7.15</postgresql.version>
         <checkerframework.version>4.4.0</checkerframework.version>
-        <flyway.version>13.12.2</flyway.version>
+        <flyway.version>13.13.0</flyway.version>
         <bucket4j.version>8.22.0</bucket4j.version>
         <caffeine.version>3.3.1</caffeine.version>
         <error-prone.version>2.53.0</error-prone.version>

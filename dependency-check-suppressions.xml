@@ -6,35 +6,35 @@
 
     <suppress until="2027-01-31Z">
         <notes><![CDATA[
-            False positive reported by Sonatype OSS Index for Spring Security 7.1.3.
+            False positive reported by Dependency-Check for Spring Security 7.2.0.
 
-            The official Spring advisory identifies Spring Security 7.1.0
-            as affected. The vulnerability was fixed in version 7.1.1.
-            Spring Security 7.1.3 includes the fix.
+            CVE-2026-47842 affects Spring Security 7.1.0 and earlier
+            affected release lines; the official advisory lists 7.1.1
+            as the fixed version. Spring Security 7.2.0 is not affected.
 
             Advisory: https://spring.io/security/cve-2026-47842
 
             Re-evaluate when updating the resolved dependency version
-            or when Sonatype corrects its vulnerability metadata.
+            or when vulnerability metadata is corrected.
         ]]></notes>
-        <packageUrl>pkg:maven/org.springframework.security/spring-security-crypto@7.1.3</packageUrl>
+        <packageUrl>pkg:maven/org.springframework.security/spring-security-crypto@7.2.0</packageUrl>
         <cve>CVE-2026-47842</cve>
     </suppress>
 
     <suppress until="2027-01-31Z">
         <notes><![CDATA[
-            False positive reported by Sonatype OSS Index for Spring Security 7.1.3.
+            False positive reported by Dependency-Check for Spring Security 7.2.0.
 
-            The official Spring advisory lists affected versions in the
+            The official advisory lists affected versions in the
             5.7, 5.8, 6.3, 6.4 and 6.5 release lines.
-            Spring Security 7.1.3 is not listed as affected.
+            Spring Security 7.2.0 is not listed as affected.
 
             Advisory: https://spring.io/security/cve-2026-47838
 
             Re-evaluate when updating the resolved dependency version
-            or when Sonatype corrects its vulnerability metadata.
+            or when vulnerability metadata is corrected.
         ]]></notes>
-        <packageUrl>pkg:maven/org.springframework.security/spring-security-web@7.1.3</packageUrl>
+        <packageUrl>pkg:maven/org.springframework.security/spring-security-web@7.2.0</packageUrl>
         <cve>CVE-2026-47838</cve>
     </suppress>
 

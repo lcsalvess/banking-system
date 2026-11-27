@@ -19,7 +19,7 @@ The main goal is to build a realistic backend system while exploring software en
 | Technology           | Version | Description                                                                 |
 |----------------------|---------|-----------------------------------------------------------------------------|
 | Java                 | 21      | Programming language                                                        |
-| Spring Boot          | 4.1.3   | Backend framework                                                           |
+| Spring Boot          | 4.2.0   | Backend framework                                                           |
 | Spring Web MVC       | -       | REST API development                                                        |
 | Spring RestClient    | -       | HTTP communication with external APIs                                       |
 | Bean Validation      | -       | Request and parameter validation                                            |
